@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import type { ApiResponse } from '../../types/index.js';
+import type { ApiResponse } from '../types/index.js';
 
 export function createResponseMiddleware() {
   return (_req: Request, res: Response, next: NextFunction) => {

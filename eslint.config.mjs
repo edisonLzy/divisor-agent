@@ -12,6 +12,13 @@ const gitignorePath = fileURLToPath(new URL('./.gitignore', import.meta.url));
 export default [
   includeIgnoreFile(gitignorePath),
   {
+    ignores: [
+      '**/src-tauri/**',
+      '!**/src/**',
+      '!**/src/**/*.{js,ts}',
+    ],
+  },
+  {
     rules: {
       ...js.configs.recommended.rules,
       'object-shorthand': ['error', 'always'],

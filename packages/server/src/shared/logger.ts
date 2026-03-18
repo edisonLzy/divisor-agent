@@ -38,14 +38,14 @@ export function createLogger(serviceName: string) {
 
     transport: isDev
       ? {
-          target: 'pino-pretty',
-          options: {
-            colorize: true,
-            translateTime: 'SYS:standard',
-            ignore: 'pid,hostname',
-            messageFormat: `[${serviceName}] {msg}`,
-          },
-        }
+        target: 'pino-pretty',
+        options: {
+          colorize: true,
+          translateTime: 'SYS:standard',
+          ignore: 'pid,hostname',
+          messageFormat: `[${serviceName}] {msg}`,
+        },
+      }
       : undefined,
 
     base: {
