@@ -70,6 +70,7 @@ packages/
 - **Server imports**: Always include `.js` extension for local TypeScript imports (ESM requirement)
 - **Type imports**: Use `import type { ... }` for pure type imports
 - **Catalog**: Shared dependency versions managed via `pnpm-workspace.yaml` `catalog` block — do not pin versions in individual `package.json` for shared deps
+- **Dependencies**: 严格按需引入依赖。严禁安装当前未使用的依赖（例如：在使用 TipTap 时，仅在真正用到某个特定插件时才进行安装，未使用到的插件绝对不要提前引入或安装）。
 - **Testing**: Root `vitest.config.ts` uses workspace mode; each package has its own `vitest.config.ts`
 - **Production build**: Server uses `packages/server/tsconfig.build.json` (excludes tests)
 

@@ -74,6 +74,7 @@ pnpm lint             # eslint .
 - **lint-staged**：仅覆盖 `*.{js,ts}`，`.tsx/.jsx` 不会在提交时自动修复，需手动 lint。
 - **Commitlint**：conventional commits（`feat:`, `fix:` 等），header/body 长度不限制。
 - **pnpm catalog**：共享依赖版本在 `pnpm-workspace.yaml` 中以 `catalog:` 声明，新增共享依赖应优先查阅 catalog。
+- **依赖引用原则（严格按需）**：严禁引入当前项目暂未使用的依赖库（例如在使用 TipTap 插件时，未实际编码用到该插件时，绝对不可提前安装或引入）。
 - **测试环境变量**：vitest 根配置注入 `JWT_SECRET`（≥32 字符），server 测试依赖此变量。
 
 ---
