@@ -3,16 +3,16 @@ import { WebSocket } from 'ws';
 import { Agent } from '@mariozechner/pi-agent-core';
 import { getModel } from '@mariozechner/pi-ai';
 import { Type } from '@sinclair/typebox';
-import { createLogger } from '../shared/logger.js';
+import { createLogger } from '../../shared/logger.js';
 import {
   createSession,
   appendMessage,
   forkSession,
   getSessionHistory,
-} from '../domain/sessions/session-repository.js';
+} from '../sessions/session-repository.js';
 import type { AgentTool } from '@mariozechner/pi-agent-core';
 import type { AssistantMessageEvent } from '@mariozechner/pi-ai';
-import type { HistoryMessage, MessageBlock } from '../types/session.js';
+import type { HistoryMessage, MessageBlock } from '../../types/session.js';
 
 const logger = createLogger('acp-handler');
 
