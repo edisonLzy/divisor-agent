@@ -1,5 +1,5 @@
-import { router, publicProcedure } from '../trpc.js';
-import type { AppSettings } from '../types/session.js';
+import { router, publicProcedure } from '../../trpc.js';
+import type { AppSettings } from '../../types/session.js';
 
 const DEFAULT_SETTINGS: AppSettings = {
   model: {

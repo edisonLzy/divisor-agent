@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { WebSocketServer } from 'ws';
 import { createApp } from './app.js';
 import { getPort } from './config/env.js';
-import { handleAcpMessage } from './acp/acp-handler.js';
+import { handleAcpMessage } from './domain/acp/acp-handler.js';
 import { createLogger } from './shared/logger.js';
 
 const logger = createLogger('server');

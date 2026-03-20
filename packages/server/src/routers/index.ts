@@ -1,6 +1,6 @@
 import { router } from '../trpc.js';
-import { sessionsRouter } from './sessions.js';
-import { settingsRouter } from './settings.js';
+import { sessionsRouter } from '../domain/sessions/sessions.router.js';
+import { settingsRouter } from '../domain/settings/settings.router.js';
 
 export const appRouter = router({
   sessions: sessionsRouter,
