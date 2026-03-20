@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createResponseMiddleware } from '../../middlewares/response.js';
+import { createResponseMiddleware } from '../middlewares/response.js';
 import type { Request, Response } from 'express';
 
 describe('createResponseMiddleware', () => {
