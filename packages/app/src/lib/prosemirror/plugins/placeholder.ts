@@ -1,7 +1,7 @@
 import { Plugin, PluginKey } from 'prosemirror-state';
 import { Decoration, DecorationSet } from 'prosemirror-view';
-import type { EditorView } from 'prosemirror-view';
 import { isEmptyNode } from '../utils.js';
+import type { EditorView } from 'prosemirror-view';
 import type { PluginCreator } from '../types.js';
 
 const placeholderPluginKey = new PluginKey('placeholder');
