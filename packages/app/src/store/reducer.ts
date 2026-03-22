@@ -1,4 +1,6 @@
-import type { SessionNode, HistoryMessage } from '@divisor-agent/server';
+import type { SessionNode, HistoryMessage, ModelInfo } from '@divisor-agent/server';
+
+export type { ModelInfo };
 
 export interface AgentMessageChunk {
   type: 'text_delta' | 'thinking_delta';
@@ -24,6 +26,12 @@ export interface AppState {
   messages: Map<string, HistoryMessage[]>;
   streaming: StreamingState | null;
   pendingApproval: ApprovalRequest | null;
+  /** Models fetched from the server (built-in + custom from models.json) */
+  availableModels: ModelInfo[];
+  /** The model chosen for the next session (or model selector default) */
+  selectedModel: ModelInfo | null;
+  /** Per-session model override, keyed by sessionId */
+  sessionModels: Map<string, ModelInfo>;
 }
 
 export type AppAction =
@@ -35,7 +43,10 @@ export type AppAction =
   | { type: 'STREAMING_CHUNK'; chunk: AgentMessageChunk }
   | { type: 'STREAMING_DONE'; sessionId: string }
   | { type: 'SET_PENDING_APPROVAL'; request: ApprovalRequest }
-  | { type: 'CLEAR_PENDING_APPROVAL' };
+  | { type: 'CLEAR_PENDING_APPROVAL' }
+  | { type: 'SET_AVAILABLE_MODELS'; models: ModelInfo[] }
+  | { type: 'SET_SELECTED_MODEL'; model: ModelInfo }
+  | { type: 'SET_SESSION_MODEL'; sessionId: string; model: ModelInfo };
 
 export const initialState: AppState = {
   sessions: [],
@@ -43,6 +54,9 @@ export const initialState: AppState = {
   messages: new Map(),
   streaming: null,
   pendingApproval: null,
+  availableModels: [],
+  selectedModel: null,
+  sessionModels: new Map(),
 };
 
 export function appReducer(state: AppState, action: AppAction): AppState {
@@ -100,6 +114,18 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 
     case 'CLEAR_PENDING_APPROVAL':
       return { ...state, pendingApproval: null };
+
+    case 'SET_AVAILABLE_MODELS':
+      return { ...state, availableModels: action.models };
+
+    case 'SET_SELECTED_MODEL':
+      return { ...state, selectedModel: action.model };
+
+    case 'SET_SESSION_MODEL': {
+      const sessionModels = new Map(state.sessionModels);
+      sessionModels.set(action.sessionId, action.model);
+      return { ...state, sessionModels };
+    }
 
     default:
       return state;

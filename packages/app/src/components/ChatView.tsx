@@ -74,6 +74,7 @@ export default function ChatView() {
   const { state, dispatch } = useAppState();
   const { activeSessionId, messages, streaming } = state;
   const bottomRef = useRef<HTMLDivElement>(null);
+  const utils = trpc.useUtils();
 
   const sessionMessages = activeSessionId ? (messages.get(activeSessionId) ?? []) : [];
 
@@ -92,26 +93,23 @@ export default function ChatView() {
   // Listen to streaming events from Rust
   useEffect(() => {
     const unlisten = listen<AgentChunkPayload>('agent_message_chunk', (event) => {
-      const { type, delta, chunkIndex, sessionId } = event.payload;
-      if (!state.streaming) {
-        dispatch({ type: 'STREAMING_START', sessionId });
-      }
+      const { type, delta, chunkIndex } = event.payload;
       dispatch({ type: 'STREAMING_CHUNK', chunk: { type, delta, chunkIndex } });
     });
 
     const unlistenDone = listen<{ sessionId: string }>('agent_message_done', (event) => {
-      dispatch({ type: 'STREAMING_DONE', sessionId: event.payload.sessionId });
-      // Reload history to get the persisted message
-      if (activeSessionId) {
-        // trpc utils invalidation happens in InputBar after send
-      }
+      const { sessionId } = event.payload;
+      dispatch({ type: 'STREAMING_DONE', sessionId });
+      // Reload history now that server has persisted both messages
+      utils.sessions.history.invalidate({ id: sessionId });
+      utils.sessions.list.invalidate();
     });
 
     return () => {
       unlisten.then(fn => fn());
       unlistenDone.then(fn => fn());
     };
-  }, [state.streaming, activeSessionId, dispatch]);
+  }, [activeSessionId, dispatch]);
 
   // Auto-scroll to bottom
   useEffect(() => {

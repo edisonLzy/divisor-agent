@@ -230,20 +230,32 @@ async fn handle_terminal_exec(tx: WsSender, msg: AcpMessage) {
     });
 }
 
-// ── Tauri commands ────────────────────────────────────────────────────────
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ModelPayload {
+    provider_id: String,
+    model_id: String,
+}
+
+// ── Tauri commands ────────────────────────────────────────────
 
 #[tauri::command]
 async fn session_start(
     session_id: String,
+    model: Option<ModelPayload>,
     app: AppHandle,
     acp: State<'_, SharedAcpState>,
 ) -> Result<(), String> {
     let tx = ensure_connected(app, Arc::clone(&acp)).await?;
+    let model_value = match model {
+        Some(m) => json!({ "providerId": m.provider_id, "modelId": m.model_id }),
+        None => Value::Null,
+    };
     send_acp(&tx, AcpMessage {
         msg_type: "session/start".to_string(),
         session_id,
         message_id: None,
-        payload: json!({}),
+        payload: json!({ "model": model_value }),
     });
     Ok(())
 }

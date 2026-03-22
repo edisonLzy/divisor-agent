@@ -7,7 +7,7 @@
     "dev": "pnpm -r --parallel --if-present dev",
     "build": "pnpm -r --parallel --if-present build",
     "dev:server": "pnpm --filter @divisor-agent/server dev",
-    "dev:app": "pnpm --filter @divisor-agent/app dev",
+    "dev:app": "pnpm --filter @divisor-agent/app tauri dev",
     "type-check": "pnpm -r type-check",
     "test": "vitest",
     "lint": "eslint .",
@@ -37,6 +37,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.91.3",
     "@tiptap/extension-mention": "^3.20.4",
+    "@tiptap/extension-placeholder": "^3.20.4",
     "@tiptap/pm": "^3.20.4",
     "@tiptap/react": "^3.20.4",
     "@tiptap/starter-kit": "^3.20.4",
