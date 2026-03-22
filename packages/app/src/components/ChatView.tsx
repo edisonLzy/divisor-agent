@@ -3,7 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { trpc } from '../lib/trpc';
 import { useAppState } from '../store/context';
 import { renderBlock } from './MessageBlocks';
-import type { HistoryMessage, MessageBlock } from '@divisor-agent/server';
+import type { HistoryMessage, MessageBlock } from '../types/index';
 
 interface AgentChunkPayload {
   type: 'text_delta' | 'thinking_delta';

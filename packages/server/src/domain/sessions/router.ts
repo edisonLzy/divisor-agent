@@ -1,12 +1,12 @@
 import { z } from 'zod/v4';
 import { TRPCError } from '@trpc/server';
-import { router, publicProcedure } from '../trpc.js';
+import { router, publicProcedure } from '../../shared/trpc.js';
 import {
   listSessions,
   getSessionHistory,
   renameSession,
   deleteSession,
-} from '../domain/sessions/session-repository.js';
+} from './service.js';
 
 export const sessionsRouter = router({
   list: publicProcedure.query(async () => {

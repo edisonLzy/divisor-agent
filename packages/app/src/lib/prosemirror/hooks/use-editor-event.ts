@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import type { EditorView } from 'prosemirror-view';
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 function useEffectEvent<T extends (...args: any[]) => any>(callback: T): T {
   const ref = useRef<T>(callback);
 
   useLayoutEffect(() => {
     ref.current = callback;
   });
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   return useCallback((...args: any[]) => ref.current(...args), []) as T;
 }
 
@@ -19,6 +17,7 @@ interface CustomEditorEvents {
 }
 
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   interface HTMLElementEventMap extends CustomEditorEvents {}
 }
 

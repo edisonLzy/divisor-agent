@@ -1,4 +1,4 @@
-import type { SessionNode, HistoryMessage, ModelInfo } from '@divisor-agent/server';
+import type { SessionNode, HistoryMessage, ModelInfo } from '../types/index';
 
 export type { ModelInfo };
 

@@ -3,22 +3,23 @@ import { WebSocket } from 'ws';
 import { Agent } from '@mariozechner/pi-agent-core';
 import { getModel } from '@mariozechner/pi-ai';
 import { Type } from '@sinclair/typebox';
-import { createLogger } from '../shared/logger.js';
+import { createLogger } from '../../shared/logger.js';
 import {
   createSession,
   appendMessage,
   forkSession,
   getSessionHistory,
-} from '../domain/sessions/session-repository.js';
+} from '../sessions/service.js';
+import { resolveCustomModelConfig } from '../models/service.js';
 import type { AgentTool } from '@mariozechner/pi-agent-core';
-import type { AssistantMessageEvent } from '@mariozechner/pi-ai';
-import type { HistoryMessage, MessageBlock } from '../types/session.js';
+import type { AssistantMessageEvent, Model } from '@mariozechner/pi-ai';
+import type { HistoryMessage, MessageBlock } from '../sessions/types.js';
 
-const logger = createLogger('acp-handler');
+const logger = createLogger('agent');
 
 // ── ACP message structures ──────────────────────────────────────────────────
 
-interface AcpMessage {
+export interface AcpMessage {
   type: string;
   sessionId: string;
   messageId?: string;
@@ -162,59 +163,69 @@ function buildTools(sessionId: string): AgentTool[] {
   ];
 }
 
-// ── Main handler ────────────────────────────────────────────────────────────
+// ── Model resolution ─────────────────────────────────────────────────────────
 
-export async function handleAcpMessage(ws: WebSocket, raw: string): Promise<void> {
-  let msg: AcpMessage;
-  try {
-    msg = JSON.parse(raw) as AcpMessage;
-  } catch {
-    logger.warn('Invalid ACP JSON received');
-    return;
+interface ResolvedModel {
+  instance: Model<string>;
+  getApiKey?: (provider: string) => string | undefined;
+}
+
+async function resolveSessionModel(
+  payload: Record<string, unknown>,
+): Promise<ResolvedModel> {
+  const modelPayload = payload.model as
+    | { providerId: string; modelId: string }
+    | undefined;
+
+  if (!modelPayload?.providerId || !modelPayload?.modelId) {
+    return { instance: getModel('anthropic', 'claude-sonnet-4-20250514') };
   }
 
-  const { type, sessionId, messageId, payload } = msg;
+  const { providerId, modelId } = modelPayload;
 
-  logger.info({ type, sessionId }, 'ACP message received');
-
-  switch (type) {
-    case 'session/start': {
-      await handleSessionStart(ws, sessionId, payload);
-      break;
-    }
-    case 'session/prompt': {
-      await handleSessionPrompt(ws, sessionId, payload);
-      break;
-    }
-    case 'session/fork': {
-      await handleSessionFork(ws, sessionId, payload);
-      break;
-    }
-    case 'tool/result': {
-      handleToolResult(sessionId, messageId, payload, false);
-      break;
-    }
-    case 'tool/error': {
-      handleToolResult(sessionId, messageId, payload, true);
-      break;
-    }
-    case 'permission/approve': {
-      handlePermissionDecision(sessionId, payload, true);
-      break;
-    }
-    case 'permission/reject': {
-      handlePermissionDecision(sessionId, payload, false);
-      break;
-    }
-    default: {
-      logger.warn({ type }, 'Unknown ACP message type');
+  // Built-in providers: delegate to getModel
+  const BUILT_IN_PROVIDERS = ['anthropic', 'openai', 'google', 'openrouter', 'xai', 'groq', 'mistral', 'minimax', 'minimax-cn'];
+  if (BUILT_IN_PROVIDERS.includes(providerId)) {
+    try {
+       
+      return { instance: getModel(providerId as any, modelId as any) };
+    } catch {
+      logger.warn({ providerId, modelId }, 'Built-in model not found, using default');
+      return { instance: getModel('anthropic', 'claude-sonnet-4-20250514') };
     }
   }
+
+  // Custom provider: resolve via models.json
+  const customConfig = await resolveCustomModelConfig(providerId, modelId);
+  if (!customConfig) {
+    logger.warn({ providerId, modelId }, 'Custom model config not found, using default');
+    return { instance: getModel('anthropic', 'claude-sonnet-4-20250514') };
+  }
+
+  const customModel: Model<string> = {
+    id: modelId,
+    name: modelId,
+    api: customConfig.api,
+    provider: providerId,
+    baseUrl: customConfig.baseUrl,
+    reasoning: false,
+    input: ['text'],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 200000,
+    maxTokens: 8192,
+  };
+
+  const { apiKey } = customConfig;
+
+  return {
+    instance: customModel,
+    getApiKey: () => apiKey,
+  };
 }
 
 // ── Handlers ───────────────────────────────────────────────────────────────
 
-async function handleSessionStart(
+export async function handleSessionStart(
   ws: WebSocket,
   sessionId: string,
   payload: Record<string, unknown>,
@@ -233,12 +244,17 @@ async function handleSessionStart(
     // Session may already exist on disk
   }
 
+  const model = await resolveSessionModel(payload);
+
+  logger.info({ sessionId, modelId: model.instance.id }, 'Session model resolved');
+
   const agent = new Agent({
     initialState: {
       systemPrompt:
         'You are a helpful AI coding assistant. You have access to the local file system and terminal via tools. Always ask for clarification if needed.',
-      model: getModel('anthropic', 'claude-sonnet-4-20250514'),
+      model: model.instance,
     },
+    getApiKey: model.getApiKey,
   });
 
   const state: SessionState = {
@@ -276,7 +292,7 @@ async function handleSessionStart(
   sendMessage(ws, { type: 'session/started', sessionId, payload: { sessionId } });
 }
 
-async function handleSessionPrompt(
+export async function handleSessionPrompt(
   ws: WebSocket,
   sessionId: string,
   payload: Record<string, unknown>,
@@ -388,7 +404,7 @@ async function handleSessionPrompt(
   }
 }
 
-async function handleSessionFork(
+export async function handleSessionFork(
   ws: WebSocket,
   sessionId: string,
   payload: Record<string, unknown>,
@@ -412,7 +428,7 @@ async function handleSessionFork(
   }
 }
 
-function handleToolResult(
+export function handleToolResult(
   sessionId: string,
   toolCallId: string | undefined,
   payload: Record<string, unknown>,
@@ -439,7 +455,7 @@ function handleToolResult(
   }
 }
 
-function handlePermissionDecision(
+export function handlePermissionDecision(
   sessionId: string,
   payload: Record<string, unknown>,
   approved: boolean,

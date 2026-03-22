@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { trpc } from '../lib/trpc';
 import { useAppState } from '../store/context';
-import type { SessionNode } from '@divisor-agent/server';
+import type { SessionNode } from '../types/index';
 
 interface SessionNodeItemProps {
   node: SessionNode;

@@ -1,6 +1,15 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createResponseMiddleware } from '../middlewares/response.js';
+import { createResponseMiddleware } from '../src/middlewares/response.js';
 import type { Request, Response } from 'express';
+ 
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Response {
+      success<T>(data: T, code?: number, statusCode?: number): void;
+    }
+  }
+}
 
 describe('createResponseMiddleware', () => {
   it('should attach success method to response', () => {

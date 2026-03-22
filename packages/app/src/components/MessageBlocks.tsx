@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { MessageBlock } from '@divisor-agent/server';
+import type { MessageBlock } from '../types/index';
 
 // ── Block renderers ──────────────────────────────────────────────────────────
 

@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "description": "Express + TypeScript server for divisor-agent",
   "type": "module",
+  "exports": {
+    "./router": {
+      "types": "./src/expose.ts"
+    }
+  },
   "scripts": {
     "dev": "tsx --watch src/index.ts",
     "build": "tsc -p tsconfig.build.json",

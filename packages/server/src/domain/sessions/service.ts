@@ -3,7 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { createLogger } from '../../shared/logger.js';
-import type { SessionMap, SessionNode, HistoryMessage, HistoryResponse } from '../../types/session.js';
+import type { SessionMap, SessionNode, HistoryMessage, HistoryResponse } from './types.js';
 
 const logger = createLogger('session-repository');
 const BASE_DIR = path.join(os.homedir(), '.pi-agent');
