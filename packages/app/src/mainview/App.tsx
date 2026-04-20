@@ -1,115 +1,209 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { SessionTree } from './components/SessionTree';
+import { ChatView } from './components/ChatView';
+import { InputBar } from './components/InputBar';
+import { ApprovalDialog } from './components/ApprovalDialog';
+import { trpc } from './lib/trpc';
+import { permissionApprove, permissionReject, sessionPrompt, subscribeRuntimeEvent } from './lib/runtime';
+import { useAppDispatch, useAppState } from './store/app-state';
+import type { HistoryMessage } from './types/message';
+import type { SessionNode } from './types/session';
 
-function App() {
-  const [count, setCount] = useState(0);
+function flattenSessionTree(nodes: SessionNode[]): SessionNode[] {
+  return nodes.flatMap((node) => [node, ...(node.children ? flattenSessionTree(node.children) : [])]);
+}
+
+function createUserMessage(sessionId: string, content: string): HistoryMessage {
+  return {
+    id: `local-user-${crypto.randomUUID()}`,
+    sessionId,
+    role: 'user',
+    blocks: [{ type: 'text', content }],
+    timestamp: Date.now(),
+  };
+}
+
+export default function App() {
+  const appState = useAppState();
+  const dispatch = useAppDispatch();
+  const trpcUtils = trpc.useUtils();
+  const [localMessagesBySession, setLocalMessagesBySession] = useState<Record<string, HistoryMessage[]>>({});
+
+  const sessionsQuery = trpc.sessions.list.useQuery(undefined, {
+    refetchInterval: 10000,
+  });
+  const modelsQuery = trpc.models.list.useQuery();
+  const renameMutation = trpc.sessions.rename.useMutation();
+  const deleteMutation = trpc.sessions.delete.useMutation();
+  const forkMutation = trpc.sessions.fork.useMutation();
+  const historyQuery = trpc.sessions.history.useQuery(
+    { id: appState.activeSessionId ?? '' },
+    { enabled: Boolean(appState.activeSessionId) },
+  );
+
+  const selectedModel = modelsQuery.data?.[0];
+
+  useEffect(() => {
+    if (appState.activeSessionId || !sessionsQuery.data || sessionsQuery.data.length === 0) {
+      return;
+    }
+
+    const firstNode = flattenSessionTree(sessionsQuery.data)[0];
+    if (firstNode) {
+      dispatch({ type: 'set_active_session', sessionId: firstNode.id });
+    }
+  }, [appState.activeSessionId, dispatch, sessionsQuery.data]);
+
+  useEffect(() => {
+    const unsubscribeChunk = subscribeRuntimeEvent('agentMessageChunk', (payload) => {
+      setLocalMessagesBySession((prev) => {
+        const current = prev[payload.sessionId] ?? [];
+        const streamMessageId = `local-stream-${payload.sessionId}`;
+        const existingIndex = current.findIndex((msg) => msg.id === streamMessageId);
+        const next = [...current];
+
+        if (existingIndex === -1) {
+          next.push({
+            id: streamMessageId,
+            sessionId: payload.sessionId,
+            role: 'assistant',
+            blocks: [{ type: payload.type, content: payload.delta }],
+            timestamp: Date.now(),
+          });
+        } else {
+          const message = next[existingIndex];
+          const targetIndex = message.blocks.findIndex((block) => block.type === payload.type);
+          if (targetIndex === -1) {
+            message.blocks.push({ type: payload.type, content: payload.delta });
+          } else {
+            message.blocks[targetIndex] = {
+              ...message.blocks[targetIndex],
+              content: message.blocks[targetIndex].content + payload.delta,
+            };
+          }
+        }
+
+        return {
+          ...prev,
+          [payload.sessionId]: next,
+        };
+      });
+
+      dispatch({ type: 'set_streaming', sessionId: payload.sessionId, isStreaming: true });
+    });
+    const unsubscribeDone = subscribeRuntimeEvent('agentMessageDone', async (payload) => {
+      dispatch({ type: 'set_streaming', sessionId: payload.sessionId, isStreaming: false });
+      await trpcUtils.sessions.history.invalidate({ id: payload.sessionId });
+    });
+    const unsubscribeApproval = subscribeRuntimeEvent('sessionRequestPermission', (payload) => {
+      dispatch({ type: 'set_pending_approval', approval: payload });
+    });
+
+    return () => {
+      unsubscribeChunk();
+      unsubscribeDone();
+      unsubscribeApproval();
+    };
+  }, [dispatch, trpcUtils.sessions.history]);
+
+  const visibleMessages = useMemo(() => {
+    const remoteMessages = historyQuery.data?.messages ?? [];
+    const localMessages = appState.activeSessionId
+      ? (localMessagesBySession[appState.activeSessionId] ?? [])
+      : [];
+
+    return [...remoteMessages, ...localMessages].sort((a, b) => a.timestamp - b.timestamp);
+  }, [appState.activeSessionId, historyQuery.data?.messages, localMessagesBySession]);
+
+  const handleRename = async (node: SessionNode) => {
+    const name = window.prompt('请输入新的会话名称', node.name)?.trim();
+    if (!name || name === node.name) {
+      return;
+    }
+
+    await renameMutation.mutateAsync({ id: node.id, name });
+    await trpcUtils.sessions.list.invalidate();
+  };
+
+  const handleDelete = async (node: SessionNode) => {
+    const confirmed = window.confirm(`确认删除会话「${node.name}」吗？`);
+    if (!confirmed) {
+      return;
+    }
+
+    await deleteMutation.mutateAsync({ id: node.id });
+    await trpcUtils.sessions.list.invalidate();
+    if (appState.activeSessionId === node.id) {
+      dispatch({ type: 'set_active_session', sessionId: null });
+    }
+  };
+
+  const handleFork = async (node: SessionNode) => {
+    const result = await forkMutation.mutateAsync({ id: node.id });
+    await trpcUtils.sessions.list.invalidate();
+    dispatch({ type: 'set_active_session', sessionId: result.newSessionId });
+  };
+
+  const handleSend = async (content: string) => {
+    const activeSessionId = appState.activeSessionId;
+    if (!activeSessionId) {
+      return;
+    }
+
+    setLocalMessagesBySession((prev) => ({
+      ...prev,
+      [activeSessionId]: [...(prev[activeSessionId] ?? []), createUserMessage(activeSessionId, content)],
+    }));
+
+    await sessionPrompt({
+      sessionId: activeSessionId,
+      content,
+      model: selectedModel
+        ? {
+            providerId: selectedModel.providerId,
+            modelId: selectedModel.modelId,
+          }
+        : undefined,
+    });
+  };
+
+  const handleApprove = async (requestId: string) => {
+    await permissionApprove(requestId);
+    dispatch({ type: 'set_pending_approval', approval: null });
+  };
+
+  const handleReject = async (requestId: string) => {
+    await permissionReject(requestId);
+    dispatch({ type: 'set_pending_approval', approval: null });
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-500 to-purple-600 text-gray-900">
-      <div className="container mx-auto px-4 py-10 max-w-3xl">
-        <h1 className="text-5xl font-bold text-center text-white mb-2 drop-shadow-lg">
-          React + Tailwind + Vite
-        </h1>
-        <p className="text-xl text-center text-white/90 mb-10">
-          A fast Electrobun app with hot module replacement
-        </p>
+    <div className="flex h-screen bg-gray-100 text-gray-900">
+      <SessionTree
+        nodes={sessionsQuery.data ?? []}
+        activeSessionId={appState.activeSessionId}
+        onSelect={(sessionId) => dispatch({ type: 'set_active_session', sessionId })}
+        onRename={(node) => void handleRename(node)}
+        onDelete={(node) => void handleDelete(node)}
+        onFork={(node) => void handleFork(node)}
+      />
 
-        <div className="bg-white rounded-xl shadow-xl p-8 mb-8">
-          <h2 className="text-2xl font-semibold text-indigo-600 mb-4">
-            Interactive Counter
-          </h2>
-          <p className="mb-4 text-gray-600">
-            Click the button below to test React state. With HMR enabled, you
-            can edit this component and see changes instantly without losing
-            state.
-          </p>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setCount((c) => c + 1)}
-              className="px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-md hover:shadow-lg"
-            >
-              Count: {count}
-            </button>
-            <button
-              onClick={() => setCount(0)}
-              className="px-4 py-3 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition-colors"
-            >
-              Reset
-            </button>
-          </div>
-        </div>
+      <main className="flex min-w-0 flex-1 flex-col">
+        <ChatView
+          messages={visibleMessages}
+          isStreaming={appState.streaming.sessionId === appState.activeSessionId && appState.streaming.isStreaming}
+        />
+        <InputBar
+          disabled={!appState.activeSessionId}
+          onSend={(content) => handleSend(content)}
+        />
+      </main>
 
-        <div className="bg-white rounded-xl shadow-xl p-8 mb-8">
-          <h2 className="text-2xl font-semibold text-indigo-600 mb-4">
-            Getting Started
-          </h2>
-          <ul className="space-y-3 text-gray-700">
-            <li className="flex items-start gap-2">
-              <span className="text-indigo-500 font-bold">1.</span>
-              <span>
-                Run{' '}
-                <code className="bg-gray-100 px-2 py-1 rounded text-sm">
-                  bun run dev
-                </code>{' '}
-                for development without HMR
-              </span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-indigo-500 font-bold">2.</span>
-              <span>
-                Run{' '}
-                <code className="bg-gray-100 px-2 py-1 rounded text-sm">
-                  bun run dev:hmr
-                </code>{' '}
-                for development with hot reload
-              </span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-indigo-500 font-bold">3.</span>
-              <span>
-                Run{' '}
-                <code className="bg-gray-100 px-2 py-1 rounded text-sm">
-                  bun run build
-                </code>{' '}
-                to build for production
-              </span>
-            </li>
-          </ul>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-xl p-8">
-          <h2 className="text-2xl font-semibold text-indigo-600 mb-4">Stack</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-3xl mb-2">⚡</div>
-              <div className="font-medium">Electrobun</div>
-            </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-3xl mb-2">⚛️</div>
-              <div className="font-medium">React</div>
-            </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-3xl mb-2">🎨</div>
-              <div className="font-medium">Tailwind</div>
-            </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-3xl mb-2">🔥</div>
-              <div className="font-medium">Vite HMR</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="text-center text-white/80 mt-10 p-6 bg-white/10 rounded-lg backdrop-blur">
-          <p>
-            Edit{' '}
-            <code className="bg-white/20 px-2 py-1 rounded text-sm">
-              src/mainview/App.tsx
-            </code>{' '}
-            and save to see HMR in action
-          </p>
-        </div>
-      </div>
+      <ApprovalDialog
+        approval={appState.pendingApproval}
+        onApprove={(requestId) => handleApprove(requestId)}
+        onReject={(requestId) => handleReject(requestId)}
+      />
     </div>
   );
 }
-
-export default App;

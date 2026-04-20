@@ -6,6 +6,7 @@ import {
   getSessionHistory,
   renameSession,
   deleteSession,
+  forkSession,
 } from './service.js';
 
 export const sessionsRouter = router({
@@ -39,5 +40,24 @@ export const sessionsRouter = router({
       } catch {
         throw new TRPCError({ code: 'NOT_FOUND', message: `Session ${input.id} not found` });
       }
+    }),
+
+  fork: publicProcedure
+    .input(z.object({
+      id: z.string(),
+      messageId: z.string().optional(),
+      name: z.string().min(1).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const node = await forkSession({
+        parentSessionId: input.id,
+        messageId: input.messageId,
+        name: input.name,
+      });
+
+      return {
+        newSessionId: node.id,
+        node,
+      };
     }),
 });
