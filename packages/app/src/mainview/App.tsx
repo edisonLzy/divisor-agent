@@ -1,115 +1,222 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { MessageList } from './components/MessageList';
+import { SessionTree } from './components/SessionTree';
+import { InputBar } from './components/InputBar';
+import { ApprovalDialog } from './components/ApprovalDialog';
+import { permissionApprove, permissionReject, sessionPrompt, subscribeAgentEvents } from './lib/ipc';
+import { trpc } from './lib/trpc';
+import { useAppState } from './store/app-state';
+import type { HistoryMessage, SessionNode } from './types/domain';
+import type { StreamChunk } from './types/ipc';
 
-function App() {
-  const [count, setCount] = useState(0);
+function flattenSessionTree(nodes: SessionNode[]): SessionNode[] {
+  const result: SessionNode[] = [];
+
+  const visit = (currentNodes: SessionNode[]) => {
+    currentNodes.forEach((node) => {
+      result.push(node);
+
+      if (node.children?.length) {
+        visit(node.children);
+      }
+    });
+  };
+
+  visit(nodes);
+
+  return result;
+}
+
+function getLatestSessionId(sessions: SessionNode[]): string | null {
+  const flattened = flattenSessionTree(sessions);
+  const sorted = [...flattened].sort((a, b) => b.timestamp - a.timestamp);
+
+  return sorted[0]?.id ?? null;
+}
+
+export default function App() {
+  const { state, dispatch } = useAppState();
+  const trpcUtils = trpc.useUtils();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [streamChunks, setStreamChunks] = useState<Record<string, StreamChunk[]>>({});
+
+  const sessionsQuery = trpc.sessions.list.useQuery();
+  const modelsQuery = trpc.models.list.useQuery();
+  const historyQuery = trpc.sessions.history.useQuery(
+    { id: state.activeSessionId ?? '' },
+    { enabled: Boolean(state.activeSessionId) },
+  );
+
+  useEffect(() => {
+    if (!sessionsQuery.data?.length || state.activeSessionId) {
+      return;
+    }
+
+    const latestSessionId = getLatestSessionId(sessionsQuery.data);
+
+    dispatch({ type: 'setActiveSession', sessionId: latestSessionId });
+  }, [dispatch, sessionsQuery.data, state.activeSessionId]);
+
+  const sessions = sessionsQuery.data ?? [];
+  const historyMessages = useMemo<HistoryMessage[]>(() => {
+    return historyQuery.data?.messages ?? [];
+  }, [historyQuery.data]);
+
+  const streamCounterRef = useRef(0);
+
+  useEffect(() => {
+    return subscribeAgentEvents((event) => {
+      if (event.type === 'sessionRequestPermission') {
+        dispatch({
+          type: 'setPendingApproval',
+          payload: {
+            requestId: event.requestId,
+            operation: event.operation,
+            params: event.params,
+          },
+        });
+        return;
+      }
+
+      if (event.type === 'sessionForked') {
+        void trpcUtils.sessions.list.invalidate();
+        dispatch({ type: 'setActiveSession', sessionId: event.newSessionId });
+        return;
+      }
+
+      if (event.type === 'agentMessageDone') {
+        dispatch({
+          type: 'setStreaming',
+          payload: {
+            sessionId: event.sessionId,
+            isStreaming: false,
+          },
+        });
+        void trpcUtils.sessions.history.invalidate({ id: event.sessionId });
+        return;
+      }
+
+      setStreamChunks((previous) => {
+        const currentSessionChunks = previous[event.sessionId] ?? [];
+        const nextChunk: StreamChunk = {
+          id: `${event.sessionId}-${streamCounterRef.current++}`,
+          kind: event.deltaType,
+          content: event.delta,
+        };
+
+        return {
+          ...previous,
+          [event.sessionId]: [...currentSessionChunks, nextChunk],
+        };
+      });
+
+      dispatch({
+        type: 'setStreaming',
+        payload: {
+          sessionId: event.sessionId,
+          isStreaming: true,
+        },
+      });
+    });
+  }, [dispatch, trpcUtils.sessions.history, trpcUtils.sessions.list]);
+
+  const activeStreamChunks = state.activeSessionId ? (streamChunks[state.activeSessionId] ?? []) : [];
+
+  const handleSend = async (content: string): Promise<void> => {
+    setErrorMessage(null);
+
+    if (!state.activeSessionId) {
+      setErrorMessage('请先选择会话。');
+      return;
+    }
+
+    try {
+      await sessionPrompt({
+        sessionId: state.activeSessionId,
+        content,
+      });
+
+      dispatch({
+        type: 'setStreaming',
+        payload: {
+          sessionId: state.activeSessionId,
+          isStreaming: true,
+        },
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '发送失败，请稍后重试。');
+    }
+  };
+
+  const handleApprove = async (requestId: string): Promise<void> => {
+    await permissionApprove({ requestId });
+    dispatch({ type: 'setPendingApproval', payload: null });
+  };
+
+  const handleReject = async (requestId: string): Promise<void> => {
+    await permissionReject({ requestId });
+    dispatch({ type: 'setPendingApproval', payload: null });
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-500 to-purple-600 text-gray-900">
-      <div className="container mx-auto px-4 py-10 max-w-3xl">
-        <h1 className="text-5xl font-bold text-center text-white mb-2 drop-shadow-lg">
-          React + Tailwind + Vite
-        </h1>
-        <p className="text-xl text-center text-white/90 mb-10">
-          A fast Electrobun app with hot module replacement
-        </p>
+    <div className='app-shell'>
+      <SessionTree
+        sessions={sessions}
+        activeSessionId={state.activeSessionId}
+        onSelect={(sessionId) => {
+          dispatch({ type: 'setActiveSession', sessionId });
+          setStreamChunks((previous) => ({
+            ...previous,
+            [sessionId]: previous[sessionId] ?? [],
+          }));
+        }}
+        isLoading={sessionsQuery.isLoading}
+        onRefresh={() => {
+          void sessionsQuery.refetch();
+        }}
+      />
+      <main className='chat-panel'>
+        <header className='chat-header'>
+          <h1>divisor-agent MVP</h1>
+          <select
+            value={state.selectedModelId ?? ''}
+            onChange={(event) => {
+              const nextModelId = event.target.value || null;
+              dispatch({ type: 'setSelectedModel', modelId: nextModelId });
+            }}
+          >
+            <option value=''>默认模型</option>
+            {(modelsQuery.data ?? []).map((model) => (
+              <option key={`${model.providerId}:${model.modelId}`} value={model.modelId}>
+                {model.modelName} ({model.providerId})
+              </option>
+            ))}
+          </select>
+        </header>
 
-        <div className="bg-white rounded-xl shadow-xl p-8 mb-8">
-          <h2 className="text-2xl font-semibold text-indigo-600 mb-4">
-            Interactive Counter
-          </h2>
-          <p className="mb-4 text-gray-600">
-            Click the button below to test React state. With HMR enabled, you
-            can edit this component and see changes instantly without losing
-            state.
-          </p>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setCount((c) => c + 1)}
-              className="px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-md hover:shadow-lg"
-            >
-              Count: {count}
-            </button>
-            <button
-              onClick={() => setCount(0)}
-              className="px-4 py-3 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition-colors"
-            >
-              Reset
-            </button>
-          </div>
+        {errorMessage ? <p className='error-banner'>{errorMessage}</p> : null}
+
+        <MessageList messages={historyMessages} streamChunks={activeStreamChunks} />
+
+        <div className='chat-footer'>
+          <span>
+            {state.streaming.isStreaming && state.streaming.sessionId === state.activeSessionId
+              ? 'Agent 正在响应...'
+              : '就绪'}
+          </span>
         </div>
 
-        <div className="bg-white rounded-xl shadow-xl p-8 mb-8">
-          <h2 className="text-2xl font-semibold text-indigo-600 mb-4">
-            Getting Started
-          </h2>
-          <ul className="space-y-3 text-gray-700">
-            <li className="flex items-start gap-2">
-              <span className="text-indigo-500 font-bold">1.</span>
-              <span>
-                Run{' '}
-                <code className="bg-gray-100 px-2 py-1 rounded text-sm">
-                  bun run dev
-                </code>{' '}
-                for development without HMR
-              </span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-indigo-500 font-bold">2.</span>
-              <span>
-                Run{' '}
-                <code className="bg-gray-100 px-2 py-1 rounded text-sm">
-                  bun run dev:hmr
-                </code>{' '}
-                for development with hot reload
-              </span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-indigo-500 font-bold">3.</span>
-              <span>
-                Run{' '}
-                <code className="bg-gray-100 px-2 py-1 rounded text-sm">
-                  bun run build
-                </code>{' '}
-                to build for production
-              </span>
-            </li>
-          </ul>
-        </div>
+        <InputBar
+          onSend={handleSend}
+          disabled={!state.activeSessionId || sessionsQuery.isLoading || historyQuery.isFetching}
+        />
+      </main>
 
-        <div className="bg-white rounded-xl shadow-xl p-8">
-          <h2 className="text-2xl font-semibold text-indigo-600 mb-4">Stack</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-3xl mb-2">⚡</div>
-              <div className="font-medium">Electrobun</div>
-            </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-3xl mb-2">⚛️</div>
-              <div className="font-medium">React</div>
-            </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-3xl mb-2">🎨</div>
-              <div className="font-medium">Tailwind</div>
-            </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-3xl mb-2">🔥</div>
-              <div className="font-medium">Vite HMR</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="text-center text-white/80 mt-10 p-6 bg-white/10 rounded-lg backdrop-blur">
-          <p>
-            Edit{' '}
-            <code className="bg-white/20 px-2 py-1 rounded text-sm">
-              src/mainview/App.tsx
-            </code>{' '}
-            and save to see HMR in action
-          </p>
-        </div>
-      </div>
+      <ApprovalDialog
+        pendingApproval={state.pendingApproval}
+        onApprove={handleApprove}
+        onReject={handleReject}
+      />
     </div>
   );
 }
-
-export default App;
