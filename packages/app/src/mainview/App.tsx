@@ -23,13 +23,13 @@ function accumulateStreamingChunk(
   previousMessages: HistoryMessage[],
   chunk: StreamingChunk,
 ): HistoryMessage[] {
-  const streamMessageId = `local-stream-${chunk.sessionId}`;
-  const existingIndex = previousMessages.findIndex((msg) => msg.id === streamMessageId);
+  const localStreamMessageId = `local-stream-${chunk.sessionId}`;
+  const existingIndex = previousMessages.findIndex((msg) => msg.id === localStreamMessageId);
   const next = [...previousMessages];
 
   if (existingIndex === -1) {
     next.push({
-      id: streamMessageId,
+      id: localStreamMessageId,
       sessionId: chunk.sessionId,
       role: 'assistant',
       blocks: [{ type: chunk.type, content: chunk.delta }],
@@ -53,9 +53,17 @@ function accumulateStreamingChunk(
   return next;
 }
 
+function createLocalMessageId(prefix: string): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 function createUserMessage(sessionId: string, content: string): HistoryMessage {
   return {
-    id: `local-user-${crypto.randomUUID()}`,
+    id: createLocalMessageId('local-user'),
     sessionId,
     role: 'user',
     blocks: [{ type: 'text', content }],
