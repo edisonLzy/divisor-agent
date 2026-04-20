@@ -333,10 +333,7 @@ export async function handleSessionStart(
       pluginCtx,
     );
 
-    const changed =
-      patch.content !== simpleContent || patch.isError !== isError;
-
-    if (!changed) return undefined;
+    if (patch.content === simpleContent && patch.isError === isError) return undefined;
 
     return {
       content: patch.content?.map(c => ({ type: 'text' as const, text: c.text })),
