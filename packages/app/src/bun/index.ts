@@ -23,8 +23,8 @@ async function getMainViewUrl(): Promise<string> {
 // Create the main application window
 const url = await getMainViewUrl();
 
-const mainWindow = new BrowserWindow({
-  title: 'React + Tailwind + Vite',
+const _mainWindow = new BrowserWindow({
+  title: 'Divisor Agent',
   url,
   frame: {
     width: 900,
@@ -34,4 +34,6 @@ const mainWindow = new BrowserWindow({
   },
 });
 
-console.log('React Tailwind Vite app started!');
+void _mainWindow;
+
+console.log('Divisor Agent app started!');
