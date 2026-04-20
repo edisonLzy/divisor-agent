@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import pinoHttp from 'pino-http';
+import { pinoHttp } from 'pino-http';
 import pino from 'pino';
 
 const isDev = process.env.NODE_ENV !== 'production';
