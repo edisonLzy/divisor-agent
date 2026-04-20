@@ -1,6 +1,6 @@
-import type { AppRouter } from './router.js';
+export { pluginRegistry } from './registry.js';
 
-export type { AppRouter };
+export { loadPlugins, loadPluginFile, discoverPluginPaths } from './loader.js';
 
 export type {
   ExtensionAPI,
@@ -18,4 +18,4 @@ export type {
   ToolCallBlockResult,
   ToolResultEvent,
   ToolResultPatch,
-} from './plugins/types.js';
+} from './types.js';

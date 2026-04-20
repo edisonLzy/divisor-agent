@@ -11,9 +11,11 @@ import {
   getSessionHistory,
 } from '../sessions/service.js';
 import { resolveCustomModelConfig } from '../models/service.js';
+import { pluginRegistry } from '../../plugins/index.js';
 import type { AgentTool } from '@mariozechner/pi-agent-core';
 import type { AssistantMessageEvent, Model } from '@mariozechner/pi-ai';
 import type { HistoryMessage, MessageBlock } from '../sessions/types.js';
+import type { PluginContext, PluginToolDefinition } from '../../plugins/types.js';
 
 const logger = createLogger('agent');
 
@@ -147,6 +149,32 @@ function makeToolDelegate(
   };
 }
 
+// ── Plugin tool adapter ────────────────────────────────────────────────────
+
+function makePluginTool(sessionId: string, def: PluginToolDefinition): AgentTool {
+  return {
+    name: def.name,
+    label: def.label,
+    description: def.description,
+    parameters: def.parameters,
+    execute: async (toolCallId, params, signal) => {
+      const ctx: PluginContext = { sessionId };
+      const result = await def.execute(
+        toolCallId,
+        params as Record<string, unknown>,
+        signal,
+        ctx,
+      );
+
+      return {
+        content: result.content,
+        details: result.details ?? {},
+        ...(result.isError !== undefined ? { isError: result.isError } : {}),
+      };
+    },
+  };
+}
+
 // ── Utility ────────────────────────────────────────────────────────────────
 
 function sendMessage(ws: WebSocket, msg: Partial<AcpMessage>): void {
@@ -156,11 +184,17 @@ function sendMessage(ws: WebSocket, msg: Partial<AcpMessage>): void {
 }
 
 function buildTools(sessionId: string): AgentTool[] {
-  return [
+  const coreTools: AgentTool[] = [
     makeToolDelegate(sessionId, 'read', 'fs/read_text_file'),
     makeToolDelegate(sessionId, 'write', 'fs/write_text_file'),
     makeToolDelegate(sessionId, 'terminal', 'terminal/create'),
   ];
+
+  const pluginTools: AgentTool[] = pluginRegistry.getTools().map(def =>
+    makePluginTool(sessionId, def),
+  );
+
+  return [...coreTools, ...pluginTools];
 }
 
 // ── Model resolution ─────────────────────────────────────────────────────────
@@ -265,6 +299,51 @@ export async function handleSessionStart(
   };
 
   agent.setTools(buildTools(sessionId));
+
+  // Wire plugin hooks into the agent's tool lifecycle
+  const pluginCtx: PluginContext = { sessionId };
+
+  agent.setBeforeToolCall(async (context) => {
+    const { toolCall, args } = context;
+    const blockResult = await pluginRegistry.emitToolCall(
+      sessionId,
+      toolCall.name,
+      toolCall.id,
+      args,
+      pluginCtx,
+    );
+
+    return blockResult;
+  });
+
+  agent.setAfterToolCall(async (context) => {
+    const { toolCall, args, result, isError } = context;
+    const simpleContent = result.content.map(c =>
+      c.type === 'text'
+        ? { type: 'text' as const, text: c.text }
+        : { type: 'text' as const, text: '[image]' },
+    );
+    const patch = await pluginRegistry.emitToolResult(
+      sessionId,
+      toolCall.name,
+      toolCall.id,
+      args,
+      simpleContent,
+      isError,
+      pluginCtx,
+    );
+
+    const changed =
+      patch.content !== simpleContent || patch.isError !== isError;
+
+    if (!changed) return undefined;
+
+    return {
+      content: patch.content?.map(c => ({ type: 'text' as const, text: c.text })),
+      isError: patch.isError,
+    };
+  });
+
   sessions.set(sessionId, state);
 
   // Load existing messages if any (for session resumption)
@@ -287,6 +366,9 @@ export async function handleSessionStart(
       agent.replaceMessages(agentMessages);
     }
   }
+
+  // Notify plugins that the session has started
+  await pluginRegistry.emitSessionStart(sessionId, pluginCtx);
 
   logger.info({ sessionId }, 'Session started');
   sendMessage(ws, { type: 'session/started', sessionId, payload: { sessionId } });
@@ -320,6 +402,22 @@ export async function handleSessionPrompt(
     timestamp: Date.now(),
   };
   await appendMessage(sessionId, userMsg);
+
+  // Allow plugins to modify the system prompt before the agent runs
+  const pluginCtx: PluginContext = { sessionId };
+  const currentSystemPrompt = state.agent.state.systemPrompt;
+  const startResult = await pluginRegistry.emitBeforeAgentStart(
+    sessionId,
+    content,
+    currentSystemPrompt,
+    pluginCtx,
+  );
+
+  if (startResult.systemPrompt !== undefined && startResult.systemPrompt !== currentSystemPrompt) {
+    state.agent.setSystemPrompt(startResult.systemPrompt);
+  }
+
+  await pluginRegistry.emitAgentStart(sessionId, content, pluginCtx);
 
   // Collect assistant response blocks for persistence
   const assistantBlocks: MessageBlock[] = [];
@@ -374,6 +472,9 @@ export async function handleSessionPrompt(
 
   try {
     await state.agent.prompt(content);
+
+    // Notify plugins that the agent has finished
+    await pluginRegistry.emitAgentEnd(sessionId, pluginCtx);
 
     // Persist assistant message
     if (assistantBlocks.length > 0) {
