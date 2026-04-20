@@ -54,7 +54,7 @@ function SessionNodeItem({
             className="rounded px-1 text-xs text-gray-500 hover:bg-gray-200"
             onClick={() => onFork(node)}
           >
-            Fork
+            分支
           </button>
           <button
             type="button"

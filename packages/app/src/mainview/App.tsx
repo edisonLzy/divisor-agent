@@ -13,6 +13,46 @@ function flattenSessionTree(nodes: SessionNode[]): SessionNode[] {
   return nodes.flatMap((node) => [node, ...(node.children ? flattenSessionTree(node.children) : [])]);
 }
 
+interface StreamingChunk {
+  sessionId: string;
+  type: 'text' | 'thinking';
+  delta: string;
+}
+
+function accumulateStreamingChunk(
+  previousMessages: HistoryMessage[],
+  chunk: StreamingChunk,
+): HistoryMessage[] {
+  const streamMessageId = `local-stream-${chunk.sessionId}`;
+  const existingIndex = previousMessages.findIndex((msg) => msg.id === streamMessageId);
+  const next = [...previousMessages];
+
+  if (existingIndex === -1) {
+    next.push({
+      id: streamMessageId,
+      sessionId: chunk.sessionId,
+      role: 'assistant',
+      blocks: [{ type: chunk.type, content: chunk.delta }],
+      timestamp: Date.now(),
+    });
+
+    return next;
+  }
+
+  const message = next[existingIndex];
+  const targetIndex = message.blocks.findIndex((block) => block.type === chunk.type);
+  if (targetIndex === -1) {
+    message.blocks.push({ type: chunk.type, content: chunk.delta });
+  } else {
+    message.blocks[targetIndex] = {
+      ...message.blocks[targetIndex],
+      content: message.blocks[targetIndex].content + chunk.delta,
+    };
+  }
+
+  return next;
+}
+
 function createUserMessage(sessionId: string, content: string): HistoryMessage {
   return {
     id: `local-user-${crypto.randomUUID()}`,
@@ -57,35 +97,9 @@ export default function App() {
   useEffect(() => {
     const unsubscribeChunk = subscribeRuntimeEvent('agentMessageChunk', (payload) => {
       setLocalMessagesBySession((prev) => {
-        const current = prev[payload.sessionId] ?? [];
-        const streamMessageId = `local-stream-${payload.sessionId}`;
-        const existingIndex = current.findIndex((msg) => msg.id === streamMessageId);
-        const next = [...current];
-
-        if (existingIndex === -1) {
-          next.push({
-            id: streamMessageId,
-            sessionId: payload.sessionId,
-            role: 'assistant',
-            blocks: [{ type: payload.type, content: payload.delta }],
-            timestamp: Date.now(),
-          });
-        } else {
-          const message = next[existingIndex];
-          const targetIndex = message.blocks.findIndex((block) => block.type === payload.type);
-          if (targetIndex === -1) {
-            message.blocks.push({ type: payload.type, content: payload.delta });
-          } else {
-            message.blocks[targetIndex] = {
-              ...message.blocks[targetIndex],
-              content: message.blocks[targetIndex].content + payload.delta,
-            };
-          }
-        }
-
         return {
           ...prev,
-          [payload.sessionId]: next,
+          [payload.sessionId]: accumulateStreamingChunk(prev[payload.sessionId] ?? [], payload),
         };
       });
 

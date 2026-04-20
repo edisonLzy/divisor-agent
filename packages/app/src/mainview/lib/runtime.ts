@@ -27,6 +27,8 @@ interface ElectrobunRPC {
   permissionReject?: (payload: { requestId: string }) => Promise<void>;
 }
 
+const MOCK_CHUNK_DELAY_MS = 250;
+
 declare global {
   interface Window {
     electrobun?: {
@@ -52,14 +54,14 @@ function mockStream(payload: PromptPayload): void {
           chunkIndex: index,
         } satisfies AgentMessageChunkPayload,
       }));
-    }, 250 * (index + 1));
+    }, MOCK_CHUNK_DELAY_MS * (index + 1));
   });
 
   window.setTimeout(() => {
     window.dispatchEvent(new CustomEvent('agentMessageDone', {
       detail: { sessionId: payload.sessionId } satisfies AgentMessageDonePayload,
     }));
-  }, 250 * (chunks.length + 1));
+  }, MOCK_CHUNK_DELAY_MS * (chunks.length + 1));
 }
 
 export async function sessionPrompt(payload: PromptPayload): Promise<SessionPromptResult> {
