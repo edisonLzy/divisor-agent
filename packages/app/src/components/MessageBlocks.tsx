@@ -63,12 +63,12 @@ const ToolResultBlockRenderer = React.memo(function ToolResultBlockRenderer({
 type BlockRenderer = React.ComponentType<{ block: MessageBlock }>;
 
 const BLOCK_RENDERERS: Record<MessageBlock['type'], BlockRenderer> = {
-  text: ({ block }) => block.type === 'text' ? <TextBlockRenderer content={block.content} /> : null,
-  thinking: ({ block }) => block.type === 'thinking' ? <ThinkingBlockRenderer content={block.content} /> : null,
-  tool_result: ({ block }) =>
-    block.type === 'tool_result' ? (
-      <ToolResultBlockRenderer toolName={block.toolName} content={block.content} />
-    ) : null,
+  text: ({ block }) => <TextBlockRenderer content={(block as { type: 'text'; content: string }).content} />,
+  thinking: ({ block }) => <ThinkingBlockRenderer content={(block as { type: 'thinking'; content: string }).content} />,
+  tool_result: ({ block }) => {
+    const b = block as { type: 'tool_result'; toolName: string; content: string };
+    return <ToolResultBlockRenderer toolName={b.toolName} content={b.content} />;
+  },
 };
 
 export function renderBlock(block: MessageBlock, key: string | number) {
