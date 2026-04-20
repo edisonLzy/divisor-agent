@@ -1,6 +1,7 @@
 {
   "name": "@divisor-agent/app",
   "version": "1.0.0",
+  "type": "module",
   "description": "Divisor agent desktop app (Electrobun + React)",
   "scripts": {
     "start": "vite build && electrobun dev",

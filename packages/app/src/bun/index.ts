@@ -34,4 +34,6 @@ const _mainWindow = new BrowserWindow({
   },
 });
 
+void _mainWindow;
+
 console.log('Divisor Agent app started!');

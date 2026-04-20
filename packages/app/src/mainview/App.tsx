@@ -160,9 +160,9 @@ export default function App() {
       content,
       model: selectedModel
         ? {
-            providerId: selectedModel.providerId,
-            modelId: selectedModel.modelId,
-          }
+          providerId: selectedModel.providerId,
+          modelId: selectedModel.modelId,
+        }
         : undefined,
     });
   };

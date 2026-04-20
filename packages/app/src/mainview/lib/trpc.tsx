@@ -16,7 +16,7 @@ export function TrpcProvider({ children }: { children: ReactNode }) {
       links: [
         loggerLink({
           enabled: (opts) =>
-            import.meta.env.DEV || (opts.direction === 'down' && opts.result instanceof Error),
+            Boolean(import.meta.env.DEV || (opts.direction === 'down' && opts.result instanceof Error)),
         }),
         httpBatchLink({
           url: `${SERVER_BASE_URL}/trpc`,
