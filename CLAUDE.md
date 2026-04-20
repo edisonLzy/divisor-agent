@@ -40,7 +40,7 @@ cargo build           # Build Rust
 
 | Layer | Protocol | Purpose |
 |---|---|---|
-| Frontend ↔ Server | tRPC (HTTP/SSE) | Session metadata (tree, history, settings) |
+| Frontend ↔ Server | tRPC (HTTP/SSE) | Session metadata (tree, history), model list |
 | Frontend ↔ Rust | Tauri IPC (`invoke`/`listen`) | Commands, permission approval, events |
 | Rust ↔ Server | WebSocket (ACP) | Real-time chat stream, tool calls |
 
@@ -50,19 +50,32 @@ cargo build           # Build Rust
 packages/
   app/                    # Tauri v2 + React 19 + Vite 7 + Tailwind v4
     src/                  # React frontend
+      types/              # Local type definitions (SessionNode, HistoryMessage, etc.)
+      components/         # React components (ChatView, SessionTree, MessageBlocks)
+      store/              # State management (context + reducer)
+      lib/                # Utilities (tRPC client, prosemirror editor)
     src-tauri/            # Rust core
   server/                 # Express v5 + tRPC + Zod + pino
     src/
-      domain/             # Feature modules (e.g. health/)
-        health/
-          health.routes.ts   # Route registration
-          health.controller.ts
-          health.service.ts
-          health.dto.ts
-      middlewares/        # Shared middleware
-      shared/             # Logger, utilities
-      errors/             # Error definitions
-      types/              # Shared types
+      domain/             # Feature modules
+        agent/            # ACP WebSocket router + agent service
+          router.ts       # WebSocket connection handling
+          service.ts      # Agent Loop, tool delegation, permission handling
+        sessions/         # Session CRUD and history
+          router.ts       # tRPC router
+          service.ts      # Session persistence (session-map.json)
+          types.ts        # Session types
+        models/           # Built-in and custom model configuration
+          router.ts       # tRPC router
+          service.ts      # Model resolution from ~/.pi/agent/models.json
+          types.ts        # ModelInfo type
+      shared/             # Logger, tRPC init
+      middlewares/        # Express middleware (response, error, request log)
+      config/             # Environment configuration
+      expose.ts           # Public type exports for frontend
+      router.ts           # Root tRPC router composition
+      app.ts              # Express app creation
+      index.ts            # Server entry point (HTTP + ACP WebSocket)
 ```
 
 ### Key Conventions
