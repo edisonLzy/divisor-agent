@@ -1,0 +1,3 @@
+@import "tailwindcss";
+
+@source "../src/mainview/**/*.{html,js,ts,jsx,tsx}";
