@@ -12,13 +12,13 @@ import {
 
 export function InstructionInput() {
   const [prompt, setPrompt] = useState('');
-  const [models, setModels] = useState<{providerId: string, modelId: string, modelName: string}[]>([]);
+  const [models, setModels] = useState<{ providerId: string, modelId: string, modelName: string }[]>([]);
   const [selectedModel, setSelectedModel] = useState('');
   const { sendPrompt, isProcessing, getAvailableModels } = useAgentRuntime();
 
   useEffect(() => {
     let mounted = true;
-    getAvailableModels().then((m: {providerId: string, modelId: string, modelName: string}[]) => {
+    getAvailableModels().then((m: { providerId: string, modelId: string, modelName: string }[]) => {
       if (mounted && m && m.length > 0) {
         setModels(m);
         // Try to find Gemini 3.1 Pro (Preview) first, otherwise use first available
