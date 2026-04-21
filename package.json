@@ -41,6 +41,9 @@
     "vitest": "^4.0.16"
   },
   "dependencies": {
+    "@mariozechner/pi-agent-core": "^0.68.0",
+    "@mariozechner/pi-ai": "^0.68.0",
+    "@sinclair/typebox": "^0.34.49",
     "@tanstack/react-query": "^5.91.3",
     "@tiptap/extension-mention": "^3.20.4",
     "@tiptap/extension-placeholder": "^3.20.4",
@@ -49,6 +52,8 @@
     "@tiptap/starter-kit": "^3.20.4",
     "@trpc/client": "^11.13.4",
     "@trpc/react-query": "^11.13.4",
+    "electrobun-react-tailwind-vite": "workspace:*",
+    "electrobun-react-tailwind-vite": "./packages/app",
     "superjson": "^2.2.6"
   }
 }
