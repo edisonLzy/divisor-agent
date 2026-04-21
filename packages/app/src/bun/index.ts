@@ -21,6 +21,18 @@ const rpc = defineElectrobunRPC('bun', {
         const p = params as { requestId: string };
         agentRuntime.rejectPermission(p.requestId);
       },
+      // 模型 RPC
+      setModel: async (params: unknown) => {
+        const p = params as { sessionId: string; provider: string; modelId: string };
+        return agentRuntime.setModel(p.sessionId, p.provider, p.modelId);
+      },
+      cycleModel: async (params: unknown) => {
+        const p = params as { sessionId: string; direction?: 'next' | 'prev' };
+        return agentRuntime.cycleModel(p.sessionId, p.direction || 'next');
+      },
+      getAvailableModels: async () => {
+        return agentRuntime.getAvailableModels();
+      },
     },
     messages: {
       '*': (name: string, payload: unknown) => {
