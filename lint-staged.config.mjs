@@ -1,5 +1,5 @@
 export default {
   '*.{js,ts}': () => {
-    return ['pnpm eslint --fix'];
+    return ['bun eslint --fix'];
   },
 };

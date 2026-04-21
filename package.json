@@ -3,12 +3,18 @@
   "version": "1.0.0",
   "description": "",
   "private": true,
+  "workspaces": ["packages/*"],
+  "catalog": {
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.16",
+    "@eslint/js": "^9.39.2"
+  },
   "scripts": {
-    "dev": "pnpm -r --parallel --if-present dev",
-    "build": "pnpm -r --parallel --if-present build",
-    "dev:server": "pnpm --filter @divisor-agent/server dev",
-    "dev:app": "pnpm --filter @divisor-agent/app tauri dev",
-    "type-check": "pnpm -r type-check",
+    "dev": "bun --bun run --parallel dev",
+    "build": "bun --bun run --parallel build",
+    "dev:server": "bun --filter @divisor-agent/server dev",
+    "dev:app": "bun --filter ./packages/app dev",
+    "type-check": "bun --workspaces run type-check",
     "test": "vitest",
     "lint": "eslint .",
     "prepare": "husky"
@@ -16,23 +22,23 @@
   "keywords": [],
   "author": "evan",
   "license": "ISC",
-  "packageManager": "pnpm@10.32.1",
   "devDependencies": {
     "@commitlint/cli": "^20.2.0",
     "@commitlint/config-conventional": "^20.2.0",
     "@eslint/compat": "^2.0.0",
-    "@eslint/js": "catalog:",
+    "@eslint/js": "^9.39.2",
     "@stylistic/eslint-plugin": "^5.6.1",
     "@types/node": "^22.0.0",
+    "conventional-changelog-conventionalcommits": "^9.3.1",
     "eslint": "^9.39.2",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-unused-imports": "^4.3.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "tsx": "^4.21.0",
-    "typescript": "catalog:",
+    "typescript": "^5.9.3",
     "typescript-eslint": "^8.50.0",
-    "vitest": "catalog:"
+    "vitest": "^4.0.16"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.91.3",

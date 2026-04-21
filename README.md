@@ -27,7 +27,7 @@ Node Server
 
 ## Monorepo 结构
 
-项目使用 pnpm workspace，包位于 `packages/*`：
+项目使用 bun workspace，包位于 `packages/*`：
 
 ```text
 packages/
@@ -43,14 +43,14 @@ docs/
 ## 环境要求
 
 - Node.js 22+
-- pnpm 10+
+- Bun
 - Rust toolchain（`rustup`、`cargo`）
 - Tauri 开发环境
 
 安装依赖：
 
 ```bash
-pnpm install
+bun install
 ```
 
 ## 常用命令
@@ -59,25 +59,25 @@ pnpm install
 
 ```bash
 # 启动所有包
-pnpm dev
+bun dev
 
 # 仅启动 server
-pnpm dev:server
+bun dev:server
 
 # 仅启动 app
-pnpm --filter divisor-agent dev
+bun --filter ./packages/app dev
 
 # 构建
-pnpm build
+bun build
 
 # 类型检查
-pnpm type-check
+bun type-check
 
 # 测试
-pnpm test
+bun test
 
 # 代码规范检查
-pnpm lint
+bun lint
 ```
 
 说明：
@@ -110,7 +110,7 @@ pnpm lint
 - 纯类型导入必须使用 `import type`。
 - Server 生产构建使用 `packages/server/tsconfig.build.json`。
 - 根测试使用 Vitest workspace 配置。
-- 共享依赖版本通过 `pnpm-workspace.yaml` 的 `catalog` 管理。
+- 共享依赖版本通过 bun workspace 自动管理。
 
 ## 文档入口
 

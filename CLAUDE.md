@@ -11,20 +11,20 @@ Divisor-agent is a desktop AI agent app using a C/S hybrid architecture:
 ## Common Commands
 
 ```bash
-pnpm dev              # Start all packages in parallel
-pnpm dev:server       # Start server only (tsx --watch)
-pnpm dev:app          # Start Tauri app only
-pnpm build            # Build all packages
-pnpm type-check        # Type-check all packages
-pnpm test             # Run all tests (Vitest workspace)
-pnpm lint             # ESLint check
+bun dev              # Start all packages in parallel
+bun dev:server       # Start server only (tsx --watch)
+bun dev:app          # Start Tauri app only
+bun build            # Build all packages
+bun type-check        # Type-check all packages
+bun test             # Run all tests (Vitest workspace)
+bun lint             # ESLint check
 ```
 
 Single package commands:
 ```bash
-pnpm --filter @divisor-agent/server dev
-pnpm --filter @divisor-agent/server test
-pnpm --filter divisor-agent dev
+bun --filter @divisor-agent/server dev
+bun --filter @divisor-agent/server test
+bun --filter ./packages/app dev
 ```
 
 Rust (app):
@@ -83,7 +83,7 @@ packages/
 
 - **Server imports**: Always include `.js` extension for local TypeScript imports (ESM requirement)
 - **Type imports**: Use `import type { ... }` for pure type imports
-- **Catalog**: Shared dependency versions managed via `pnpm-workspace.yaml` `catalog` block — do not pin versions in individual `package.json` for shared deps
+- **Dependencies**: Bun workspace 自动管理共享依赖版本
 - **Dependencies**: 严格按需引入依赖。严禁安装当前未使用的依赖（例如：在使用 TipTap 时，仅在真正用到某个特定插件时才进行安装，未使用到的插件绝对不要提前引入或安装）。
 - **Testing**: Root `vitest.config.ts` uses workspace mode; each package has its own `vitest.config.ts`
 - **Production build**: Server uses `packages/server/tsconfig.build.json` (excludes tests)
