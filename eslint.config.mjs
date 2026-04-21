@@ -88,7 +88,7 @@ export default [
     },
   },
   {
-    files: ['**/*.{js,jsx,ts,tsx}'],
+    files: ['**/*.{js,jsx,ts,tsx}', '!**/*.cjs'],
     plugins: {
       import: importPlugin,
     },
