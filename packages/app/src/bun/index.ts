@@ -63,8 +63,7 @@ const url = await getMainViewUrl();
 new BrowserWindow({
   title: 'Divisor Agent',
   url,
-   
-  rpc: rpc as any,
+  rpc,
   frame: {
     width: 1200,
     height: 800,

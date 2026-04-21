@@ -108,7 +108,6 @@ export class AgentRuntime {
 
     try {
       if (model) {
-         
         agent.state.model = model as any;
       }
       await agent.prompt(content);
