@@ -6,7 +6,7 @@ declare global {
   interface Window {
     electrobun?: {
       rpc?: {
-        request: (method: string, params: any) => Promise<any>;
+        request: (method: string, params?: any) => Promise<any>;
       };
     };
   }
@@ -42,16 +42,23 @@ export function useAgentRuntime() {
   /**
    * Dispatches a prompt to the Bun backend to execute
    */
-  const sendPrompt = useCallback((sessionId: string, content: string, modelStr: string = 'Gemini 3.1 Pro (Preview)') => {
+  const sendPrompt = useCallback((sessionId: string, content: string, modelStr?: string) => {
     setProcessing(true);
     
-    // Parse model string if needed, depending on convention
+    let providerId = 'google';
+    let modelId = 'gemini-3.1-pro-preview';
+    if (modelStr && modelStr.includes('/')) {
+      const parts = modelStr.split('/');
+      providerId = parts[0];
+      modelId = parts.slice(1).join('/');
+    }
+
     const params: SessionPromptParams = {
       sessionId,
       content,
       model: {
-        providerId: 'google',
-        modelId: modelStr
+        providerId,
+        modelId
       }
     };
     
@@ -59,8 +66,22 @@ export function useAgentRuntime() {
     window.electrobun?.rpc?.request('sessionPrompt', params).catch(console.error);
   }, [setProcessing]);
 
+  /**
+   * Fetches available models from the Bun backend
+   */
+  const getAvailableModels = useCallback(async () => {
+    if (!window.electrobun?.rpc) return [];
+    try {
+      return (await window.electrobun.rpc.request('getAvailableModels')) || [];
+    } catch (e) {
+      console.error('Failed to get available models:', e);
+      return [];
+    }
+  }, []);
+
   return {
     isProcessing,
     sendPrompt,
+    getAvailableModels,
   };
 }

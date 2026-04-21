@@ -1,7 +1,7 @@
 import {
   Message,
   MessageContent,
-} from "@/mainview/components/ai-elements/message";
+} from '@/mainview/components/ai-elements/message';
 
 export function Messages() {
   return (
