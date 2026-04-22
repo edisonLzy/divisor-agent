@@ -1,7 +1,18 @@
 import { Workspace } from './modules/workspace/Workspace';
 import { TooltipProvider } from './components/ui/tooltip';
+import { useElectroview } from './context/ElectroViewProvider';
+import { useEffect } from 'react';
 
-function App() {
+export function App() {
+
+  const electroview = useElectroview();
+  
+  useEffect(()=>{
+    electroview.rpc?.request.getAvailableModels().then(models => {
+      console.log(models);
+    })
+  },[])
+
   return (
     <TooltipProvider>
       <div className="flex h-screen w-full bg-[#111111] text-[#D4D4D4] font-sans overflow-hidden">
@@ -71,4 +82,3 @@ function App() {
   );
 }
 
-export default App;

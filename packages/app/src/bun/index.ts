@@ -1,45 +1,27 @@
-import { BrowserWindow, Updater, defineElectrobunRPC } from 'electrobun/bun';
+import { BrowserView, BrowserWindow, Updater } from 'electrobun/bun';
 import { AgentRuntime } from './agent-runtime.js';
-import type { SessionPromptParams, BunToWebViewMessage } from '../shared/ipc-types.js';
+import type { BunToWebViewMessage, RPCType } from '../shared/ipc-types.js';
 
 const DEV_SERVER_PORT = 5173;
 const DEV_SERVER_URL = `http://localhost:${DEV_SERVER_PORT}`;
 const HOME_DIR = process.env.HOME ?? '/tmp';
 
 // Bun RPC handlers
-const rpc = defineElectrobunRPC('bun', {
+const rpc = BrowserView.defineRPC<RPCType>({
   handlers: {
     requests: {
-      sessionPrompt: async (params: unknown) => {
-        await agentRuntime.prompt(params as SessionPromptParams);
+      setModel: async (params) => {
+        const { sessionId, provider, modelId } = params;
+        agentRuntime.setModel(sessionId, provider, modelId);
       },
-      permissionApprove: async (params: unknown) => {
-        const p = params as { requestId: string };
-        agentRuntime.approvePermission(p.requestId);
+      cycleModel(params) {
+        agentRuntime.cycleModel(params.sessionId, params.direction);
       },
-      permissionReject: async (params: unknown) => {
-        const p = params as { requestId: string };
-        agentRuntime.rejectPermission(p.requestId);
-      },
-      // 模型 RPC
-      setModel: async (params: unknown) => {
-        const p = params as { sessionId: string; provider: string; modelId: string };
-        return agentRuntime.setModel(p.sessionId, p.provider, p.modelId);
-      },
-      cycleModel: async (params: unknown) => {
-        const p = params as { sessionId: string; direction?: 'next' | 'prev' };
-        return agentRuntime.cycleModel(p.sessionId, p.direction || 'next');
-      },
-      getAvailableModels: async () => {
+      getAvailableModels() {
         return agentRuntime.getAvailableModels();
       },
     },
-    messages: {
-      '*': (name: string, payload: unknown) => {
-        // Forward messages to webview
-        (rpc.send as (name: string, payload: unknown) => void)(name, payload);
-      },
-    },
+    messages: {},
   },
 });
 

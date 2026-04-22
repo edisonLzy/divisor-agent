@@ -2,6 +2,8 @@
 // WebView → Bun RPC
 // ============================================================
 
+import type { RPCSchema } from 'electrobun/view';
+
 export interface SessionPromptParams {
   sessionId: string;
   content: string;
@@ -18,6 +20,32 @@ export interface PermissionApproveParams {
 export interface PermissionRejectParams {
   requestId: string;
 }
+
+// RPC type for webview ↔ bun bidirectional communication
+export type RPCType = {
+  // functions that execute in the main process (webview calls bun)
+  bun: RPCSchema<{
+    requests: {
+      setModel: {
+        params: { sessionId: string; provider: string; modelId: string };
+        response: void;
+      };
+      cycleModel: {
+        params: { sessionId: string; direction?: 'next' | 'prev' };
+        response: void;
+      };
+      getAvailableModels: {
+        params: void;
+        response: unknown;
+      };
+    };
+    messages: {
+      agentMessageChunk: { msg: string };
+      agentMessageDone: { msg: string };
+    };
+  }>;
+  webview: RPCSchema<Record<string, never>>
+};
 
 // ============================================================
 // Bun → WebView Messages (pushed by Bun, not RPC responses)

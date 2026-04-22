@@ -25,6 +25,7 @@ interface ModelsJsonConfig {
       apiKey?: string;
       api?: string;
       headers?: Record<string, string>;
+      models?: { id: string; name?: string }[];
     }
   >;
   models?: CustomModelConfig[];
@@ -40,7 +41,8 @@ export class ModelRegistry {
   >();
 
   constructor() {
-    this.loadBuiltInModels();
+    // this.loadBuiltInModels(); // TODO 后续再加载内置模型
+    this.loadCustomModels();
   }
 
   private loadBuiltInModels(): void {
@@ -62,6 +64,13 @@ export class ModelRegistry {
       if (config.providers) {
         for (const [name, cfg] of Object.entries(config.providers)) {
           this.providerConfigs.set(name, cfg);
+
+          if (cfg.models) {
+            for (const modelCfg of cfg.models) {
+              const model = this.toModel({ ...modelCfg, provider: name });
+              this.customModels.set(`${name}/${modelCfg.id}`, model);
+            }
+          }
         }
       }
 
