@@ -2,5 +2,8 @@
     "cSpell.words": [
         "mariozechner",
         "typebox"
-    ]
+    ],
+    "chat.tools.terminal.autoApprove": {
+        "bun": true
+    }
 }

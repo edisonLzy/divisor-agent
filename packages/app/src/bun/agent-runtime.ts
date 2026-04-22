@@ -6,6 +6,7 @@ import { PermissionService } from './permissions/index.js';
 import { ExtensionRegistry } from './extensions/index.js';
 import { loadAllExtensions } from './extensions/loader.js';
 import { fsReadTextFileTool, fsWriteTextFileTool, terminalCreateTool } from './tools/index.js';
+import { ModelService } from './models/index.js';
 import type {
   SessionPromptParams,
   BunToWebViewMessage,
@@ -17,6 +18,7 @@ export class AgentRuntime {
   private sessions = new Map<string, { agent: Agent }>();
   private permissionService: PermissionService;
   private extensionRegistry: ExtensionRegistry;
+  private modelService: ModelService;
   private sendToWebView: WebViewSender | null = null;
   private homeDir: string;
 
@@ -24,6 +26,21 @@ export class AgentRuntime {
     this.homeDir = homeDir;
     this.permissionService = new PermissionService();
     this.extensionRegistry = new ExtensionRegistry();
+    this.modelService = new ModelService((sessionId) => {
+      return this.sessions.get(sessionId)?.agent;
+    });
+  }
+
+  async setModel(sessionId: string, provider: string, modelId: string) {
+    return this.modelService.setModel(sessionId, provider, modelId);
+  }
+
+  cycleModel(sessionId: string, direction: 'next' | 'prev' = 'next') {
+    return this.modelService.cycleModel(sessionId, direction);
+  }
+
+  getAvailableModels() {
+    return this.modelService.getAvailableModels();
   }
 
   setWebViewSender(send: WebViewSender) {
@@ -108,7 +125,6 @@ export class AgentRuntime {
 
     try {
       if (model) {
-         
         agent.state.model = model as any;
       }
       await agent.prompt(content);
