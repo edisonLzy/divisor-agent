@@ -17,7 +17,6 @@
         "@trpc/client": "^11.13.4",
         "@trpc/react-query": "^11.13.4",
         "electrobun-react-tailwind-vite": "workspace:*",
-        "electrobun-react-tailwind-vite": "./packages/app",
         "superjson": "^2.2.6",
       },
       "devDependencies": {
