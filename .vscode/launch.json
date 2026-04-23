@@ -1,0 +1,41 @@
+{
+  "version": "0.2.0",
+  "compounds": [
+    {
+      "name": "Electrobun: Launch Dev + Debug Renderer",
+      "configurations": [
+        "Electrobun: Start HMR Dev",
+        "Electrobun: Debug Renderer"
+      ],
+      "stopAll": true
+    }
+  ],
+  "configurations": [
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "Electrobun: Start HMR Dev",
+      "command": "cd ${workspaceFolder}/packages/app && bun run dev:hmr"
+    },
+    {
+      "type": "chrome",
+      "request": "launch",
+      "name": "Electrobun: Debug Renderer",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/packages/app/src/mainview",
+      "sourceMaps": true
+    },
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "Electrobun: Start Native Dev",
+      "command": "cd ${workspaceFolder}/packages/app && bun run dev"
+    },
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "Electrobun: Start Main Process Inspector",
+      "command": "cd \"${workspaceFolder}/packages/app/build/dev-macos-arm64/divisor-agent-dev.app/Contents/MacOS\" && ./bun --inspect-wait=localhost:6499/main \"${workspaceFolder}/packages/app/src/bun/index.ts\""
+    }
+  ]
+}

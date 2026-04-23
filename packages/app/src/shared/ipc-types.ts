@@ -44,7 +44,7 @@ export type RPCType = {
       agentMessageDone: { msg: string };
     };
   }>;
-  webview: RPCSchema<Record<string, never>>
+  webview: RPCSchema<Record<string, unknown>>
 };
 
 // ============================================================

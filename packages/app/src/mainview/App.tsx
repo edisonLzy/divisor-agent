@@ -1,7 +1,7 @@
+import { useEffect } from 'react';
 import { Workspace } from './modules/workspace/Workspace';
 import { TooltipProvider } from './components/ui/tooltip';
 import { useElectroview } from './context/ElectroViewProvider';
-import { useEffect } from 'react';
 
 export function App() {
 
@@ -10,8 +10,8 @@ export function App() {
   useEffect(()=>{
     electroview.rpc?.request.getAvailableModels().then(models => {
       console.log(models);
-    })
-  },[])
+    });
+  },[]);
 
   return (
     <TooltipProvider>
@@ -81,4 +81,3 @@ export function App() {
     </TooltipProvider>
   );
 }
-
