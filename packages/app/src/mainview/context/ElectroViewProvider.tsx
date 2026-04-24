@@ -1,37 +1,34 @@
 import { createContext, useContext } from 'react';
-import type {
-  AgentMessageChunkPayload,
-  AgentMessageDonePayload,
-  SessionRequestPermissionPayload,
-  SessionForkedPayload,
-} from '../../shared/ipc-types.js';
+import type { IpcInvokeMap, IpcEventMap } from '../../shared/ipc-types.js';
 
-// ── ElectronAPI global type (exposed by preload) ──────────────────────────────
+// ── Typed ElectronAPI global (exposed by preload via contextBridge) ───────────
 
-type AllowedChannel =
-  | 'setModel'
-  | 'cycleModel'
-  | 'getAvailableModels'
-  | 'sessionPrompt'
-  | 'permissionApprove'
-  | 'permissionReject';
-
-type AllowedEventPayloads = {
-  agentMessageChunk: AgentMessageChunkPayload;
-  agentMessageDone: AgentMessageDonePayload;
-  sessionRequestPermission: SessionRequestPermissionPayload;
-  sessionForked: SessionForkedPayload;
-};
-
-type AllowedEvent = keyof AllowedEventPayloads;
+/**
+ * Helper: if Params is void the channel takes no extra args;
+ * otherwise it takes exactly one argument of type Params.
+ */
+type InvokeArgs<C extends keyof IpcInvokeMap> =
+  IpcInvokeMap[C]['params'] extends void ? [] : [IpcInvokeMap[C]['params']];
 
 declare global {
   interface Window {
     electronAPI: {
-      invoke: (channel: AllowedChannel, ...args: unknown[]) => Promise<unknown>;
-      on: <E extends AllowedEvent>(
+      /**
+       * Type-safe IPC invoke.
+       * The channel name determines the params type and return type automatically.
+       */
+      invoke: <C extends keyof IpcInvokeMap>(
+        channel: C,
+        ...args: InvokeArgs<C>
+      ) => Promise<IpcInvokeMap[C]['return']>;
+
+      /**
+       * Subscribe to a push event from the main process.
+       * Returns an unsubscribe function.
+       */
+      on: <E extends keyof IpcEventMap>(
         event: E,
-        callback: (payload: AllowedEventPayloads[E]) => void,
+        callback: (payload: IpcEventMap[E]) => void,
       ) => () => void;
     };
   }

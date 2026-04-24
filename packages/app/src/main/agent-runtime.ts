@@ -9,10 +9,10 @@ import { fsReadTextFileTool, fsWriteTextFileTool, terminalCreateTool } from './t
 import { ModelService } from './models/index.js';
 import type {
   SessionPromptParams,
-  BunToWebViewMessage,
+  MainToRendererMessage,
 } from '../shared/ipc-types.js';
 
-export type WebViewSender = (msg: BunToWebViewMessage) => void;
+export type WebViewSender = (msg: MainToRendererMessage) => void;
 
 export class AgentRuntime {
   private sessions = new Map<string, { agent: Agent }>();

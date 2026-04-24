@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from 'react';
 import { useAgentStore } from './useAgentStore';
-import type { AvailableModel, SessionPromptParams } from '../../shared/ipc-types';
+import type { SessionPromptParams } from '../../shared/ipc-types';
 
 /**
  * Hook for integrating React UI logic with the Electron main process (agent runtime).
@@ -44,11 +44,12 @@ export function useAgentRuntime() {
   }, [setProcessing]);
 
   /**
-   * Fetches available models from the main process
+   * Fetches available models from the main process.
+   * Return type (AvailableModel[]) is inferred from IpcInvokeMap — no cast needed.
    */
-  const getAvailableModels = useCallback(async (): Promise<AvailableModel[]> => {
+  const getAvailableModels = useCallback(async () => {
     try {
-      return (await window.electronAPI.invoke('getAvailableModels') as AvailableModel[]) || [];
+      return (await window.electronAPI.invoke('getAvailableModels')) ?? [];
     } catch (e) {
       console.error('Failed to get available models:', e);
       return [];

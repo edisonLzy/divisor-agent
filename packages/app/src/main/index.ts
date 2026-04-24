@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { join } from 'path';
 import { AgentRuntime } from './agent-runtime.js';
-import type { BunToWebViewMessage } from '../shared/ipc-types.js';
+import type { IpcInvokeMap, MainToRendererMessage } from '../shared/ipc-types.js';
 
 const HOME_DIR = process.env.HOME ?? '/tmp';
 
@@ -9,36 +9,36 @@ let mainWindow: BrowserWindow | null = null;
 
 const agentRuntime = new AgentRuntime(HOME_DIR);
 
-agentRuntime.setWebViewSender((msg: BunToWebViewMessage) => {
+agentRuntime.setWebViewSender((msg: MainToRendererMessage) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send(msg.event, msg.payload);
   }
 });
 
 function registerIpcHandlers(): void {
-  ipcMain.handle('setModel', (_, params: { sessionId: string; provider: string; modelId: string }) =>
+  ipcMain.handle('setModel', (_, params: IpcInvokeMap['setModel']['params']) =>
     agentRuntime.setModel(params.sessionId, params.provider, params.modelId),
   );
 
-  ipcMain.handle('cycleModel', (_, params: { sessionId: string; direction?: 'next' | 'prev' }) =>
+  ipcMain.handle('cycleModel', (_, params: IpcInvokeMap['cycleModel']['params']) =>
     agentRuntime.cycleModel(params.sessionId, params.direction),
   );
 
-  ipcMain.handle('getAvailableModels', () =>
+  ipcMain.handle('getAvailableModels', (): IpcInvokeMap['getAvailableModels']['return'] =>
     agentRuntime.getAvailableModels(),
   );
 
-  ipcMain.handle('sessionPrompt', (_, params) => {
+  ipcMain.handle('sessionPrompt', (_, params: IpcInvokeMap['sessionPrompt']['params']) => {
     agentRuntime.prompt(params).catch((err: unknown) => {
       console.error('sessionPrompt error:', err);
     });
   });
 
-  ipcMain.handle('permissionApprove', (_, params: { requestId: string }) => {
+  ipcMain.handle('permissionApprove', (_, params: IpcInvokeMap['permissionApprove']['params']) => {
     agentRuntime.approvePermission(params.requestId);
   });
 
-  ipcMain.handle('permissionReject', (_, params: { requestId: string }) => {
+  ipcMain.handle('permissionReject', (_, params: IpcInvokeMap['permissionReject']['params']) => {
     agentRuntime.rejectPermission(params.requestId);
   });
 }

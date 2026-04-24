@@ -1,5 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { IpcInvokeMap, IpcEventMap } from '../shared/ipc-types.js';
 
+// These arrays are verified at compile-time to contain exactly the keys of
+// IpcInvokeMap / IpcEventMap via `satisfies`. Adding or removing a channel
+// from the shared types without updating these lists is a compile error.
 const ALLOWED_CHANNELS = [
   'setModel',
   'cycleModel',
@@ -7,14 +11,14 @@ const ALLOWED_CHANNELS = [
   'sessionPrompt',
   'permissionApprove',
   'permissionReject',
-] as const;
+] as const satisfies readonly (keyof IpcInvokeMap)[];
 
 const ALLOWED_EVENTS = [
   'agentMessageChunk',
   'agentMessageDone',
   'sessionRequestPermission',
   'sessionForked',
-] as const;
+] as const satisfies readonly (keyof IpcEventMap)[];
 
 type AllowedChannel = (typeof ALLOWED_CHANNELS)[number];
 type AllowedEvent = (typeof ALLOWED_EVENTS)[number];
