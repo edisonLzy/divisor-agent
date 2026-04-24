@@ -31,7 +31,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     if (!(ALLOWED_EVENTS as readonly string[]).includes(event)) {
       throw new Error(`IPC event not allowed: ${event}`);
     }
-    const subscription = (_e: Electron.IpcRendererEvent, ...args: unknown[]) =>
+    const subscription = (_event: Electron.IpcRendererEvent, ...args: unknown[]) =>
       callback(...args);
     ipcRenderer.on(event, subscription);
     return () => ipcRenderer.removeListener(event, subscription);

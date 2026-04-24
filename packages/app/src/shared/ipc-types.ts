@@ -2,6 +2,12 @@
 // IPC channel types
 // ============================================================
 
+export interface AvailableModel {
+  providerId: string;
+  modelId: string;
+  modelName: string;
+}
+
 export interface SessionPromptParams {
   sessionId: string;
   content: string;
