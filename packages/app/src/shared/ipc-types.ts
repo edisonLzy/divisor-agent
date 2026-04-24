@@ -1,8 +1,12 @@
 // ============================================================
-// WebView → Bun RPC
+// IPC channel types
 // ============================================================
 
-import type { RPCSchema } from 'electrobun/view';
+export interface AvailableModel {
+  providerId: string;
+  modelId: string;
+  modelName: string;
+}
 
 export interface SessionPromptParams {
   sessionId: string;
@@ -21,34 +25,40 @@ export interface PermissionRejectParams {
   requestId: string;
 }
 
-// RPC type for webview ↔ bun bidirectional communication
-export type RPCType = {
-  // functions that execute in the main process (webview calls bun)
-  bun: RPCSchema<{
-    requests: {
-      setModel: {
-        params: { sessionId: string; provider: string; modelId: string };
-        response: void;
-      };
-      cycleModel: {
-        params: { sessionId: string; direction?: 'next' | 'prev' };
-        response: void;
-      };
-      getAvailableModels: {
-        params: void;
-        response: unknown;
-      };
-    };
-    messages: {
-      agentMessageChunk: { msg: string };
-      agentMessageDone: { msg: string };
-    };
-  }>;
-  webview: RPCSchema<Record<string, unknown>>
-};
+/**
+ * Typed map for renderer → main IPC invocations.
+ * Each key is a channel name; value describes its params and return type.
+ * `params: void` means the channel takes no arguments.
+ */
+export interface IpcInvokeMap {
+  setModel: {
+    params: { sessionId: string; provider: string; modelId: string };
+    return: void;
+  };
+  cycleModel: {
+    params: { sessionId: string; direction?: 'next' | 'prev' };
+    return: void;
+  };
+  getAvailableModels: {
+    params: void;
+    return: AvailableModel[];
+  };
+  sessionPrompt: {
+    params: SessionPromptParams;
+    return: void;
+  };
+  permissionApprove: {
+    params: PermissionApproveParams;
+    return: void;
+  };
+  permissionReject: {
+    params: PermissionRejectParams;
+    return: void;
+  };
+}
 
 // ============================================================
-// Bun → WebView Messages (pushed by Bun, not RPC responses)
+// Main → Renderer push events
 // ============================================================
 
 export interface AgentMessageChunkPayload {
@@ -73,11 +83,21 @@ export interface SessionForkedPayload {
   parentSessionId: string;
 }
 
-export type BunToWebViewMessage =
-  | { event: 'agentMessageChunk'; payload: AgentMessageChunkPayload }
-  | { event: 'agentMessageDone'; payload: AgentMessageDonePayload }
-  | { event: 'sessionRequestPermission'; payload: SessionRequestPermissionPayload }
-  | { event: 'sessionForked'; payload: SessionForkedPayload };
+/**
+ * Typed map for main → renderer push events.
+ * Each key is an event name; value is the payload type.
+ */
+export interface IpcEventMap {
+  agentMessageChunk: AgentMessageChunkPayload;
+  agentMessageDone: AgentMessageDonePayload;
+  sessionRequestPermission: SessionRequestPermissionPayload;
+  sessionForked: SessionForkedPayload;
+}
+
+/** Discriminated union of all push events from main to renderer. */
+export type MainToRendererMessage = {
+  [E in keyof IpcEventMap]: { event: E; payload: IpcEventMap[E] };
+}[keyof IpcEventMap];
 
 // ============================================================
 // Internal types

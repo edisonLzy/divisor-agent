@@ -1,17 +1,17 @@
 import { useEffect } from 'react';
 import { Workspace } from './modules/workspace/Workspace';
 import { TooltipProvider } from './components/ui/tooltip';
-import { useElectroview } from './context/ElectroViewProvider';
+import { useElectronIPC } from './context/ElectroViewProvider';
 
 export function App() {
 
-  const electroview = useElectroview();
-  
-  useEffect(()=>{
-    electroview.rpc?.request.getAvailableModels().then(models => {
+  const { invoke } = useElectronIPC();
+
+  useEffect(() => {
+    invoke('getAvailableModels').then(models => {
       console.log(models);
-    });
-  },[]);
+    }).catch(console.error);
+  }, [invoke]);
 
   return (
     <TooltipProvider>

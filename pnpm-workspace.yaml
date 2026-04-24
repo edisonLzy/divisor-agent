@@ -1,0 +1,7 @@
+packages:
+  - 'packages/*'
+
+catalog:
+  typescript: ^6.0.3
+  vitest: ^4.0.16
+  '@eslint/js': ^9.39.2

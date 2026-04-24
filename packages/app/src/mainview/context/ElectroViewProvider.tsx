@@ -1,37 +1,65 @@
-import { createContext, useContext, useState } from 'react';
-import { Electroview } from 'electrobun/view';
-import type { RPCType } from '../../shared/ipc-types.js';
+import { createContext, useContext } from 'react';
+import type { IpcInvokeMap, IpcEventMap } from '../../shared/ipc-types.js';
 
-const electroviewContext = createContext<ElectroviewContextValues | null>(null);
+// ── Typed ElectronAPI global (exposed by preload via contextBridge) ───────────
 
-type ElectroviewContextValues = {
-  electroview: Electroview<ReturnType<typeof Electroview.defineRPC<RPCType>>>;
-};
+/**
+ * Helper: if Params is void the channel takes no extra args;
+ * otherwise it takes exactly one argument of type Params.
+ */
+type InvokeArgs<C extends keyof IpcInvokeMap> =
+  IpcInvokeMap[C]['params'] extends void ? [] : [IpcInvokeMap[C]['params']];
 
-export function useElectroview() {
-  const values = useContext(electroviewContext);
-  if (!values) {
-    throw new Error('useElectroview must be used within an ElectroViewProvider');
+declare global {
+  interface Window {
+    electronAPI: {
+      /**
+       * Type-safe IPC invoke.
+       * The channel name determines the params type and return type automatically.
+       */
+      invoke: <C extends keyof IpcInvokeMap>(
+        channel: C,
+        ...args: InvokeArgs<C>
+      ) => Promise<IpcInvokeMap[C]['return']>;
+
+      /**
+       * Subscribe to a push event from the main process.
+       * Returns an unsubscribe function.
+       */
+      on: <E extends keyof IpcEventMap>(
+        event: E,
+        callback: (payload: IpcEventMap[E]) => void,
+      ) => () => void;
+    };
   }
-  return values.electroview;
 }
 
-export function ElectroViewProvider({ children }: { children: React.ReactNode }) {
+// ── Context ───────────────────────────────────────────────────────────────────
 
-  const [electroview] = useState(() => {
-    return new Electroview({
-      rpc: Electroview.defineRPC<RPCType>({
-        handlers: {
-          requests: {},
-          messages: {},
-        },
-      })
-    });
-  });
+type ElectronIPCContextValues = {
+  invoke: Window['electronAPI']['invoke'];
+  on: Window['electronAPI']['on'];
+};
 
-  const contextValue: ElectroviewContextValues = {
-    electroview
+const ElectronIPCContext = createContext<ElectronIPCContextValues | null>(null);
+
+export function useElectronIPC() {
+  const ctx = useContext(ElectronIPCContext);
+  if (!ctx) {
+    throw new Error('useElectronIPC must be used within an ElectronIPCProvider');
+  }
+  return ctx;
+}
+
+export function ElectronIPCProvider({ children }: { children: React.ReactNode }) {
+  const contextValue: ElectronIPCContextValues = {
+    invoke: window.electronAPI.invoke,
+    on: window.electronAPI.on,
   };
 
-  return <electroviewContext.Provider value={contextValue}>{children}</electroviewContext.Provider>;
+  return (
+    <ElectronIPCContext.Provider value={contextValue}>
+      {children}
+    </ElectronIPCContext.Provider>
+  );
 }
