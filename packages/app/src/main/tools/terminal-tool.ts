@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import { Type } from '@mariozechner/pi-ai';
 import type { Static } from '@sinclair/typebox';
 import type { AgentTool } from '@mariozechner/pi-agent-core';
@@ -27,18 +28,23 @@ export const terminalCreateTool: AgentTool<typeof TerminalParams> = {
     }
 
     try {
-      const proc = Bun.spawn(['sh', '-c', command], {
-        cwd: cwd ?? process.cwd(),
-        stdout: 'pipe',
-        stderr: 'pipe',
-      });
+      const [stdout, stderr, exitCode] = await new Promise<[string, string, number]>(
+        (resolve, reject) => {
+          const proc = spawn('sh', ['-c', command], {
+            cwd: cwd ?? process.cwd(),
+          });
 
-      const [stdout, stderr] = await Promise.all([
-        new Response(proc.stdout).text(),
-        new Response(proc.stderr).text(),
-      ]);
+          let out = '';
+          let err = '';
 
-      const exitCode = proc.exitCode ?? undefined;
+          proc.stdout.on('data', (chunk: Buffer) => { out += chunk.toString(); });
+          proc.stderr.on('data', (chunk: Buffer) => { err += chunk.toString(); });
+
+          proc.on('close', (code) => resolve([out, err, code ?? 0]));
+          proc.on('error', reject);
+        },
+      );
+
       const output = stdout || stderr || '(no output)';
 
       return {

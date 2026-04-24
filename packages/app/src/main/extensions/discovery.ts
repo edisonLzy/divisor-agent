@@ -1,5 +1,5 @@
 import { join, resolve } from 'path';
-import { existsSync, readdirSync } from 'fs';
+import { existsSync, readdirSync, readFileSync } from 'fs';
 import type { DiscoveredExtension } from './registry.js';
 
 const EXTENSION_DIRS = ['.pi/extensions'];
@@ -8,7 +8,7 @@ function getExtensionManifest(path: string): DiscoveredExtension['manifest'] | n
   try {
     const pkgPath = join(path, 'package.json');
     if (!existsSync(pkgPath)) return null;
-    const pkg = Bun.file(pkgPath).json() as {
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as {
       name?: string;
       version?: string;
       main?: string;

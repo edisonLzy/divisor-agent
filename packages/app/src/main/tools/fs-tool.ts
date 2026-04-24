@@ -1,3 +1,4 @@
+import { readFile, writeFile } from 'node:fs/promises';
 import { Type } from '@mariozechner/pi-ai';
 import type { Static } from '@sinclair/typebox';
 import type { AgentTool } from '@mariozechner/pi-agent-core';
@@ -20,14 +21,7 @@ export const fsReadTextFileTool: AgentTool<typeof PathParams> = {
     const { path } = params as Static<typeof PathParams>;
 
     try {
-      const file = Bun.file(path);
-      if (!file.exists()) {
-        return {
-          content: [{ type: 'text', text: `Error: File not found: ${path}` }],
-          details: { toolCallId },
-        };
-      }
-      const content = await file.text();
+      const content = await readFile(path, 'utf-8');
       return {
         content: [{ type: 'text', text: content }],
         details: { toolCallId, bytesRead: content.length },
@@ -50,7 +44,7 @@ export const fsWriteTextFileTool: AgentTool<typeof WriteParams> = {
     const { path, content } = params as Static<typeof WriteParams>;
 
     try {
-      await Bun.write(path, content);
+      await writeFile(path, content, 'utf-8');
       return {
         content: [{ type: 'text', text: `File written successfully: ${path}` }],
         details: { toolCallId, bytesWritten: content.length },

@@ -1,50 +1,28 @@
 import { useCallback, useEffect } from 'react';
 import { useAgentStore } from './useAgentStore';
-import type { BunToWebViewMessage, SessionPromptParams } from '../../shared/ipc-types';
-
-declare global {
-  interface Window {
-    electrobun?: {
-      rpc?: {
-        request: (method: string, params?: any) => Promise<any>;
-      };
-    };
-  }
-}
+import type { SessionPromptParams } from '../../shared/ipc-types';
 
 /**
- * Hook for integrating React UI logic with the main Bun process (agent runtime).
- * Exposes methods to communicate with the Agent Runtime and syncs its state to Zustand.
+ * Hook for integrating React UI logic with the Electron main process (agent runtime).
+ * Exposes methods to communicate with the Agent Runtime via Electron IPC.
  */
 export function useAgentRuntime() {
   const { isProcessing, setProcessing } = useAgentStore();
 
   useEffect(() => {
-    // Setup listener for messages pushed by Bun
-    const messageHandler = (e: MessageEvent) => {
-      const message = e.data as BunToWebViewMessage;
-      console.log('Received message from Bun:', message);
+    const removeListener = window.electronAPI.on('agentMessageDone', () => {
+      setProcessing(false);
+    });
 
-      if (message.event === 'agentMessageDone') {
-        setProcessing(false);
-      }
-      // TODO: Handle agentMessageChunk, sessionRequestPermission, etc.
-    };
-
-    // Electrobun webview environment standard mechanism for receiving pushing events
-    window.addEventListener('message', messageHandler);
-
-    return () => {
-      window.removeEventListener('message', messageHandler);
-    };
+    return removeListener;
   }, [setProcessing]);
 
   /**
-   * Dispatches a prompt to the Bun backend to execute
+   * Dispatches a prompt to the main process to execute
    */
   const sendPrompt = useCallback((sessionId: string, content: string, modelStr?: string) => {
     setProcessing(true);
-    
+
     let providerId = 'google';
     let modelId = 'gemini-3.1-pro-preview';
     if (modelStr && modelStr.includes('/')) {
@@ -58,21 +36,19 @@ export function useAgentRuntime() {
       content,
       model: {
         providerId,
-        modelId
-      }
+        modelId,
+      },
     };
-    
-    // Dispatch through Electrobun RPC
-    window.electrobun?.rpc?.request('sessionPrompt', params).catch(console.error);
+
+    window.electronAPI.invoke('sessionPrompt', params).catch(console.error);
   }, [setProcessing]);
 
   /**
-   * Fetches available models from the Bun backend
+   * Fetches available models from the main process
    */
   const getAvailableModels = useCallback(async () => {
-    if (!window.electrobun?.rpc) return [];
     try {
-      return (await window.electrobun.rpc.request('getAvailableModels')) || [];
+      return (await window.electronAPI.invoke('getAvailableModels') as { providerId: string; modelId: string; modelName: string }[]) || [];
     } catch (e) {
       console.error('Failed to get available models:', e);
       return [];

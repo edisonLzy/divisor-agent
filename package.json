@@ -3,18 +3,12 @@
   "version": "1.0.0",
   "description": "",
   "private": true,
-  "workspaces": ["packages/*"],
-  "catalog": {
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.16",
-    "@eslint/js": "^9.39.2"
-  },
   "scripts": {
-    "dev": "bun --bun run --parallel dev",
-    "build": "bun --bun run --parallel build",
-    "dev:server": "bun --filter @divisor-agent/server dev",
-    "dev:app": "bun --filter ./packages/app dev",
-    "type-check": "bun --workspaces run type-check",
+    "dev": "pnpm run --parallel dev",
+    "build": "pnpm run --parallel build",
+    "dev:server": "pnpm --filter @divisor-agent/server dev",
+    "dev:app": "pnpm --filter @divisor-agent/app dev",
+    "type-check": "pnpm -r run type-check",
     "test": "vitest",
     "lint": "eslint .",
     "prepare": "husky"
@@ -39,21 +33,5 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.50.0",
     "vitest": "^4.0.16"
-  },
-  "dependencies": {
-    "@mariozechner/pi-agent-core": "^0.68.0",
-    "@mariozechner/pi-ai": "^0.68.0",
-    "@sinclair/typebox": "^0.34.49",
-    "@tanstack/react-query": "^5.91.3",
-    "@tiptap/extension-mention": "^3.20.4",
-    "@tiptap/extension-placeholder": "^3.20.4",
-    "@tiptap/pm": "^3.20.4",
-    "@tiptap/react": "^3.20.4",
-    "@tiptap/starter-kit": "^3.20.4",
-    "@trpc/client": "^11.13.4",
-    "@trpc/react-query": "^11.13.4",
-    "electrobun-react-tailwind-vite": "workspace:*",
-    "electrobun-react-tailwind-vite": "./packages/app",
-    "superjson": "^2.2.6"
   }
 }
