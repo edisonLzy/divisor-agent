@@ -34,10 +34,10 @@ pnpm --filter @divisor-agent/server test
 ### Communication Layers
 
 | Layer                    | Protocol                     | Purpose                                      |
-| ------------------------ | --------------------------- | -------------------------------------------- |
+| ------------------------ | ---------------------------- | -------------------------------------------- |
 | Frontend ↔ Electron Main | Electron IPC (contextBridge) | Agent prompt, permissions, model selection   |
-| Frontend ↔ Server        | tRPC (HTTP)                 | Session metadata (tree, history), model list |
-| Electron Main ↔ Server   | HTTP/tRPC                   | Session persistence, model config             |
+| Frontend ↔ Server        | tRPC (HTTP)                  | Session metadata (tree, history), model list |
+| Electron Main ↔ Server   | HTTP/tRPC                    | Session persistence, model config            |
 
 ### Monorepo Structure
 
