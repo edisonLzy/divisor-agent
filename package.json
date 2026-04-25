@@ -1,8 +1,12 @@
 {
   "name": "divisor-agent",
   "version": "1.0.0",
-  "description": "",
   "private": true,
+  "description": "",
+  "keywords": [],
+  "license": "ISC",
+  "author": "evan",
+  "type": "module",
   "scripts": {
     "dev": "pnpm run --parallel dev",
     "build": "pnpm run --parallel build",
@@ -10,28 +14,28 @@
     "dev:app": "pnpm --filter @divisor-agent/app dev",
     "type-check": "pnpm -r run type-check",
     "test": "vitest",
-    "lint": "eslint .",
+    "lint": "oxlint",
+    "format": "oxfmt --write",
+    "format:check": "oxfmt --check",
     "prepare": "husky"
   },
-  "keywords": [],
-  "author": "evan",
-  "license": "ISC",
   "devDependencies": {
     "@commitlint/cli": "^20.2.0",
     "@commitlint/config-conventional": "^20.2.0",
-    "@eslint/compat": "^2.0.0",
-    "@eslint/js": "^9.39.2",
-    "@stylistic/eslint-plugin": "^5.6.1",
     "@types/node": "^22.0.0",
     "conventional-changelog-conventionalcommits": "^9.3.1",
-    "eslint": "^9.39.2",
-    "eslint-plugin-import": "^2.32.0",
-    "eslint-plugin-unused-imports": "^4.3.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
+    "oxfmt": "^0.46.0",
+    "oxlint": "^1.61.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.50.0",
     "vitest": "^4.0.16"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild"
+    ]
   }
 }

@@ -20,10 +20,10 @@ graph LR
 
 **两层通信职责**：
 
-| 通道 | 技术 | 职责 |
-|---|---|---|
-| 前端 ↔ Express | HTTP REST (`/api/*`) | 会话元数据（列表、历史消息、设置） |
-| 前端 ↔ Rust | Tauri IPC (`invoke`/`listen`) | ACP 连接、终端执行、文件操作、流式消息 |
+| 通道           | 技术                          | 职责                                   |
+| -------------- | ----------------------------- | -------------------------------------- |
+| 前端 ↔ Express | HTTP REST (`/api/*`)          | 会话元数据（列表、历史消息、设置）     |
+| 前端 ↔ Rust    | Tauri IPC (`invoke`/`listen`) | ACP 连接、终端执行、文件操作、流式消息 |
 
 当前 Express Server 仅有一个 health-check 路由，业务路由（`/api/sessions` 等）尚未实现。
 
@@ -32,6 +32,7 @@ graph LR
 ## 二、tRPC 简介
 
 tRPC 是一种 TypeScript-first 的 RPC 框架，特点：
+
 - 端到端类型安全，前后端共享 TypeScript 类型，无需手写 API schema
 - 零配置，通过过程（procedure）定义 API
 - 支持查询（query）、变更（mutation）、订阅（subscription/SSE）
@@ -46,24 +47,32 @@ tRPC 是一种 TypeScript-first 的 RPC 框架，特点：
 **现状**：前端文档中定义了 5 个 REST 接口（`GET /api/sessions`、`GET /api/sessions/:id/history` 等）。
 
 **tRPC 能带来的收益**：
+
 - 前后端共享同一个 TypeScript 类型定义，修改接口时类型错误直接报错
 - 去掉 Zod validation + REST 路由的重复工作
 - 更好的开发时补全和类型提示
 
 **实施方式**：
+
 ```ts
 // server/src/routers/sessions.ts
 const sessionsRouter = router({
-  list: publicProcedure.query(async () => { /* ... */ }),
+  list: publicProcedure.query(async () => {
+    /* ... */
+  }),
   history: publicProcedure
     .input(z.object({ id: z.string(), cursor: z.string().optional() }))
-    .query(async ({ input }) => { /* ... */ }),
+    .query(async ({ input }) => {
+      /* ... */
+    }),
   rename: publicProcedure
     .input(z.object({ id: z.string(), name: z.string() }))
-    .mutation(async ({ input }) => { /* ... */ }),
-  delete: publicProcedure
-    .input(z.object({ id: z.string() }))
-    .mutation(async ({ input }) => { /* ... */ }),
+    .mutation(async ({ input }) => {
+      /* ... */
+    }),
+  delete: publicProcedure.input(z.object({ id: z.string() })).mutation(async ({ input }) => {
+    /* ... */
+  }),
 });
 
 // client/src/api/sessions.ts
@@ -108,19 +117,21 @@ graph LR
 
 **通道职责分工**：
 
-| 通道 | 方向 | 协议 | 职责 |
-|---|---|---|---|
-| tRPC (query/mutation) | React → Express | HTTP | 会话元数据的读写（列表、历史、设置） |
-| tRPC Subscription | Express → React | SSE | 将 Rust 推送的事件转发给 React |
-| WebSocket | Rust → Express | TCP/WebSocket | Rust 主动向 Express 推送 ACP 事件 |
+| 通道                  | 方向            | 协议          | 职责                                 |
+| --------------------- | --------------- | ------------- | ------------------------------------ |
+| tRPC (query/mutation) | React → Express | HTTP          | 会话元数据的读写（列表、历史、设置） |
+| tRPC Subscription     | Express → React | SSE           | 将 Rust 推送的事件转发给 React       |
+| WebSocket             | Rust → Express  | TCP/WebSocket | Rust 主动向 Express 推送 ACP 事件    |
 
 **为什么可行**：
+
 - WebSocket 客户端可以是任何语言，Rust 有成熟的 `tokio-tungstenite` 库
 - Express 通过 `ws` 或 `socket.io` 可以轻松承载 WebSocket 服务端
 - tRPC 的 subscription endpoint 本身支持 SSE，可以作为前端订阅入口
 - Rust 通过 WebSocket 发消息到 Express，Express 通过 tRPC SSE 推给前端——全链路打通
 
 **数据流示例（审批请求）**：
+
 ```
 1. Rust 检测到高风险操作
 2. Rust → Express (WebSocket): { type: 'permission_request', requestId, operation, params }
@@ -132,6 +143,7 @@ graph LR
 ```
 
 **技术选型**：
+
 - Rust 端：`tokio-tungstenite` + `futures-util`
 - Express 端：`ws`（轻量）或 `socket.io`（带 rooms/namespace，适合多会话场景）
 - 消息格式：JSON，与 ACP 协议解耦
@@ -145,10 +157,12 @@ graph LR
 引入 Rust → Express WebSocket 通道后，Rust 与前端的通信从 Tauri IPC 迁移到了 Express 中转。此时 Tauri IPC 的必要性取决于前端是否需要**直接**调用 Rust。
 
 **需要保留 Tauri IPC 的场景**：
+
 - 前端需要直接触发 Rust 命令（如 `session_prompt`、`session_fork`），不经过 Express
 - 出于安全考虑，不想让 Express 有权限触发 Rust 的敏感操作
 
 **可以移除 Tauri IPC 的场景**：
+
 - 所有 Rust 命令都通过 Express 中转（前端 → tRPC mutation → Express → WebSocket → Rust）
 - Express 作为唯一的命令入口，Rust 不接受前端直接 IPC 调用
 
@@ -237,13 +251,13 @@ graph LR
 
 ### 4.3 tRPC Router 设计
 
-| Procedure | Type | Input | Description |
-|---|---|---|---|
-| `sessions.list` | query | - | 获取会话树 |
-| `sessions.history` | query | `{ id, cursor? }` | 分页获取会话历史 |
-| `sessions.rename` | mutation | `{ id, name }` | 重命名会话 |
-| `sessions.delete` | mutation | `{ id }` | 删除会话 |
-| `settings.get` | query | - | 获取应用与模型配置 |
+| Procedure          | Type     | Input             | Description        |
+| ------------------ | -------- | ----------------- | ------------------ |
+| `sessions.list`    | query    | -                 | 获取会话树         |
+| `sessions.history` | query    | `{ id, cursor? }` | 分页获取会话历史   |
+| `sessions.rename`  | mutation | `{ id, name }`    | 重命名会话         |
+| `sessions.delete`  | mutation | `{ id }`          | 删除会话           |
+| `settings.get`     | query    | -                 | 获取应用与模型配置 |
 
 ### 4.4 与现有设计的兼容性
 
@@ -256,15 +270,16 @@ graph LR
 
 ## 五、结论
 
-| 评估维度 | 结论 |
-|---|---|
-| Express ↔ React 层 | ✅ **推荐使用 tRPC** — 端到端类型安全，DX 好，替换成本低 |
-| Rust ↔ Express WebSocket | ✅ **可行** — Rust 作为 WebSocket 客户端连接 Express，技术成熟 |
-| Rust Tauri IPC | ⚠️ **可选** — 若采用 WebSocket 通道，Tauri IPC 可逐步废弃；否则保留 |
-| 整体收益 | **正向** — tRPC + WebSocket 双通道架构清晰，各自职责明确 |
-| 实施风险 | **低** — 渐进式迁移，可先引入 tRPC，再搭建 WebSocket 通道 |
+| 评估维度                 | 结论                                                                |
+| ------------------------ | ------------------------------------------------------------------- |
+| Express ↔ React 层       | ✅ **推荐使用 tRPC** — 端到端类型安全，DX 好，替换成本低            |
+| Rust ↔ Express WebSocket | ✅ **可行** — Rust 作为 WebSocket 客户端连接 Express，技术成熟      |
+| Rust Tauri IPC           | ⚠️ **可选** — 若采用 WebSocket 通道，Tauri IPC 可逐步废弃；否则保留 |
+| 整体收益                 | **正向** — tRPC + WebSocket 双通道架构清晰，各自职责明确            |
+| 实施风险                 | **低** — 渐进式迁移，可先引入 tRPC，再搭建 WebSocket 通道           |
 
 **最终建议**：
+
 1. **短期**：Express ↔ React 层引入 tRPC，Rust 通信保持 Tauri IPC
 2. **长期**：Rust 通过 WebSocket 连接 Express，Express 通过 tRPC Subscription 转发事件给前端，Tauri IPC 可废弃
 

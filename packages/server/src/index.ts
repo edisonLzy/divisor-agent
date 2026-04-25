@@ -1,9 +1,10 @@
-import { createServer } from 'node:http';
-import { createApp } from './app.js';
-import { getPort } from './config/env.js';
-import { createLogger } from './shared/logger.js';
+import { createServer } from "node:http";
 
-const logger = createLogger('server');
+import { createApp } from "./app.js";
+import { getPort } from "./config/env.js";
+import { createLogger } from "./shared/logger.js";
+
+const logger = createLogger("server");
 const port = getPort();
 const app = createApp();
 

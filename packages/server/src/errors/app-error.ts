@@ -6,7 +6,7 @@ export class AppError extends Error {
     super(message);
     this.statusCode = statusCode;
     this.code = code ?? statusCode;
-    this.name = 'AppError';
+    this.name = "AppError";
     Error.captureStackTrace(this, this.constructor);
   }
 }

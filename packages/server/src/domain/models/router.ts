@@ -1,5 +1,5 @@
-import { router, publicProcedure } from '../../shared/trpc.js';
-import { listModels } from './service.js';
+import { router, publicProcedure } from "../../shared/trpc.js";
+import { listModels } from "./service.js";
 
 export const modelsRouter = router({
   list: publicProcedure.query(async () => {

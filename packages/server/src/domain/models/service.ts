@@ -1,9 +1,10 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import os from 'node:os';
-import type { ModelInfo } from './types.js';
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
-const MODELS_JSON_PATH = path.join(os.homedir(), '.pi', 'agent', 'models.json');
+import type { ModelInfo } from "./types.js";
+
+const MODELS_JSON_PATH = path.join(os.homedir(), ".pi", "agent", "models.json");
 
 interface ModelsJsonModel {
   id: string;
@@ -23,24 +24,24 @@ interface ModelsJsonConfig {
 
 const BUILT_IN_MODELS: ModelInfo[] = [
   {
-    providerId: 'anthropic',
-    modelId: 'claude-sonnet-4-20250514',
-    modelName: 'Claude Sonnet 4',
+    providerId: "anthropic",
+    modelId: "claude-sonnet-4-20250514",
+    modelName: "Claude Sonnet 4",
     isBuiltIn: true,
-    api: 'anthropic-messages',
+    api: "anthropic-messages",
   },
   {
-    providerId: 'anthropic',
-    modelId: 'claude-opus-4-5',
-    modelName: 'Claude Opus 4.5',
+    providerId: "anthropic",
+    modelId: "claude-opus-4-5",
+    modelName: "Claude Opus 4.5",
     isBuiltIn: true,
-    api: 'anthropic-messages',
+    api: "anthropic-messages",
   },
 ];
 
 async function readModelsJson(): Promise<ModelsJsonConfig> {
   try {
-    const content = await fs.readFile(MODELS_JSON_PATH, 'utf-8');
+    const content = await fs.readFile(MODELS_JSON_PATH, "utf-8");
     return JSON.parse(content) as ModelsJsonConfig;
   } catch {
     return {};
@@ -82,7 +83,7 @@ export async function resolveCustomModelConfig(
   if (!provider || !provider.baseUrl || !provider.apiKey || !provider.api) {
     return null;
   }
-  const modelExists = provider.models?.some(m => m.id === modelId);
+  const modelExists = provider.models?.some((m) => m.id === modelId);
   if (!modelExists) return null;
 
   return {

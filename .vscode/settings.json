@@ -1,10 +1,6 @@
 {
-    "cSpell.words": [
-        "electroview",
-        "mariozechner",
-        "typebox"
-    ],
-    "chat.tools.terminal.autoApprove": {
-        "bun": true
-    }
+  "cSpell.words": ["electroview", "mariozechner", "typebox"],
+  "chat.tools.terminal.autoApprove": {
+    "bun": true
+  }
 }

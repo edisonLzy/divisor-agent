@@ -1,11 +1,12 @@
-import { randomUUID } from 'node:crypto';
-import { AsyncLocalStorage } from 'node:async_hooks';
-import { pinoHttp } from 'pino-http';
-import pino from 'pino';
+import { AsyncLocalStorage } from "node:async_hooks";
+import { randomUUID } from "node:crypto";
 
-const isDev = process.env.NODE_ENV !== 'production';
+import pino from "pino";
+import { pinoHttp } from "pino-http";
 
-const TRACE_HEADER_KEY = 'x-request-id';
+const isDev = process.env.NODE_ENV !== "production";
+
+const TRACE_HEADER_KEY = "x-request-id";
 
 interface LoggerContext {
   traceId?: string;
@@ -16,7 +17,7 @@ const asyncLocalStorage = new AsyncLocalStorage<LoggerContext>();
 
 export function createLogger(serviceName: string) {
   return pino({
-    level: process.env.LOG_LEVEL || 'info',
+    level: process.env.LOG_LEVEL || "info",
 
     mixin() {
       const traceId = getTraceId();
@@ -25,27 +26,27 @@ export function createLogger(serviceName: string) {
 
     redact: {
       paths: [
-        'req.headers.authorization',
+        "req.headers.authorization",
         'req.headers["x-auth-token"]',
-        'password',
-        'token',
-        'secret',
-        'credit_card',
-        'bank_account',
+        "password",
+        "token",
+        "secret",
+        "credit_card",
+        "bank_account",
       ],
-      censor: '***',
+      censor: "***",
     },
 
     transport: isDev
       ? {
-        target: 'pino-pretty',
-        options: {
-          colorize: true,
-          translateTime: 'SYS:standard',
-          ignore: 'pid,hostname',
-          messageFormat: `[${serviceName}] {msg}`,
-        },
-      }
+          target: "pino-pretty",
+          options: {
+            colorize: true,
+            translateTime: "SYS:standard",
+            ignore: "pid,hostname",
+            messageFormat: `[${serviceName}] {msg}`,
+          },
+        }
       : undefined,
 
     base: {
@@ -64,7 +65,7 @@ export function createRequestLoggerMiddleware(logger: pino.Logger) {
   const httpLogger = pinoHttp({
     logger,
     genReqId: (req) => {
-      return ((req.headers[TRACE_HEADER_KEY] as string) || randomUUID());
+      return (req.headers[TRACE_HEADER_KEY] as string) || randomUUID();
     },
     serializers: {
       req: (req) => ({
@@ -76,14 +77,18 @@ export function createRequestLoggerMiddleware(logger: pino.Logger) {
       }),
     },
     customAttributeKeys: {
-      req: 'req',
-      res: 'res',
-      err: 'err',
-      responseTime: 'responseTime',
+      req: "req",
+      res: "res",
+      err: "err",
+      responseTime: "responseTime",
     },
   });
 
-  return (req: Parameters<typeof httpLogger>[0], res: Parameters<typeof httpLogger>[1], next: () => void) => {
+  return (
+    req: Parameters<typeof httpLogger>[0],
+    res: Parameters<typeof httpLogger>[1],
+    next: () => void,
+  ) => {
     httpLogger(req, res, () => {
       const traceId = req.id as string;
       res.setHeader(TRACE_HEADER_KEY, traceId);

@@ -82,11 +82,11 @@ Returns server health status.
 
 ## Environment Variables
 
-| Variable    | Default | Description           |
-|-------------|---------|-----------------------|
-| `PORT`      | `3000`  | Server port           |
+| Variable    | Default | Description                   |
+| ----------- | ------- | ----------------------------- |
+| `PORT`      | `3000`  | Server port                   |
 | `NODE_ENV`  | -       | `production` or `development` |
-| `LOG_LEVEL` | `info`  | Pino log level        |
+| `LOG_LEVEL` | `info`  | Pino log level                |
 
 Copy `.env.example` to `.env` to get started.
 

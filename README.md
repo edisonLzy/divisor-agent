@@ -1,6 +1,7 @@
 # divisor-agent
 
 桌面原生 AI Agent 应用，采用 C/S 混合架构：
+
 - Server（远程大脑）：Node.js + TypeScript，负责 Agent Loop、会话存储、LLM 调用、ACP 服务端。
 - App（本地客户端）：Tauri（Rust） + React，负责本地文件系统/终端执行、ACP 通信、UI 渲染。
 
@@ -21,6 +22,7 @@ Node Server
 ```
 
 当前通信边界：
+
 - 前端到服务端：tRPC / HTTP，用于元数据查询与变更。
 - 前端到 Rust：Tauri IPC，用于会话启动、审批反馈等本地桥接。
 - Rust 到服务端：基于 WebSocket 的 ACP 协议，用于实时对话流和工具调用。
@@ -81,6 +83,7 @@ bun lint
 ```
 
 说明：
+
 - `packages/server` 使用 `tsx --watch` 进行开发。
 - `packages/app` 使用 `tauri dev` 启动桌面应用。
 - Vite 开发端口固定为 `1420`，端口被占用时会直接失败而不是自动切换。
@@ -123,6 +126,7 @@ bun lint
 ## 当前状态
 
 当前仓库已完成：
+
 - Monorepo 基础结构
 - Server 基础骨架与 health-check
 - App 基础 Tauri + React 工程
