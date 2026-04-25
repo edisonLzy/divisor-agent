@@ -7,15 +7,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Divisor-agent is a desktop AI agent app using a C/S hybrid architecture:
 
 - **Server** (`packages/server`): Remote brain — Express v5 + tRPC + Zod, handles session persistence and model configuration
-- **App** (`packages/app`): Local client — electrobun + React 19 Webview, handles agent execution, tools, and UI rendering
+- **App** (`packages/app`): Local client — Electron 39 + React 19, handles agent execution, tools, and UI rendering
 
 ## Common Commands
 
 ```bash
 pnpm dev              # Start all packages in parallel
 pnpm dev:server       # Start server only (tsx --watch)
-pnpm dev:app          # Start electrobun app with HMR
-pnpm dev:hmr          # Run Vite dev server for frontend HMR
+pnpm dev:app          # Start Electron app with electron-vite
 pnpm build            # Build all packages
 pnpm type-check       # Type-check all packages
 pnpm test             # Run all tests (Vitest workspace)
@@ -26,6 +25,7 @@ Single package commands:
 
 ```bash
 pnpm --filter @divisor-agent/server dev
+pnpm --filter @divisor-agent/app dev
 pnpm --filter @divisor-agent/server test
 ```
 
@@ -33,36 +33,44 @@ pnpm --filter @divisor-agent/server test
 
 ### Communication Layers
 
-| Layer             | Protocol                               | Purpose                                      |
-| ----------------- | -------------------------------------- | -------------------------------------------- |
-| Frontend ↔ Bun    | electrobun RPC (`defineElectrobunRPC`) | Agent prompt, permissions, model selection   |
-| Frontend ↔ Server | tRPC (HTTP/SSE)                        | Session metadata (tree, history), model list |
-| Bun ↔ Server      | None (local execution)                 | Agent runs entirely in-process               |
+| Layer                    | Protocol                     | Purpose                                      |
+| ------------------------ | --------------------------- | -------------------------------------------- |
+| Frontend ↔ Electron Main | Electron IPC (contextBridge) | Agent prompt, permissions, model selection   |
+| Frontend ↔ Server        | tRPC (HTTP)                 | Session metadata (tree, history), model list |
+| Electron Main ↔ Server   | HTTP/tRPC                   | Session persistence, model config             |
 
 ### Monorepo Structure
 
 ```
 packages/
-  app/                    # electrobun + React 19 + Tailwind v4 + shadcn/ui
+  app/                    # Electron + React 19 + Tailwind v4 + shadcn/ui
     src/
-      mainview/          # React frontend
-        components/      # UI components (shadcn/ui + custom ai-elements)
-        hooks/           # React hooks (useAgentStore, useAgentRuntime)
-        lib/             # Utilities (utils.ts)
-        modules/         # Page modules (workspace/)
-          workspace/      # Main workspace (Workspace, Messages, InstructionInput)
-        App.tsx          # Root component with dark theme layout
-        main.tsx         # React entry point
-        index.css        # Tailwind v4 + custom CSS variables
-      bun/               # Bun runtime (desktop backend)
-        agent-runtime.ts # Agent orchestration (sessions, permissions, extensions)
-        extensions/      # Extension system (loader, registry, discovery)
-        models/          # Model registry and runtime (supports custom models)
-        permissions/     # Permission service (high-risk operation gating)
-        tools/           # Built-in tools (fs read/write, terminal)
-        index.ts         # electrobun BrowserWindow entry point
-      shared/
-        ipc-types.ts     # Shared IPC type definitions
+      main/              # Electron main process
+        index.ts         # Main process entry (BrowserWindow, IPC handlers)
+      preload/           # Electron preload scripts
+        index.ts         # contextBridge API exposure
+      renderer/          # React frontend
+        index.html       # HTML entry
+        src/
+          mainview/      # React frontend
+            components/  # UI components (shadcn/ui + custom ai-elements)
+            hooks/       # React hooks (useAgentStore, useAgentRuntime)
+            lib/         # Utilities (utils.ts)
+            modules/     # Page modules (workspace/)
+              workspace/ # Main workspace (Workspace, Messages, InstructionInput)
+            App.tsx      # Root component with dark theme layout
+            main.tsx     # React entry point
+            index.css    # Tailwind v4 + custom CSS variables
+          bun/           # Bun runtime (desktop backend, embedded in main process)
+            agent-runtime.ts # Agent orchestration (sessions, permissions, extensions)
+            extensions/  # Extension system (loader, registry, discovery)
+            models/      # Model registry and runtime (supports custom models)
+            permissions/ # Permission service (high-risk operation gating)
+            tools/       # Built-in tools (fs read/write, terminal)
+          shared/
+            ipc-types.ts # Shared IPC type definitions
+    electron.vite.config.ts
+    electron-builder.yml
   server/                 # Express v5 + tRPC + Zod + Superjson + Pino
     src/
       domain/             # Feature modules
@@ -72,8 +80,8 @@ packages/
           types.ts        # ModelInfo type
         sessions/         # Session persistence
           router.ts       # tRPC router
-          service.ts     # Session CRUD and history (session-map.json)
-          types.ts       # Session types
+          service.ts      # Session CRUD and history (session-map.json)
+          types.ts        # Session types
       shared/             # Logger, tRPC init
       middlewares/        # Express middleware (response, error, request log)
       config/             # Environment configuration
@@ -104,9 +112,9 @@ The app uses a dark theme with the following color palette:
 - **Testing**: Root `vitest.config.ts` uses workspace mode; each package has its own `vitest.config.ts`
 - **Production build**: Server uses `packages/server/tsconfig.build.json` (excludes tests)
 
-## Agent Runtime (Bun Side)
+## Agent Runtime (Main Process)
 
-The `AgentRuntime` class in `packages/app/src/bun/agent-runtime.ts` manages:
+The `AgentRuntime` class in `packages/app/src/renderer/src/bun/agent-runtime.ts` manages:
 
 - **Sessions**: Creates/manages per-session `Agent` instances using `@mariozechner/pi-agent-core`
 - **Tools**: Built-in tools (fs read/write, terminal) + extension tools
@@ -119,8 +127,8 @@ The `AgentRuntime` class in `packages/app/src/bun/agent-runtime.ts` manages:
 High-risk operations (defined in `PermissionService.isHighRisk()`) require user approval:
 
 1. Tool call triggers permission check
-2. UI shows permission dialog via `sessionRequestPermission` event
-3. User approves/rejects via `permissionApprove` / `permissionReject` RPC
+2. UI shows permission dialog via IPC event
+3. User approves/rejects via `permissionApprove` / `permissionReject` IPC calls
 
 ### Extension System
 
@@ -135,6 +143,6 @@ The project is in MVP development. Current state:
 
 - Monorepo scaffolding and tooling are set up
 - Server has Express + tRPC skeleton with sessions and models routers
-- App has electrobun + React shell with dark theme workspace UI
+- App has Electron + React shell with dark theme workspace UI
 - Agent runtime, permission system, and extension system are implemented
 - Session management, model selection, and permission approval flows are wired up
