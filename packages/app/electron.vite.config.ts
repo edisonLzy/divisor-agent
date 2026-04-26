@@ -5,7 +5,14 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "electron-vite";
 
 export default defineConfig({
-  main: {},
+  main: {
+    build: {
+      lib: {
+        entry: path.resolve(__dirname, "src/main/index.ts"),
+        formats: ["es"],
+      },
+    },
+  },
   preload: {},
   renderer: {
     root: "src/renderer",
