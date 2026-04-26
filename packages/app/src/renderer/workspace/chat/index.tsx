@@ -1,3 +1,3 @@
 export function Chat() {
-  return <div>this is sessions</div>;
+  return <div className="text-green-400">this is chat</div>;
 }

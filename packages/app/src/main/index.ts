@@ -2,7 +2,7 @@ import { join } from "path";
 
 import { app, BrowserWindow, ipcMain } from "electron";
 
-import type { IpcInvokeMap, MainToRendererMessage } from "../shared/ipc-types.js";
+import type { IpcInvokeMap, MainToRendererMessage } from "../shared/ipc-types";
 import { AgentRuntime } from "./agent-runtime.js";
 
 const HOME_DIR = process.env.HOME ?? "/tmp";
