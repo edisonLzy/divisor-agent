@@ -1,5 +1,3 @@
-import type { PendingPermission } from "../../shared/ipc-types.js";
-
 export type PermissionCallback = (request: {
   requestId: string;
   operation: string;
@@ -7,7 +5,15 @@ export type PermissionCallback = (request: {
 }) => void;
 
 export class PermissionService {
-  private pendingPermissions = new Map<string, PendingPermission>();
+  private pendingPermissions = new Map<
+    string,
+    {
+      requestId: string;
+      operation: string;
+      params: Record<string, unknown>;
+      resolve: (approved: boolean) => void;
+    }
+  >();
   private onRequestCallback: PermissionCallback | null = null;
 
   setRequestCallback(cb: PermissionCallback) {
@@ -20,7 +26,7 @@ export class PermissionService {
     params: Record<string, unknown>,
   ): Promise<boolean> {
     return new Promise((resolve) => {
-      const pending: PendingPermission = { requestId, operation, params, resolve };
+      const pending = { requestId, operation, params, resolve };
       this.pendingPermissions.set(requestId, pending);
 
       this.onRequestCallback?.({ requestId, operation, params });

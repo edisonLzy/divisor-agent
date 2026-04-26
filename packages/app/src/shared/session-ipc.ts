@@ -2,13 +2,13 @@ import type { AvailableModel } from "./models-ipc";
 
 interface PromptContent {
   content: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
-interface PromptPayload {
+export interface PromptPayload {
   sessionId: string;
   content: string;
-  model: AvailableModel;
+  model?: Pick<AvailableModel, "modelId" | "providerId">;
 }
 
 export interface AgentSessionIPC {
@@ -16,3 +16,5 @@ export interface AgentSessionIPC {
   setHistoryMessages: (messages: PromptContent[]) => Promise<void>;
   setSessionId: (sessionId: string) => Promise<void>;
 }
+
+export type { PromptContent };

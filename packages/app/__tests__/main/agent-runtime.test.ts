@@ -70,6 +70,13 @@ import { AgentRuntime } from "../../src/main/agent-runtime.js";
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 describe("AgentRuntime", () => {
+  function emitAgentEvent(event: unknown) {
+    const listener = mockSubscribeFn.mock.calls.at(-1)?.[0];
+    expect(listener).toBeDefined();
+    listener(event, new AbortController().signal);
+    return Promise.resolve();
+  }
+
   beforeEach(() => {
     // Don't use clearAllMocks as it clears the mock implementations
     // Instead, reset the mock implementations directly
@@ -81,7 +88,7 @@ describe("AgentRuntime", () => {
 
   describe("constructor", () => {
     it("creates Agent and subscribes to events", () => {
-      const runtime = new AgentRuntime();
+      new AgentRuntime();
 
       // Agent should be created with tools and subscribe should be called
       expect(mockSubscribeFn).toHaveBeenCalled();
@@ -162,7 +169,7 @@ describe("AgentRuntime", () => {
       await runtime.prompt({
         sessionId: "session-456",
         content: "Hello!",
-        model: { modelId: "claude-sonnet-4-20250514", providerId: "anthropic", modelName: "test" },
+        model: { modelId: "claude-sonnet-4-20250514", providerId: "anthropic" },
       });
 
       expect(mockPromptFn).toHaveBeenCalled();
@@ -180,6 +187,105 @@ describe("AgentRuntime", () => {
           model: undefined,
         }),
       ).resolves.not.toThrow();
+    });
+
+    it("emits renderer-ready thinking and response messages", async () => {
+      const runtime = new AgentRuntime();
+      const chunkListener = vi.fn();
+      runtime.on("agentMessageChunk", chunkListener);
+
+      await runtime.setSessionId("session-stream");
+
+      await emitAgentEvent({
+        type: "message_start",
+        message: { role: "assistant" },
+      });
+
+      await emitAgentEvent({
+        type: "message_update",
+        message: { role: "assistant" },
+        assistantMessageEvent: {
+          type: "thinking_delta",
+          contentIndex: 0,
+          delta: "reasoning",
+          partial: {
+            content: [{ type: "thinking", thinking: "reasoning" }],
+          },
+        },
+      });
+
+      await emitAgentEvent({
+        type: "message_update",
+        message: { role: "assistant" },
+        assistantMessageEvent: {
+          type: "text_end",
+          contentIndex: 0,
+          content: "final answer",
+          partial: {
+            content: [{ type: "text", text: "final answer" }],
+          },
+        },
+      });
+
+      expect(chunkListener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "agentMessageChunk",
+          data: expect.objectContaining({
+            sessionId: "session-stream",
+            message: expect.objectContaining({ kind: "thinking", content: "reasoning" }),
+          }),
+        }),
+      );
+      expect(chunkListener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "agentMessageChunk",
+          data: expect.objectContaining({
+            sessionId: "session-stream",
+            message: expect.objectContaining({ kind: "response", content: "final answer" }),
+          }),
+        }),
+      );
+    });
+
+    it("emits renderer-ready tool messages", async () => {
+      const runtime = new AgentRuntime();
+      const chunkListener = vi.fn();
+      runtime.on("agentMessageChunk", chunkListener);
+
+      await runtime.setSessionId("session-tool");
+
+      await emitAgentEvent({
+        type: "tool_execution_start",
+        toolCallId: "tool-1",
+        toolName: "fs/read_text_file",
+        args: { path: "/tmp/demo.txt" },
+      });
+
+      await emitAgentEvent({
+        type: "tool_execution_end",
+        toolCallId: "tool-1",
+        toolName: "fs/read_text_file",
+        result: {
+          content: [{ type: "text", text: "hello" }],
+          details: { toolCallId: "tool-1" },
+        },
+        isError: false,
+      });
+
+      expect(chunkListener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "agentMessageChunk",
+          data: expect.objectContaining({
+            sessionId: "session-tool",
+            message: expect.objectContaining({
+              kind: "tool",
+              toolName: "fs/read_text_file",
+              output: "hello",
+              state: "done",
+            }),
+          }),
+        }),
+      );
     });
   });
 
@@ -202,7 +308,7 @@ describe("AgentRuntime", () => {
 
       // Should not throw
       await expect(
-        runtime.setHistoryMessages("session-123", [{ content: "Hello", metadata: {} }]),
+        runtime.setHistoryMessages([{ content: "Hello", metadata: {} }]),
       ).resolves.not.toThrow();
     });
   });

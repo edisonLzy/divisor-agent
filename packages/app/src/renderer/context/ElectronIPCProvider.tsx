@@ -1,5 +1,9 @@
-import type { IpcInvokeMap, IpcEventMap } from "@shared/ipc-types";
+import type { IpcEventMap } from "@shared/message-ipc";
+import type { AgentModelsIPC } from "@shared/models-ipc";
+import type { AgentSessionIPC } from "@shared/session-ipc";
 import { createContext, useContext } from "react";
+
+type AgentIPC = AgentModelsIPC & AgentSessionIPC;
 
 // ── Typed ElectronAPI global (exposed by preload via contextBridge) ───────────
 
@@ -7,9 +11,8 @@ import { createContext, useContext } from "react";
  * Helper: if Params is void the channel takes no extra args;
  * otherwise it takes exactly one argument of type Params.
  */
-type InvokeArgs<C extends keyof IpcInvokeMap> = IpcInvokeMap[C]["params"] extends void
-  ? []
-  : [IpcInvokeMap[C]["params"]];
+type InvokeArgs<C extends keyof AgentIPC> =
+  Parameters<AgentIPC[C]> extends [] ? [] : Parameters<AgentIPC[C]>;
 
 declare global {
   interface Window {
@@ -18,10 +21,10 @@ declare global {
        * Type-safe IPC invoke.
        * The channel name determines the params type and return type automatically.
        */
-      invoke: <C extends keyof IpcInvokeMap>(
+      invoke: <C extends keyof AgentIPC>(
         channel: C,
         ...args: InvokeArgs<C>
-      ) => Promise<IpcInvokeMap[C]["return"]>;
+      ) => Promise<Awaited<ReturnType<AgentIPC[C]>>>;
 
       /**
        * Subscribe to a push event from the main process.

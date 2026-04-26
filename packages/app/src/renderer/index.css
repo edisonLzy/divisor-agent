@@ -228,3 +228,22 @@
     @apply font-sans;
   }
 }
+
+.ProseMirror {
+  outline: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ProseMirror p {
+  margin: 0;
+}
+
+.ProseMirror p + p {
+  margin-top: 0.75rem;
+}
+
+.pm-readonly .ProseMirror {
+  min-height: auto;
+  padding: 0;
+}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from "react";
 
-import type { SessionPromptParams } from "../../shared/ipc-types";
+import type { PromptPayload } from "../../shared/session-ipc";
 import { useAgentStore } from "./useAgentStore";
 
 /**
@@ -33,7 +33,7 @@ export function useAgentRuntime() {
         modelId = parts.slice(1).join("/");
       }
 
-      const params: SessionPromptParams = {
+      const params: PromptPayload = {
         sessionId,
         content,
         model: {
@@ -42,14 +42,14 @@ export function useAgentRuntime() {
         },
       };
 
-      window.electronAPI.invoke("sessionPrompt", params).catch(console.error);
+      window.electronAPI.invoke("prompt", params).catch(console.error);
     },
     [setProcessing],
   );
 
   /**
    * Fetches available models from the main process.
-   * Return type (AvailableModel[]) is inferred from IpcInvokeMap — no cast needed.
+   * Return type is inferred from the shared IPC method signature.
    */
   const getAvailableModels = useCallback(async () => {
     try {
