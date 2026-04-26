@@ -1,194 +1,106 @@
 import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { resolve } from "node:path";
 
 import { getModels, getProviders } from "@mariozechner/pi-ai";
-import type { Model, Api, KnownProvider } from "@mariozechner/pi-ai";
+import type { Api, Model, OAuthProviderInterface } from "@mariozechner/pi-ai";
 
-export interface CustomModelConfig {
+export interface CustomModel {
   id: string;
-  provider: string;
   name?: string;
-  baseUrl?: string;
-  api?: string;
-  apiKey?: string;
   reasoning?: boolean;
   input?: ("text" | "image")[];
-  cost?: { input: number; output: number; cacheRead?: number; cacheWrite?: number };
+  cost?: { input: number; output: number; cacheRead: number; cacheWrite: number };
   contextWindow?: number;
   maxTokens?: number;
+  headers?: Record<string, string>;
+  compat?: Model<Api>["compat"];
 }
 
-interface ModelsJsonConfig {
-  providers?: Record<
-    string,
-    {
-      baseUrl?: string;
-      apiKey?: string;
-      api?: string;
-      headers?: Record<string, string>;
-      models?: { id: string; name?: string }[];
-    }
-  >;
-  models?: CustomModelConfig[];
-  defaultModel?: { provider: string; modelId: string };
+export interface CustomProvider {
+  baseUrl: string;
+  apiKey: string;
+  api: Api;
+  headers?: Record<string, string>;
+  authHeader?: boolean;
+  /** OAuth provider for /login support */
+  oauth?: Omit<OAuthProviderInterface, "id">;
+  models?: CustomModel[];
 }
+
+export interface CustomProvidersConfig {
+  providers?: Record<string, CustomProvider>;
+}
+
+type ModelKey = `${string}/${string}`;
 
 export class ModelRegistry {
-  private builtInProviders = new Map<string, Model<any>[]>();
-  private customModels = new Map<string, Model<any>>();
-  private providerConfigs = new Map<string, { baseUrl?: string; apiKey?: string; api?: string }>();
+  private customProvider = new Map<string, CustomProvider>();
+
+  private loadedModels = new Map<ModelKey, Model<any>>();
 
   constructor() {
-    // this.loadBuiltInModels(); // TODO 后续再加载内置模型
     this.loadCustomModels();
+    this.loadBuiltInModels();
   }
 
-  private loadBuiltInModels(): void {
+  private loadBuiltInModels() {
     const providers = getProviders();
     for (const provider of providers) {
       const models = getModels(provider);
-      if (models) {
-        this.builtInProviders.set(provider, [...models]);
+      for (const model of models) {
+        this.loadedModels.set(`${provider}/${model.id}`, model);
       }
     }
   }
 
-  async loadCustomModels(): Promise<void> {
+  private async loadCustomModels() {
     try {
-      const configPath = resolve(process.env.HOME ?? "/tmp", ".pi", "agent", "models.json");
-      const content = await readFile(configPath, "utf-8");
-      const config: ModelsJsonConfig = JSON.parse(content);
+      const configPath = resolve(homedir(), ".pi", "agent", "models.json");
+      const content = await readFile(configPath, {
+        encoding: "utf-8",
+      });
+      const config: CustomProvidersConfig = JSON.parse(content);
 
       if (config.providers) {
         for (const [name, cfg] of Object.entries(config.providers)) {
-          this.providerConfigs.set(name, cfg);
+          this.customProvider.set(name, cfg);
 
           if (cfg.models) {
             for (const modelCfg of cfg.models) {
-              const model = this.toModel({ ...modelCfg, provider: name });
-              this.customModels.set(`${name}/${modelCfg.id}`, model);
+              const modelKey: ModelKey = `${name}/${modelCfg.id}`;
+              const model: Model<any> = {
+                id: modelCfg.id,
+                api: cfg.api,
+                baseUrl: cfg.baseUrl,
+                provider: name,
+                headers: cfg.headers,
+                name: modelCfg.name ?? modelCfg.id,
+                reasoning: modelCfg.reasoning ?? false,
+                input: modelCfg.input ?? ["text"],
+                cost: modelCfg.cost ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+                contextWindow: modelCfg.contextWindow ?? 128000,
+                maxTokens: modelCfg.maxTokens ?? 16384,
+              };
+              this.loadedModels.set(modelKey, model);
             }
           }
         }
       }
-
-      if (config.models) {
-        for (const modelCfg of config.models) {
-          const model = this.toModel(modelCfg);
-          this.customModels.set(`${modelCfg.provider}/${modelCfg.id}`, model);
-        }
-      }
     } catch {
-      // models.json 不存在，跳过
+      // models.json does not exist, skip
     }
   }
 
-  private toModel(cfg: CustomModelConfig): Model<any> {
-    return {
-      id: cfg.id,
-      name: cfg.name || cfg.id,
-      provider: cfg.provider,
-      api: (cfg.api as Api) || "openai-chat",
-      baseUrl: cfg.baseUrl || "",
-      reasoning: cfg.reasoning || false,
-      input: cfg.input || ["text"],
-      cost: cfg.cost
-        ? {
-            input: cfg.cost.input,
-            output: cfg.cost.output,
-            cacheRead: cfg.cost.cacheRead ?? 0,
-            cacheWrite: cfg.cost.cacheWrite ?? 0,
-          }
-        : { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: cfg.contextWindow || 128000,
-      maxTokens: cfg.maxTokens || 8192,
-    };
+  public resolveModel(providerId: string, modelId: string) {
+    return this.loadedModels.get(`${providerId}/${modelId}`);
   }
 
-  getAvailableModels(): Model<any>[] {
-    const result: Model<any>[] = [];
-    for (const models of this.builtInProviders.values()) {
-      result.push(...models);
-    }
-    result.push(...this.customModels.values());
-    return result;
+  public resolveApiKey(providerId: string) {
+    return this.customProvider.get(providerId)?.apiKey;
   }
 
-  getModelsByProvider(provider: string): Model<any>[] {
-    const builtIn = this.builtInProviders.get(provider) || [];
-    const custom = this.getCustomModelsByProvider(provider);
-    return [...builtIn, ...custom];
-  }
-
-  private getCustomModelsByProvider(provider: string): Model<any>[] {
-    const result: Model<any>[] = [];
-    for (const [key, model] of this.customModels) {
-      if (key.startsWith(`${provider}/`)) {
-        result.push(model);
-      }
-    }
-    return result;
-  }
-
-  getBuiltInProviders(): KnownProvider[] {
-    return getProviders();
-  }
-
-  resolveModel(provider: string, modelId: string): Model<any> | null {
-    const builtIn = this.builtInProviders.get(provider);
-    if (builtIn) {
-      const found = builtIn.find((m) => m.id === modelId);
-      if (found) return found;
-    }
-    return this.customModels.get(`${provider}/${modelId}`) || null;
-  }
-
-  resolveApiKey(provider: string, model?: Model<any>): string | null {
-    if (model && this.customModels.has(`${provider}/${model.id}`)) {
-      const cfg = this.getCustomModelConfig(provider, model.id);
-      if (cfg?.apiKey) return this.resolveSecret(cfg.apiKey);
-    }
-
-    const providerCfg = this.providerConfigs.get(provider);
-    if (providerCfg?.apiKey) {
-      return this.resolveSecret(providerCfg.apiKey);
-    }
-
-    return this.getEnvApiKey(provider);
-  }
-
-  private resolveSecret(value: string): string | null {
-    if (value.startsWith("env:")) {
-      return process.env[value.slice(4)] || null;
-    }
-    return value;
-  }
-
-  private getEnvApiKey(provider: string): string | null {
-    const envMap: Record<string, string[]> = {
-      anthropic: ["ANTHROPIC_API_KEY"],
-      openai: ["OPENAI_API_KEY"],
-      google: ["GOOGLE_API_KEY"],
-      openrouter: ["OPENROUTER_API_KEY"],
-      minimax: ["MINIMAX_API_KEY"],
-    };
-    const envVars = envMap[provider] || ["API_KEY"];
-    for (const envVar of envVars) {
-      if (process.env[envVar]) return process.env[envVar] || null;
-    }
-    return null;
-  }
-
-  private getCustomModelConfig(_provider: string, _modelId: string): CustomModelConfig | null {
-    // TODO: 需要缓存原始配置
-    return null;
-  }
-
-  async refresh(): Promise<void> {
-    this.customModels.clear();
-    this.providerConfigs.clear();
-    await this.loadCustomModels();
+  public getAvailableModels(): Model<any>[] {
+    return [...this.loadedModels.values()];
   }
 }
-
-export const modelRegistry = new ModelRegistry();

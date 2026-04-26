@@ -1,52 +1,12 @@
 import { join } from "path";
 
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow } from "electron";
 
-import type { IpcInvokeMap, MainToRendererMessage } from "../shared/ipc-types";
+import { bindAgentRuntimeIPC } from "./agent-ipc.js";
 import { AgentRuntime } from "./agent-runtime.js";
 
-const HOME_DIR = process.env.HOME ?? "/tmp";
-
-let mainWindow: BrowserWindow | null = null;
-
-const agentRuntime = new AgentRuntime(HOME_DIR);
-
-agentRuntime.setWebViewSender((msg: MainToRendererMessage) => {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send(msg.event, msg.payload);
-  }
-});
-
-function registerIpcHandlers(): void {
-  ipcMain.handle("setModel", (_, params: IpcInvokeMap["setModel"]["params"]) =>
-    agentRuntime.setModel(params.sessionId, params.provider, params.modelId),
-  );
-
-  ipcMain.handle("cycleModel", (_, params: IpcInvokeMap["cycleModel"]["params"]) =>
-    agentRuntime.cycleModel(params.sessionId, params.direction),
-  );
-
-  ipcMain.handle("getAvailableModels", (): IpcInvokeMap["getAvailableModels"]["return"] =>
-    agentRuntime.getAvailableModels(),
-  );
-
-  ipcMain.handle("sessionPrompt", (_, params: IpcInvokeMap["sessionPrompt"]["params"]) => {
-    agentRuntime.prompt(params).catch((err: unknown) => {
-      console.error("sessionPrompt error:", err);
-    });
-  });
-
-  ipcMain.handle("permissionApprove", (_, params: IpcInvokeMap["permissionApprove"]["params"]) => {
-    agentRuntime.approvePermission(params.requestId);
-  });
-
-  ipcMain.handle("permissionReject", (_, params: IpcInvokeMap["permissionReject"]["params"]) => {
-    agentRuntime.rejectPermission(params.requestId);
-  });
-}
-
-function createWindow(): void {
-  mainWindow = new BrowserWindow({
+function createWindow() {
+  const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     x: 100,
@@ -65,18 +25,27 @@ function createWindow(): void {
     mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
   }
 
-  mainWindow.on("closed", () => {
-    mainWindow = null;
-  });
+  return mainWindow;
+}
+
+function createAgentRuntime() {
+  const agentRuntime = new AgentRuntime();
+  return agentRuntime;
 }
 
 app.whenReady().then(async () => {
-  registerIpcHandlers();
-  await agentRuntime.initialize();
-  createWindow();
+  const browserWindow = createWindow();
+  const agentRuntime = createAgentRuntime();
+
+  const unbind = bindAgentRuntimeIPC(agentRuntime, browserWindow);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+
+  app.on("quit", () => {
+    unbind();
+    agentRuntime.destroy();
   });
 });
 

@@ -1,31 +1,31 @@
 import { contextBridge, ipcRenderer } from "electron";
 
-import type { IpcInvokeMap, IpcEventMap } from "../shared/ipc-types.js";
+import type { AgentModelsIPC } from "../shared/models-ipc.js";
+import type { AgentSessionIPC } from "../shared/session-ipc.js";
+
+type AgentIPC = AgentModelsIPC & AgentSessionIPC;
 
 // These arrays are verified at compile-time to contain exactly the keys of
-// IpcInvokeMap / IpcEventMap via `satisfies`. Adding or removing a channel
-// from the shared types without updating these lists is a compile error.
+// AgentIPC via `satisfies`. Adding or removing a channel from the shared
+// types without updating these lists is a compile error.
 const ALLOWED_CHANNELS = [
   "setModel",
-  "cycleModel",
   "getAvailableModels",
-  "sessionPrompt",
-  "permissionApprove",
-  "permissionReject",
-] as const satisfies readonly (keyof IpcInvokeMap)[];
+  "prompt",
+  "setHistoryMessages",
+  "setSessionId",
+] as const satisfies readonly (keyof AgentIPC)[];
 
-const ALLOWED_EVENTS = [
-  "agentMessageChunk",
-  "agentMessageDone",
-  "sessionRequestPermission",
-  "sessionForked",
-] as const satisfies readonly (keyof IpcEventMap)[];
+const ALLOWED_EVENTS = ["agentMessageChunk", "agentMessageDone"] as const;
 
 type AllowedChannel = (typeof ALLOWED_CHANNELS)[number];
 type AllowedEvent = (typeof ALLOWED_EVENTS)[number];
 
 contextBridge.exposeInMainWorld("electronAPI", {
-  invoke: (channel: AllowedChannel, ...args: unknown[]) => {
+  invoke: <C extends AllowedChannel>(
+    channel: C,
+    ...args: Parameters<AgentIPC[C]>
+  ): Promise<ReturnType<AgentIPC[C]>> => {
     if (!(ALLOWED_CHANNELS as readonly string[]).includes(channel)) {
       throw new Error(`IPC channel not allowed: ${channel}`);
     }
@@ -42,3 +42,5 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return () => ipcRenderer.removeListener(event, subscription);
   },
 });
+
+export type { AgentIPC };

@@ -1,151 +1,117 @@
-import { Agent, type AgentEvent } from "@mariozechner/pi-agent-core";
+import { Agent, AgentState } from "@mariozechner/pi-agent-core";
+import Emittery from "emittery";
 
-import type { SessionPromptParams, MainToRendererMessage } from "../shared/ipc-types.js";
-import { ExtensionRegistry } from "./extensions/index.js";
-import { loadAllExtensions } from "./extensions/loader.js";
-import { ModelService } from "./models/index.js";
-import { PermissionService } from "./permissions/index.js";
+import { AgentModelsIPC } from "../shared/models-ipc.js";
+import { AgentSessionIPC } from "../shared/session-ipc.js";
+import { ModelRegistry } from "./models/index.js";
 import { fsReadTextFileTool, fsWriteTextFileTool, terminalCreateTool } from "./tools/index.js";
 
-export type WebViewSender = (msg: MainToRendererMessage) => void;
+type AgentEvents = {
+  agentMessageChunk: {
+    type: "text_delta" | "thinking_delta";
+    delta: string;
+    chunkIndex: number;
+    sessionId: string;
+  };
+  agentMessageDone: { sessionId: string };
+};
 
-export class AgentRuntime {
-  private sessions = new Map<string, { agent: Agent }>();
-  private permissionService: PermissionService;
-  private extensionRegistry: ExtensionRegistry;
-  private modelService: ModelService;
-  private sendToWebView: WebViewSender | null = null;
-  private homeDir: string;
+export class AgentRuntime extends Emittery<AgentEvents> implements AgentSessionIPC, AgentModelsIPC {
+  private modelRegistry: ModelRegistry;
+  private agent: Agent;
 
-  constructor(homeDir: string) {
-    this.homeDir = homeDir;
-    this.permissionService = new PermissionService();
-    this.extensionRegistry = new ExtensionRegistry();
-    this.modelService = new ModelService((sessionId) => {
-      return this.sessions.get(sessionId)?.agent;
-    });
+  constructor() {
+    super();
+    this.modelRegistry = new ModelRegistry();
+    this.agent = this.createInternalAgent();
   }
 
-  async setModel(sessionId: string, provider: string, modelId: string) {
-    return this.modelService.setModel(sessionId, provider, modelId);
-  }
-
-  cycleModel(sessionId: string, direction: "next" | "prev" = "next") {
-    return this.modelService.cycleModel(sessionId, direction);
-  }
-
-  getAvailableModels() {
-    return this.modelService.getAvailableModels();
-  }
-
-  setWebViewSender(send: WebViewSender) {
-    this.sendToWebView = send;
-  }
-
-  async initialize(): Promise<void> {
-    this.permissionService.setRequestCallback((req) => {
-      this.sendToWebView?.({
-        event: "sessionRequestPermission",
-        payload: req,
-      });
+  private createInternalAgent() {
+    const agent = new Agent({
+      getApiKey: (provider) => {
+        return this.modelRegistry.resolveApiKey(provider);
+      },
+      initialState: {
+        tools: [fsReadTextFileTool, fsWriteTextFileTool, terminalCreateTool],
+      },
     });
 
-    await loadAllExtensions(this.extensionRegistry, this.homeDir);
-  }
-
-  private getOrCreateAgent(sessionId: string): Agent {
-    if (!this.sessions.has(sessionId)) {
-      const agent = new Agent({
-        sessionId,
-        initialState: {
-          systemPrompt: "",
-          thinkingLevel: "off",
-          tools: [
-            fsReadTextFileTool,
-            fsWriteTextFileTool,
-            terminalCreateTool,
-            ...this.extensionRegistry.getTools(),
-          ],
-        },
-        beforeToolCall: async (context) => {
-          const op = context.toolCall.name;
-          if (this.permissionService.isHighRisk(op)) {
-            const approved = await this.permissionService.requestPermission(
-              `${sessionId}-${context.toolCall.id}`,
-              op,
-              context.args as Record<string, unknown>,
-            );
-            if (!approved) {
-              return { block: true, reason: "User rejected" };
-            }
-          }
-        },
-      });
-
-      agent.subscribe((event: AgentEvent) => {
-        if (event.type === "message_update") {
-          const { assistantMessageEvent } = event;
-          if (assistantMessageEvent.type === "text_delta") {
-            this.sendToWebView?.({
-              event: "agentMessageChunk",
-              payload: {
-                type: "text_delta",
-                delta: assistantMessageEvent.delta,
-                chunkIndex: 0,
-                sessionId,
-              },
-            });
-          } else if (assistantMessageEvent.type === "thinking_delta") {
-            this.sendToWebView?.({
-              event: "agentMessageChunk",
-              payload: {
-                type: "thinking_delta",
-                delta: assistantMessageEvent.delta,
-                chunkIndex: 0,
-                sessionId,
-              },
-            });
-          }
+    agent.subscribe((event) => {
+      if (event.type === "message_update") {
+        const { assistantMessageEvent } = event;
+        if (assistantMessageEvent.type === "text_delta") {
+          this.emit("agentMessageChunk", {
+            type: "text_delta",
+            delta: assistantMessageEvent.delta,
+            chunkIndex: 0,
+            sessionId: "",
+          });
+        } else if (assistantMessageEvent.type === "thinking_delta") {
+          this.emit("agentMessageChunk", {
+            type: "thinking_delta",
+            delta: assistantMessageEvent.delta,
+            chunkIndex: 0,
+            sessionId: "",
+          });
         }
-      });
+      }
+    });
 
-      this.sessions.set(sessionId, { agent });
-    }
-    return this.sessions.get(sessionId)!.agent;
+    return agent;
   }
 
-  async prompt(params: SessionPromptParams): Promise<void> {
+  private updateState<T extends keyof AgentState>(key: T, value: AgentState[T]) {
+    this.agent.state[key] = value;
+  }
+
+  public setModel: AgentModelsIPC["setModel"] = async (model) => {
+    const { modelId, providerId } = model;
+    const modelInfo = this.modelRegistry.resolveModel(providerId, modelId);
+    if (!modelInfo) {
+      console.warn(`Model not found: ${providerId}/${modelId}`);
+      return false;
+    }
+    this.updateState("model", modelInfo);
+    return true;
+  };
+
+  public getAvailableModels: AgentModelsIPC["getAvailableModels"] = async () => {
+    return this.modelRegistry.getAvailableModels().map((m) => {
+      return {
+        modelId: m.id,
+        providerId: m.provider,
+        modelName: `${m.provider}/${m.id}`,
+      };
+    });
+  };
+
+  public setSessionId: AgentSessionIPC["setSessionId"] = async (sessionId: string) => {
+    this.agent.sessionId = sessionId;
+  };
+
+  public setHistoryMessages: AgentSessionIPC["setHistoryMessages"] = async (messages) => {
+    // TODO: implement history
+    return;
+  };
+
+  public prompt: AgentSessionIPC["prompt"] = async (params) => {
     const { sessionId, content, model } = params;
-    const agent = this.getOrCreateAgent(sessionId);
 
     try {
       if (model) {
-        agent.state.model = model as any;
+        this.setModel(model);
       }
-      await agent.prompt(content);
 
-      this.sendToWebView?.({
-        event: "agentMessageDone",
-        payload: { sessionId },
-      });
+      await this.agent.prompt(content);
+
+      this.emit("agentMessageDone", { sessionId });
     } catch (err) {
       console.error(`Agent error for session ${sessionId}:`, err);
-      this.sendToWebView?.({
-        event: "agentMessageDone",
-        payload: { sessionId },
-      });
+      this.emit("agentMessageDone", { sessionId });
     }
-  }
+  };
 
-  approvePermission(requestId: string): void {
-    this.permissionService.approve(requestId);
-  }
-
-  rejectPermission(requestId: string): void {
-    this.permissionService.reject(requestId);
-  }
-
-  listExtensions() {
-    return this.extensionRegistry.listExtensions();
+  public destroy() {
+    this.clearListeners();
   }
 }
