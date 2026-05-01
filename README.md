@@ -12,11 +12,12 @@ React Webview
   ├─ tRPC / HTTP: 会话树、历史消息、设置等元数据
   └─ Electron IPC: 前端与主进程交互
 
-Electron Main Process (Node.js/Bun)
+Electron Main Process
   ├─ Agent Runtime (@mariozechner/pi-agent-core)
   ├─ Extensions Loader
   ├─ Tools (fs, terminal)
-  └─ Permission Service
+  ├─ Permission Service
+  └─ Model Registry
 
 Node Server
   ├─ Express v5
@@ -36,13 +37,43 @@ Node Server
 
 ```text
 packages/
-  app/      Electron 39 + React 19 + Vite 7 + electron-vite
-  server/   Express v5 + tRPC v11 + Zod v4 + pino
+├── app/          Electron 39 + React 19 + Vite 7 + electron-vite
+│   ├── __tests__/
+│   └── src/
+│       ├── main/             # Electron 主进程
+│       │   ├── agent-runtime.ts
+│       │   ├── tools/         # fs-tool, terminal-tool
+│       │   ├── models/        # model registry
+│       │   ├── permissions/   # permission service
+│       │   └── extensions/    # extension loader & registry
+│       ├── preload/           # contextBridge API
+│       ├── renderer/          # React 前端
+│       │   ├── components/
+│       │   │   ├── ai-elements/   # code-block, message, tool
+│       │   │   ├── richtext/      # rich text editor
+│       │   │   └── ui/            # shadcn/ui components
+│       │   ├── hooks/         # useAgentStore, useAgentRuntime
+│       │   ├── workspace/
+│       │   │   ├── chat/      # 聊天界面
+│       │   │   │   ├── messages/      # user, assistant, thinking, tool messages
+│       │   │   │   └── prompt-input/ # 提示词输入
+│       │   │   └── sessions/  # 会话列表
+│       │   └── context/       # ElectronIPCProvider
+│       └── shared/            # IPC 类型定义
+└── server/       Express v5 + tRPC v11 + Zod v4 + pino
+    ├── __tests__/
+    └── src/
+        ├── domain/
+        │   ├── models/        # 模型配置
+        │   └── sessions/      # 会话持久化
+        ├── middlewares/
+        ├── shared/
+        └── errors/
 docs/
-  需求/      MVP 需求文档
-  技术文档/   前后端技术拆解
-  原型/      UI 原型与交互说明
-  调研文档/   选型调研与架构分析
+├── 需求/          MVP 需求文档
+├── 技术文档/       前后端技术拆解
+├── 原型/          UI 原型与交互说明
+└── 调研文档/       选型调研与架构分析
 ```
 
 ## 环境要求
@@ -118,15 +149,18 @@ pnpm lint
 - React 19
 - Vite 7
 - Tailwind CSS v4
+- shadcn/ui
 - @electron-toolkit/preload + utils
 
 ## 项目约定
 
 - Server 端本地 TypeScript 导入必须显式带 `.js` 扩展名。
 - 纯类型导入必须使用 `import type`。
+- React 19 使用新的 JSX Runtime，无需手动 import React。
 - Server 生产构建使用 `packages/server/tsconfig.build.json`。
 - 根测试使用 Vitest workspace 配置。
 - 共享依赖版本通过 pnpm workspace 自动管理。
+- 严格按需引入依赖，严禁安装未使用的依赖。
 
 ## 文档入口
 
@@ -135,14 +169,19 @@ pnpm lint
 - [前端技术文档](docs/技术文档/mvp/前端.md)
 - [后端技术文档](docs/技术文档/mvp/后端.md)
 - [tRPC 适用性分析](docs/调研文档/tRPC适用性分析.md)
+- [pi-agent-core 适用性分析](docs/调研文档/pi-agent-core适用性分析.md)
+- [pi-agent-extension 机制分析](docs/调研文档/pi-agent-extension机制.md)
 
 ## 当前状态
 
-当前仓库已完成：
+MVP 开发阶段，已完成：
 
 - Monorepo 基础结构
-- Server 基础骨架（Express + tRPC + sessions + models）
+- Server 完整骨架（Express + tRPC + sessions + models）
 - App 基础 Electron + React 工程
-- MVP 需求、原型、技术方案与调研文档
+- Agent Runtime、Permission System、Extension System
+- 聊天 UI（用户消息、助手消息、思考中、工具调用）
+- 富文本提示词输入组件
+- Session 管理、模型选择、权限审批流程
 
-业务能力（会话树、Agent 工具调用、审批流、Fork）仍处于设计与逐步实现阶段。
+业务能力（会话树、Fork）仍处于设计与逐步实现阶段。

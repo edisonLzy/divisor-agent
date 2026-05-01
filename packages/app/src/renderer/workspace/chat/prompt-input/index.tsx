@@ -1,14 +1,33 @@
-import {
-  createEmptyRichTextDocument,
-  readRichText,
-  RichTextEditor,
-  type RichTextDocument,
-} from "@renderer/components/richtext";
+import type { RichTextDocument } from "@renderer/components/richtext";
+import { Button } from "@renderer/components/ui/button";
+import { Textarea } from "@renderer/components/ui/textarea";
 import { cn } from "@renderer/lib/utils";
 import { ArrowUp } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useState } from "react";
 
 import type { PromptSubmission } from "../chat-types";
+import { ModalSelector, useModalSelector } from "./ModalSelector";
+
+function createPromptDocument(text: string): RichTextDocument {
+  return {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: text
+          .split("\n")
+          .filter((line) => line.length > 0)
+          .flatMap((line, index, lines) => {
+            const nodes: Array<Record<string, unknown>> = [{ type: "text", text: line }];
+            if (index < lines.length - 1) {
+              nodes.push({ type: "hard_break" });
+            }
+            return nodes;
+          }),
+      },
+    ],
+  };
+}
 
 interface PromptInputProps {
   disabled?: boolean;
@@ -16,34 +35,28 @@ interface PromptInputProps {
 }
 
 export function PromptInput({ disabled = false, onSubmit }: PromptInputProps) {
-  const submitRef = useRef(onSubmit);
-  const [content, setContent] = useState<RichTextDocument>(() => createEmptyRichTextDocument());
+  const modelSelectorProps = useModalSelector();
+  const [value, setValue] = useState("");
+  const trimmedValue = value.trim();
+  const canSubmit = !disabled && trimmedValue.length > 0 && modelSelectorProps.value !== null;
 
-  useEffect(() => {
-    submitRef.current = onSubmit;
-  }, [onSubmit]);
-
-  const text = useMemo(() => readRichText(content), [content]);
-  const canSubmit = text.length > 0 && !disabled;
-
-  const handleSubmit = useCallback(async () => {
-    const nextText = readRichText(content);
-    if (!nextText || disabled) {
+  const handleSubmit = async () => {
+    if (!canSubmit || !modelSelectorProps.value) {
       return;
     }
 
-    await submitRef.current({
-      text: nextText,
-      document: content,
+    await onSubmit({
+      text: trimmedValue,
+      document: createPromptDocument(trimmedValue),
+      model: modelSelectorProps.value,
     });
-
-    setContent(createEmptyRichTextDocument());
-  }, [content, disabled]);
+    setValue("");
+  };
 
   return (
     <div
       className={cn(
-        "mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-[28px] border border-[#343434] bg-[#242424] p-3 shadow-[0_24px_80px_rgba(0,0,0,0.24)] transition-all duration-300 focus-within:ring-2 focus-within:ring-[#5A5A5A]",
+        "mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-[30px] border border-[#3A3A3A] bg-[#1C1C1C] p-3 shadow-[0_28px_80px_rgba(0,0,0,0.32)] transition-all duration-300 focus-within:border-[#5A5A5A] focus-within:ring-2 focus-within:ring-[#4D4D4D]/60",
         disabled && "opacity-80",
       )}
       onKeyDownCapture={(event) => {
@@ -63,35 +76,29 @@ export function PromptInput({ disabled = false, onSubmit }: PromptInputProps) {
       }}
     >
       <div className="relative">
-        {text.length === 0 ? (
-          <div className="pointer-events-none absolute left-5 top-4 text-[15px] text-[#707070]">
-            要求后续变更
-          </div>
-        ) : null}
-
-        <RichTextEditor
-          document={content}
-          onChange={setContent}
-          editable={!disabled}
-          onModEnter={() => {
-            void handleSubmit();
-          }}
-          className="min-h-28 max-h-56 overflow-y-auto px-5 py-4 text-[15px] leading-7 text-[#D4D4D4] outline-none"
+        <Textarea
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          placeholder="Ask anything, or describe the change you want to make..."
+          className="min-h-28 max-h-56 overflow-y-auto rounded-[22px] border-transparent bg-[#262626] px-5 py-4 text-[15px] leading-7 text-[#E6E6E6] placeholder:text-[#7B7B7B] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] outline-none focus-visible:border-transparent focus-visible:ring-0"
         />
       </div>
 
-      <div className="flex items-center justify-end border-t border-[#343434] px-2 pt-3">
-        <button
+      <div className="flex items-center justify-between border-t border-[#303030] px-2 pt-3">
+        <ModalSelector {...modelSelectorProps} />
+
+        <Button
           type="button"
           onClick={() => {
             void handleSubmit();
           }}
           disabled={!canSubmit}
-          className="flex size-10 items-center justify-center rounded-full bg-[#D4D4D4] text-[#161616] transition hover:bg-[#FFFFFF] disabled:cursor-not-allowed disabled:bg-[#454545] disabled:text-[#8B8B8B]"
+          size="icon"
+          className="rounded-full bg-[#E8E8E8] text-[#151515] hover:bg-[#FFFFFF] disabled:bg-[#333333] disabled:text-[#7D7D7D]"
           aria-label="Send prompt"
         >
           <ArrowUp className="size-5" />
-        </button>
+        </Button>
       </div>
     </div>
   );

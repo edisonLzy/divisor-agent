@@ -1,23 +1,21 @@
-import type { IpcEventMap } from "../shared/message-ipc.js";
-import type { AgentModelsIPC } from "../shared/models-ipc.js";
-import type { AgentSessionIPC } from "../shared/session-ipc.js";
+import type { AllowedMainExposeEvents, AgentRuntimeIPC } from "../shared/events-ipc.js";
 
-type AgentIPC = AgentModelsIPC & AgentSessionIPC;
-
-type InvokeArgs<C extends keyof AgentIPC> =
-  Parameters<AgentIPC[C]> extends [] ? [] : Parameters<AgentIPC[C]>;
+type InvokeArgs<C extends keyof AgentRuntimeIPC> = Parameters<AgentRuntimeIPC[C]>;
 
 interface ElectronAPI {
-  invoke<C extends keyof AgentIPC>(
+  invoke<C extends keyof AgentRuntimeIPC>(
     channel: C,
     ...args: InvokeArgs<C>
-  ): Promise<Awaited<ReturnType<AgentIPC[C]>>>;
-  on<E extends keyof IpcEventMap>(event: E, callback: (data: IpcEventMap[E]) => void): () => void;
+  ): Promise<Awaited<ReturnType<AgentRuntimeIPC[C]>>>;
+  on<E extends keyof AllowedMainExposeEvents>(
+    event: E,
+    callback: (data: AllowedMainExposeEvents[E]) => void,
+  ): () => void;
 }
 
 declare global {
   interface Window {
-    electron: ElectronAPI;
+    electronAPI: ElectronAPI;
     api: unknown;
   }
 }

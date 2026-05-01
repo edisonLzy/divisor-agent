@@ -1,117 +1,101 @@
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
-import type { ResponseChatMessage } from "@shared/message-ipc";
-import { nanoid } from "nanoid";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { ChatTimelineMessage, PromptSubmission } from "./chat-types";
+import {
+  createInitialChatRenderState,
+  createLocalUserMessage,
+  reduceChatAgentEvent,
+  type ChatTimelineMessage,
+  type PromptSubmission,
+} from "./chat-types";
 
-function upsertMessage(messages: ChatTimelineMessage[], nextMessage: ChatTimelineMessage) {
-  const index = messages.findIndex((message) => message.id === nextMessage.id);
-  if (index === -1) {
-    return [...messages, nextMessage];
+function createSessionId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
   }
 
-  const currentMessage = messages[index];
-  const nextMessages = [...messages];
-  nextMessages[index] = {
-    ...currentMessage,
-    ...nextMessage,
-    createdAt: currentMessage.createdAt,
-  };
-  return nextMessages;
-}
-
-function createRendererErrorMessage(sessionId: string, error: unknown): ResponseChatMessage {
-  return {
-    id: nanoid(),
-    sessionId,
-    role: "assistant",
-    kind: "response",
-    content: error instanceof Error ? error.message : "Prompt failed unexpectedly.",
-    status: "error",
-    createdAt: Date.now(),
-  };
+  return `session-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export function useChat() {
   const { invoke, on } = useElectronIPC();
-  const sessionId = useMemo(() => nanoid(), []);
-  const [messages, setMessages] = useState<ChatTimelineMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const sessionIdRef = useRef(sessionId);
-
-  useEffect(() => {
-    sessionIdRef.current = sessionId;
-  }, [sessionId]);
+  const sessionIdRef = useRef<string>(createSessionId());
+  const [renderState, setRenderState] = useState(createInitialChatRenderState);
 
   useEffect(() => {
     void invoke("setSessionId", sessionIdRef.current);
 
-    const unsubscribeChunk = on("agentMessageChunk", ({ sessionId: eventSessionId, message }) => {
-      if (eventSessionId !== sessionIdRef.current) {
-        return;
-      }
-
-      if (message.role !== "assistant") {
-        return;
-      }
-
-      setMessages((currentMessages) => upsertMessage(currentMessages, message));
-    });
-
-    const unsubscribeDone = on("agentMessageDone", ({ sessionId: eventSessionId }) => {
-      if (eventSessionId !== sessionIdRef.current) {
-        return;
-      }
-      setIsLoading(false);
-    });
+    const unsubscribe = [
+      on("agent_start", (event) => {
+        setRenderState((current) => reduceChatAgentEvent(current, event));
+      }),
+      on("agent_end", (event) => {
+        setRenderState((current) => reduceChatAgentEvent(current, event));
+      }),
+      on("message_start", (event) => {
+        setRenderState((current) => reduceChatAgentEvent(current, event));
+      }),
+      on("message_update", (event) => {
+        setRenderState((current) => reduceChatAgentEvent(current, event));
+      }),
+      on("message_end", (event) => {
+        setRenderState((current) => reduceChatAgentEvent(current, event));
+      }),
+      on("tool_execution_start", (event) => {
+        setRenderState((current) => reduceChatAgentEvent(current, event));
+      }),
+      on("tool_execution_update", (event) => {
+        setRenderState((current) => reduceChatAgentEvent(current, event));
+      }),
+      on("tool_execution_end", (event) => {
+        setRenderState((current) => reduceChatAgentEvent(current, event));
+      }),
+    ];
 
     return () => {
-      unsubscribeChunk();
-      unsubscribeDone();
+      for (const off of unsubscribe) {
+        off();
+      }
     };
   }, [invoke, on]);
 
   const submitPrompt = useCallback(
-    async ({ text, document }: PromptSubmission) => {
-      const trimmedText = text.trim();
-      if (!trimmedText) {
-        return;
-      }
-
-      setMessages((currentMessages) => [
-        ...currentMessages,
-        {
-          id: nanoid(),
-          sessionId: sessionIdRef.current,
-          role: "user",
-          kind: "user",
-          content: trimmedText,
-          document,
-          createdAt: Date.now(),
-        },
-      ]);
-
-      setIsLoading(true);
+    async (submission: PromptSubmission) => {
+      setRenderState((current) => ({
+        ...current,
+        isLoading: true,
+        messages: [
+          ...current.messages,
+          createLocalUserMessage(submission.text, submission.document),
+        ],
+      }));
 
       try {
         await invoke("prompt", {
           sessionId: sessionIdRef.current,
-          content: trimmedText,
+          content: submission.text,
+          model: {
+            modelId: submission.model.modelId,
+            providerId: submission.model.providerId,
+          },
         });
       } catch (error) {
-        setIsLoading(false);
-        setMessages((currentMessages) => [
-          ...currentMessages,
-          createRendererErrorMessage(sessionIdRef.current, error),
-        ]);
+        console.error("Failed to submit prompt", error);
+        setRenderState((current) => ({
+          ...current,
+          isLoading: false,
+        }));
       }
     },
     [invoke],
   );
 
+  const messages = useMemo<ChatTimelineMessage[]>(() => {
+    return renderState.messages;
+  }, [renderState.messages]);
+
   return {
-    isLoading,
+    isLoading: renderState.isLoading,
     messages,
     submitPrompt,
   };

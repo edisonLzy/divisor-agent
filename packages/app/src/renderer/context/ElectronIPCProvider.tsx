@@ -1,18 +1,16 @@
-import type { IpcEventMap } from "@shared/message-ipc";
-import type { AgentModelsIPC } from "@shared/models-ipc";
-import type { AgentSessionIPC } from "@shared/session-ipc";
+import type {
+  AgentRuntimeIPC,
+  AllowedMainExposeEvents,
+  AllowedRenderInvokeEvents,
+} from "@shared/events-ipc";
 import { createContext, useContext } from "react";
-
-type AgentIPC = AgentModelsIPC & AgentSessionIPC;
 
 // ── Typed ElectronAPI global (exposed by preload via contextBridge) ───────────
 
 /**
- * Helper: if Params is void the channel takes no extra args;
- * otherwise it takes exactly one argument of type Params.
+ * Reuse the shared IPC method signatures so renderer and preload stay aligned.
  */
-type InvokeArgs<C extends keyof AgentIPC> =
-  Parameters<AgentIPC[C]> extends [] ? [] : Parameters<AgentIPC[C]>;
+type InvokeArgs<C extends keyof AgentRuntimeIPC> = Parameters<AgentRuntimeIPC[C]>;
 
 declare global {
   interface Window {
@@ -21,18 +19,18 @@ declare global {
        * Type-safe IPC invoke.
        * The channel name determines the params type and return type automatically.
        */
-      invoke: <C extends keyof AgentIPC>(
+      invoke: <C extends AllowedRenderInvokeEvents>(
         channel: C,
         ...args: InvokeArgs<C>
-      ) => Promise<Awaited<ReturnType<AgentIPC[C]>>>;
+      ) => Promise<Awaited<ReturnType<AgentRuntimeIPC[C]>>>;
 
       /**
        * Subscribe to a push event from the main process.
        * Returns an unsubscribe function.
        */
-      on: <E extends keyof IpcEventMap>(
+      on: <E extends keyof AllowedMainExposeEvents>(
         event: E,
-        callback: (payload: IpcEventMap[E]) => void,
+        callback: (payload: AllowedMainExposeEvents[E]) => void,
       ) => () => void;
     };
   }

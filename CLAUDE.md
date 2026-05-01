@@ -42,53 +42,118 @@ pnpm --filter @divisor-agent/server test
 ### Monorepo Structure
 
 ```
-packages/
-  app/                    # Electron + React 19 + Tailwind v4 + shadcn/ui
-    src/
-      main/              # Electron main process
-        index.ts         # Main process entry (BrowserWindow, IPC handlers)
-      preload/           # Electron preload scripts
-        index.ts         # contextBridge API exposure
-      renderer/          # React frontend
-        index.html       # HTML entry
-        src/
-          mainview/      # React frontend
-            components/  # UI components (shadcn/ui + custom ai-elements)
-            hooks/       # React hooks (useAgentStore, useAgentRuntime)
-            lib/         # Utilities (utils.ts)
-            modules/     # Page modules (workspace/)
-              workspace/ # Main workspace (Workspace, Messages, InstructionInput)
-            App.tsx      # Root component with dark theme layout
-            main.tsx     # React entry point
-            index.css    # Tailwind v4 + custom CSS variables
-          bun/           # Bun runtime (desktop backend, embedded in main process)
-            agent-runtime.ts # Agent orchestration (sessions, permissions, extensions)
-            extensions/  # Extension system (loader, registry, discovery)
-            models/      # Model registry and runtime (supports custom models)
-            permissions/ # Permission service (high-risk operation gating)
-            tools/       # Built-in tools (fs read/write, terminal)
-          shared/
-            ipc-types.ts # Shared IPC type definitions
-    electron.vite.config.ts
-    electron-builder.yml
-  server/                 # Express v5 + tRPC + Zod + Superjson + Pino
-    src/
-      domain/             # Feature modules
-        models/           # Model configuration tRPC router
-          router.ts       # tRPC router for model list
-          service.ts      # Model resolution from ~/.pi/agent/models.json
-          types.ts        # ModelInfo type
-        sessions/         # Session persistence
-          router.ts       # tRPC router
-          service.ts      # Session CRUD and history (session-map.json)
-          types.ts        # Session types
-      shared/             # Logger, tRPC init
-      middlewares/        # Express middleware (response, error, request log)
-      config/             # Environment configuration
-      expose.ts           # Public type exports for frontend
-      router.ts           # Root tRPC router composition
-      app.ts              # Express app creation
-      index.ts            # Server entry point
+.
+├── docs/                           # Project documentation
+│   ├── 调研文档/                    # Research documents (pi-agent-core, extension, tRPC analysis)
+│   ├── 技术文档/mvp/               # Technical docs (frontend, backend MVP specs)
+│   ├── 需求/                        # Requirements (mvp.md)
+│   └── 原型/                        # Prototypes
+├── packages/
+│   ├── app/                        # Electron + React 19 + shadcn/ui
+│   │   ├── __tests__/              # App tests
+│   │   ├── electron.vite.config.ts
+│   │   ├── electron-builder.yml
+│   │   ├── vitest.config.ts
+│   │   └── src/
+│   │       ├── main/               # Electron main process
+│   │       │   ├── index.ts       # Main entry (BrowserWindow, IPC handlers)
+│   │       │   ├── agent-runtime.ts # Agent orchestration
+│   │       │   ├── agent-ipc.ts    # Agent IPC handlers
+│   │       │   ├── tools/          # Built-in tools
+│   │       │   │   ├── fs-tool.ts
+│   │       │   │   └── terminal-tool.ts
+│   │       │   ├── models/         # Model registry
+│   │       │   │   └── registry.ts
+│   │       │   ├── permissions/    # Permission service
+│   │       │   │   └── permission-service.ts
+│   │       │   └── extensions/     # Extension system
+│   │       │       ├── loader.ts
+│   │       │       ├── registry.ts
+│   │       │       └── discovery.ts
+│   │       ├── preload/            # Electron preload scripts
+│   │       │   ├── index.ts        # contextBridge API exposure
+│   │       │   └── index.d.ts
+│   │       ├── renderer/           # React frontend
+│   │       │   ├── index.html
+│   │       │   ├── main.tsx
+│   │       │   ├── App.tsx
+│   │       │   ├── index.css
+│   │       │   ├── shim.d.ts
+│   │       │   ├── context/
+│   │       │   │   └── ElectronIPCProvider.tsx
+│   │       │   ├── hooks/
+│   │       │   │   ├── useAgentStore.ts
+│   │       │   │   └── useAgentRuntime.ts
+│   │       │   ├── lib/
+│   │       │   │   └── utils.ts
+│   │       │   ├── components/
+│   │       │   │   ├── ai-elements/  # AI-specific UI components
+│   │       │   │   │   ├── code-block.tsx
+│   │       │   │   │   ├── message.tsx
+│   │       │   │   │   └── tool.tsx
+│   │       │   │   ├── richtext/      # Rich text editor
+│   │       │   │   │   ├── schema.ts
+│   │       │   │   │   ├── richtext-editor.tsx
+│   │       │   │   │   └── richtext-document-view.tsx
+│   │       │   │   └── ui/            # shadcn/ui components
+│   │       │   │       ├── button.tsx
+│   │       │   │       ├── input.tsx
+│   │       │   │       ├── dialog.tsx
+│   │       │   │       └── ... (27 components)
+│   │       │   └── workspace/
+│   │       │       ├── sessions/      # Session sidebar
+│   │       │       │   └── index.tsx
+│   │       │       └── chat/          # Main chat interface
+│   │       │           ├── index.tsx
+│   │       │           ├── chat-types.ts
+│   │       │           ├── useChat.tsx
+│   │       │           ├── messages/   # Message components
+│   │       │           │   ├── user-message.tsx
+│   │       │           │   ├── assistant-message.tsx
+│   │       │           │   ├── assistant-response-message.tsx
+│   │       │           │   ├── assistant-thinking-message.tsx
+│   │       │           │   ├── assistant-tool-message.tsx
+│   │       │           │   └── index.tsx
+│   │       │           └── prompt-input/
+│   │       │               └── index.tsx
+│   │       └── shared/             # Shared IPC types
+│   │           ├── message-ipc.ts
+│   │           ├── models-ipc.ts
+│   │           └── session-ipc.ts
+│   └── server/                    # Express v5 + tRPC + Zod
+│       ├── __tests__/             # Server tests
+│       ├── vitest.config.ts
+│       └── src/
+│           ├── index.ts           # Server entry point
+│           ├── app.ts             # Express app creation
+│           ├── router.ts          # Root tRPC router
+│           ├── expose.ts          # Public type exports
+│           ├── config/
+│           │   └── env.ts         # Environment configuration
+│           ├── errors/
+│           │   └── app-error.ts  # Custom error class
+│           ├── middlewares/
+│           │   ├── response.ts
+│           │   ├── error.ts
+│           │   └── request-log.ts
+│           ├── shared/
+│           │   ├── trpc.ts       # tRPC initialization
+│           │   └── logger.ts     # Pino logger
+│           ├── types/
+│           │   └── index.ts
+│           └── domain/            # Feature modules
+│               ├── models/        # Model configuration
+│               │   ├── router.ts
+│               │   ├── service.ts
+│               │   └── types.ts
+│               └── sessions/      # Session persistence
+│                   ├── router.ts
+│                   ├── service.ts
+│                   └── types.ts
+├── vitest.config.ts               # Root vitest workspace config
+├── pnpm-workspace.yaml
+├── package.json
+└── CLAUDE.md
 ```
 
 ### UI Theme
@@ -114,7 +179,7 @@ The app uses a dark theme with the following color palette:
 
 ## Agent Runtime (Main Process)
 
-The `AgentRuntime` class in `packages/app/src/renderer/src/bun/agent-runtime.ts` manages:
+The `AgentRuntime` class in `packages/app/src/main/agent-runtime.ts` manages:
 
 - **Sessions**: Creates/manages per-session `Agent` instances using `@mariozechner/pi-agent-core`
 - **Tools**: Built-in tools (fs read/write, terminal) + extension tools
@@ -146,3 +211,5 @@ The project is in MVP development. Current state:
 - App has Electron + React shell with dark theme workspace UI
 - Agent runtime, permission system, and extension system are implemented
 - Session management, model selection, and permission approval flows are wired up
+- Chat UI with message components (user, assistant, thinking, tool messages)
+- Rich text editor for prompt input

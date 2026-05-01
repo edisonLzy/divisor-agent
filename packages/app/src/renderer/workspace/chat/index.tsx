@@ -5,6 +5,8 @@ import { useChat } from "./useChat";
 export function Chat() {
   const { isLoading, messages, submitPrompt } = useChat();
 
+  console.log(messages);
+
   return (
     <div className="flex h-full flex-col bg-[#111111]">
       <section className="min-h-0 flex-1 px-6 pt-6">

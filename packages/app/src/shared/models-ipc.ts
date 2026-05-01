@@ -1,5 +1,6 @@
 export interface AvailableModel {
   providerId: string;
+  providerName: string;
   modelId: string;
   modelName: string;
 }

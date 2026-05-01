@@ -5,20 +5,16 @@ import { AgentSessionIPC } from "../shared/session-ipc";
 import { AgentRuntime } from "./agent-runtime";
 
 function registerAgentRuntimeHandlers(agentRuntime: AgentRuntime, browserWindow: BrowserWindow) {
-  agentRuntime.on("agentMessageChunk", ({ data }) => {
-    if (!browserWindow.isDestroyed()) {
-      browserWindow.webContents.send("agentMessageChunk", data);
+  const offAny = agentRuntime.onAny(({ name, data }) => {
+    if (browserWindow.isDestroyed() || typeof name !== "string") {
+      return;
     }
-  });
 
-  agentRuntime.on("agentMessageDone", ({ data }) => {
-    if (!browserWindow.isDestroyed()) {
-      browserWindow.webContents.send("agentMessageDone", data);
-    }
+    browserWindow.webContents.send(name, data);
   });
 
   return () => {
-    agentRuntime.clearListeners();
+    offAny();
   };
 }
 

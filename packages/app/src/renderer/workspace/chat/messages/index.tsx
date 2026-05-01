@@ -54,7 +54,7 @@ export function ChatMessages({ messages }: ChatMessagesProps) {
           const message = messages[virtualRow.index];
           return (
             <div
-              key={virtualRow.key}
+              key={message.id}
               data-index={virtualRow.index}
               ref={virtualizer.measureElement}
               className="absolute left-0 top-0 w-full px-2"
