@@ -1,28 +1,25 @@
+import type { StopReason } from "@mariozechner/pi-ai";
 import { Message, MessageContent, MessageResponse } from "@renderer/components/ai-elements/message";
 
-import type { AssistantTimelineMessage } from "../chat-types";
-
-type ResponseMessage = Extract<AssistantTimelineMessage, { kind: "response" }>;
-
 interface AssistantResponseMessageProps {
-  message: ResponseMessage;
+  content: string;
+  stopReason?: StopReason;
+  errorMessage?: string;
 }
 
-function statusLabel(status: ResponseMessage["status"]) {
-  switch (status) {
-    case "streaming":
-      return "Streaming";
-    case "error":
-      return "Error";
-    case "aborted":
-      return "Aborted";
-    default:
-      return null;
-  }
+function statusLabel(stopReason?: StopReason, errorMessage?: string): string | null {
+  if (stopReason === "error") return errorMessage?.trim() ? "Error" : "Error";
+  if (stopReason === "aborted") return "Aborted";
+  if (stopReason === "length") return "Truncated";
+  return null;
 }
 
-export function AssistantResponseMessage({ message }: AssistantResponseMessageProps) {
-  const label = statusLabel(message.status);
+export function AssistantResponseMessage({
+  content,
+  stopReason,
+  errorMessage,
+}: AssistantResponseMessageProps) {
+  const label = statusLabel(stopReason, errorMessage);
 
   return (
     <Message from="assistant">
@@ -36,7 +33,7 @@ export function AssistantResponseMessage({ message }: AssistantResponseMessagePr
       </div>
       <MessageContent className="rounded-[22px] border border-[#2B2B2B] bg-[#181818] px-5 py-4 shadow-none">
         <MessageResponse className="text-[15px] leading-7 text-[#E7E7E7] [&_a]:text-[#F3F3F3] [&_code]:text-[#F5F5F5] [&_em]:text-[#D6D6D6] [&_h1]:text-[#FAFAFA] [&_h2]:text-[#FAFAFA] [&_h3]:text-[#FAFAFA] [&_li]:text-inherit [&_ol]:text-inherit [&_p]:text-inherit [&_pre]:text-[#E7E7E7] [&_span]:text-inherit [&_strong]:text-[#FFFFFF] [&_ul]:text-inherit">
-          {message.content}
+          {content}
         </MessageResponse>
       </MessageContent>
     </Message>

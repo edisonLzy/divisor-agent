@@ -5,7 +5,7 @@ import { cn } from "@renderer/lib/utils";
 import { ArrowUp } from "lucide-react";
 import { useState } from "react";
 
-import type { PromptSubmission } from "../chat-types";
+import type { PromptSubmission } from "../prompt-types";
 import { ModalSelector, useModalSelector } from "./ModalSelector";
 
 function createPromptDocument(text: string): RichTextDocument {

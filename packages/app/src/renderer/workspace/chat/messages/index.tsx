@@ -1,16 +1,17 @@
+import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef } from "react";
 
-import type { ChatTimelineMessage } from "../chat-types";
-import { isUserChatMessage } from "../chat-types";
+import type { ToolExecutionState } from "../../../store/session";
 import { AssistantMessage } from "./assistant-message";
 import { UserMessage } from "./user-message";
 
 interface ChatMessagesProps {
-  messages: ChatTimelineMessage[];
+  messages: AgentMessage[];
+  toolStates: Map<string, ToolExecutionState>;
 }
 
-export function ChatMessages({ messages }: ChatMessagesProps) {
+export function ChatMessages({ messages, toolStates }: ChatMessagesProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const virtualizer = useVirtualizer({
@@ -52,9 +53,11 @@ export function ChatMessages({ messages }: ChatMessagesProps) {
       >
         {virtualizer.getVirtualItems().map((virtualRow) => {
           const message = messages[virtualRow.index];
+          if (!("role" in message)) return null;
+
           return (
             <div
-              key={message.id}
+              key={virtualRow.index}
               data-index={virtualRow.index}
               ref={virtualizer.measureElement}
               className="absolute left-0 top-0 w-full px-2"
@@ -63,11 +66,11 @@ export function ChatMessages({ messages }: ChatMessagesProps) {
               }}
             >
               <div className="mx-auto w-full max-w-4xl">
-                {isUserChatMessage(message) ? (
+                {message.role === "user" ? (
                   <UserMessage message={message} />
-                ) : (
-                  <AssistantMessage message={message} />
-                )}
+                ) : message.role === "assistant" ? (
+                  <AssistantMessage message={message} toolStates={toolStates} />
+                ) : null}
               </div>
             </div>
           );
