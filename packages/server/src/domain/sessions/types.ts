@@ -1,55 +1,55 @@
-export interface SessionNode {
-  id: string;
-  parentId: string | null;
-  name: string;
-  timestamp: number;
-  children?: SessionNode[];
-}
+import { z } from "zod/v4";
 
-export interface SessionMap {
-  version: string;
-  sessions: Omit<SessionNode, "children">[];
-}
+// ── Entry data schemas (type-specific JSONB content) ────────────────────────
 
-export type MessageBlockType = "text" | "thinking" | "tool_result";
+export const MessageDataSchema = z.object({
+  role: z.enum(["user", "assistant", "tool"]),
+  content: z.union([
+    z.string(),
+    z.array(
+      z.object({
+        type: z.string(),
+        text: z.string(),
+      }),
+    ),
+  ]),
+});
 
-export interface TextBlock {
-  type: "text";
-  content: string;
-}
+export const ModelChangeDataSchema = z.object({
+  provider: z.string(),
+  modelId: z.string(),
+});
 
-export interface ThinkingBlock {
-  type: "thinking";
-  content: string;
-}
+// ── Append entry input ──────────────────────────────────────────────────────
 
-export interface ToolResultBlock {
-  type: "tool_result";
-  toolName: string;
-  content: string;
-}
+export const AppendEntrySchema = z.object({
+  sessionId: z.uuid(),
+  parentId: z.uuid().nullable(),
+  type: z.enum(["message", "model_change"]),
+  data: z.union([MessageDataSchema, ModelChangeDataSchema]),
+});
 
-export type MessageBlock = TextBlock | ThinkingBlock | ToolResultBlock;
+export type AppendEntryInput = z.infer<typeof AppendEntrySchema>;
 
-export interface HistoryMessage {
+// ── Entry output ────────────────────────────────────────────────────────────
+
+export interface EntryOutput {
   id: string;
   sessionId: string;
-  role: "user" | "assistant";
-  blocks: MessageBlock[];
-  timestamp: number;
+  parentId: string | null;
+  type: string;
+  timestamp: Date;
+  data: Record<string, unknown>;
 }
 
-export interface HistoryResponse {
-  messages: HistoryMessage[];
-  nextCursor: string | null;
-}
+// ── Session context (messages collected from leaf to root) ──────────────────
 
-export interface AppSettings {
-  model: {
-    provider: string;
-    name: string;
-  };
-  app: {
-    workingDirectory?: string;
-  };
+export interface SessionContextOutput {
+  messages: Array<{
+    id: string;
+    role: string;
+    content: unknown;
+    timestamp: Date;
+  }>;
+  model: { provider: string; modelId: string } | null;
 }

@@ -1,293 +1,487 @@
-import os from "node:os";
-import path from "node:path";
+import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+// vi.hoisted() ensures these are available when vi.mock is hoisted
+const {
+  mockReturning,
+  mockWhere,
+  mockValues,
+  mockSet,
+  mockSelect,
+  mockInsert,
+  mockUpdate,
+  mockDelete,
+  mockExecute,
+} = vi.hoisted(() => {
+  const mockReturning: Mock = vi.fn();
+  const mockWhere: Mock = vi.fn(() => ({ returning: mockReturning }));
+  const mockValues: Mock = vi.fn(() => ({ returning: mockReturning, where: mockWhere }));
+  const mockSet = vi.fn(() => ({ where: mockWhere }));
+  const mockSelect = vi.fn(() => ({
+    from: vi.fn(() => ({
+      where: vi.fn(() => Promise.resolve([])),
+      orderBy: vi.fn(() => Promise.resolve([])),
+    })),
+  }));
+  const mockInsert = vi.fn(() => ({ values: mockValues }));
+  const mockUpdate = vi.fn(() => ({ set: mockSet }));
+  const mockDelete = vi.fn(() => ({ where: mockWhere }));
+  const mockExecute = vi.fn();
 
-import {
-  createSession,
-  forkSession,
-  listSessions,
-  appendMessage,
-  getSessionHistory,
-} from "../../../src/domain/sessions/service.js";
-import type { HistoryMessage } from "../../../src/domain/sessions/types.js";
+  return {
+    mockReturning,
+    mockWhere,
+    mockValues,
+    mockSet,
+    mockSelect,
+    mockInsert,
+    mockUpdate,
+    mockDelete,
+    mockExecute,
+  };
+});
 
-// ── fs/promises mock (hoisted so vi.mock factory can reference it) ─────────
-
-const mockFs = vi.hoisted(() => ({
-  readFile: vi.fn(),
-  writeFile: vi.fn(),
-  rename: vi.fn(),
-  mkdir: vi.fn(),
-  appendFile: vi.fn(),
-  rm: vi.fn(),
+vi.mock("../../../src/db/index.js", () => ({
+  db: {
+    select: mockSelect,
+    insert: mockInsert,
+    update: mockUpdate,
+    delete: mockDelete,
+    execute: mockExecute,
+  },
 }));
 
-vi.mock("node:fs/promises", () => ({ default: mockFs }));
+// Now import the service (after mock is set up)
+import {
+  appendEntry,
+  buildContext,
+  createSession,
+  deleteSession,
+  getBranch,
+  getChildren,
+  getEntries,
+  getEntry,
+  getSession,
+  listSessions,
+  renameSession,
+  rewind,
+  setLeaf,
+} from "../../../src/domain/sessions/service.js";
 
-// ── Path constants (mirror sessions/service.ts) ───────────────────────────
+// ── Test data ───────────────────────────────────────────────────────────────
 
-const BASE_DIR = path.join(os.homedir(), ".pi-agent");
-const SESSION_MAP_PATH = path.join(BASE_DIR, "session-map.json");
-const SESSIONS_DIR = path.join(BASE_DIR, "sessions");
+const mockSession = {
+  id: "session-1",
+  name: "Test Session",
+  cwd: "/test",
+  parentSessionId: null,
+  leafEntryId: "entry-2",
+  createdAt: new Date("2025-01-01"),
+  updatedAt: new Date("2025-01-01"),
+};
 
-// ── In-memory FS helper ───────────────────────────────────────────────────
+const mockEntry = {
+  id: "entry-1",
+  sessionId: "session-1",
+  parentId: null,
+  type: "message",
+  timestamp: new Date("2025-01-01"),
+  data: { role: "user", content: "Hello" },
+};
 
-let store: Map<string, string>;
+const mockEntry2 = {
+  id: "entry-2",
+  sessionId: "session-1",
+  parentId: "entry-1",
+  type: "message",
+  timestamp: new Date("2025-01-02"),
+  data: { role: "assistant", content: "Hi there" },
+};
 
-function setupMemoryFs(): void {
-  store = new Map();
+// ── Session CRUD Tests ──────────────────────────────────────────────────────
 
-  mockFs.readFile.mockImplementation(async (filePath: string) => {
-    const content = store.get(filePath);
-    if (content === undefined) {
-      throw Object.assign(new Error(`ENOENT: no such file: ${filePath}`), { code: "ENOENT" });
-    }
-    return content;
-  });
-
-  mockFs.writeFile.mockImplementation(async (filePath: string, data: string) => {
-    store.set(filePath, data);
-  });
-
-  mockFs.rename.mockImplementation(async (from: string, to: string) => {
-    const content = store.get(from);
-    if (content !== undefined) {
-      store.set(to, content);
-      store.delete(from);
-    }
-  });
-
-  mockFs.mkdir.mockResolvedValue(undefined);
-
-  mockFs.appendFile.mockImplementation(async (filePath: string, data: string) => {
-    store.set(filePath, (store.get(filePath) ?? "") + data);
-  });
-
-  mockFs.rm.mockResolvedValue(undefined);
-}
-
-// ── Tests ─────────────────────────────────────────────────────────────────
-
-describe("sessions/service", () => {
+describe("Sessions Service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    setupMemoryFs();
   });
 
   describe("createSession", () => {
-    it("creates a session with a generated id", async () => {
-      const session = await createSession({});
+    it("should create a session with default values", async () => {
+      mockReturning.mockResolvedValue([mockSession]);
 
-      expect(session.id).toBeDefined();
-      expect(session.parentId).toBeNull();
-      expect(typeof session.name).toBe("string");
-      expect(session.timestamp).toBeGreaterThan(0);
+      const result = await createSession({});
+
+      expect(mockInsert).toHaveBeenCalled();
+      expect(mockValues).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "",
+          cwd: "",
+          parentSessionId: null,
+        }),
+      );
+      expect(result).toEqual(mockSession);
     });
 
-    it("uses the provided id and name", async () => {
-      const session = await createSession({ id: "explicit-id", name: "My Session" });
+    it("should create a session with custom values", async () => {
+      mockReturning.mockResolvedValue([mockSession]);
 
-      expect(session.id).toBe("explicit-id");
-      expect(session.name).toBe("My Session");
+      await createSession({
+        name: "My Session",
+        cwd: "/work",
+        parentSessionId: "parent-1",
+      });
+
+      expect(mockValues).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "My Session",
+          cwd: "/work",
+          parentSessionId: "parent-1",
+        }),
+      );
     });
 
-    it("stores parentId when provided", async () => {
-      await createSession({ id: "parent" });
-      const child = await createSession({ id: "child", parentId: "parent" });
+    it("should create a session with explicit id", async () => {
+      mockReturning.mockResolvedValue([mockSession]);
 
-      expect(child.parentId).toBe("parent");
-    });
+      await createSession({ id: "custom-id" });
 
-    it("persists session in session-map.json", async () => {
-      await createSession({ id: "persist-test" });
-
-      const raw = store.get(SESSION_MAP_PATH);
-      expect(raw).toBeDefined();
-      const map = JSON.parse(raw!);
-      expect(map.sessions.some((s: { id: string }) => s.id === "persist-test")).toBe(true);
-    });
-
-    it("accumulates multiple sessions in the map", async () => {
-      await createSession({ id: "s1" });
-      await createSession({ id: "s2" });
-
-      const map = JSON.parse(store.get(SESSION_MAP_PATH)!);
-      expect(map.sessions).toHaveLength(2);
-    });
-
-    it("writes meta.json for the new session", async () => {
-      await createSession({ id: "meta-test" });
-
-      const metaPath = path.join(SESSIONS_DIR, "meta-test", "meta.json");
-      const raw = store.get(metaPath);
-      expect(raw).toBeDefined();
-      const meta = JSON.parse(raw!);
-      expect(meta.id).toBe("meta-test");
+      expect(mockValues).toHaveBeenCalledWith(expect.objectContaining({ id: "custom-id" }));
     });
   });
 
   describe("listSessions", () => {
-    it("returns an empty array when there are no sessions", async () => {
-      const sessions = await listSessions();
-      expect(sessions).toEqual([]);
-    });
+    it("should list sessions ordered by updatedAt desc", async () => {
+      const mockFrom = { orderBy: vi.fn().mockResolvedValue([mockSession]) };
+      mockSelect.mockReturnValue({ from: vi.fn().mockReturnValue(mockFrom) });
 
-    it("returns a flat list when there are no parent-child relationships", async () => {
-      await createSession({ id: "r1" });
-      await createSession({ id: "r2" });
+      const result = await listSessions();
 
-      const sessions = await listSessions();
-      expect(sessions).toHaveLength(2);
-      expect(sessions.every((s) => !s.children || s.children.length === 0)).toBe(true);
-    });
-
-    it("nests children under their parent", async () => {
-      await createSession({ id: "root" });
-      await createSession({ id: "child", parentId: "root" });
-
-      const sessions = await listSessions();
-      const root = sessions.find((s) => s.id === "root");
-
-      expect(root).toBeDefined();
-      expect(root?.children).toHaveLength(1);
-      expect(root?.children?.[0].id).toBe("child");
+      expect(result).toEqual([mockSession]);
+      expect(mockSelect).toHaveBeenCalled();
     });
   });
 
-  describe("appendMessage & getSessionHistory", () => {
-    it("returns empty history when no messages file exists", async () => {
-      await createSession({ id: "empty-session" });
+  describe("getSession", () => {
+    it("should return a session by id", async () => {
+      const mockWhereFn = vi.fn().mockResolvedValue([mockSession]);
+      const mockFrom = { where: mockWhereFn };
+      mockSelect.mockReturnValue({ from: vi.fn().mockReturnValue(mockFrom) });
 
-      const history = await getSessionHistory("empty-session");
-      expect(history.messages).toEqual([]);
-      expect(history.nextCursor).toBeNull();
+      const result = await getSession("session-1");
+
+      expect(result).toEqual(mockSession);
     });
 
-    it("appends and retrieves a message", async () => {
-      await createSession({ id: "msg-session" });
+    it("should return null when session not found", async () => {
+      const mockWhereFn = vi.fn().mockResolvedValue([]);
+      const mockFrom = { where: mockWhereFn };
+      mockSelect.mockReturnValue({ from: vi.fn().mockReturnValue(mockFrom) });
 
-      const msg: HistoryMessage = {
-        id: "msg-1",
-        sessionId: "msg-session",
-        role: "user",
-        blocks: [{ type: "text", content: "Hello" }],
-        timestamp: Date.now(),
-      };
-      await appendMessage("msg-session", msg);
+      const result = await getSession("nonexistent");
 
-      const history = await getSessionHistory("msg-session");
-      expect(history.messages).toHaveLength(1);
-      expect(history.messages[0].id).toBe("msg-1");
-      expect(history.messages[0].blocks[0]).toMatchObject({ type: "text", content: "Hello" });
-    });
-
-    it("paginates with limit and cursor", async () => {
-      await createSession({ id: "paginate-session" });
-
-      const messages: HistoryMessage[] = Array.from({ length: 5 }, (_, i) => ({
-        id: `msg-${i}`,
-        sessionId: "paginate-session",
-        role: "user" as const,
-        blocks: [{ type: "text" as const, content: `Message ${i}` }],
-        timestamp: i,
-      }));
-      for (const m of messages) {
-        await appendMessage("paginate-session", m);
-      }
-
-      const page1 = await getSessionHistory("paginate-session", undefined, 3);
-      expect(page1.messages).toHaveLength(3);
-      expect(page1.nextCursor).toBe("msg-2");
-
-      const page2 = await getSessionHistory("paginate-session", "msg-2", 3);
-      expect(page2.messages).toHaveLength(2);
-      expect(page2.nextCursor).toBeNull();
-    });
-
-    it("returns empty history when cursor points to the last message", async () => {
-      await createSession({ id: "cursor-end-session" });
-
-      const msg: HistoryMessage = {
-        id: "only-msg",
-        sessionId: "cursor-end-session",
-        role: "user",
-        blocks: [],
-        timestamp: 1,
-      };
-      await appendMessage("cursor-end-session", msg);
-
-      const history = await getSessionHistory("cursor-end-session", "only-msg", 10);
-      expect(history.messages).toEqual([]);
-      expect(history.nextCursor).toBeNull();
+      expect(result).toBeNull();
     });
   });
 
-  describe("forkSession", () => {
-    it("creates a child session with all parent messages", async () => {
-      await createSession({ id: "fork-parent" });
+  describe("renameSession", () => {
+    it("should rename a session", async () => {
+      mockWhere.mockResolvedValue(undefined);
 
-      const msg: HistoryMessage = {
-        id: "orig-msg",
-        sessionId: "fork-parent",
-        role: "user",
-        blocks: [{ type: "text", content: "Original" }],
-        timestamp: 1,
+      await renameSession("session-1", "New Name");
+
+      expect(mockUpdate).toHaveBeenCalled();
+      expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({ name: "New Name" }));
+    });
+  });
+
+  describe("deleteSession", () => {
+    it("should delete a session", async () => {
+      mockReturning.mockResolvedValue(undefined);
+
+      await deleteSession("session-1");
+
+      expect(mockDelete).toHaveBeenCalled();
+    });
+  });
+
+  // ── Entry CRUD Tests ─────────────────────────────────────────────────────
+
+  describe("appendEntry", () => {
+    it("should append a message entry", async () => {
+      mockReturning.mockResolvedValue([mockEntry]);
+      mockWhere.mockResolvedValue(undefined);
+
+      const result = await appendEntry({
+        sessionId: "session-1",
+        parentId: null,
+        type: "message",
+        data: { role: "user", content: "Hello" },
+      });
+
+      expect(mockInsert).toHaveBeenCalled();
+      expect(mockValues).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionId: "session-1",
+          parentId: null,
+          type: "message",
+          data: { role: "user", content: "Hello" },
+        }),
+      );
+      expect(result.id).toBe("entry-1");
+      expect(result.type).toBe("message");
+    });
+
+    it("should append a model_change entry", async () => {
+      const modelEntry = {
+        ...mockEntry,
+        id: "entry-model",
+        type: "model_change",
+        data: { provider: "anthropic", modelId: "claude-sonnet-4" },
       };
-      await appendMessage("fork-parent", msg);
+      mockReturning.mockResolvedValue([modelEntry]);
+      mockWhere.mockResolvedValue(undefined);
 
-      const fork = await forkSession({ parentSessionId: "fork-parent" });
+      const result = await appendEntry({
+        sessionId: "session-1",
+        parentId: "entry-1",
+        type: "model_change",
+        data: { provider: "anthropic", modelId: "claude-sonnet-4" },
+      });
 
-      expect(fork.id).not.toBe("fork-parent");
-      expect(fork.parentId).toBe("fork-parent");
-
-      const history = await getSessionHistory(fork.id);
-      expect(history.messages).toHaveLength(1);
-      expect(history.messages[0].sessionId).toBe(fork.id);
+      expect(result.type).toBe("model_change");
+      expect(result.data).toEqual({ provider: "anthropic", modelId: "claude-sonnet-4" });
     });
 
-    it("truncates messages at the specified messageId (inclusive)", async () => {
-      await createSession({ id: "trunc-parent" });
+    it("should update session leafEntryId after append", async () => {
+      mockReturning.mockResolvedValue([mockEntry]);
+      mockWhere.mockResolvedValue(undefined);
 
-      const msgs: HistoryMessage[] = [
-        { id: "a", sessionId: "trunc-parent", role: "user", blocks: [], timestamp: 1 },
-        { id: "b", sessionId: "trunc-parent", role: "assistant", blocks: [], timestamp: 2 },
-        { id: "c", sessionId: "trunc-parent", role: "user", blocks: [], timestamp: 3 },
-      ];
-      for (const m of msgs) {
-        await appendMessage("trunc-parent", m);
-      }
+      await appendEntry({
+        sessionId: "session-1",
+        parentId: null,
+        type: "message",
+        data: { role: "user", content: "Hello" },
+      });
 
-      const fork = await forkSession({ parentSessionId: "trunc-parent", messageId: "b" });
-      const history = await getSessionHistory(fork.id);
+      // Second call to mockUpdate is the leafEntryId update
+      expect(mockUpdate).toHaveBeenCalled();
+      expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({ leafEntryId: "entry-1" }));
+    });
+  });
 
-      expect(history.messages.map((m) => m.id)).toEqual(["a", "b"]);
+  describe("getEntry", () => {
+    it("should return an entry by id", async () => {
+      const mockWhereFn = vi.fn().mockResolvedValue([mockEntry]);
+      const mockFrom = { where: mockWhereFn };
+      mockSelect.mockReturnValue({ from: vi.fn().mockReturnValue(mockFrom) });
+
+      const result = await getEntry("entry-1");
+
+      expect(result).not.toBeNull();
+      expect(result!.id).toBe("entry-1");
+      expect(result!.type).toBe("message");
     });
 
-    it("uses a custom name when provided", async () => {
-      await createSession({ id: "named-parent" });
-      const fork = await forkSession({ parentSessionId: "named-parent", name: "Custom Fork" });
+    it("should return null when entry not found", async () => {
+      const mockWhereFn = vi.fn().mockResolvedValue([]);
+      const mockFrom = { where: mockWhereFn };
+      mockSelect.mockReturnValue({ from: vi.fn().mockReturnValue(mockFrom) });
 
-      expect(fork.name).toBe("Custom Fork");
+      const result = await getEntry("nonexistent");
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("getEntries", () => {
+    it("should return all entries for a session ordered by timestamp", async () => {
+      const mockOrderBy = vi.fn().mockResolvedValue([mockEntry, mockEntry2]);
+      const mockWhereFn = vi.fn().mockReturnValue({ orderBy: mockOrderBy });
+      const mockFrom = { where: mockWhereFn };
+      mockSelect.mockReturnValue({ from: vi.fn().mockReturnValue(mockFrom) });
+
+      const result = await getEntries("session-1");
+
+      expect(result).toHaveLength(2);
+      expect(result[0].id).toBe("entry-1");
+      expect(result[1].id).toBe("entry-2");
+    });
+  });
+
+  // ── Tree Operations Tests ─────────────────────────────────────────────────
+
+  describe("getBranch", () => {
+    it("should return branch path using recursive CTE", async () => {
+      // Mock session lookup (for leafEntryId)
+      const mockSessionWhere = vi.fn().mockResolvedValue([mockSession]);
+      const mockSessionFrom = { where: mockSessionWhere };
+      mockSelect.mockReturnValue({ from: vi.fn().mockReturnValue(mockSessionFrom) });
+
+      mockExecute.mockResolvedValue([
+        {
+          id: "entry-1",
+          session_id: "session-1",
+          parent_id: null,
+          type: "message",
+          timestamp: new Date("2025-01-01"),
+          data: JSON.stringify({ role: "user", content: "Hello" }),
+        },
+        {
+          id: "entry-2",
+          session_id: "session-1",
+          parent_id: "entry-1",
+          type: "message",
+          timestamp: new Date("2025-01-02"),
+          data: JSON.stringify({ role: "assistant", content: "Hi" }),
+        },
+      ]);
+
+      const result = await getBranch("session-1", "entry-2");
+
+      expect(result).toHaveLength(2);
+      expect(result[0].id).toBe("entry-1");
+      expect(result[1].id).toBe("entry-2");
+      expect(mockExecute).toHaveBeenCalled();
     });
 
-    it("creates a fork with no messages when parent has none", async () => {
-      await createSession({ id: "empty-parent" });
-      const fork = await forkSession({ parentSessionId: "empty-parent" });
-      const history = await getSessionHistory(fork.id);
+    it("should use session leafEntryId when no leafId provided", async () => {
+      const mockSessionWhere = vi.fn().mockResolvedValue([mockSession]);
+      const mockSessionFrom = { where: mockSessionWhere };
+      mockSelect.mockReturnValue({ from: vi.fn().mockReturnValue(mockSessionFrom) });
+      mockExecute.mockResolvedValue([]);
 
-      expect(history.messages).toEqual([]);
+      await getBranch("session-1");
+
+      expect(mockSelect).toHaveBeenCalled();
     });
 
-    it("registers the fork in the session map", async () => {
-      await createSession({ id: "map-parent" });
-      const fork = await forkSession({ parentSessionId: "map-parent" });
+    it("should return empty array when session has no leaf", async () => {
+      const sessionNoLeaf = { ...mockSession, leafEntryId: null };
+      const mockSessionWhere = vi.fn().mockResolvedValue([sessionNoLeaf]);
+      const mockSessionFrom = { where: mockSessionWhere };
+      mockSelect.mockReturnValue({ from: vi.fn().mockReturnValue(mockSessionFrom) });
 
-      const map = JSON.parse(store.get(SESSION_MAP_PATH)!);
-      const forkEntry = map.sessions.find((s: { id: string }) => s.id === fork.id);
+      const result = await getBranch("session-1");
 
-      expect(forkEntry).toBeDefined();
-      expect(forkEntry.parentId).toBe("map-parent");
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("buildContext", () => {
+    it("should collect messages and model info from branch", async () => {
+      const mockSessionWhere = vi.fn().mockResolvedValue([mockSession]);
+      const mockSessionFrom = { where: mockSessionWhere };
+      mockSelect.mockReturnValue({ from: vi.fn().mockReturnValue(mockSessionFrom) });
+
+      mockExecute.mockResolvedValue([
+        {
+          id: "entry-1",
+          session_id: "session-1",
+          parent_id: null,
+          type: "message",
+          timestamp: new Date("2025-01-01"),
+          data: JSON.stringify({ role: "user", content: "Hello" }),
+        },
+        {
+          id: "entry-model",
+          session_id: "session-1",
+          parent_id: "entry-1",
+          type: "model_change",
+          timestamp: new Date("2025-01-01"),
+          data: JSON.stringify({ provider: "anthropic", modelId: "claude-sonnet-4" }),
+        },
+        {
+          id: "entry-2",
+          session_id: "session-1",
+          parent_id: "entry-model",
+          type: "message",
+          timestamp: new Date("2025-01-02"),
+          data: JSON.stringify({ role: "assistant", content: "Hi" }),
+        },
+      ]);
+
+      const result = await buildContext("session-1", "entry-2");
+
+      expect(result.messages).toHaveLength(2);
+      expect(result.messages[0].role).toBe("user");
+      expect(result.messages[1].role).toBe("assistant");
+      expect(result.model).toEqual({ provider: "anthropic", modelId: "claude-sonnet-4" });
+    });
+
+    it("should return empty context when no entries", async () => {
+      const mockSessionWhere = vi.fn().mockResolvedValue([mockSession]);
+      const mockSessionFrom = { where: mockSessionWhere };
+      mockSelect.mockReturnValue({ from: vi.fn().mockReturnValue(mockSessionFrom) });
+      mockExecute.mockResolvedValue([]);
+
+      const result = await buildContext("session-1", "entry-1");
+
+      expect(result.messages).toEqual([]);
+      expect(result.model).toBeNull();
+    });
+  });
+
+  describe("getChildren", () => {
+    it("should return direct children of an entry", async () => {
+      const mockOrderBy = vi.fn().mockResolvedValue([mockEntry2]);
+      const mockWhereFn = vi.fn().mockReturnValue({ orderBy: mockOrderBy });
+      const mockFrom = { where: mockWhereFn };
+      mockSelect.mockReturnValue({ from: vi.fn().mockReturnValue(mockFrom) });
+
+      const result = await getChildren("entry-1");
+
+      expect(result).toHaveLength(1);
+      expect(result[0].parentId).toBe("entry-1");
+    });
+  });
+
+  // ── Branch & Rewind Tests ─────────────────────────────────────────────────
+
+  describe("setLeaf", () => {
+    it("should move leaf pointer to specified entry", async () => {
+      const mockEntryWhere = vi.fn().mockResolvedValue([mockEntry]);
+      const mockEntryFrom = { where: mockEntryWhere };
+      mockSelect.mockReturnValue({ from: vi.fn().mockReturnValue(mockEntryFrom) });
+      mockWhere.mockResolvedValue(undefined);
+
+      await setLeaf("session-1", "entry-1");
+
+      expect(mockUpdate).toHaveBeenCalled();
+      expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({ leafEntryId: "entry-1" }));
+    });
+
+    it("should throw when entry not found", async () => {
+      const mockEntryWhere = vi.fn().mockResolvedValue([]);
+      const mockEntryFrom = { where: mockEntryWhere };
+      mockSelect.mockReturnValue({ from: vi.fn().mockReturnValue(mockEntryFrom) });
+
+      await expect(setLeaf("session-1", "nonexistent")).rejects.toThrow(
+        "Entry nonexistent not found in session session-1",
+      );
+    });
+
+    it("should throw when entry belongs to different session", async () => {
+      const wrongSessionEntry = { ...mockEntry, sessionId: "other-session" };
+      const mockEntryWhere = vi.fn().mockResolvedValue([wrongSessionEntry]);
+      const mockEntryFrom = { where: mockEntryWhere };
+      mockSelect.mockReturnValue({ from: vi.fn().mockReturnValue(mockEntryFrom) });
+
+      await expect(setLeaf("session-1", "entry-1")).rejects.toThrow(
+        "Entry entry-1 not found in session session-1",
+      );
+    });
+  });
+
+  describe("rewind", () => {
+    it("should move leaf to target entry", async () => {
+      const mockEntryWhere = vi.fn().mockResolvedValue([mockEntry]);
+      const mockEntryFrom = { where: mockEntryWhere };
+      mockSelect.mockReturnValue({ from: vi.fn().mockReturnValue(mockEntryFrom) });
+      mockWhere.mockResolvedValue(undefined);
+
+      await rewind("session-1", "entry-1");
+
+      expect(mockUpdate).toHaveBeenCalled();
+      expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({ leafEntryId: "entry-1" }));
     });
   });
 });

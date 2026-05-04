@@ -13,16 +13,22 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
     "type-check": "tsc --noEmit",
-    "test": "vitest"
+    "test": "vitest",
+    "drizzle:generate": "drizzle-kit generate",
+    "drizzle:migrate": "drizzle-kit migrate",
+    "drizzle:push": "drizzle-kit push",
+    "drizzle:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@sinclair/typebox": "^0.34.48",
     "@trpc/server": "^11.13.4",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
+    "drizzle-orm": "^0.45.2",
     "express": "^5.0.1",
     "pino": "^9.6.0",
     "pino-http": "^10.4.0",
+    "postgres": "^3.4.9",
     "superjson": "^2.2.6",
     "zod": "^4.2.1"
   },
@@ -30,6 +36,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.6",
     "@types/node": "^22.0.0",
+    "drizzle-kit": "^0.31.10",
     "pino-pretty": "^13.0.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",

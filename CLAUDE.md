@@ -170,7 +170,7 @@ The app uses a dark theme with the following color palette:
 - **Server imports**: Always include `.js` extension for local TypeScript imports (ESM requirement)
 - **Type imports**: Use `import type { ... }` for pure type imports
 - **React imports**: 项目使用 React 19 和新的 JSX Runtime，不需要在 `.tsx` / `.jsx` 文件中手动 `import React from 'react';`
-- **Package Manager**: Strictly use `pnpm` as the package manager. `bun`, `npm`, or `yarn` should not be used
+- **Package Manager**: Strictly use `pnpm` as the package manager. `bun`, `npm`, or `yarn` should not be used. Use `pnpx` instead of `npx` to run packages
 - **Node Linker**: 使用 `nodelinker=hoisted` 配置，创建扁平化的 `node_modules`（在 `.npmrc` 中配置）
 - **Dependencies**: pnpm workspace 自动管理共享依赖版本
 - **Dependencies**: 严格按需引入依赖。严禁安装当前未使用的依赖（例如：在使用 TipTap 时，仅在真正用到某个特定插件时才进行安装，未使用到的插件绝对不要提前引入或安装）
