@@ -1,9 +1,6 @@
-import type { AvailableModel } from "./models-ipc";
+import type { AgentMessage } from "@mariozechner/pi-agent-core";
 
-interface PromptContent {
-  content: string;
-  metadata: Record<string, unknown>;
-}
+import type { AvailableModel } from "./models-ipc";
 
 export interface PromptPayload {
   sessionId: string;
@@ -13,8 +10,6 @@ export interface PromptPayload {
 
 export interface AgentSessionIPC {
   prompt: (params: PromptPayload) => Promise<void>;
-  setHistoryMessages: (messages: PromptContent[]) => Promise<void>;
+  setHistoryMessages: (messages: AgentMessage[]) => Promise<void>;
   setSessionId: (sessionId: string) => Promise<void>;
 }
-
-export type { PromptContent };
