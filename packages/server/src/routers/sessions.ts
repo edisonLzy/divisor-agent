@@ -3,6 +3,7 @@ import { TRPCError } from '@trpc/server';
 import { router, publicProcedure } from '../trpc.js';
 import {
   listSessions,
+  createSession,
   getSessionHistory,
   renameSession,
   deleteSession,
@@ -12,6 +13,12 @@ export const sessionsRouter = router({
   list: publicProcedure.query(async () => {
     return listSessions();
   }),
+
+  create: publicProcedure
+    .input(z.object({ name: z.string().optional() }).optional())
+    .mutation(async ({ input }) => {
+      return createSession({ name: input?.name });
+    }),
 
   history: publicProcedure
     .input(z.object({ id: z.string(), cursor: z.string().optional() }))
