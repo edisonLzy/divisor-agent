@@ -45,7 +45,7 @@ export function AssistantToolMessage({ toolName, args, toolState }: AssistantToo
         <Shimmer as="span" className="text-xs text-[#9E9E9E]" animate={isRunning}>
           {`${statusLabel(toolState?.status)} ${toolName}`}
         </Shimmer>
-        <ChevronRightIcon className="size-3.5 transition-transform group-data-[panel-open]/tool:rotate-90 text-[#7C7C7C]" />
+        <ChevronRightIcon className="size-3.5 text-[#7C7C7C] transition-transform group-data-panel-open/tool:rotate-90" />
       </CollapsibleTrigger>
 
       <CollapsibleContent>
