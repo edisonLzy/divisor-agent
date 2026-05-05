@@ -26,6 +26,7 @@ function registerIPCHandlers(agentRuntime: AgentRuntime) {
   typedIpcMain.handle("prompt", agentRuntime.prompt);
   typedIpcMain.handle("setHistoryMessages", agentRuntime.setHistoryMessages);
   typedIpcMain.handle("setSessionId", agentRuntime.setSessionId);
+  typedIpcMain.handle("searchWorkspaceFiles", agentRuntime.searchWorkspaceFiles);
 
   return () => {
     typedIpcMain.removeAllListeners();

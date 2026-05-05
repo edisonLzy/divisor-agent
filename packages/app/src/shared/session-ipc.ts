@@ -2,6 +2,11 @@ import type { AgentMessage } from "@mariozechner/pi-agent-core";
 
 import type { AvailableModel } from "./models-ipc";
 
+export interface WorkspaceFileItem {
+  name: string;
+  path: string;
+}
+
 export interface PromptPayload {
   sessionId: string;
   content: string;
@@ -12,4 +17,5 @@ export interface AgentSessionIPC {
   prompt: (params: PromptPayload) => Promise<void>;
   setHistoryMessages: (messages: AgentMessage[]) => Promise<void>;
   setSessionId: (sessionId: string) => Promise<void>;
+  searchWorkspaceFiles: (query: string) => Promise<WorkspaceFileItem[]>;
 }

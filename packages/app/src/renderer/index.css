@@ -247,3 +247,25 @@
   min-height: auto;
   padding: 0;
 }
+
+/* Tiptap placeholder */
+.prompt-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #7b7b7b;
+  pointer-events: none;
+  height: 0;
+}
+
+/* Tiptap mention node */
+.prompt-editor .ProseMirror .mention {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 0.375rem;
+  background-color: #2a2a3a;
+  padding: 0.125rem 0.375rem;
+  color: #b4b4ff;
+  font-weight: 500;
+  font-size: 0.875rem;
+}

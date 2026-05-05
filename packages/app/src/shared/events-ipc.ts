@@ -33,6 +33,7 @@ export const ALLOWED_RENDER_INVOKE_EVENTS: (keyof AgentRuntimeIPC)[] = [
   "prompt",
   "setHistoryMessages",
   "setSessionId",
+  "searchWorkspaceFiles",
 ];
 
 export type AllowedRenderInvokeEvents = (typeof ALLOWED_RENDER_INVOKE_EVENTS)[number];
