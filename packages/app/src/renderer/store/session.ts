@@ -22,6 +22,10 @@ export interface ModelChangedData {
   modelId: string;
 }
 
+/** The shape of the `data` field in a SessionEntry with `type === "message"`. */
+
+export type AgentMessageData = AgentMessage;
+
 /**
  * A single immutable timeline entry in the session.
  * Entries form a linked list via `parentId` so the conversation tree can be
@@ -37,7 +41,7 @@ export interface SessionEntry {
   /** Unix timestamp in milliseconds when this entry was created */
   timestamp: number;
   /** Entry payload — either an agent message or a model-change record */
-  data: AgentMessage | ModelChangedData;
+  data: AgentMessageData | ModelChangedData;
 }
 
 /** Possible states during a tool call's lifecycle */

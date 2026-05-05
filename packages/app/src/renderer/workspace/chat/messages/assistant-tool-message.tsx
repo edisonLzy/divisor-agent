@@ -1,4 +1,10 @@
-import { Message, MessageContent } from "@renderer/components/ai-elements/message";
+import { Shimmer } from "@renderer/components/ai-elements/shimmer";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@renderer/components/ui/collapsible";
+import { ChevronRightIcon } from "lucide-react";
 
 import type { ToolExecutionState } from "../../../store/session";
 
@@ -20,30 +26,30 @@ function formatArgs(value: unknown): string {
 function statusLabel(status?: ToolExecutionState["status"]): string {
   switch (status) {
     case "done":
-      return "Done";
+      return "已处理";
     case "error":
-      return "Error";
+      return "错误";
     case "running":
-      return "Running";
+      return "运行中";
     default:
-      return "Preparing";
+      return "准备中";
   }
 }
 
 export function AssistantToolMessage({ toolName, args, toolState }: AssistantToolMessageProps) {
+  const isRunning = toolState?.status === "running";
+
   return (
-    <Message from="assistant">
-      <div className="flex items-center gap-3 text-xs font-medium uppercase tracking-[0.22em] text-[#7C7C7C]">
-        <span>Tool</span>
-        <span className="rounded-full border border-[#343434] px-2 py-1 text-[10px] tracking-[0.16em] text-[#B8B8B8]">
-          {statusLabel(toolState?.status)}
-        </span>
-      </div>
+    <Collapsible defaultOpen={false}>
+      <CollapsibleTrigger className="group/tool flex w-full cursor-pointer items-center gap-1.5  text-sm">
+        <Shimmer as="span" className="text-xs text-[#9E9E9E]" animate={isRunning}>
+          {`${statusLabel(toolState?.status)} ${toolName}`}
+        </Shimmer>
+        <ChevronRightIcon className="size-3.5 transition-transform group-data-[state=open]/tool:rotate-90 text-[#7C7C7C]" />
+      </CollapsibleTrigger>
 
-      <MessageContent className="border border-[#2A2A2A] bg-[#161616] p-4 shadow-none">
-        <div className="text-sm font-medium text-[#E2E2E2]">{toolName}</div>
-
-        <div className="mt-4 flex flex-col gap-3">
+      <CollapsibleContent>
+        <div className="flex flex-col gap-3 pt-3">
           <section className="rounded-2xl bg-[#1E1E1E] p-3">
             <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-[#7C7C7C]">Input</div>
             <pre className="overflow-x-auto whitespace-pre-wrap wrap-break-word text-xs leading-6 text-[#B8B8B8]">
@@ -52,15 +58,12 @@ export function AssistantToolMessage({ toolName, args, toolState }: AssistantToo
           </section>
 
           <section className="rounded-2xl bg-[#1E1E1E] p-3">
-            <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-[#7C7C7C]">
-              Output
-            </div>
             <pre className="overflow-x-auto whitespace-pre-wrap wrap-break-word text-xs leading-6 text-[#D4D4D4]">
-              {toolState?.output || "(waiting for tool output)"}
+              {toolState?.output}
             </pre>
           </section>
         </div>
-      </MessageContent>
-    </Message>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

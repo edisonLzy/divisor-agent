@@ -36,13 +36,15 @@ export function useChat() {
   const { invoke } = useElectronIPC();
   const state = useStore(sessionStore);
 
-  useSubscribeMessageEvents();
+  useSubscribeAgentEvents();
 
   const messages = useMemo<AgentMessage[]>(() => {
     return state.entries
       .filter((entry) => entry.type === "message")
       .map((entry) => entry.data as AgentMessage);
   }, [state.entries]);
+
+  const toolStates = state.toolStates;
 
   const submitPrompt = useCallback(
     async (submission: PromptSubmission) => {
@@ -68,14 +70,14 @@ export function useChat() {
   return {
     isLoading: state.isLoading,
     messages,
-    toolStates: state.toolStates,
+    toolStates,
     submitPrompt,
   };
 }
 
 // ── Agent message event subscriptions ────────────────────────────────────────
 
-function useSubscribeMessageEvents() {
+function useSubscribeAgentEvents() {
   const { on } = useElectronIPC();
 
   useEffect(() => {
@@ -90,7 +92,6 @@ function useSubscribeMessageEvents() {
       }),
 
       on("message_start", (event) => {
-        if (event.type !== "message_start") return;
         const { message } = event;
 
         if (message.role === "user") {
@@ -105,7 +106,6 @@ function useSubscribeMessageEvents() {
       }),
 
       on("message_update", (event) => {
-        if (event.type !== "message_update") return;
         if (event.message.role !== "assistant") return;
 
         const entryId = sessionStore.getState().streamingEntryId;
@@ -132,7 +132,6 @@ function useSubscribeMessageEvents() {
       }),
 
       on("message_end", (event) => {
-        if (event.type !== "message_end") return;
         if (event.message.role !== "assistant") return;
 
         const message = event.message as AssistantMessage;
@@ -148,7 +147,10 @@ function useSubscribeMessageEvents() {
       }),
 
       on("tool_execution_start", (event) => {
-        if (event.type !== "tool_execution_start") return;
+
+        const existing = sessionStore.getState().toolStates.get(event.toolCallId);
+        if (existing) return;
+
         sessionStore.getState().setToolState(event.toolCallId, {
           toolCallId: event.toolCallId,
           toolName: event.toolName,
@@ -159,8 +161,10 @@ function useSubscribeMessageEvents() {
       }),
 
       on("tool_execution_update", (event) => {
-        if (event.type !== "tool_execution_update") return;
+
         const existing = sessionStore.getState().toolStates.get(event.toolCallId);
+        if (!existing) return;
+
         sessionStore.getState().setToolState(event.toolCallId, {
           toolCallId: event.toolCallId,
           toolName: event.toolName,
@@ -171,7 +175,6 @@ function useSubscribeMessageEvents() {
       }),
 
       on("tool_execution_end", (event) => {
-        if (event.type !== "tool_execution_end") return;
 
         const resultContent = event.result?.content;
         const output = Array.isArray(resultContent)
