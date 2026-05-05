@@ -1,15 +1,9 @@
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import type { AssistantMessage } from "@mariozechner/pi-ai";
+import { isAgentMessageEntry } from "@renderer/lib/is";
 import type { AvailableModel } from "@shared/models-ipc";
 import { v4 as uuidv4 } from "uuid";
 import { createStore } from "zustand/vanilla";
-
-/**
- * Discriminator for SessionEntry — determines how `data` should be interpreted.
- * - "message":      agent message (user / assistant / toolResult)
- * - "model_change": user switched the active model mid-session
- */
-export type EntryType = "message" | "model_change";
 
 /**
  * Payload stored in a SessionEntry when `type === "model_change"`.
@@ -23,26 +17,35 @@ export interface ModelChangedData {
 }
 
 /** The shape of the `data` field in a SessionEntry with `type === "message"`. */
-
 export type AgentMessageData = AgentMessage;
 
-/**
- * A single immutable timeline entry in the session.
- * Entries form a linked list via `parentId` so the conversation tree can be
- * reconstructed even if the flat list is reordered or filtered.
- */
-export interface SessionEntry {
+/** Shared fields for all session entries. */
+export interface SessionEntryBase {
   /** Unique ID for this entry (UUID v4) */
   id: string;
   /** ID of the preceding entry, or null if this is the first entry */
   parentId: string | null;
-  /** Determines the shape of `data` */
-  type: EntryType;
   /** Unix timestamp in milliseconds when this entry was created */
   timestamp: number;
-  /** Entry payload — either an agent message or a model-change record */
-  data: AgentMessageData | ModelChangedData;
 }
+
+/** A session entry containing an agent message (user / assistant / toolResult). */
+export interface MessageEntry extends SessionEntryBase {
+  type: "message";
+  data: AgentMessageData;
+}
+
+/** A session entry recording a mid-session model switch. */
+export interface ModelChangedEntry extends SessionEntryBase {
+  type: "model_change";
+  data: ModelChangedData;
+}
+
+/**
+ * Discriminated union of all session entry types.
+ * Narrowing on `entry.type` gives full type safety on `data`.
+ */
+export type SessionEntry = MessageEntry | ModelChangedEntry;
 
 /** Possible states during a tool call's lifecycle */
 export type ToolExecutionStatus = "running" | "done" | "error";
@@ -151,17 +154,16 @@ export const sessionStore = createStore<SessionState & SessionActions>()((set, g
     // Link to the last entry to maintain conversation order
     const parentId = entries.length > 0 ? entries[entries.length - 1].id : null;
 
+    const messageEntry: MessageEntry = {
+      id,
+      parentId,
+      type: "message",
+      timestamp: Date.now(),
+      data: message,
+    };
+
     set((prev) => ({
-      entries: [
-        ...prev.entries,
-        {
-          id,
-          parentId,
-          type: "message" as const,
-          timestamp: Date.now(),
-          data: message,
-        },
-      ],
+      entries: [...prev.entries, messageEntry],
     }));
 
     return id;
@@ -172,8 +174,11 @@ export const sessionStore = createStore<SessionState & SessionActions>()((set, g
       const index = prev.entries.findIndex((e) => e.id === entryId);
       if (index < 0) return prev;
 
+      const existEntry = prev.entries[index];
+      if (!isAgentMessageEntry(existEntry)) return prev;
+
       const next = [...prev.entries];
-      next[index] = { ...next[index], data: message };
+      next[index] = { ...existEntry, data: message };
       return { entries: next };
     });
   },

@@ -1,6 +1,7 @@
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import type { AssistantMessage, ToolCall, ToolResultMessage } from "@mariozechner/pi-ai";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
+import { isAgentMessageEntry } from "@renderer/lib/is";
 import { sessionStore } from "@renderer/store/session";
 import { useCallback, useEffect, useMemo } from "react";
 import { v4 as uuidv4 } from "uuid";
@@ -39,9 +40,7 @@ export function useChat() {
   useSubscribeAgentEvents();
 
   const messages = useMemo<AgentMessage[]>(() => {
-    return state.entries
-      .filter((entry) => entry.type === "message")
-      .map((entry) => entry.data as AgentMessage);
+    return state.entries.filter(isAgentMessageEntry).map((entry) => entry.data);
   }, [state.entries]);
 
   const toolStates = state.toolStates;
@@ -81,6 +80,11 @@ function useSubscribeAgentEvents() {
   const { on } = useElectronIPC();
 
   useEffect(() => {
+    // ── Closure state for multi-turn merging ───────────────────────────────
+    // Content index where the current turn starts. Set on turn_start.
+    // turnContentStartIndex === 0 → first turn, > 0 → subsequent turn (merge).
+    let turnContentStartIndex = 0;
+
     const unsubscribe = [
       on("agent_start", () => {
         sessionStore.getState().setLoading(true);
@@ -89,10 +93,25 @@ function useSubscribeAgentEvents() {
       on("agent_end", () => {
         sessionStore.getState().setLoading(false);
         sessionStore.getState().setStreamingEntryId(undefined);
+        turnContentStartIndex = 0;
+      }),
+
+      on("turn_start", () => {
+        // If we already have a streaming entry (subsequent turn), record where
+        // new content should start so message_update/message_end can splice.
+        const { streamingEntryId, entries } = sessionStore.getState();
+        if (streamingEntryId) {
+          const entry = entries.find((e) => e.id === streamingEntryId);
+          if (entry && isAgentMessageEntry(entry)) {
+            turnContentStartIndex = (entry.data.content ?? []).length;
+          }
+        }
       }),
 
       on("message_start", (event) => {
         const { message } = event;
+
+        if (message.role === "toolResult") return;
 
         if (message.role === "user") {
           sessionStore.getState().appendMessageEntry(message);
@@ -100,19 +119,40 @@ function useSubscribeAgentEvents() {
         }
 
         if (message.role === "assistant") {
-          const entryId = sessionStore.getState().appendMessageEntry(message);
-          sessionStore.getState().setStreamingEntryId(entryId);
+          if (turnContentStartIndex === 0) {
+            // First assistant turn — create a new entry
+            const entryId = sessionStore.getState().appendMessageEntry(message);
+            sessionStore.getState().setStreamingEntryId(entryId);
+          }
+          // Subsequent turn — streamingEntryId already set, no-op here
         }
       }),
 
       on("message_update", (event) => {
         if (event.message.role !== "assistant") return;
 
-        const entryId = sessionStore.getState().streamingEntryId;
-        if (!entryId) return;
+        const { streamingEntryId } = sessionStore.getState();
+        if (!streamingEntryId) return;
 
-        const message = event.message as AssistantMessage;
-        sessionStore.getState().updateMessageEntry(entryId, message);
+        const entry = sessionStore.getState().entries.find((e) => e.id === streamingEntryId);
+        if (!entry) return;
+
+        if (!isAgentMessageEntry(entry)) return;
+
+        const message = event.message;
+
+        if (turnContentStartIndex === 0) {
+          sessionStore.getState().updateMessageEntry(streamingEntryId, message);
+        } else {
+          const existingContent = entry.data.content ?? [];
+          sessionStore.getState().updateMessageEntry(streamingEntryId, {
+            ...message,
+            content: [
+              ...existingContent.slice(0, turnContentStartIndex),
+              ...message.content,
+            ] as AssistantMessage["content"],
+          });
+        }
 
         for (const block of message.content) {
           if (block.type === "toolCall") {
@@ -134,20 +174,31 @@ function useSubscribeAgentEvents() {
       on("message_end", (event) => {
         if (event.message.role !== "assistant") return;
 
-        const message = event.message as AssistantMessage;
-        const entryId = sessionStore.getState().streamingEntryId;
+        const { streamingEntryId } = sessionStore.getState();
+        if (!streamingEntryId) return;
 
-        if (entryId) {
-          sessionStore.getState().updateMessageEntry(entryId, message);
-          sessionStore.getState().setStreamingEntryId(undefined);
+        const entry = sessionStore.getState().entries.find((e) => e.id === streamingEntryId);
+        if (!entry) return;
+
+        if (!isAgentMessageEntry(entry)) return;
+
+        const message = event.message as AssistantMessage;
+
+        if (turnContentStartIndex === 0) {
+          sessionStore.getState().updateMessageEntry(streamingEntryId, message);
         } else {
-          // Fallback: no prior message_start received — append as new entry
-          sessionStore.getState().appendMessageEntry(message);
+          const existingContent = entry.data.content ?? [];
+          sessionStore.getState().updateMessageEntry(streamingEntryId, {
+            ...message,
+            content: [
+              ...existingContent.slice(0, turnContentStartIndex),
+              ...message.content,
+            ] as AssistantMessage["content"],
+          });
         }
       }),
 
       on("tool_execution_start", (event) => {
-
         const existing = sessionStore.getState().toolStates.get(event.toolCallId);
         if (existing) return;
 
@@ -161,7 +212,6 @@ function useSubscribeAgentEvents() {
       }),
 
       on("tool_execution_update", (event) => {
-
         const existing = sessionStore.getState().toolStates.get(event.toolCallId);
         if (!existing) return;
 
@@ -175,7 +225,6 @@ function useSubscribeAgentEvents() {
       }),
 
       on("tool_execution_end", (event) => {
-
         const resultContent = event.result?.content;
         const output = Array.isArray(resultContent)
           ? extractToolResultText(resultContent)
