@@ -35,7 +35,7 @@ export function ChatMessages({ messages, toolStates }: ChatMessagesProps) {
   if (messages.length === 0) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="rounded-full border border-[#2A2A2A] px-5 py-2 text-sm text-[#6D6D6D]">
+        <div className="rounded-full border border-border bg-background/80 px-5 py-2 text-sm text-muted-foreground shadow-sm">
           Start a conversation
         </div>
       </div>

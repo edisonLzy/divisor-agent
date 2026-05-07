@@ -55,7 +55,7 @@ export function AssistantMessage({ message, toolStates }: AssistantMessageProps)
         <div className="flex flex-col gap-2">
           <CollapsibleTrigger className="group/trigger flex cursor-pointer items-center gap-1.5">
             <ProcessingTip />
-            <ChevronRightIcon className="size-3.5 text-[#7C7C7C] transition-transform group-data-panel-open/trigger:rotate-90 hover:text-[#9C9C9C]" />
+            <ChevronRightIcon className="size-3.5 text-muted-foreground transition-transform group-data-panel-open/trigger:rotate-90 hover:text-foreground" />
           </CollapsibleTrigger>
           <Separator />
         </div>
@@ -109,7 +109,7 @@ function ProcessingTip() {
   }, [isLoading]);
 
   return (
-    <Shimmer as="span" animate={isLoading} className="text-xs text-[#9E9E9E]">
+    <Shimmer as="span" animate={isLoading} className="text-xs text-muted-foreground">
       {`${isLoading ? "正在处理" : "已处理"} ${elapsed}s`}
     </Shimmer>
   );

@@ -53,7 +53,7 @@ export function PromptInput({ disabled = false, onSubmit }: PromptInputProps) {
   return (
     <div
       className={cn(
-        "mx-auto flex w-full max-w-3xl flex-col rounded-[24px] border border-[#3A3A3A] bg-[#1C1C1C] shadow-[0_20px_48px_rgba(0,0,0,0.28)] transition-all duration-300 focus-within:border-[#5A5A5A] focus-within:ring-2 focus-within:ring-[#4D4D4D]/60",
+        "mx-auto flex w-full max-w-3xl flex-col rounded-[24px] border border-border bg-card shadow-[0_20px_48px_rgb(15_23_42_/_0.08)] transition-all duration-300 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20 dark:shadow-[0_20px_48px_rgb(0_0_0_/_0.28)]",
         disabled && "opacity-80",
       )}
     >
@@ -68,8 +68,10 @@ export function PromptInput({ disabled = false, onSubmit }: PromptInputProps) {
       />
 
       {/* Action bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#303030] px-3 py-2">
-        <span className="pl-1 text-[11px] text-[#6F6F6F] sm:text-xs">Type @ to mention files</span>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-2">
+        <span className="pl-1 text-[11px] text-muted-foreground sm:text-xs">
+          Type @ to mention files
+        </span>
 
         <div className="ml-auto flex items-center gap-2">
           <ModalSelector {...modelSelectorProps} />
@@ -81,7 +83,7 @@ export function PromptInput({ disabled = false, onSubmit }: PromptInputProps) {
             }}
             disabled={!canSubmit}
             size="icon-sm"
-            className="size-8 rounded-full bg-[#E8E8E8] text-[#151515] hover:bg-[#FFFFFF] disabled:bg-[#333333] disabled:text-[#7D7D7D]"
+            className="size-8 rounded-full bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground"
             aria-label="Send prompt"
           >
             <ArrowUp className="size-4" />

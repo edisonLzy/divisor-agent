@@ -70,7 +70,7 @@ export function ModalSelector({ value, onChange }: ModalSelectorProps) {
     }
   }, [models, onChange, value]);
 
-  const selectedValue = value ? `${value.providerId}/${value.modelId}` : undefined;
+  const selectedValue = value ? `${value.providerId}/${value.modelId}` : null;
   const normalizedQuery = query.trim().toLowerCase();
   const filteredModels = useMemo(() => {
     if (!normalizedQuery) {
@@ -104,27 +104,27 @@ export function ModalSelector({ value, onChange }: ModalSelectorProps) {
       disabled={isLoading || models.length === 0}
     >
       <SelectTrigger
-        className="h-9 min-w-44 max-w-60 gap-2 rounded-full border-[#3A3A3A] bg-[#202020] px-3 text-[#E6E6E6] hover:border-[#505050] hover:bg-[#242424] data-popup-open:border-[#5C5C5C] data-popup-open:bg-[#262626] **:data-[slot=select-value]:items-center **:data-[slot=select-value]:line-clamp-none"
+        className="h-9 min-w-44 max-w-60 gap-2 rounded-full border-border bg-background/80 px-3 text-foreground shadow-sm hover:bg-muted data-popup-open:border-ring data-popup-open:bg-muted **:data-[slot=select-value]:items-center **:data-[slot=select-value]:line-clamp-none"
         aria-label="Select model"
       >
         <SelectValue className="min-w-0">
           {value ? (
             <div className="flex min-w-0 items-center gap-2">
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[#2D2D2D] text-[#BDBDBD]">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
                 <Bot className="size-3.5" />
               </span>
 
               <span className="min-w-0">
-                <span className="block truncate text-sm font-medium text-[#E6E6E6]">
+                <span className="block truncate text-sm font-medium text-foreground">
                   {value.modelName}
                 </span>
-                <span className="block truncate text-[11px] text-[#8D8D8D]">
+                <span className="block truncate text-[11px] text-muted-foreground">
                   {value.providerName}
                 </span>
               </span>
             </div>
           ) : (
-            <span className="truncate text-sm text-[#8D8D8D]">
+            <span className="truncate text-sm text-muted-foreground">
               {isLoading ? "Loading models..." : "Select model"}
             </span>
           )}
@@ -133,9 +133,9 @@ export function ModalSelector({ value, onChange }: ModalSelectorProps) {
       <SelectContent
         align="end"
         sideOffset={10}
-        className="w-80 min-w-80 max-h-none overflow-hidden rounded-2xl border border-[#333333] bg-[#1B1B1B] p-0 text-[#E6E6E6] shadow-[0_20px_48px_rgba(0,0,0,0.4)]"
+        className="w-80 min-w-80 max-h-none overflow-hidden rounded-2xl border border-border bg-popover p-0 text-popover-foreground shadow-[0_20px_48px_rgb(15_23_42/0.16)] dark:shadow-[0_20px_48px_rgb(0_0_0/0.4)]"
       >
-        <div className="border-b border-[#2B2B2B] px-3 py-2.5">
+        <div className="border-b border-border px-3 py-2.5">
           <Input
             autoFocus
             value={query}
@@ -144,7 +144,7 @@ export function ModalSelector({ value, onChange }: ModalSelectorProps) {
               event.stopPropagation();
             }}
             placeholder="Filter models..."
-            className="h-8 border-[#343434] bg-[#232323] text-[#E6E6E6] placeholder:text-[#777777]"
+            className="h-8 border-border bg-background text-foreground placeholder:text-muted-foreground"
           />
         </div>
 
@@ -154,13 +154,13 @@ export function ModalSelector({ value, onChange }: ModalSelectorProps) {
               <SelectItem
                 key={`${model.providerId}/${model.modelId}`}
                 value={`${model.providerId}/${model.modelId}`}
-                className="w-full overflow-hidden rounded-xl px-3 py-2 text-[#D8D8D8] focus:bg-[#262626] focus:text-[#F3F3F3]"
+                className="w-full overflow-hidden rounded-xl px-3 py-2 text-foreground focus:bg-accent focus:text-accent-foreground"
               >
                 <div className="min-w-0 flex flex-1 flex-col gap-0.5 overflow-hidden pr-3">
                   <span className="block min-w-0 truncate text-sm font-medium text-current">
                     {model.modelName}
                   </span>
-                  <span className="block min-w-0 truncate text-xs text-[#8D8D8D]">
+                  <span className="block min-w-0 truncate text-xs text-muted-foreground">
                     {model.providerName}
                   </span>
                 </div>
@@ -171,7 +171,7 @@ export function ModalSelector({ value, onChange }: ModalSelectorProps) {
           {!isLoading && filteredModels.length === 0 ? (
             <div
               className={cn(
-                "px-3 py-3 text-sm text-[#7D7D7D]",
+                "px-3 py-3 text-sm text-muted-foreground",
                 models.length === 0 && "text-center",
               )}
             >

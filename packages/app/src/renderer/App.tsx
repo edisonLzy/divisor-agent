@@ -1,18 +1,21 @@
+import { ThemeProvider } from "./components/theme-provider";
 import { Chat } from "./workspace/chat";
 import { Sessions } from "./workspace/sessions";
 
 export function App() {
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-[#111111] font-sans text-[#D4D4D4]">
-      {/* Sidebar */}
-      <aside className="w-64 bg-[#141414] border-r border-[#2C2C2C] flex-col shrink-0 hidden">
-        <Sessions />
-      </aside>
+    <ThemeProvider defaultTheme="system" storageKey="divisor-agent.theme">
+      <div className="flex h-screen w-full overflow-hidden bg-background font-sans text-foreground">
+        {/* Sidebar */}
+        <aside className="hidden w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+          <Sessions />
+        </aside>
 
-      {/* Main Panel */}
-      <main className="flex-1 flex flex-col relative min-w-0">
-        <Chat />
-      </main>
-    </div>
+        {/* Main Panel */}
+        <main className="relative flex min-w-0 flex-1 flex-col">
+          <Chat />
+        </main>
+      </div>
+    </ThemeProvider>
   );
 }

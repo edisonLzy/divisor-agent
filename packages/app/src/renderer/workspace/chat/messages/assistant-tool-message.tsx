@@ -42,23 +42,25 @@ export function AssistantToolMessage({ toolName, args, toolState }: AssistantToo
   return (
     <Collapsible defaultOpen={false}>
       <CollapsibleTrigger className="group/tool flex w-full cursor-pointer items-center gap-1.5  text-sm">
-        <Shimmer as="span" className="text-xs text-[#9E9E9E]" animate={isRunning}>
+        <Shimmer as="span" className="text-xs text-muted-foreground" animate={isRunning}>
           {`${statusLabel(toolState?.status)} ${toolName}`}
         </Shimmer>
-        <ChevronRightIcon className="size-3.5 text-[#7C7C7C] transition-transform group-data-panel-open/tool:rotate-90" />
+        <ChevronRightIcon className="size-3.5 text-muted-foreground transition-transform group-data-panel-open/tool:rotate-90" />
       </CollapsibleTrigger>
 
       <CollapsibleContent>
         <div className="flex flex-col gap-3 pt-3">
-          <section className="rounded-2xl bg-[#1E1E1E] p-3">
-            <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-[#7C7C7C]">Input</div>
-            <pre className="overflow-x-auto whitespace-pre-wrap wrap-break-word text-xs leading-6 text-[#B8B8B8]">
+          <section className="rounded-2xl border border-border/70 bg-card/80 p-3">
+            <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+              Input
+            </div>
+            <pre className="overflow-x-auto whitespace-pre-wrap wrap-break-word text-xs leading-6 text-muted-foreground">
               {formatArgs(args) || "{}"}
             </pre>
           </section>
 
-          <section className="rounded-2xl bg-[#1E1E1E] p-3">
-            <pre className="overflow-x-auto whitespace-pre-wrap wrap-break-word text-xs leading-6 text-[#D4D4D4]">
+          <section className="rounded-2xl border border-border/70 bg-card/80 p-3">
+            <pre className="overflow-x-auto whitespace-pre-wrap wrap-break-word text-xs leading-6 text-card-foreground">
               {toolState?.output}
             </pre>
           </section>

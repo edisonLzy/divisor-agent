@@ -41,7 +41,7 @@ function FileSuggestionPopup({
 
   if (items.length === 0) {
     return (
-      <div className="w-80 rounded-xl border border-[#3A3A3A] bg-[#1C1C1C] p-3 text-sm text-[#7B7B7B] shadow-xl">
+      <div className="w-80 rounded-xl border border-border bg-popover p-3 text-sm text-muted-foreground shadow-xl">
         No files found
       </div>
     );
@@ -50,7 +50,7 @@ function FileSuggestionPopup({
   return (
     <div
       ref={listRef}
-      className="w-80 max-h-60 overflow-y-auto rounded-xl border border-[#3A3A3A] bg-[#1C1C1C] p-1.5 shadow-xl"
+      className="w-80 max-h-60 overflow-y-auto rounded-xl border border-border bg-popover p-1.5 shadow-xl"
     >
       {items.map((item, index) => (
         <button
@@ -59,15 +59,15 @@ function FileSuggestionPopup({
           className={cn(
             "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors",
             index === selectedIndex
-              ? "bg-[#2C2C2C] text-[#E6E6E6]"
-              : "text-[#D4D4D4] hover:bg-[#222222]",
+              ? "bg-accent text-accent-foreground"
+              : "text-popover-foreground hover:bg-muted",
           )}
           onClick={() => command(item)}
           onMouseEnter={() => onHighlight(index)}
         >
-          <FileIcon className="size-4 shrink-0 text-[#9E9E9E]" />
+          <FileIcon className="size-4 shrink-0 text-muted-foreground" />
           <span className="truncate">{item.name}</span>
-          <span className="ml-auto truncate text-xs text-[#666666]">{item.path}</span>
+          <span className="ml-auto truncate text-xs text-muted-foreground">{item.path}</span>
         </button>
       ))}
     </div>
@@ -243,7 +243,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
       Mention.configure({
         HTMLAttributes: {
           class:
-            "inline-flex items-center gap-1 rounded-md bg-[#2A2A3A] px-1.5 py-0.5 text-[#B4B4FF] font-medium text-sm",
+            "inline-flex items-center gap-1 rounded-md bg-accent px-1.5 py-0.5 text-accent-foreground font-medium text-sm",
         },
         renderText({ node, suggestion }) {
           return `${suggestion?.char ?? "@"}${node.attrs.label ?? node.attrs.id ?? ""}`;
@@ -254,7 +254,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
     editorProps: {
       attributes: {
         class:
-          "outline-none min-h-[48px] max-h-[160px] overflow-y-auto text-[14px] leading-6 text-[#E6E6E6] caret-[#E6E6E6] ProseMirror",
+          "outline-none min-h-[48px] max-h-[160px] overflow-y-auto text-[14px] leading-6 text-foreground caret-foreground ProseMirror",
       },
     },
     editable: !disabled,

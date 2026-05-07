@@ -6,7 +6,7 @@ interface AssistantResponseMessageProps {
 
 export function AssistantResponseMessage({ content }: AssistantResponseMessageProps) {
   return (
-    <MessageResponse className="text-[15px] leading-7 text-[#E7E7E7] [&_a]:text-[#F3F3F3] [&_code]:text-[#F5F5F5] [&_em]:text-[#D6D6D6] [&_h1]:text-[#FAFAFA] [&_h2]:text-[#FAFAFA] [&_h3]:text-[#FAFAFA] [&_li]:text-inherit [&_ol]:text-inherit [&_p]:text-inherit [&_pre]:text-[#E7E7E7] [&_span]:text-inherit [&_strong]:text-[#FFFFFF] [&_ul]:text-inherit">
+    <MessageResponse className="text-[15px] leading-7 text-foreground [&_a]:text-foreground [&_a]:underline [&_a]:underline-offset-4 [&_code]:text-foreground [&_em]:text-foreground/80 [&_h1]:text-foreground [&_h2]:text-foreground [&_h3]:text-foreground [&_li]:text-inherit [&_ol]:text-inherit [&_p]:text-inherit [&_pre]:text-foreground [&_span]:text-inherit [&_strong]:text-foreground [&_ul]:text-inherit">
       {content}
     </MessageResponse>
   );
