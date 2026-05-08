@@ -12,10 +12,8 @@ import {
   CollapsibleTrigger,
 } from "@renderer/components/ui/collapsible";
 import { Separator } from "@renderer/components/ui/separator";
-import { sessionStore } from "@renderer/store/session";
 import { ChevronRightIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useStore } from "zustand";
 
 import type { ToolExecutionState } from "../../../store/session";
 import { AssistantResponseMessage } from "./assistant-response-message";
@@ -23,11 +21,20 @@ import { AssistantThinkingMessage } from "./assistant-thinking-message";
 import { AssistantToolMessage } from "./assistant-tool-message";
 
 interface AssistantMessageProps {
+  completedAt?: number;
+  isStreaming: boolean;
   message: AssistantMessageType;
+  startedAt: number;
   toolStates: Map<string, ToolExecutionState>;
 }
 
-export function AssistantMessage({ message, toolStates }: AssistantMessageProps) {
+export function AssistantMessage({
+  completedAt,
+  isStreaming,
+  message,
+  startedAt,
+  toolStates,
+}: AssistantMessageProps) {
   const { processingContent, textContent } = message.content.reduce<{
     processingContent: (ThinkingContent | ToolCall)[];
     textContent: TextContent[];
@@ -54,7 +61,11 @@ export function AssistantMessage({ message, toolStates }: AssistantMessageProps)
       <Collapsible open={isProcessingOpen} onOpenChange={(open) => setIsProcessingOpen(open)}>
         <div className="flex flex-col gap-2">
           <CollapsibleTrigger className="group/trigger flex cursor-pointer items-center gap-1.5">
-            <ProcessingTip />
+            <ProcessingTip
+              completedAt={completedAt}
+              isStreaming={isStreaming}
+              startedAt={startedAt}
+            />
             <ChevronRightIcon className="size-3.5 text-muted-foreground transition-transform group-data-panel-open/trigger:rotate-90 hover:text-foreground" />
           </CollapsibleTrigger>
           <Separator />
@@ -94,23 +105,35 @@ export function AssistantMessage({ message, toolStates }: AssistantMessageProps)
   );
 }
 
-function ProcessingTip() {
-  const isLoading = useStore(sessionStore, (s) => s.isLoading);
-  const [elapsed, setElapsed] = useState(0);
+interface ProcessingTipProps {
+  completedAt?: number;
+  isStreaming: boolean;
+  startedAt: number;
+}
+
+function ProcessingTip({ completedAt, isStreaming, startedAt }: ProcessingTipProps) {
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    if (!isLoading) return;
+    if (!isStreaming) {
+      return;
+    }
+
+    setNow(Date.now());
 
     const id = setInterval(() => {
-      setElapsed((prev) => prev + 1);
+      setNow(Date.now());
     }, 1000);
 
     return () => clearInterval(id);
-  }, [isLoading]);
+  }, [isStreaming, startedAt]);
+
+  const endTime = isStreaming ? now : (completedAt ?? startedAt);
+  const elapsed = Math.max(0, Math.floor((endTime - startedAt) / 1000));
 
   return (
-    <Shimmer as="span" animate={isLoading} className="text-xs text-muted-foreground">
-      {`${isLoading ? "正在处理" : "已处理"} ${elapsed}s`}
+    <Shimmer as="span" animate={isStreaming} className="text-xs text-muted-foreground">
+      {`${isStreaming ? "正在处理" : "已处理"} ${elapsed}s`}
     </Shimmer>
   );
 }

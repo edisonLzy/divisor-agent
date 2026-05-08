@@ -5,7 +5,7 @@ import { PromptInput } from "./prompt-input";
 import { useChat } from "./use-chat";
 
 export function Chat() {
-  const { isLoading, messages, toolStates, submitPrompt } = useChat();
+  const { isLoading, messageEntries, streamingEntryId, toolStates, submitPrompt } = useChat();
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -16,7 +16,11 @@ export function Chat() {
       </section>
 
       <section className="min-h-0 flex-1 px-6 pt-4">
-        <ChatMessages messages={messages} toolStates={toolStates} />
+        <ChatMessages
+          messageEntries={messageEntries}
+          streamingEntryId={streamingEntryId}
+          toolStates={toolStates}
+        />
       </section>
 
       <section className="shrink-0 px-6 pb-6 pt-4">

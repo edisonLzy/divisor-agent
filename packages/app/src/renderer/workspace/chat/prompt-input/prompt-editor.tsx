@@ -24,6 +24,7 @@ interface FileSuggestionPopupProps {
   selectedIndex: number;
   command: (item: FileItem) => void;
   onHighlight: (index: number) => void;
+  maxHeight: number;
 }
 
 function FileSuggestionPopup({
@@ -31,6 +32,7 @@ function FileSuggestionPopup({
   selectedIndex,
   command,
   onHighlight,
+  maxHeight,
 }: FileSuggestionPopupProps) {
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -41,7 +43,7 @@ function FileSuggestionPopup({
 
   if (items.length === 0) {
     return (
-      <div className="w-80 rounded-xl border border-border bg-popover p-3 text-sm text-muted-foreground shadow-xl">
+      <div className="rounded-[20px] border border-border/80 bg-popover/95 px-4 py-3.5 text-sm text-muted-foreground shadow-[0_24px_64px_rgb(15_23_42/0.18)] backdrop-blur-xl dark:shadow-[0_24px_64px_rgb(0_0_0/0.45)]">
         No files found
       </div>
     );
@@ -50,24 +52,31 @@ function FileSuggestionPopup({
   return (
     <div
       ref={listRef}
-      className="w-80 max-h-60 overflow-y-auto rounded-xl border border-border bg-popover p-1.5 shadow-xl"
+      className="overflow-y-auto rounded-[20px] border border-border/80 bg-popover/95 p-2 shadow-[0_24px_64px_rgb(15_23_42/0.18)] backdrop-blur-xl dark:shadow-[0_24px_64px_rgb(0_0_0/0.45)]"
+      style={{ maxHeight }}
     >
       {items.map((item, index) => (
         <button
           key={item.id}
           type="button"
           className={cn(
-            "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors",
+            "flex w-full items-start gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors",
             index === selectedIndex
               ? "bg-accent text-accent-foreground"
               : "text-popover-foreground hover:bg-muted",
           )}
           onClick={() => command(item)}
+          onMouseDown={(event) => event.preventDefault()}
           onMouseEnter={() => onHighlight(index)}
         >
-          <FileIcon className="size-4 shrink-0 text-muted-foreground" />
-          <span className="truncate">{item.name}</span>
-          <span className="ml-auto truncate text-xs text-muted-foreground">{item.path}</span>
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-background/70 text-muted-foreground">
+            <FileIcon className="size-4 shrink-0" />
+          </span>
+
+          <span className="min-w-0 flex flex-1 flex-col gap-0.5">
+            <span className="truncate text-sm font-medium text-current">{item.name}</span>
+            <span className="truncate text-xs text-muted-foreground">{item.path}</span>
+          </span>
         </button>
       ))}
     </div>
@@ -76,28 +85,111 @@ function FileSuggestionPopup({
 
 // ── Suggestion configuration ────────────────────────────────────────────────
 
+interface SuggestionLifecycleCallbacks {
+  onOpenChange?: (isOpen: boolean) => void;
+  onSelect?: () => void;
+}
+
 function createSuggestion(
   onSearch: (query: string) => FileItem[] | Promise<FileItem[]>,
+  callbacks: SuggestionLifecycleCallbacks,
 ): Omit<SuggestionOptions<FileItem>, "editor"> {
+  const POPUP_GAP = 8;
+  const VIEWPORT_MARGIN = 16;
+  const MAX_POPUP_HEIGHT = 352;
+  const MIN_POPUP_HEIGHT = 140;
+  const POPUP_WIDTH = 760;
+
   return {
     char: "@",
     allowSpaces: true,
     startOfLine: false,
+    decorationClass: "file-suggestion-query",
+    decorationContent: "type to filter",
+    decorationEmptyClass: "is-empty",
     items: ({ query }) => onSearch(query),
     render: () => {
       let popupEl: HTMLDivElement | null = null;
       let root: Root | null = null;
       let selectedIndex = 0;
       let currentItemsKey = "";
+      let popupMaxHeight = MAX_POPUP_HEIGHT;
+      let rafId: number | null = null;
       let latestProps: {
         items: FileItem[];
         command: (item: FileItem) => void;
+        query: string;
         clientRect?: (() => DOMRect | null) | null;
       } | null = null;
+
+      function renderPopup() {
+        if (!root || !latestProps) return;
+
+        root.render(
+          <FileSuggestionPopup
+            items={latestProps.items}
+            selectedIndex={selectedIndex}
+            command={(item) => latestProps?.command(item)}
+            maxHeight={popupMaxHeight}
+            onHighlight={(index) => {
+              selectedIndex = index;
+              renderPopup();
+            }}
+          />,
+        );
+      }
+
+      function positionPopup() {
+        if (!popupEl || !latestProps) return;
+
+        const rect = latestProps.clientRect?.();
+        if (!rect) return;
+
+        const popupWidth = Math.min(POPUP_WIDTH, window.innerWidth - VIEWPORT_MARGIN * 2);
+        const spaceBelow = window.innerHeight - rect.bottom - VIEWPORT_MARGIN;
+        const spaceAbove = rect.top - VIEWPORT_MARGIN;
+
+        popupEl.style.width = `${popupWidth}px`;
+        popupEl.style.display = "block";
+
+        const measuredHeight = popupEl.offsetHeight || MAX_POPUP_HEIGHT;
+        const shouldFlip =
+          spaceBelow < Math.min(measuredHeight, MAX_POPUP_HEIGHT) + POPUP_GAP &&
+          spaceAbove > spaceBelow;
+        const availableSpace = shouldFlip ? spaceAbove : spaceBelow;
+
+        popupMaxHeight = Math.max(MIN_POPUP_HEIGHT, Math.min(availableSpace, MAX_POPUP_HEIGHT));
+        renderPopup();
+
+        const finalHeight = popupEl.offsetHeight || popupMaxHeight;
+        const left = Math.max(
+          VIEWPORT_MARGIN,
+          Math.min(rect.left, window.innerWidth - popupWidth - VIEWPORT_MARGIN),
+        );
+        const top = shouldFlip
+          ? Math.max(VIEWPORT_MARGIN, rect.top - finalHeight - POPUP_GAP)
+          : Math.min(window.innerHeight - VIEWPORT_MARGIN - finalHeight, rect.bottom + POPUP_GAP);
+
+        popupEl.dataset.side = shouldFlip ? "top" : "bottom";
+        popupEl.style.left = `${left}px`;
+        popupEl.style.top = `${top}px`;
+      }
+
+      function schedulePosition() {
+        if (rafId !== null) {
+          window.cancelAnimationFrame(rafId);
+        }
+
+        rafId = window.requestAnimationFrame(() => {
+          rafId = null;
+          positionPopup();
+        });
+      }
 
       function updatePopup(props: {
         items: FileItem[];
         command: (item: FileItem) => void;
+        query: string;
         clientRect?: (() => DOMRect | null) | null;
       }) {
         latestProps = props;
@@ -114,26 +206,8 @@ function createSuggestion(
           selectedIndex = Math.min(selectedIndex, props.items.length - 1);
         }
 
-        const rect = props.clientRect?.();
-        if (rect) {
-          popupEl.style.left = `${rect.left}px`;
-          popupEl.style.top = `${rect.bottom + 4}px`;
-          popupEl.style.display = "block";
-        }
-
-        root.render(
-          <FileSuggestionPopup
-            items={props.items}
-            selectedIndex={selectedIndex}
-            command={props.command}
-            onHighlight={(index) => {
-              selectedIndex = index;
-              if (latestProps) {
-                updatePopup(latestProps);
-              }
-            }}
-          />,
-        );
+        renderPopup();
+        schedulePosition();
       }
 
       return {
@@ -142,9 +216,15 @@ function createSuggestion(
           popupEl.dataset.suggestion = "files";
           popupEl.style.position = "fixed";
           popupEl.style.zIndex = "50";
+          popupEl.style.pointerEvents = "auto";
           document.body.appendChild(popupEl);
 
           root = createRoot(popupEl);
+          callbacks.onOpenChange?.(true);
+
+          window.addEventListener("resize", schedulePosition);
+          window.addEventListener("scroll", schedulePosition, true);
+
           updatePopup(props);
         },
         onUpdate: (props) => {
@@ -170,6 +250,7 @@ function createSuggestion(
           }
 
           if (props.event.key === "Enter" && items.length > 0) {
+            callbacks.onSelect?.();
             latestProps?.command(items[selectedIndex]);
             return true;
           }
@@ -184,6 +265,13 @@ function createSuggestion(
           return false;
         },
         onExit: () => {
+          callbacks.onOpenChange?.(false);
+          window.removeEventListener("resize", schedulePosition);
+          window.removeEventListener("scroll", schedulePosition, true);
+          if (rafId !== null) {
+            window.cancelAnimationFrame(rafId);
+            rafId = null;
+          }
           if (root) {
             root.unmount();
             root = null;
@@ -221,6 +309,8 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   const editorRef = useRef<Editor | null>(null);
   const onSubmitRef = useRef(onSubmit);
   onSubmitRef.current = onSubmit;
+  const suggestionOpenRef = useRef(false);
+  const skipNextSubmitRef = useRef(false);
 
   const onContentChangeRef = useRef(onContentChange);
   onContentChangeRef.current = onContentChange;
@@ -248,7 +338,14 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
         renderText({ node, suggestion }) {
           return `${suggestion?.char ?? "@"}${node.attrs.label ?? node.attrs.id ?? ""}`;
         },
-        suggestion: createSuggestion(handleSearchFiles),
+        suggestion: createSuggestion(handleSearchFiles, {
+          onOpenChange: (isOpen) => {
+            suggestionOpenRef.current = isOpen;
+          },
+          onSelect: () => {
+            skipNextSubmitRef.current = true;
+          },
+        }),
       }),
     ],
     editorProps: {
@@ -275,11 +372,6 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   useEffect(() => {
     if (!editor) return;
 
-    const observer = new MutationObserver(() => {
-      // no-op: observer kept for cleanup symmetry
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
         event.key === "Enter" &&
@@ -289,8 +381,16 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
         !event.metaKey &&
         !event.isComposing
       ) {
-        const hasSuggestionPopup = document.querySelector("[data-suggestion]");
-        if (hasSuggestionPopup) return;
+        if (skipNextSubmitRef.current) {
+          skipNextSubmitRef.current = false;
+          event.preventDefault();
+          return;
+        }
+
+        if (suggestionOpenRef.current) {
+          event.preventDefault();
+          return;
+        }
 
         event.preventDefault();
         onSubmitRef.current();
@@ -301,7 +401,6 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
     dom.addEventListener("keydown", handleKeyDown);
     return () => {
       dom.removeEventListener("keydown", handleKeyDown);
-      observer.disconnect();
     };
   }, [editor]);
 

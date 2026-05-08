@@ -33,6 +33,7 @@ export interface SessionEntryBase {
 export interface MessageEntry extends SessionEntryBase {
   type: "message";
   data: AgentMessageData;
+  completedAt?: number;
 }
 
 /** A session entry recording a mid-session model switch. */
@@ -111,6 +112,7 @@ export interface SessionActions {
    * No-op if `entryId` is not found.
    */
   updateMessageEntry: (entryId: string, message: AssistantMessage) => void;
+  setMessageCompletedAt: (entryId: string, completedAt: number) => void;
   /**
    * Create or overwrite the execution state for a specific tool call.
    * Called on tool_execution_start (create), tool_execution_update (progress),
@@ -179,6 +181,20 @@ export const sessionStore = createStore<SessionState & SessionActions>()((set, g
 
       const next = [...prev.entries];
       next[index] = { ...existEntry, data: message };
+      return { entries: next };
+    });
+  },
+
+  setMessageCompletedAt: (entryId, completedAt) => {
+    set((prev) => {
+      const index = prev.entries.findIndex((e) => e.id === entryId);
+      if (index < 0) return prev;
+
+      const existEntry = prev.entries[index];
+      if (!isAgentMessageEntry(existEntry)) return prev;
+
+      const next = [...prev.entries];
+      next[index] = { ...existEntry, completedAt };
       return { entries: next };
     });
   },

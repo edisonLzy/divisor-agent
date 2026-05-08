@@ -1,21 +1,21 @@
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef } from "react";
 
-import type { ToolExecutionState } from "../../../store/session";
+import type { MessageEntry, ToolExecutionState } from "../../../store/session";
 import { AssistantMessage } from "./assistant-message";
 import { UserMessage } from "./user-message";
 
 interface ChatMessagesProps {
-  messages: AgentMessage[];
+  messageEntries: MessageEntry[];
+  streamingEntryId?: string;
   toolStates: Map<string, ToolExecutionState>;
 }
 
-export function ChatMessages({ messages, toolStates }: ChatMessagesProps) {
+export function ChatMessages({ messageEntries, streamingEntryId, toolStates }: ChatMessagesProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const virtualizer = useVirtualizer({
-    count: messages.length,
+    count: messageEntries.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => 160,
     overscan: 6,
@@ -23,16 +23,16 @@ export function ChatMessages({ messages, toolStates }: ChatMessagesProps) {
   });
 
   useEffect(() => {
-    if (messages.length === 0) {
+    if (messageEntries.length === 0) {
       return;
     }
 
-    virtualizer.scrollToIndex(messages.length - 1, {
+    virtualizer.scrollToIndex(messageEntries.length - 1, {
       align: "end",
     });
-  }, [messages.length, virtualizer]);
+  }, [messageEntries.length, virtualizer]);
 
-  if (messages.length === 0) {
+  if (messageEntries.length === 0) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="rounded-full border border-border bg-background/80 px-5 py-2 text-sm text-muted-foreground shadow-sm">
@@ -52,7 +52,8 @@ export function ChatMessages({ messages, toolStates }: ChatMessagesProps) {
         }}
       >
         {virtualizer.getVirtualItems().map((virtualRow) => {
-          const message = messages[virtualRow.index];
+          const entry = messageEntries[virtualRow.index];
+          const message = entry.data;
           if (!("role" in message)) return null;
 
           return (
@@ -69,7 +70,13 @@ export function ChatMessages({ messages, toolStates }: ChatMessagesProps) {
                 {message.role === "user" ? (
                   <UserMessage message={message} />
                 ) : message.role === "assistant" ? (
-                  <AssistantMessage message={message} toolStates={toolStates} />
+                  <AssistantMessage
+                    completedAt={entry.completedAt}
+                    isStreaming={entry.id === streamingEntryId}
+                    message={message}
+                    startedAt={entry.timestamp}
+                    toolStates={toolStates}
+                  />
                 ) : null}
               </div>
             </div>

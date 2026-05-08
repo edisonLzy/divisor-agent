@@ -273,3 +273,14 @@
   font-weight: 500;
   font-size: 0.875rem;
 }
+
+.prompt-editor .ProseMirror .file-suggestion-query {
+  position: relative;
+}
+
+.prompt-editor .ProseMirror .file-suggestion-query.is-empty::after {
+  content: attr(data-decoration-content);
+  margin-left: 0.35rem;
+  color: var(--muted-foreground);
+  pointer-events: none;
+}

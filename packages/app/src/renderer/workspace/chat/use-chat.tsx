@@ -1,8 +1,7 @@
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import type { AssistantMessage, ToolCall, ToolResultMessage } from "@mariozechner/pi-ai";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { isAgentMessageEntry } from "@renderer/lib/is";
-import { sessionStore } from "@renderer/store/session";
+import { sessionStore, type MessageEntry } from "@renderer/store/session";
 import { useCallback, useEffect, useMemo } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { useStore } from "zustand";
@@ -39,8 +38,8 @@ export function useChat() {
 
   useSubscribeAgentEvents();
 
-  const messages = useMemo<AgentMessage[]>(() => {
-    return state.entries.filter(isAgentMessageEntry).map((entry) => entry.data);
+  const messageEntries = useMemo<MessageEntry[]>(() => {
+    return state.entries.filter(isAgentMessageEntry);
   }, [state.entries]);
 
   const toolStates = state.toolStates;
@@ -68,7 +67,8 @@ export function useChat() {
 
   return {
     isLoading: state.isLoading,
-    messages,
+    messageEntries,
+    streamingEntryId: state.streamingEntryId,
     toolStates,
     submitPrompt,
   };
@@ -91,6 +91,10 @@ function useSubscribeAgentEvents() {
       }),
 
       on("agent_end", () => {
+        const { streamingEntryId } = sessionStore.getState();
+        if (streamingEntryId) {
+          sessionStore.getState().setMessageCompletedAt(streamingEntryId, Date.now());
+        }
         sessionStore.getState().setLoading(false);
         sessionStore.getState().setStreamingEntryId(undefined);
         turnContentStartIndex = 0;
