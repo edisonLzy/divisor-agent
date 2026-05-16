@@ -78,11 +78,11 @@ shadcn/ui (base-nova style) with 25+ components in `packages/app/src/renderer/co
 
 ## Tech Stack Quick Reference
 
-| Layer          | Key Dependencies                                              |
-| -------------- | ------------------------------------------------------------- |
-| Server         | Express 5, tRPC 11, Zod 4, Pino 9, Drizzle ORM (not yet wired) |
-| App/Build      | Electron 39, electron-vite 5, Vite 7                          |
-| App/UI         | React 19, Tailwind CSS 4, shadcn/ui, TipTap 3, Lucide icons   |
-| App/State      | Zustand 5, react-router-dom 7 (memory router)                 |
-| App/Agent      | @mariozechner/pi-agent-core 0.68, Emittery 2                  |
-| App/Rendering  | streamdown 2, Shiki 4, @tanstack/react-virtual 3              |
+| Layer         | Key Dependencies                                               |
+| ------------- | -------------------------------------------------------------- |
+| Server        | Express 5, tRPC 11, Zod 4, Pino 9, Drizzle ORM (not yet wired) |
+| App/Build     | Electron 39, electron-vite 5, Vite 7                           |
+| App/UI        | React 19, Tailwind CSS 4, shadcn/ui, TipTap 3, Lucide icons    |
+| App/State     | Zustand 5, react-router-dom 7 (memory router)                  |
+| App/Agent     | @mariozechner/pi-agent-core 0.68, Emittery 2                   |
+| App/Rendering | streamdown 2, Shiki 4, @tanstack/react-virtual 3               |
