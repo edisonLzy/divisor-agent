@@ -12,6 +12,8 @@ function createWindow() {
     x: 100,
     y: 100,
     title: "Divisor Agent",
+    titleBarStyle: "hidden",
+    trafficLightPosition: { x: 12, y: 12 },
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,

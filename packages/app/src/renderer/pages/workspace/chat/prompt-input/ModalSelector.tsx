@@ -104,21 +104,21 @@ export function ModalSelector({ value, onChange }: ModalSelectorProps) {
       disabled={isLoading || models.length === 0}
     >
       <SelectTrigger
-        className="h-9 min-w-44 max-w-60 gap-2 rounded-full border-border bg-background/80 px-3 text-foreground shadow-sm hover:bg-muted data-popup-open:border-ring data-popup-open:bg-muted **:data-[slot=select-value]:items-center **:data-[slot=select-value]:line-clamp-none"
+        className="h-8 w-auto max-w-[200px] gap-2 rounded-full border-border bg-background/80 px-2.5 text-foreground shadow-sm hover:bg-muted data-popup-open:border-ring data-popup-open:bg-muted **:data-[slot=select-value]:items-center **:data-[slot=select-value]:line-clamp-none overflow-hidden"
         aria-label="Select model"
       >
-        <SelectValue className="min-w-0">
+        <SelectValue className="min-w-0 pointer-events-none">
           {value ? (
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                <Bot className="size-3.5" />
+            <div className="flex min-w-0 items-center gap-1.5 text-left">
+              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <Bot className="size-3" />
               </span>
 
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-medium text-foreground">
+              <span className="min-w-0 flex flex-col leading-none">
+                <span className="block truncate text-[12px] font-medium text-foreground">
                   {value.modelName}
                 </span>
-                <span className="block truncate text-[11px] text-muted-foreground">
+                <span className="block truncate text-[10px] text-muted-foreground mt-[2px]">
                   {value.providerName}
                 </span>
               </span>

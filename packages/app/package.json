@@ -61,6 +61,7 @@
     "prosemirror-state": "^1.4.4",
     "prosemirror-view": "^1.41.8",
     "react-jsx-parser": "^2.4.1",
+    "react-resizable-panels": "^4.11.1",
     "react-router-dom": "^7.15.0",
     "shiki": "^4.0.2",
     "streamdown": "^2.5.0",

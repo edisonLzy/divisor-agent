@@ -70,15 +70,15 @@ export function Sessions() {
     useSessionSidebar();
 
   return (
-    <div className="flex h-full w-[260px] flex-col bg-sidebar border-r border-sidebar-border select-none">
+    <div className="flex h-full w-full flex-col bg-sidebar border-r border-sidebar-border select-none">
       {/* Top Actions */}
       <div className="flex flex-col px-3 py-4 space-y-[2px]">
         <button
           onClick={handleCreateSession}
-          className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground overflow-hidden"
         >
-          <SquarePen className="size-4 opacity-70" />
-          <span>新对话</span>
+          <SquarePen className="size-4 opacity-70 shrink-0" />
+          <span className="truncate">新对话</span>
         </button>
       </div>
 
@@ -86,7 +86,9 @@ export function Sessions() {
         {/* Session Items */}
         <div className="flex flex-col px-1">
           {renderedSessions.length === 0 ? (
-            <div className="px-2 py-2 text-[13px] text-muted-foreground/40">暂无对话</div>
+            <div className="px-2 py-2 text-[13px] text-muted-foreground/40 break-keep truncate">
+              暂无对话
+            </div>
           ) : (
             renderedSessions.map((session) => {
               return (
@@ -118,14 +120,14 @@ export function Sessions() {
         </div>
       </div>
 
-      {/* Settings Bottom */}
-      <div className="mt-auto px-3 py-3 border-sidebar-border">
+      {/* Bottom Actions */}
+      <div className="flex flex-col px-3 py-3 border-t border-sidebar-border space-y-[2px]">
         <button
           onClick={handleOpenSettings}
-          className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground overflow-hidden"
         >
-          <Settings className="size-4 opacity-70" />
-          <span>设置</span>
+          <Settings className="size-4 opacity-70 shrink-0" />
+          <span className="truncate">设置</span>
         </button>
       </div>
     </div>

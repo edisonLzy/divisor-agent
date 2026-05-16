@@ -18,7 +18,9 @@ pnpm dev:app          # Start Electron app with electron-vite
 pnpm build            # Build all packages
 pnpm type-check       # Type-check all packages
 pnpm test             # Run all tests (Vitest workspace)
-pnpm lint             # ESLint check
+pnpm lint             # oxlint check (NOT ESLint)
+pnpm format           # oxfmt auto-format
+pnpm format:check     # oxfmt format check
 ```
 
 Single package commands:
@@ -27,6 +29,12 @@ Single package commands:
 pnpm --filter @divisor-agent/server dev
 pnpm --filter @divisor-agent/app dev
 pnpm --filter @divisor-agent/server test
+```
+
+Run a single test file:
+
+```bash
+pnpm vitest run packages/server/__tests__/domain/sessions/service.test.ts
 ```
 
 ## Architecture
@@ -39,177 +47,42 @@ pnpm --filter @divisor-agent/server test
 | Frontend ↔ Server        | tRPC (HTTP)                  | Session metadata (tree, history), model list |
 | Electron Main ↔ Server   | HTTP/tRPC                    | Session persistence, model config            |
 
-### Monorepo Structure
+### Key Architectural Patterns
 
-```
-.
-├── docs/                           # Project documentation
-│   ├── 调研文档/                    # Research documents (pi-agent-core, extension, tRPC analysis)
-│   ├── 技术文档/mvp/               # Technical docs (frontend, backend MVP specs)
-│   ├── 需求/                        # Requirements (mvp.md)
-│   └── 原型/                        # Prototypes
-├── packages/
-│   ├── app/                        # Electron + React 19 + shadcn/ui
-│   │   ├── __tests__/              # App tests
-│   │   ├── electron.vite.config.ts
-│   │   ├── electron-builder.yml
-│   │   ├── vitest.config.ts
-│   │   └── src/
-│   │       ├── main/               # Electron main process
-│   │       │   ├── index.ts       # Main entry (BrowserWindow, IPC handlers)
-│   │       │   ├── agent-runtime.ts # Agent orchestration
-│   │       │   ├── agent-ipc.ts    # Agent IPC handlers
-│   │       │   ├── tools/          # Built-in tools
-│   │       │   │   ├── fs-tool.ts
-│   │       │   │   └── terminal-tool.ts
-│   │       │   ├── models/         # Model registry
-│   │       │   │   └── registry.ts
-│   │       │   ├── permissions/    # Permission service
-│   │       │   │   └── permission-service.ts
-│   │       │   └── extensions/     # Extension system
-│   │       │       ├── loader.ts
-│   │       │       ├── registry.ts
-│   │       │       └── discovery.ts
-│   │       ├── preload/            # Electron preload scripts
-│   │       │   ├── index.ts        # contextBridge API exposure
-│   │       │   └── index.d.ts
-│   │       ├── renderer/           # React frontend
-│   │       │   ├── index.html
-│   │       │   ├── main.tsx
-│   │       │   ├── App.tsx
-│   │       │   ├── index.css
-│   │       │   ├── shim.d.ts
-│   │       │   ├── context/
-│   │       │   │   └── ElectronIPCProvider.tsx
-│   │       │   ├── hooks/
-│   │       │   │   ├── useAgentStore.ts
-│   │       │   │   └── useAgentRuntime.ts
-│   │       │   ├── lib/
-│   │       │   │   └── utils.ts
-│   │       │   ├── components/
-│   │       │   │   ├── ai-elements/  # AI-specific UI components
-│   │       │   │   │   ├── code-block.tsx
-│   │       │   │   │   ├── message.tsx
-│   │       │   │   │   └── tool.tsx
-│   │       │   │   ├── richtext/      # Rich text editor
-│   │       │   │   │   ├── schema.ts
-│   │       │   │   │   ├── richtext-editor.tsx
-│   │       │   │   │   └── richtext-document-view.tsx
-│   │       │   │   └── ui/            # shadcn/ui components
-│   │       │   │       ├── button.tsx
-│   │       │   │       ├── input.tsx
-│   │       │   │       ├── dialog.tsx
-│   │       │   │       └── ... (27 components)
-│   │       │   └── workspace/
-│   │       │       ├── sessions/      # Session sidebar
-│   │       │       │   └── index.tsx
-│   │       │       └── chat/          # Main chat interface
-│   │       │           ├── index.tsx
-│   │       │           ├── chat-types.ts
-│   │       │           ├── useChat.tsx
-│   │       │           ├── messages/   # Message components
-│   │       │           │   ├── user-message.tsx
-│   │       │           │   ├── assistant-message.tsx
-│   │       │           │   ├── assistant-response-message.tsx
-│   │       │           │   ├── assistant-thinking-message.tsx
-│   │       │           │   ├── assistant-tool-message.tsx
-│   │       │           │   └── index.tsx
-│   │       │           └── prompt-input/
-│   │       │               └── index.tsx
-│   │       └── shared/             # Shared IPC types
-│   │           ├── message-ipc.ts
-│   │           ├── models-ipc.ts
-│   │           └── session-ipc.ts
-│   └── server/                    # Express v5 + tRPC + Zod
-│       ├── __tests__/             # Server tests
-│       ├── vitest.config.ts
-│       └── src/
-│           ├── index.ts           # Server entry point
-│           ├── app.ts             # Express app creation
-│           ├── router.ts          # Root tRPC router
-│           ├── expose.ts          # Public type exports
-│           ├── config/
-│           │   └── env.ts         # Environment configuration
-│           ├── errors/
-│           │   └── app-error.ts  # Custom error class
-│           ├── middlewares/
-│           │   ├── response.ts
-│           │   ├── error.ts
-│           │   └── request-log.ts
-│           ├── shared/
-│           │   ├── trpc.ts       # tRPC initialization
-│           │   └── logger.ts     # Pino logger
-│           ├── types/
-│           │   └── index.ts
-│           └── domain/            # Feature modules
-│               ├── models/        # Model configuration
-│               │   ├── router.ts
-│               │   ├── service.ts
-│               │   └── types.ts
-│               └── sessions/      # Session persistence
-│                   ├── router.ts
-│                   ├── service.ts
-│                   └── types.ts
-├── vitest.config.ts               # Root vitest workspace config
-├── pnpm-workspace.yaml
-├── package.json
-└── CLAUDE.md
-```
+**tRPC Router**: Root router at `packages/server/src/router.ts` composes domain routers. Currently only `sessionsRouter`. Server uses `superjson` transformer. Client at `packages/app/src/renderer/lib/trpc.ts` connects to `http://localhost:3000/trpc` (configurable via `VITE_SERVER_URL`).
 
-### UI Theme
+**Agent Runtime** (`packages/app/src/main/agent-runtime.ts`): Extends `Emittery`, orchestrates `@mariozechner/pi-agent-core`. Manages sessions, tools (fs read/write, terminal), permissions, extensions, and models. Events flow: Agent → Emittery → `agent-ipc.ts` → `webContents.send()` → renderer.
 
-The app uses a dark theme with the following color palette:
+**IPC Bridge**: Preload script exposes typed `invoke`/`on` via `contextBridge`. Channel whitelists in `packages/app/src/shared/events-ipc.ts`. 10 main→renderer events (agent lifecycle), 6 renderer→main invocations (prompt, model, session).
 
-- Background: `#111111` (main), `#141414` (sidebar), `#222222` (hover/active)
-- Border: `#2C2C2C`
-- Text: `#D4D4D4` (primary), `#9E9E9E` (secondary), `#666666` (muted)
-- Accent: `#EFEFEF` (headings)
+**State Management**: Two Zustand stores — `useAgentStore` (React hook, `isProcessing`) and `sessionStore` (vanilla store, entries/toolStates/streaming). Session data persisted server-side via tRPC; renderer hydrates on session select.
+
+**Session Tree**: Server stores entries in a tree with `parentId` links, supporting branching/rewind via `setLeaf`/`rewind` mutations.
+
+### UI Component Library
+
+shadcn/ui (base-nova style) with 25+ components in `packages/app/src/renderer/components/ui/`. Rich text input via TipTap 3.x with @-mention file search. Messages rendered via streamdown (streaming markdown with CJK, code, math, mermaid support). Chat messages virtualized via `@tanstack/react-virtual`.
 
 ## Key Conventions
 
 - **Server imports**: Always include `.js` extension for local TypeScript imports (ESM requirement)
 - **Type imports**: Use `import type { ... }` for pure type imports
-- **React imports**: 项目使用 React 19 和新的 JSX Runtime，不需要在 `.tsx` / `.jsx` 文件中手动 `import React from 'react';`
-- **Package Manager**: Strictly use `pnpm` as the package manager. `bun`, `npm`, or `yarn` should not be used. Use `pnpx` instead of `npx` to run packages
-- **Node Linker**: 使用 `nodelinker=hoisted` 配置，创建扁平化的 `node_modules`（在 `.npmrc` 中配置）
-- **Dependencies**: pnpm workspace 自动管理共享依赖版本
-- **Dependencies**: 严格按需引入依赖。严禁安装当前未使用的依赖（例如：在使用 TipTap 时，仅在真正用到某个特定插件时才进行安装，未使用到的插件绝对不要提前引入或安装）
-- **Testing**: Root `vitest.config.ts` uses workspace mode; each package has its own `vitest.config.ts`
+- **React imports**: React 19 + new JSX Runtime — do NOT manually `import React from 'react'` in `.tsx`/`.jsx` files
+- **Package Manager**: Strictly use `pnpm`. Use `pnpx` instead of `npx`
+- **Node Linker**: `nodeLinker=hoisted` in `.npmrc` for flat `node_modules`
+- **Dependencies**: Strictly on-demand. Never install unused dependencies
+- **Linting/Formatting**: oxlint (not ESLint) + oxfmt. Config at `oxlint.config.ts` and `oxfmt.config.ts`
+- **Git Hooks**: Husky + lint-staged runs `oxlint --fix` and `oxfmt --write` on staged files. Commitlint enforces conventional commits (header/body length unrestricted)
+- **Testing**: Vitest 4.x workspace mode. Each package has `vitest.config.ts` with `__tests__/` directory. Tests use `vi.mock()` with hoisted mocks
 - **Production build**: Server uses `packages/server/tsconfig.build.json` (excludes tests)
 
-## Agent Runtime (Main Process)
+## Tech Stack Quick Reference
 
-The `AgentRuntime` class in `packages/app/src/main/agent-runtime.ts` manages:
-
-- **Sessions**: Creates/manages per-session `Agent` instances using `@mariozechner/pi-agent-core`
-- **Tools**: Built-in tools (fs read/write, terminal) + extension tools
-- **Permissions**: `PermissionService` blocks high-risk operations until user approves
-- **Extensions**: `ExtensionRegistry` discovers and loads extensions from `~/.pi/agent/extensions/`
-- **Models**: `ModelService` resolves model config from `ModelRegistry`
-
-### Permission System
-
-High-risk operations (defined in `PermissionService.isHighRisk()`) require user approval:
-
-1. Tool call triggers permission check
-2. UI shows permission dialog via IPC event
-3. User approves/rejects via `permissionApprove` / `permissionReject` IPC calls
-
-### Extension System
-
-Extensions are discovered from `~/.pi/agent/extensions/` and loaded via `ExtensionRegistry`:
-
-- Each extension can provide tools and metadata
-- Extensions are loaded at startup via `loadAllExtensions()`
-
-## MVP Status
-
-The project is in MVP development. Current state:
-
-- Monorepo scaffolding and tooling are set up
-- Server has Express + tRPC skeleton with sessions and models routers
-- App has Electron + React shell with dark theme workspace UI
-- Agent runtime, permission system, and extension system are implemented
-- Session management, model selection, and permission approval flows are wired up
-- Chat UI with message components (user, assistant, thinking, tool messages)
-- Rich text editor for prompt input
+| Layer          | Key Dependencies                                              |
+| -------------- | ------------------------------------------------------------- |
+| Server         | Express 5, tRPC 11, Zod 4, Pino 9, Drizzle ORM (not yet wired) |
+| App/Build      | Electron 39, electron-vite 5, Vite 7                          |
+| App/UI         | React 19, Tailwind CSS 4, shadcn/ui, TipTap 3, Lucide icons   |
+| App/State      | Zustand 5, react-router-dom 7 (memory router)                 |
+| App/Agent      | @mariozechner/pi-agent-core 0.68, Emittery 2                  |
+| App/Rendering  | streamdown 2, Shiki 4, @tanstack/react-virtual 3              |
