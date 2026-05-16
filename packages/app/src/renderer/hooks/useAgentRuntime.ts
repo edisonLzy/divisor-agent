@@ -11,7 +11,7 @@ export function useAgentRuntime() {
   const { isProcessing, setProcessing } = useAgentStore();
 
   useEffect(() => {
-    const removeListener = window.electronAPI.on("agentMessageDone", () => {
+    const removeListener = window.electronAPI.on("agent_end", () => {
       setProcessing(false);
     });
 

@@ -1,23 +1,147 @@
-import { asc, desc, eq, sql } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { db } from "../../db/index.js";
 import { createLogger } from "../../shared/logger.js";
-import { entries, sessions } from "./schema.js";
 import type { AppendEntryInput, EntryOutput, SessionContextOutput } from "./types.js";
 
 const logger = createLogger("sessions-service");
+const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+const DATA_FILE_PATH = join(PACKAGE_ROOT, ".data", "sessions.json");
+
+interface PersistedSessionRecord {
+  id: string;
+  name: string;
+  cwd: string;
+  parentSessionId: string | null;
+  leafEntryId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface PersistedEntryRecord {
+  id: string;
+  sessionId: string;
+  parentId: string | null;
+  type: string;
+  timestamp: string;
+  data: Record<string, unknown>;
+}
+
+interface PersistedSessionsState {
+  sessions: PersistedSessionRecord[];
+  entries: PersistedEntryRecord[];
+}
+
+let stateCache: PersistedSessionsState | null = null;
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function toEntryOutput(row: typeof entries.$inferSelect): EntryOutput {
+function createEmptyState(): PersistedSessionsState {
+  return {
+    sessions: [],
+    entries: [],
+  };
+}
+
+async function readState(): Promise<PersistedSessionsState> {
+  if (stateCache) {
+    return stateCache;
+  }
+
+  try {
+    const content = await readFile(DATA_FILE_PATH, "utf8");
+    const parsed = JSON.parse(content) as Partial<PersistedSessionsState>;
+    stateCache = {
+      sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
+      entries: Array.isArray(parsed.entries) ? parsed.entries : [],
+    };
+    return stateCache;
+  } catch (error) {
+    const isFileMissing =
+      typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
+
+    if (!isFileMissing) {
+      logger.error({ error }, "Failed to read session storage file");
+    }
+
+    stateCache = createEmptyState();
+    return stateCache;
+  }
+}
+
+async function writeState(state: PersistedSessionsState): Promise<void> {
+  await mkdir(dirname(DATA_FILE_PATH), { recursive: true });
+  await writeFile(DATA_FILE_PATH, JSON.stringify(state, null, 2), "utf8");
+  stateCache = state;
+}
+
+function toEntryOutput(row: PersistedEntryRecord): EntryOutput {
   return {
     id: row.id,
     sessionId: row.sessionId,
     parentId: row.parentId,
     type: row.type,
-    timestamp: row.timestamp,
+    timestamp: new Date(row.timestamp),
     data: (row.data ?? {}) as Record<string, unknown>,
   };
+}
+
+function toSessionOutput(row: PersistedSessionRecord) {
+  return {
+    id: row.id,
+    name: row.name,
+    cwd: row.cwd,
+    parentSessionId: row.parentSessionId,
+    leafEntryId: row.leafEntryId,
+    createdAt: new Date(row.createdAt),
+    updatedAt: new Date(row.updatedAt),
+  };
+}
+
+function sortSessionsByUpdatedAt(left: PersistedSessionRecord, right: PersistedSessionRecord) {
+  return Date.parse(right.updatedAt) - Date.parse(left.updatedAt);
+}
+
+function sortEntriesByTimestamp(left: PersistedEntryRecord, right: PersistedEntryRecord) {
+  return Date.parse(left.timestamp) - Date.parse(right.timestamp);
+}
+
+function extractTextFromContent(content: unknown): string {
+  if (typeof content === "string") {
+    return content.trim();
+  }
+
+  if (!Array.isArray(content)) {
+    return "";
+  }
+
+  return content
+    .map((block) => {
+      if (typeof block !== "object" || block === null || !("text" in block)) {
+        return "";
+      }
+
+      const text = (block as { text?: unknown }).text;
+      return typeof text === "string" ? text.trim() : "";
+    })
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+}
+
+function deriveSessionName(entryData: Record<string, unknown>): string | null {
+  if (entryData.role !== "user") {
+    return null;
+  }
+
+  const text = extractTextFromContent(entryData.content);
+  if (!text) {
+    return null;
+  }
+
+  return text.length <= 40 ? text : `${text.slice(0, 37).trimEnd()}...`;
 }
 
 // ── Session CRUD ────────────────────────────────────────────────────────────
@@ -28,76 +152,104 @@ export async function createSession(opts: {
   cwd?: string;
   parentSessionId?: string | null;
 }) {
-  const [row] = await db
-    .insert(sessions)
-    .values({
-      ...(opts.id ? { id: opts.id } : {}),
-      name: opts.name ?? "",
-      cwd: opts.cwd ?? "",
-      parentSessionId: opts.parentSessionId ?? null,
-    })
-    .returning();
+  const state = await readState();
+  const now = new Date().toISOString();
+  const row: PersistedSessionRecord = {
+    id: opts.id ?? randomUUID(),
+    name: opts.name ?? "",
+    cwd: opts.cwd ?? "",
+    parentSessionId: opts.parentSessionId ?? null,
+    leafEntryId: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  state.sessions.unshift(row);
+  await writeState(state);
 
   logger.info({ id: row.id }, "Session created");
-  return row;
+  return toSessionOutput(row);
 }
 
 export async function listSessions() {
-  const rows = await db.select().from(sessions).orderBy(desc(sessions.updatedAt));
+  const state = await readState();
 
-  return rows;
+  return [...state.sessions].sort(sortSessionsByUpdatedAt).map(toSessionOutput);
 }
 
 export async function getSession(id: string) {
-  const [row] = await db.select().from(sessions).where(eq(sessions.id, id));
-  return row ?? null;
+  const state = await readState();
+  const row = state.sessions.find((session) => session.id === id);
+
+  return row ? toSessionOutput(row) : null;
 }
 
 export async function renameSession(id: string, name: string) {
-  await db.update(sessions).set({ name, updatedAt: new Date() }).where(eq(sessions.id, id));
+  const state = await readState();
+  const row = state.sessions.find((session) => session.id === id);
+
+  if (!row) {
+    return;
+  }
+
+  row.name = name;
+  row.updatedAt = new Date().toISOString();
+  await writeState(state);
 }
 
 export async function deleteSession(id: string) {
-  await db.delete(sessions).where(eq(sessions.id, id));
+  const state = await readState();
+  state.sessions = state.sessions.filter((session) => session.id !== id);
+  state.entries = state.entries.filter((entry) => entry.sessionId !== id);
+  await writeState(state);
 }
 
 // ── Entry CRUD ──────────────────────────────────────────────────────────────
 
 export async function appendEntry(input: AppendEntryInput): Promise<EntryOutput> {
-  const [row] = await db
-    .insert(entries)
-    .values({
-      sessionId: input.sessionId,
-      parentId: input.parentId,
-      type: input.type,
-      data: input.data,
-    })
-    .returning();
+  const state = await readState();
+  const session = state.sessions.find((item) => item.id === input.sessionId);
 
-  // Update session's leafEntryId and updatedAt
-  await db
-    .update(sessions)
-    .set({
-      leafEntryId: row.id,
-      updatedAt: new Date(),
-    })
-    .where(eq(sessions.id, input.sessionId));
+  if (!session) {
+    throw new Error(`Session ${input.sessionId} not found`);
+  }
+
+  const row: PersistedEntryRecord = {
+    id: randomUUID(),
+    sessionId: input.sessionId,
+    parentId: input.parentId,
+    type: input.type,
+    timestamp: new Date().toISOString(),
+    data: input.data as Record<string, unknown>,
+  };
+
+  state.entries.push(row);
+  session.leafEntryId = row.id;
+  session.updatedAt = row.timestamp;
+
+  const derivedName = deriveSessionName(row.data);
+  if (derivedName && session.name.trim() === "") {
+    session.name = derivedName;
+  }
+
+  await writeState(state);
 
   logger.info({ entryId: row.id, sessionId: input.sessionId, type: input.type }, "Entry appended");
   return toEntryOutput(row);
 }
 
 export async function getEntry(id: string): Promise<EntryOutput | null> {
-  const [row] = await db.select().from(entries).where(eq(entries.id, id));
+  const state = await readState();
+  const row = state.entries.find((entry) => entry.id === id);
+
   return row ? toEntryOutput(row) : null;
 }
 
 export async function getEntries(sessionId: string): Promise<EntryOutput[]> {
-  const rows = await db
-    .select()
-    .from(entries)
-    .where(eq(entries.sessionId, sessionId))
-    .orderBy(asc(entries.timestamp));
+  const state = await readState();
+  const rows = state.entries
+    .filter((entry) => entry.sessionId === sessionId)
+    .sort(sortEntriesByTimestamp);
 
   return rows.map(toEntryOutput);
 }
@@ -117,28 +269,28 @@ export async function getBranch(sessionId: string, leafId?: string): Promise<Ent
     targetLeafId = session.leafEntryId;
   }
 
-  const rows = await db.execute(sql`
-    WITH RECURSIVE branch AS (
-      SELECT *
-      FROM entries
-      WHERE id = ${targetLeafId} AND session_id = ${sessionId}
-      UNION ALL
-      SELECT e.*
-      FROM entries e
-      JOIN branch b ON e.id = b.parent_id
-    )
-    SELECT * FROM branch
-    ORDER BY timestamp ASC
-  `);
+  const state = await readState();
+  const entryMap = new Map(
+    state.entries
+      .filter((entry) => entry.sessionId === sessionId)
+      .map((entry) => [entry.id, entry]),
+  );
 
-  return (rows as any[]).map((row: any) => ({
-    id: row.id,
-    sessionId: row.session_id,
-    parentId: row.parent_id,
-    type: row.type,
-    timestamp: row.timestamp,
-    data: typeof row.data === "string" ? JSON.parse(row.data) : (row.data ?? {}),
-  }));
+  const branch: PersistedEntryRecord[] = [];
+  let currentId: string | null | undefined = targetLeafId;
+
+  while (currentId) {
+    const currentEntry = entryMap.get(currentId);
+    if (!currentEntry) {
+      break;
+    }
+
+    branch.push(currentEntry);
+    currentId = currentEntry.parentId;
+  }
+
+  branch.reverse();
+  return branch.map(toEntryOutput);
 }
 
 /**
@@ -175,11 +327,10 @@ export async function buildContext(
  * Get direct children of an entry.
  */
 export async function getChildren(parentId: string): Promise<EntryOutput[]> {
-  const rows = await db
-    .select()
-    .from(entries)
-    .where(eq(entries.parentId, parentId))
-    .orderBy(asc(entries.timestamp));
+  const state = await readState();
+  const rows = state.entries
+    .filter((entry) => entry.parentId === parentId)
+    .sort(sortEntriesByTimestamp);
 
   return rows.map(toEntryOutput);
 }
@@ -196,10 +347,16 @@ export async function setLeaf(sessionId: string, entryId: string): Promise<void>
     throw new Error(`Entry ${entryId} not found in session ${sessionId}`);
   }
 
-  await db
-    .update(sessions)
-    .set({ leafEntryId: entryId, updatedAt: new Date() })
-    .where(eq(sessions.id, sessionId));
+  const state = await readState();
+  const session = state.sessions.find((item) => item.id === sessionId);
+
+  if (!session) {
+    throw new Error(`Session ${sessionId} not found`);
+  }
+
+  session.leafEntryId = entryId;
+  session.updatedAt = new Date().toISOString();
+  await writeState(state);
 
   logger.info({ sessionId, entryId }, "Leaf moved");
 }

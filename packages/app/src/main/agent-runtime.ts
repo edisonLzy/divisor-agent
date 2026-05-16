@@ -105,9 +105,8 @@ export class AgentRuntime
     this.agent.sessionId = sessionId;
   };
 
-  public setHistoryMessages: AgentSessionIPC["setHistoryMessages"] = async (_messages) => {
-    // TODO: implement history
-    return;
+  public setHistoryMessages: AgentSessionIPC["setHistoryMessages"] = async (messages) => {
+    this.updateState("messages", messages);
   };
 
   public searchWorkspaceFiles: AgentSessionIPC["searchWorkspaceFiles"] = async (query) => {
@@ -148,7 +147,9 @@ export class AgentRuntime
   };
 
   public prompt: AgentSessionIPC["prompt"] = async (params) => {
-    const { content, model } = params;
+    const { content, model, sessionId } = params;
+
+    this.agent.sessionId = sessionId;
 
     if (model) {
       this.setModel(model);

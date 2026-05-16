@@ -96,6 +96,13 @@ export interface SessionState {
   toolStates: Map<string, ToolExecutionState>;
 }
 
+export interface SessionSnapshot {
+  entries: SessionEntry[];
+  cwd: string;
+  model: AvailableModel | null;
+  toolStates: Map<string, ToolExecutionState> | ToolExecutionState[];
+}
+
 // ── Session Actions ───────────────────────────────────────────────────────────
 
 export interface SessionActions {
@@ -130,25 +137,29 @@ export interface SessionActions {
   setModel: (model: AvailableModel) => void;
   /** Update the current working directory */
   setCwd: (cwd: string) => void;
+  /** Replace the current renderer session with a fully loaded snapshot */
+  hydrate: (snapshot: SessionSnapshot) => void;
   /** Reset the entire session store back to its initial empty state */
   reset: () => void;
 }
 
 // ── Initial State ─────────────────────────────────────────────────────────────
 
-const initialState: SessionState = {
-  entries: [],
-  cwd: "",
-  model: null,
-  isLoading: false,
-  streamingEntryId: undefined,
-  toolStates: new Map(),
-};
+function createInitialState(): SessionState {
+  return {
+    entries: [],
+    cwd: "",
+    model: null,
+    isLoading: false,
+    streamingEntryId: undefined,
+    toolStates: new Map(),
+  };
+}
 
 // ── Store Implementation ──────────────────────────────────────────────────────
 
 export const sessionStore = createStore<SessionState & SessionActions>()((set, get) => ({
-  ...initialState,
+  ...createInitialState(),
 
   appendMessageEntry: (message) => {
     const id = uuidv4();
@@ -211,5 +222,19 @@ export const sessionStore = createStore<SessionState & SessionActions>()((set, g
   setStreamingEntryId: (id) => set({ streamingEntryId: id }),
   setModel: (model) => set({ model }),
   setCwd: (cwd) => set({ cwd }),
-  reset: () => set(initialState),
+
+  hydrate: (snapshot) => {
+    set({
+      ...createInitialState(),
+      entries: [...snapshot.entries],
+      cwd: snapshot.cwd,
+      model: snapshot.model,
+      toolStates:
+        snapshot.toolStates instanceof Map
+          ? new Map(snapshot.toolStates)
+          : new Map(snapshot.toolStates.map((state) => [state.toolCallId, state])),
+    });
+  },
+
+  reset: () => set(createInitialState()),
 }));

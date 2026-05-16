@@ -3,16 +3,8 @@ import { z } from "zod/v4";
 // ── Entry data schemas (type-specific JSONB content) ────────────────────────
 
 export const MessageDataSchema = z.object({
-  role: z.enum(["user", "assistant", "tool"]),
-  content: z.union([
-    z.string(),
-    z.array(
-      z.object({
-        type: z.string(),
-        text: z.string(),
-      }),
-    ),
-  ]),
+  role: z.string(),
+  content: z.unknown(),
 });
 
 export const ModelChangeDataSchema = z.object({

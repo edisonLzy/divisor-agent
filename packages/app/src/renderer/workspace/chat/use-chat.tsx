@@ -3,9 +3,9 @@ import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { isAgentMessageEntry } from "@renderer/lib/is";
 import { sessionStore, type MessageEntry } from "@renderer/store/session";
 import { useCallback, useEffect, useMemo } from "react";
-import { v4 as uuidv4 } from "uuid";
 import { useStore } from "zustand";
 
+import { useWorkspaceSession } from "../session-provider";
 import type { PromptSubmission } from "./prompt-types";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -34,9 +34,16 @@ function formatArgs(value: unknown): string {
 
 export function useChat() {
   const { invoke } = useElectronIPC();
+  const {
+    activeSessionId,
+    isBootstrapping,
+    isSwitching,
+    persistAssistantMessage,
+    persistUserMessage,
+  } = useWorkspaceSession();
   const state = useStore(sessionStore);
 
-  useSubscribeAgentEvents();
+  useSubscribeAgentEvents({ persistAssistantMessage });
 
   const messageEntries = useMemo<MessageEntry[]>(() => {
     return state.entries.filter(isAgentMessageEntry);
@@ -46,11 +53,17 @@ export function useChat() {
 
   const submitPrompt = useCallback(
     async (submission: PromptSubmission) => {
+      if (!activeSessionId) {
+        return;
+      }
+
       sessionStore.getState().setLoading(true);
 
       try {
+        await persistUserMessage(submission.text);
+
         await invoke("prompt", {
-          sessionId: uuidv4(),
+          sessionId: activeSessionId,
           content: submission.text,
           model: {
             modelId: submission.model.modelId,
@@ -62,11 +75,11 @@ export function useChat() {
         sessionStore.getState().setLoading(false);
       }
     },
-    [invoke],
+    [activeSessionId, invoke, persistUserMessage],
   );
 
   return {
-    isLoading: state.isLoading,
+    isLoading: state.isLoading || isBootstrapping || isSwitching,
     messageEntries,
     streamingEntryId: state.streamingEntryId,
     toolStates,
@@ -76,7 +89,11 @@ export function useChat() {
 
 // ── Agent message event subscriptions ────────────────────────────────────────
 
-function useSubscribeAgentEvents() {
+function useSubscribeAgentEvents({
+  persistAssistantMessage,
+}: {
+  persistAssistantMessage: (message: AssistantMessage) => Promise<void>;
+}) {
   const { on } = useElectronIPC();
 
   useEffect(() => {
@@ -93,7 +110,15 @@ function useSubscribeAgentEvents() {
       on("agent_end", () => {
         const { streamingEntryId } = sessionStore.getState();
         if (streamingEntryId) {
+          const entry = sessionStore
+            .getState()
+            .entries.find((item) => item.id === streamingEntryId);
+
           sessionStore.getState().setMessageCompletedAt(streamingEntryId, Date.now());
+
+          if (entry && isAgentMessageEntry(entry) && entry.data.role === "assistant") {
+            void persistAssistantMessage(entry.data);
+          }
         }
         sessionStore.getState().setLoading(false);
         sessionStore.getState().setStreamingEntryId(undefined);
@@ -249,5 +274,5 @@ function useSubscribeAgentEvents() {
         off();
       }
     };
-  }, [on]);
+  }, [on, persistAssistantMessage]);
 }
