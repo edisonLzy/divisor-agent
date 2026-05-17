@@ -4,40 +4,31 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@renderer/components/ui/resizable";
-import { useState } from "react";
-import { usePanelRef } from "react-resizable-panels";
 
 import { Chat } from "./chat";
 import { WorkspaceSessionProvider } from "./session-provider";
 import { Sessions } from "./sessions";
+import { ToggleSidebarButton, useToggleSidebarButton } from "./toggle-sidebar-button";
 
 export function WorkspacePage() {
-  const sidebarRef = usePanelRef();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  const toggleSidebar = () => {
-    const panel = sidebarRef.current;
-    if (!panel) return;
-    if (sidebarCollapsed) {
-      panel.expand();
-    } else {
-      panel.collapse();
-    }
-  };
+  const { isCollapsed, panelRef, setIsCollapsed, toggle } = useToggleSidebarButton();
 
   return (
     <WorkspaceSessionProvider>
       <div className="flex h-screen w-full flex-col overflow-hidden bg-background font-sans text-foreground">
-        <Titlebar sidebarCollapsed={sidebarCollapsed} onToggleSidebar={toggleSidebar} />
+        <Titlebar>
+          <ToggleSidebarButton isCollapsed={isCollapsed} onToggle={toggle} />
+          <span className="text-[13px] font-medium text-sidebar-foreground/80">divisor-agent</span>
+        </Titlebar>
         <ResizablePanelGroup orientation="horizontal" className="flex-1">
           <ResizablePanel
-            panelRef={sidebarRef}
+            panelRef={panelRef}
             collapsible
             collapsedSize="0%"
             defaultSize="26%"
             minSize="18%"
             maxSize="32%"
-            onResize={(size) => setSidebarCollapsed(size.asPercentage === 0)}
+            onResize={(size) => setIsCollapsed(size.asPercentage === 0)}
           >
             <Sessions />
           </ResizablePanel>

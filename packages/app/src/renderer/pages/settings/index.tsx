@@ -1,4 +1,5 @@
 import { useTheme, type Theme } from "@renderer/components/theme-provider";
+import { Titlebar } from "@renderer/components/titlebar";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -151,18 +152,20 @@ export function SettingsPage() {
   ];
 
   return (
-    <div className="h-screen w-full overflow-hidden bg-background text-foreground">
-      <ResizablePanelGroup orientation="horizontal">
+    <div className="flex h-screen w-full flex-col overflow-hidden bg-background text-foreground">
+      <Titlebar>
+        <button
+          onClick={() => navigate("/")}
+          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] font-medium text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+        >
+          <ArrowLeft className="size-3.5" />
+          返回应用
+        </button>
+      </Titlebar>
+      <ResizablePanelGroup orientation="horizontal" className="flex-1">
         <ResizablePanel defaultSize="20%" minSize="16%" maxSize="24%">
           <aside className="flex h-full flex-col border-r border-border bg-card px-3 py-4 text-foreground select-none">
-            <button
-              onClick={() => navigate("/")}
-              className="mb-4 flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              <ArrowLeft className="size-3.5" />
-              返回应用
-            </button>
-
             <nav className="flex flex-col space-y-0.5">
               {SECTIONS.map((section) => {
                 const isActive = section.id === activeSection;
