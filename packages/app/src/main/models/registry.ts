@@ -2,7 +2,6 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 
-import { getModels, getProviders } from "@mariozechner/pi-ai";
 import type { Api, Model, OAuthProviderInterface } from "@mariozechner/pi-ai";
 
 export interface CustomModel {
@@ -41,17 +40,6 @@ export class ModelRegistry {
 
   constructor() {
     this.loadCustomModels();
-    this.loadBuiltInModels();
-  }
-
-  private loadBuiltInModels() {
-    const providers = getProviders();
-    for (const provider of providers) {
-      const models = getModels(provider);
-      for (const model of models) {
-        this.loadedModels.set(`${provider}/${model.id}`, model);
-      }
-    }
   }
 
   private async loadCustomModels() {

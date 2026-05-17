@@ -7,7 +7,10 @@ export interface AvailableModel {
 
 export interface AgentModelsIPC {
   // Sets the model for a given session. Returns true on success, false on failure.
-  setModel: (model: Pick<AvailableModel, "modelId" | "providerId">) => Promise<boolean>;
+  setModel: (
+    sessionId: string,
+    model: Pick<AvailableModel, "modelId" | "providerId">,
+  ) => Promise<boolean>;
   // get all available models to the renderer process
   getAvailableModels: () => Promise<AvailableModel[]>;
 }

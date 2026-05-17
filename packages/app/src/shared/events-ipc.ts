@@ -3,9 +3,7 @@ import type { AgentEvent } from "@mariozechner/pi-agent-core";
 import { AgentModelsIPC } from "./models-ipc";
 import { AgentSessionIPC } from "./session-ipc";
 
-type EventToNested<T extends { type: string }> = {
-  [K in T as K["type"]]: K;
-};
+type SessionTagged<T> = T & { sessionId: string };
 
 // main -> renderer events. These are verified at compile-time to be a subset of the
 export const ALLOWED_MAIN_EXPOSE_EVENTS: AgentEvent["type"][] = [
@@ -21,7 +19,13 @@ export const ALLOWED_MAIN_EXPOSE_EVENTS: AgentEvent["type"][] = [
   "tool_execution_end",
 ];
 
-export type AllowedMainExposeEvents = EventToNested<AgentEvent>;
+/**
+ * Each agent event is tagged with the sessionId so the renderer can
+ * route multi-session events to the correct session's state store.
+ */
+export type AllowedMainExposeEvents = {
+  [K in AgentEvent as K["type"]]: SessionTagged<K>;
+};
 
 // render -> main
 

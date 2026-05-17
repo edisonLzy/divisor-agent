@@ -1,7 +1,9 @@
 import { cn } from "@renderer/lib/utils";
+import { sessionStore, type SessionStatus } from "@renderer/store/session";
 import { Settings, SquarePen } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useStore } from "zustand";
 
 import { useWorkspaceSession } from "../session-provider";
 
@@ -10,6 +12,7 @@ interface SessionSidebarItem {
   isActive: boolean;
   label: string;
   updatedAtLabel: string;
+  status: SessionStatus;
 }
 
 function formatRelativeTime(value: Date | string) {
@@ -23,10 +26,30 @@ function formatRelativeTime(value: Date | string) {
   return `${diffInDays} 天`;
 }
 
+const STATUS_CONFIG: Record<SessionStatus, { label: string; dotClass: string }> = {
+  idle: { label: "", dotClass: "bg-muted-foreground/30" },
+  running: { label: "执行中", dotClass: "bg-green-500 animate-pulse" },
+  completed: { label: "已完成", dotClass: "bg-blue-500" },
+  failed: { label: "失败", dotClass: "bg-red-500" },
+};
+
+function SessionStatusDot({ status }: { status: SessionStatus }) {
+  const config = STATUS_CONFIG[status];
+  if (status === "idle") return null;
+
+  return (
+    <span className="flex items-center gap-1 ml-1.5" title={config.label}>
+      <span className={cn("size-1.5 rounded-full shrink-0", config.dotClass)} />
+      <span className="text-[11px] text-muted-foreground/60">{config.label}</span>
+    </span>
+  );
+}
+
 function useSessionSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { activeSessionId, createSession, selectSession, sessions } = useWorkspaceSession();
+  const storeSessions = useStore(sessionStore, (s) => s.sessions);
 
   const handleCreateSession = useCallback(() => {
     void createSession();
@@ -48,14 +71,17 @@ function useSessionSidebar() {
     const isWorkspaceRoute = location.pathname === "/";
 
     return sessions.slice(0, 50).map((session) => {
+      const storeSession = storeSessions.find((s) => s.id === session.id);
+      const localStatus = storeSession?.status ?? "idle";
       return {
         id: session.id,
         isActive: isWorkspaceRoute && session.id === activeSessionId,
         label: session.name.trim() || "untitled",
         updatedAtLabel: formatRelativeTime(session.updatedAt),
+        status: localStatus,
       };
     });
-  }, [activeSessionId, location.pathname, sessions]);
+  }, [activeSessionId, location.pathname, sessions, storeSessions]);
 
   return {
     handleCreateSession,
@@ -102,7 +128,10 @@ export function Sessions() {
                       : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
                   )}
                 >
-                  <span className="truncate pr-4">{session.label}</span>
+                  <span className="flex items-center min-w-0 flex-1">
+                    <span className="truncate pr-2">{session.label}</span>
+                    <SessionStatusDot status={session.status} />
+                  </span>
                   <span
                     className={cn(
                       "shrink-0 text-[11px]",

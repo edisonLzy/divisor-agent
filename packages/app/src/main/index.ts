@@ -3,7 +3,7 @@ import { join } from "path";
 import { app, BrowserWindow } from "electron";
 
 import { bindAgentRuntimeIPC } from "./agent-ipc.js";
-import { AgentRuntime } from "./agent-runtime.js";
+import { AgentPool } from "./agent-pool.js";
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -31,15 +31,15 @@ function createWindow() {
 }
 
 function createAgentRuntime() {
-  const agentRuntime = new AgentRuntime();
-  return agentRuntime;
+  const agentPool = new AgentPool();
+  return agentPool;
 }
 
 app.whenReady().then(async () => {
   const browserWindow = createWindow();
-  const agentRuntime = createAgentRuntime();
+  const agentPool = createAgentRuntime();
 
-  const unbind = bindAgentRuntimeIPC(agentRuntime, browserWindow);
+  const unbind = bindAgentRuntimeIPC(agentPool, browserWindow);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -47,7 +47,7 @@ app.whenReady().then(async () => {
 
   app.on("quit", () => {
     unbind();
-    agentRuntime.destroy();
+    agentPool.destroyAll();
   });
 });
 

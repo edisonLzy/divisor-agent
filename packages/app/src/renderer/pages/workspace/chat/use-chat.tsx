@@ -1,7 +1,7 @@
 import type { AssistantMessage, ToolCall, ToolResultMessage } from "@mariozechner/pi-ai";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { isAgentMessageEntry } from "@renderer/lib/is";
-import { sessionStore, type MessageEntry } from "@renderer/store/session";
+import { sessionStore, type MessageEntry, type SessionEntry } from "@renderer/store/sessions";
 import { useCallback, useEffect, useMemo } from "react";
 import { useStore } from "zustand";
 
@@ -30,58 +30,69 @@ function formatArgs(value: unknown): string {
   }
 }
 
+function getSessionEntries(sessionId: string): SessionEntry[] {
+  return sessionStore.getState().getSession(sessionId)?.entries ?? [];
+}
+
+function getToolState(sessionId: string, toolCallId: string) {
+  return sessionStore.getState().getSession(sessionId)?.toolStates.get(toolCallId);
+}
+
+// ── Active session selector ──────────────────────────────────────────────────
+
+function useActiveSessionState() {
+  const activeSessionId = useStore(sessionStore, (s) => s.activeSessionId);
+  const activeSession = useStore(sessionStore, (s) =>
+    activeSessionId ? s.sessions.find((ss) => ss.id === activeSessionId) : undefined,
+  );
+  return { activeSessionId, activeSession };
+}
+
 // ── Public hook ──────────────────────────────────────────────────────────────
 
 export function useChat() {
   const { invoke } = useElectronIPC();
-  const {
-    activeSessionId,
-    isBootstrapping,
-    isSwitching,
-    persistAssistantMessage,
-    persistUserMessage,
-  } = useWorkspaceSession();
+  const { isBootstrapping, isSwitching, persistAssistantMessage, persistUserMessage } =
+    useWorkspaceSession();
+  const { activeSession } = useActiveSessionState();
   const state = useStore(sessionStore);
 
   useSubscribeAgentEvents({ persistAssistantMessage });
 
   const messageEntries = useMemo<MessageEntry[]>(() => {
-    return state.entries.filter(isAgentMessageEntry);
-  }, [state.entries]);
+    return (activeSession?.entries ?? []).filter(isAgentMessageEntry);
+  }, [activeSession?.entries]);
 
-  const toolStates = state.toolStates;
+  const toolStates = activeSession?.toolStates ?? new Map();
 
   const submitPrompt = useCallback(
     async (submission: PromptSubmission) => {
-      if (!activeSessionId) {
+      const sessionId = state.activeSessionId;
+      if (!sessionId) {
         return;
       }
 
-      sessionStore.getState().setLoading(true);
+      sessionStore.getState().setLoading(sessionId, true);
 
       try {
         await persistUserMessage(submission.text);
 
-        await invoke("prompt", {
-          sessionId: activeSessionId,
-          content: submission.text,
-          model: {
-            modelId: submission.model.modelId,
-            providerId: submission.model.providerId,
-          },
+        await invoke("prompt", sessionId, submission.text, {
+          modelId: submission.model.modelId,
+          providerId: submission.model.providerId,
         });
       } catch (error) {
         console.error("Failed to submit prompt", error);
-        sessionStore.getState().setLoading(false);
+        sessionStore.getState().setLoading(sessionId, false);
       }
     },
-    [activeSessionId, invoke, persistUserMessage],
+    [state.activeSessionId, invoke, persistUserMessage],
   );
 
   return {
-    isLoading: state.isLoading || isBootstrapping || isSwitching,
+    isLoading: (activeSession?.isLoading ?? false) || isBootstrapping || isSwitching,
     messageEntries,
-    streamingEntryId: state.streamingEntryId,
+    streamingEntryId: activeSession?.streamingEntryId,
     toolStates,
     submitPrompt,
   };
@@ -97,87 +108,97 @@ function useSubscribeAgentEvents({
   const { on } = useElectronIPC();
 
   useEffect(() => {
-    // ── Closure state for multi-turn merging ───────────────────────────────
+    // ── Per-session closure state for multi-turn merging ────────────────────
     // Content index where the current turn starts. Set on turn_start.
     // turnContentStartIndex === 0 → first turn, > 0 → subsequent turn (merge).
-    let turnContentStartIndex = 0;
+    const turnContentStartIndices: Record<string, number> = {};
+
+    const getSession = (sessionId: string) => {
+      return sessionStore.getState().getOrCreateSession(sessionId);
+    };
 
     const unsubscribe = [
-      on("agent_start", () => {
-        sessionStore.getState().setLoading(true);
+      on("agent_start", (event) => {
+        const { sessionId } = event;
+        getSession(sessionId);
+        sessionStore.getState().setLoading(sessionId, true);
+        sessionStore.getState().setSessionStatus(sessionId, "running");
       }),
 
-      on("agent_end", () => {
-        const { streamingEntryId } = sessionStore.getState();
-        if (streamingEntryId) {
-          const entry = sessionStore
-            .getState()
-            .entries.find((item) => item.id === streamingEntryId);
+      on("agent_end", (event) => {
+        const { sessionId } = event;
+        const { streamingEntryId } = getSession(sessionId);
 
-          sessionStore.getState().setMessageCompletedAt(streamingEntryId, Date.now());
+        if (streamingEntryId) {
+          const entries = getSessionEntries(sessionId);
+          const entry = entries.find((item) => item.id === streamingEntryId);
+
+          sessionStore.getState().setMessageCompletedAt(sessionId, streamingEntryId, Date.now());
 
           if (entry && isAgentMessageEntry(entry) && entry.data.role === "assistant") {
             void persistAssistantMessage(entry.data);
           }
         }
-        sessionStore.getState().setLoading(false);
-        sessionStore.getState().setStreamingEntryId(undefined);
-        turnContentStartIndex = 0;
+        sessionStore.getState().setLoading(sessionId, false);
+        sessionStore.getState().setStreamingEntryId(sessionId, undefined);
+        sessionStore.getState().setSessionStatus(sessionId, "completed");
+        turnContentStartIndices[sessionId] = 0;
       }),
 
-      on("turn_start", () => {
-        // If we already have a streaming entry (subsequent turn), record where
-        // new content should start so message_update/message_end can splice.
-        const { streamingEntryId, entries } = sessionStore.getState();
+      on("turn_start", (event) => {
+        const { sessionId } = event;
+        const session = getSession(sessionId);
+        const { streamingEntryId, entries } = session;
         if (streamingEntryId) {
           const entry = entries.find((e) => e.id === streamingEntryId);
           if (entry && isAgentMessageEntry(entry)) {
-            turnContentStartIndex = (entry.data.content ?? []).length;
+            turnContentStartIndices[sessionId] = (entry.data.content ?? []).length;
           }
         }
       }),
 
       on("message_start", (event) => {
-        const { message } = event;
-
+        const { sessionId, message } = event;
         if (message.role === "toolResult") return;
 
         if (message.role === "user") {
-          sessionStore.getState().appendMessageEntry(message);
+          sessionStore.getState().appendMessageEntry(sessionId, message);
           return;
         }
 
         if (message.role === "assistant") {
-          if (turnContentStartIndex === 0) {
+          const turnStartIdx = turnContentStartIndices[sessionId] ?? 0;
+          if (turnStartIdx === 0) {
             // First assistant turn — create a new entry
-            const entryId = sessionStore.getState().appendMessageEntry(message);
-            sessionStore.getState().setStreamingEntryId(entryId);
+            const entryId = sessionStore.getState().appendMessageEntry(sessionId, message);
+            sessionStore.getState().setStreamingEntryId(sessionId, entryId);
           }
           // Subsequent turn — streamingEntryId already set, no-op here
         }
       }),
 
       on("message_update", (event) => {
-        if (event.message.role !== "assistant") return;
+        const { sessionId, message } = event;
+        if (message.role !== "assistant") return;
 
-        const { streamingEntryId } = sessionStore.getState();
+        const session = getSession(sessionId);
+        const { streamingEntryId, entries } = session;
         if (!streamingEntryId) return;
 
-        const entry = sessionStore.getState().entries.find((e) => e.id === streamingEntryId);
+        const entry = entries.find((e) => e.id === streamingEntryId);
         if (!entry) return;
-
         if (!isAgentMessageEntry(entry)) return;
 
-        const message = event.message;
+        const turnStartIdx = turnContentStartIndices[sessionId] ?? 0;
 
-        if (turnContentStartIndex === 0) {
-          sessionStore.getState().updateMessageEntry(streamingEntryId, message);
+        if (turnStartIdx === 0) {
+          sessionStore.getState().updateMessageEntry(sessionId, streamingEntryId, message);
         } else {
           const existingContent = entry.data.content ?? [];
-          sessionStore.getState().updateMessageEntry(streamingEntryId, {
+          sessionStore.getState().updateMessageEntry(sessionId, streamingEntryId, {
             ...message,
             content: [
-              ...existingContent.slice(0, turnContentStartIndex),
+              ...existingContent.slice(0, turnStartIdx),
               ...message.content,
             ] as AssistantMessage["content"],
           });
@@ -186,9 +207,9 @@ function useSubscribeAgentEvents({
         for (const block of message.content) {
           if (block.type === "toolCall") {
             const tc = block as ToolCall;
-            const existing = sessionStore.getState().toolStates.get(tc.id);
+            const existing = getToolState(sessionId, tc.id);
             if (!existing) {
-              sessionStore.getState().setToolState(tc.id, {
+              sessionStore.getState().setToolState(sessionId, tc.id, {
                 toolCallId: tc.id,
                 toolName: tc.name,
                 status: "running",
@@ -201,69 +222,75 @@ function useSubscribeAgentEvents({
       }),
 
       on("message_end", (event) => {
-        if (event.message.role !== "assistant") return;
+        const { sessionId, message } = event;
+        if (message.role !== "assistant") return;
 
-        const { streamingEntryId } = sessionStore.getState();
+        const session = getSession(sessionId);
+        const { streamingEntryId, entries } = session;
         if (!streamingEntryId) return;
 
-        const entry = sessionStore.getState().entries.find((e) => e.id === streamingEntryId);
+        const entry = entries.find((e) => e.id === streamingEntryId);
         if (!entry) return;
-
         if (!isAgentMessageEntry(entry)) return;
 
-        const message = event.message as AssistantMessage;
+        const turnStartIdx = turnContentStartIndices[sessionId] ?? 0;
+        const assistantMsg = message as AssistantMessage;
 
-        if (turnContentStartIndex === 0) {
-          sessionStore.getState().updateMessageEntry(streamingEntryId, message);
+        if (turnStartIdx === 0) {
+          sessionStore.getState().updateMessageEntry(sessionId, streamingEntryId, assistantMsg);
         } else {
           const existingContent = entry.data.content ?? [];
-          sessionStore.getState().updateMessageEntry(streamingEntryId, {
-            ...message,
+          sessionStore.getState().updateMessageEntry(sessionId, streamingEntryId, {
+            ...assistantMsg,
             content: [
-              ...existingContent.slice(0, turnContentStartIndex),
-              ...message.content,
+              ...existingContent.slice(0, turnStartIdx),
+              ...assistantMsg.content,
             ] as AssistantMessage["content"],
           });
         }
       }),
 
       on("tool_execution_start", (event) => {
-        const existing = sessionStore.getState().toolStates.get(event.toolCallId);
+        const { sessionId, toolCallId, toolName, args } = event;
+        const existing = getToolState(sessionId, toolCallId);
         if (existing) return;
 
-        sessionStore.getState().setToolState(event.toolCallId, {
-          toolCallId: event.toolCallId,
-          toolName: event.toolName,
+        sessionStore.getState().setToolState(sessionId, toolCallId, {
+          toolCallId,
+          toolName,
           status: "running",
-          args: event.args,
+          args,
           output: "",
         });
       }),
 
       on("tool_execution_update", (event) => {
-        const existing = sessionStore.getState().toolStates.get(event.toolCallId);
+        const { sessionId, toolCallId, toolName, args } = event;
+        const existing = getToolState(sessionId, toolCallId);
         if (!existing) return;
 
-        sessionStore.getState().setToolState(event.toolCallId, {
-          toolCallId: event.toolCallId,
-          toolName: event.toolName,
+        sessionStore.getState().setToolState(sessionId, toolCallId, {
+          toolCallId,
+          toolName,
           status: "running",
-          args: event.args,
-          output: existing?.output ?? "",
+          args,
+          output: existing.output ?? "",
         });
       }),
 
       on("tool_execution_end", (event) => {
-        const resultContent = event.result?.content;
+        const { sessionId, toolCallId, toolName, result, isError } = event;
+        const resultContent = result?.content;
         const output = Array.isArray(resultContent)
           ? extractToolResultText(resultContent)
-          : formatArgs(event.result);
+          : formatArgs(result);
 
-        sessionStore.getState().setToolState(event.toolCallId, {
-          toolCallId: event.toolCallId,
-          toolName: event.toolName,
-          status: event.isError ? "error" : "done",
-          args: sessionStore.getState().toolStates.get(event.toolCallId)?.args ?? {},
+        const existing = getToolState(sessionId, toolCallId);
+        sessionStore.getState().setToolState(sessionId, toolCallId, {
+          toolCallId,
+          toolName,
+          status: isError ? "error" : "done",
+          args: existing?.args ?? {},
           output,
         });
       }),

@@ -2,14 +2,58 @@ import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-import { Agent, AgentState } from "@mariozechner/pi-agent-core";
+import type { AgentMessage } from "@mariozechner/pi-agent-core";
+import { Agent } from "@mariozechner/pi-agent-core";
 import Emittery from "emittery";
 
-import { AllowedMainExposeEvents } from "../shared/events-ipc.js";
-import { AgentModelsIPC } from "../shared/models-ipc.js";
-import { AgentSessionIPC, type WorkspaceFileItem } from "../shared/session-ipc.js";
+import type { AllowedMainExposeEvents } from "../shared/events-ipc.js";
+import type { AgentModelsIPC } from "../shared/models-ipc.js";
+import type { AgentSessionIPC, WorkspaceFileItem } from "../shared/session-ipc.js";
 import { ModelRegistry } from "./models/index.js";
 import { fsReadTextFileTool, fsWriteTextFileTool, terminalCreateTool } from "./tools/index.js";
+
+// ── Derived runtime delegate type ──────────────────────────────────────────
+
+/**
+ * Strips the `sessionId` routing parameter from IPC method signatures.
+ *
+ * IPC:    setHistoryMessages(sessionId, messages) => Promise<void>
+ * Runtime: setHistoryMessages(messages) => void
+ *
+ * Methods without leading `sessionId` param (getAvailableModels) pass through.
+ */
+type StripSessionId<T> = T extends (sessionId: string, ...args: infer A) => infer R
+  ? (...args: A) => R
+  : T;
+
+type CombinedIPC = AgentSessionIPC & AgentModelsIPC;
+
+/**
+ * Contract that AgentRuntime must satisfy, auto-derived from IPC interfaces.
+ *
+ * - Methods where sessionId is a routing parameter → sessionId is stripped.
+ * - `setSessionId` / `getAvailableModels` are excluded (sessionId IS the data
+ *   for setSessionId; getAvailableModels is registry-level).
+ *
+ * Enforcement: AgentPool calls these methods by name — if a method is missing
+ * on AgentRuntime, the delegation call in AgentPool errors at compile time.
+ */
+export type AgentRuntimeDelegate = {
+  [K in keyof CombinedIPC as K extends "getAvailableModels" | "setSessionId"
+    ? never
+    : K]: StripSessionId<CombinedIPC[K]>;
+} & {
+  setSessionId(sessionId: string): void;
+};
+
+// ── Event type map ──────────────────────────────────────────────────────────
+
+/** Derive base events from session-tagged events by stripping sessionId. */
+type AgentRuntimeEvents = {
+  [K in keyof AllowedMainExposeEvents]: Omit<AllowedMainExposeEvents[K], "sessionId">;
+};
+
+// ── Workspace helpers ──────────────────────────────────────────────────────
 
 const WORKSPACE_MARKERS = ["pnpm-workspace.yaml", ".git"];
 const IGNORED_DIRECTORY_NAMES = new Set([
@@ -41,21 +85,22 @@ function resolveWorkspaceRoot(startDir = process.cwd()) {
   }
 }
 
-export class AgentRuntime
-  extends Emittery<AllowedMainExposeEvents>
-  implements AgentSessionIPC, AgentModelsIPC
-{
-  private modelRegistry: ModelRegistry;
+/**
+ * Per-session runtime that manages a single Agent instance.
+ *
+ * Satisfies AgentRuntimeDelegate (derived from IPC interfaces).
+ * Emits raw AgentEvent-type events without sessionId — AgentPool handles tagging.
+ */
+export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentRuntimeDelegate {
   private agent: Agent;
   private workspaceRoot: string;
   private workspaceFilesCache: WorkspaceFileItem[] | null;
 
-  constructor() {
+  constructor(private modelRegistry: ModelRegistry) {
     super();
-    this.modelRegistry = new ModelRegistry();
-    this.agent = this.createInternalAgent();
     this.workspaceRoot = resolveWorkspaceRoot();
     this.workspaceFilesCache = null;
+    this.agent = this.createInternalAgent();
   }
 
   private createInternalAgent() {
@@ -75,92 +120,42 @@ export class AgentRuntime
     return agent;
   }
 
-  private updateState<T extends keyof AgentState>(key: T, value: AgentState[T]) {
-    this.agent.state[key] = value;
-  }
+  // ── AgentRuntimeDelegate implementation ──────────────────────────────────
 
-  public setModel: AgentModelsIPC["setModel"] = async (model) => {
-    const { modelId, providerId } = model;
-    const modelInfo = this.modelRegistry.resolveModel(providerId, modelId);
+  public setSessionId: AgentRuntimeDelegate["setSessionId"] = (sessionId) => {
+    this.agent.sessionId = sessionId;
+  };
+
+  public setHistoryMessages: AgentRuntimeDelegate["setHistoryMessages"] = async (messages) => {
+    this.agent.state.messages = messages;
+  };
+
+  public setModel: AgentRuntimeDelegate["setModel"] = async (model) => {
+    const modelInfo = this.modelRegistry.resolveModel(model.providerId, model.modelId);
     if (!modelInfo) {
-      console.warn(`Model not found: ${providerId}/${modelId}`);
+      console.warn(`Model not found: ${model.providerId}/${model.modelId}`);
       return false;
     }
-    this.updateState("model", modelInfo);
+    this.agent.state.model = modelInfo;
     return true;
   };
 
-  public getAvailableModels: AgentModelsIPC["getAvailableModels"] = async () => {
-    return this.modelRegistry.getAvailableModels().map((m) => {
-      return {
-        modelId: m.id,
-        providerId: m.provider,
-        providerName: m.provider,
-        modelName: m.name ?? m.id,
-      };
-    });
-  };
-
-  public setSessionId: AgentSessionIPC["setSessionId"] = async (sessionId: string) => {
-    this.agent.sessionId = sessionId;
-  };
-
-  public setHistoryMessages: AgentSessionIPC["setHistoryMessages"] = async (messages) => {
-    this.updateState("messages", messages);
-  };
-
-  public searchWorkspaceFiles: AgentSessionIPC["searchWorkspaceFiles"] = async (query) => {
-    const files = await this.getWorkspaceFiles();
-    const normalizedQuery = query.trim().toLowerCase();
-
-    if (!normalizedQuery) {
-      return files.slice(0, MAX_FILE_SEARCH_RESULTS);
-    }
-
-    return files
-      .map((file) => {
-        const lowerName = file.name.toLowerCase();
-        const lowerPath = file.path.toLowerCase();
-
-        let score = Number.POSITIVE_INFINITY;
-
-        if (lowerName === normalizedQuery || lowerPath === normalizedQuery) {
-          score = 0;
-        } else if (lowerName.startsWith(normalizedQuery)) {
-          score = 1;
-        } else if (lowerPath.startsWith(normalizedQuery)) {
-          score = 2;
-        } else if (lowerName.includes(normalizedQuery)) {
-          score = 3;
-        } else if (lowerPath.includes(normalizedQuery)) {
-          score = 4;
-        }
-
-        return { file, score };
-      })
-      .filter((entry) => Number.isFinite(entry.score))
-      .sort((left, right) => {
-        return left.score - right.score || left.file.path.localeCompare(right.file.path);
-      })
-      .slice(0, MAX_FILE_SEARCH_RESULTS)
-      .map((entry) => entry.file);
-  };
-
-  public prompt: AgentSessionIPC["prompt"] = async (params) => {
-    const { content, model, sessionId } = params;
-
-    this.agent.sessionId = sessionId;
-
+  public prompt: AgentRuntimeDelegate["prompt"] = async (content, model) => {
     if (model) {
-      this.setModel(model);
+      await this.setModel(model);
     }
-
     this.agent.prompt(content);
+  };
+
+  public searchWorkspaceFiles: AgentRuntimeDelegate["searchWorkspaceFiles"] = (query) => {
+    return this.searchFiles(query);
   };
 
   public destroy() {
     this.clearListeners();
   }
+
+  // ── Workspace file scanner ───────────────────────────────────────────────
 
   private async getWorkspaceFiles() {
     if (this.workspaceFilesCache) {
@@ -200,5 +195,42 @@ export class AgentRuntime
     }
 
     return files;
+  }
+
+  private async searchFiles(query: string): Promise<WorkspaceFileItem[]> {
+    const files = await this.getWorkspaceFiles();
+    const normalizedQuery = query.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return files.slice(0, MAX_FILE_SEARCH_RESULTS);
+    }
+
+    return files
+      .map((file) => {
+        const lowerName = file.name.toLowerCase();
+        const lowerPath = file.path.toLowerCase();
+
+        let score = Number.POSITIVE_INFINITY;
+
+        if (lowerName === normalizedQuery || lowerPath === normalizedQuery) {
+          score = 0;
+        } else if (lowerName.startsWith(normalizedQuery)) {
+          score = 1;
+        } else if (lowerPath.startsWith(normalizedQuery)) {
+          score = 2;
+        } else if (lowerName.includes(normalizedQuery)) {
+          score = 3;
+        } else if (lowerPath.includes(normalizedQuery)) {
+          score = 4;
+        }
+
+        return { file, score };
+      })
+      .filter((entry) => Number.isFinite(entry.score))
+      .sort((left, right) => {
+        return left.score - right.score || left.file.path.localeCompare(right.file.path);
+      })
+      .slice(0, MAX_FILE_SEARCH_RESULTS)
+      .map((entry) => entry.file);
   }
 }

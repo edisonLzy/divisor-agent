@@ -1,6 +1,5 @@
 import { useCallback, useEffect } from "react";
 
-import type { PromptPayload } from "../../shared/session-ipc";
 import { useAgentStore } from "./useAgentStore";
 
 /**
@@ -33,16 +32,12 @@ export function useAgentRuntime() {
         modelId = parts.slice(1).join("/");
       }
 
-      const params: PromptPayload = {
-        sessionId,
-        content,
-        model: {
+      window.electronAPI
+        .invoke("prompt", sessionId, content, {
           providerId,
           modelId,
-        },
-      };
-
-      window.electronAPI.invoke("prompt", params).catch(console.error);
+        })
+        .catch(console.error);
     },
     [setProcessing],
   );

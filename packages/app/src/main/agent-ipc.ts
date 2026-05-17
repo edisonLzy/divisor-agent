@@ -2,10 +2,10 @@ import { BrowserWindow, ipcMain } from "electron";
 
 import { AgentModelsIPC } from "../shared/models-ipc";
 import { AgentSessionIPC } from "../shared/session-ipc";
-import { AgentRuntime } from "./agent-runtime";
+import { AgentPool } from "./agent-pool";
 
-function registerAgentRuntimeHandlers(agentRuntime: AgentRuntime, browserWindow: BrowserWindow) {
-  const offAny = agentRuntime.onAny(({ name, data }) => {
+function registerAgentRuntimeHandlers(agentPool: AgentPool, browserWindow: BrowserWindow) {
+  const offAny = agentPool.onAny(({ name, data }) => {
     if (browserWindow.isDestroyed() || typeof name !== "string") {
       return;
     }
@@ -18,15 +18,15 @@ function registerAgentRuntimeHandlers(agentRuntime: AgentRuntime, browserWindow:
   };
 }
 
-function registerIPCHandlers(agentRuntime: AgentRuntime) {
+function registerIPCHandlers(agentPool: AgentPool) {
   const typedIpcMain = createTypedIpcMain();
 
-  typedIpcMain.handle("setModel", agentRuntime.setModel);
-  typedIpcMain.handle("getAvailableModels", agentRuntime.getAvailableModels);
-  typedIpcMain.handle("prompt", agentRuntime.prompt);
-  typedIpcMain.handle("setHistoryMessages", agentRuntime.setHistoryMessages);
-  typedIpcMain.handle("setSessionId", agentRuntime.setSessionId);
-  typedIpcMain.handle("searchWorkspaceFiles", agentRuntime.searchWorkspaceFiles);
+  typedIpcMain.handle("setModel", agentPool.setModel);
+  typedIpcMain.handle("getAvailableModels", agentPool.getAvailableModels);
+  typedIpcMain.handle("prompt", agentPool.prompt);
+  typedIpcMain.handle("setHistoryMessages", agentPool.setHistoryMessages);
+  typedIpcMain.handle("setSessionId", agentPool.setSessionId);
+  typedIpcMain.handle("searchWorkspaceFiles", agentPool.searchWorkspaceFiles);
 
   return () => {
     typedIpcMain.removeAllListeners();
@@ -34,11 +34,11 @@ function registerIPCHandlers(agentRuntime: AgentRuntime) {
 }
 
 export function bindAgentRuntimeIPC(
-  agentRuntime: AgentRuntime,
+  agentPool: AgentPool,
   browserWindow: BrowserWindow,
 ): () => void {
-  const unregisterAgentRuntimeHandlers = registerAgentRuntimeHandlers(agentRuntime, browserWindow);
-  const unregisterIPCHandlers = registerIPCHandlers(agentRuntime);
+  const unregisterAgentRuntimeHandlers = registerAgentRuntimeHandlers(agentPool, browserWindow);
+  const unregisterIPCHandlers = registerIPCHandlers(agentPool);
 
   return () => {
     // Unbind logic here

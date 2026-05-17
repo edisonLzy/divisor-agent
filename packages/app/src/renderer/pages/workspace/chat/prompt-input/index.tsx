@@ -11,9 +11,10 @@ import { type FileItem, PromptEditor, type PromptEditorHandle } from "./prompt-e
 interface PromptInputProps {
   disabled?: boolean;
   onSubmit: (submission: PromptSubmission) => Promise<void> | void;
+  sessionId: string | null;
 }
 
-export function PromptInput({ disabled = false, onSubmit }: PromptInputProps) {
+export function PromptInput({ disabled = false, onSubmit, sessionId }: PromptInputProps) {
   const { invoke } = useElectronIPC();
   const modelSelectorProps = useModalSelector();
   const editorRef = useRef<PromptEditorHandle>(null);
@@ -23,7 +24,9 @@ export function PromptInput({ disabled = false, onSubmit }: PromptInputProps) {
 
   const handleSearchFiles = useCallback(
     async (query: string): Promise<FileItem[]> => {
-      const files = await invoke("searchWorkspaceFiles", query);
+      if (!sessionId) return [];
+
+      const files = await invoke("searchWorkspaceFiles", sessionId, query);
       return files.map((file) => ({
         id: file.path,
         label: file.path,
@@ -31,7 +34,7 @@ export function PromptInput({ disabled = false, onSubmit }: PromptInputProps) {
         path: file.path,
       }));
     },
-    [invoke],
+    [invoke, sessionId],
   );
 
   const handleSubmit = useCallback(async () => {
