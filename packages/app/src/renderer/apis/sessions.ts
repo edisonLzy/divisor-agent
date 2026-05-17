@@ -8,8 +8,8 @@ export interface Session {
   cwd: string;
   parentSessionId: string | null;
   leafEntryId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface Entry {
@@ -17,7 +17,7 @@ export interface Entry {
   sessionId: string;
   parentId: string | null;
   type: "message" | "model_change";
-  timestamp: Date;
+  timestamp: number;
   data: Record<string, unknown>;
 }
 

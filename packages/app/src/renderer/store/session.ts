@@ -1,9 +1,27 @@
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import type { AssistantMessage } from "@mariozechner/pi-ai";
+import { Session } from "@renderer/apis/sessions";
 import { isAgentMessageEntry } from "@renderer/lib/is";
 import type { AvailableModel } from "@shared/models-ipc";
 import { v4 as uuidv4 } from "uuid";
 import { createStore } from "zustand/vanilla";
+
+interface AgentSession extends Session {
+  /** Whether the agent is actively processing a prompt (controls loading indicators) */
+  isLoading: boolean;
+  /**
+   * ID of the entry currently being streamed from the assistant.
+   * Set when `message_start` fires for an assistant message, cleared on `message_end`.
+   * Used to route `message_update` events to the correct entry.
+   */
+  streamingEntryId: string | undefined;
+  /**
+   * Per-tool-call execution states, keyed by toolCallId.
+   * Populated by `tool_execution_start`, updated by `tool_execution_update`,
+   * finalized by `tool_execution_end`.
+   */
+  toolStates: Map<string, ToolExecutionState>;
+}
 
 /**
  * Payload stored in a SessionEntry when `type === "model_change"`.

@@ -1,7 +1,7 @@
+import type { MessageEntry, ToolExecutionState } from "@renderer/store/session";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef } from "react";
 
-import type { MessageEntry, ToolExecutionState } from "../../../store/session";
 import { AssistantMessage } from "./assistant-message";
 import { UserMessage } from "./user-message";
 

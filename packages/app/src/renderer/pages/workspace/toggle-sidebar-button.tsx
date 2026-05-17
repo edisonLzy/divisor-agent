@@ -2,7 +2,7 @@ import { PanelLeft } from "lucide-react";
 import { useCallback, useState } from "react";
 import { usePanelRef } from "react-resizable-panels";
 
-type UseToggleSidebarReturn = ReturnType<typeof useToggleSidebarButton>
+type UseToggleSidebarReturn = ReturnType<typeof useToggleSidebarButton>;
 
 export function useToggleSidebarButton() {
   const panelRef = usePanelRef();
@@ -22,8 +22,8 @@ export function useToggleSidebarButton() {
 }
 
 type ToggleSidebarButtonProps = {
-  isCollapsed: UseToggleSidebarReturn['isCollapsed'];
-  onToggle: UseToggleSidebarReturn['toggle'];
+  isCollapsed: UseToggleSidebarReturn["isCollapsed"];
+  onToggle: UseToggleSidebarReturn["toggle"];
 };
 
 export function ToggleSidebarButton(props: ToggleSidebarButtonProps) {
