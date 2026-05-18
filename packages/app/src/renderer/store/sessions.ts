@@ -116,6 +116,10 @@ export interface SessionActions {
   selectSession: (sessionId: string | null) => void;
   /** Get the active session object */
   getActiveSession: () => AgentSession | undefined;
+  /** Bulk-set sessions from API list response */
+  setSessions: (sessions: AgentSession[]) => void;
+  /** Set entries for a specific session (from API detail response) */
+  setSessionEntries: (sessionId: string, entries: SessionEntry[]) => void;
   /**
    * Append a new message entry to the timeline.
    * Links to the previous entry via `parentId` and stamps with `Date.now()`.
@@ -200,6 +204,35 @@ export const sessionStore = createStore<SessionsState & SessionActions>()((set, 
   },
 
   selectSession: (id) => set({ activeSessionId: id }),
+
+  setSessions: (sessions) => {
+    set((prev) => {
+      // Merge: update existing sessions, add new ones
+      const existingMap = new Map(prev.sessions.map((s) => [s.id, s]));
+      for (const session of sessions) {
+        const existing = existingMap.get(session.id);
+        if (existing) {
+          existingMap.set(session.id, { ...existing, ...session, entries: existing.entries });
+        } else {
+          existingMap.set(session.id, session);
+        }
+      }
+      return { sessions: [...existingMap.values()] };
+    });
+  },
+
+  setSessionEntries: (sessionId, entries) => {
+    const session = get().getSession(sessionId);
+    if (!session) return;
+
+    set((prev) => {
+      const idx = prev.sessions.findIndex((s) => s.id === sessionId);
+      if (idx < 0) return prev;
+      const next = [...prev.sessions];
+      next[idx] = { ...session, entries: [...entries], updatedAt: Date.now() };
+      return { sessions: next };
+    });
+  },
 
   appendMessageEntry: (sessionId, message) => {
     const entryId = uuidv4();

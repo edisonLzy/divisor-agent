@@ -1,7 +1,15 @@
+import { getSessionDetail, listSessions } from "@renderer/apis/sessions";
+import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { cn } from "@renderer/lib/utils";
-import { sessionStore, type SessionStatus } from "@renderer/store/sessions";
+import {
+  sessionStore,
+  type AgentSession,
+  type SessionEntry,
+  type SessionStatus,
+} from "@renderer/store/sessions";
+import { useQuery } from "@tanstack/react-query";
 import { Settings, SquarePen } from "lucide-react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useStore } from "zustand";
 
@@ -46,11 +54,38 @@ function SessionStatusDot({ status }: { status: SessionStatus }) {
 function useSessionSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { invoke } = useElectronIPC();
   const activeSessionId = useStore(sessionStore, (s) => s.activeSessionId);
   const storeSessions = useStore(sessionStore, (s) => s.sessions);
 
+  // Fetch session list from API
+  const { data: apiSessions } = useQuery({
+    queryKey: ["sessions"],
+    queryFn: listSessions,
+  });
+
+  // Sync API sessions to store
+  useEffect(() => {
+    if (apiSessions) {
+      sessionStore.getState().setSessions(
+        apiSessions.map(
+          (s) =>
+            ({
+              ...s,
+              entries: [],
+              model: undefined,
+              isLoading: false,
+              streamingEntryId: undefined,
+              toolStates: new Map(),
+              status: "idle",
+            }) as AgentSession,
+        ),
+      );
+    }
+  }, [apiSessions]);
+
   const handleCreateSession = useCallback(() => {
-    // TODO: implement session creation after refactor
+    // TODO: implement session creation
   }, []);
 
   const handleOpenSettings = useCallback(() => {
@@ -58,25 +93,44 @@ function useSessionSidebar() {
   }, [navigate]);
 
   const handleSelectSession = useCallback(
-    (sessionId: string) => {
+    async (sessionId: string) => {
+      const session = sessionStore.getState().getSession(sessionId);
+
+      // Fetch entries from API if not cached in store
+      if (session && session.entries.length === 0) {
+        try {
+          const detail = await getSessionDetail({ id: sessionId });
+          sessionStore
+            .getState()
+            .setSessionEntries(sessionId, detail.entries as unknown as SessionEntry[]);
+        } catch (error) {
+          console.error("Failed to fetch session details:", error);
+        }
+      }
+
+      // Notify main process to create/get the agent for this session
+      try {
+        await invoke("setSessionId", sessionId);
+      } catch (error) {
+        console.error("Failed to set session ID:", error);
+      }
+
       sessionStore.getState().selectSession(sessionId);
       navigate("/");
     },
-    [navigate],
+    [navigate, invoke],
   );
 
   const renderedSessions = useMemo<SessionSidebarItem[]>(() => {
     const isWorkspaceRoute = location.pathname === "/";
 
-    return storeSessions.slice(0, 50).map((session) => {
-      return {
-        id: session.id,
-        isActive: isWorkspaceRoute && session.id === activeSessionId,
-        label: session.name.trim() || "untitled",
-        updatedAtLabel: formatRelativeTime(new Date(session.updatedAt)),
-        status: session.status,
-      };
-    });
+    return storeSessions.slice(0, 50).map((session) => ({
+      id: session.id,
+      isActive: isWorkspaceRoute && session.id === activeSessionId,
+      label: session.name.trim() || "untitled",
+      updatedAtLabel: formatRelativeTime(new Date(session.updatedAt)),
+      status: session.status,
+    }));
   }, [activeSessionId, location.pathname, storeSessions]);
 
   return {
