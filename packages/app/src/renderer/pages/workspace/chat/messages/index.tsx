@@ -1,4 +1,4 @@
-import type { MessageEntry, ToolExecutionState } from "@renderer/store/session";
+import type { MessageEntry, ToolExecutionState } from "@renderer/store/sessions";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef } from "react";
 

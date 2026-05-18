@@ -5,7 +5,6 @@ import { sessionStore, type MessageEntry, type SessionEntry } from "@renderer/st
 import { useCallback, useEffect, useMemo } from "react";
 import { useStore } from "zustand";
 
-import { useWorkspaceSession } from "../session-provider";
 import type { PromptSubmission } from "./prompt-types";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -52,12 +51,12 @@ function useActiveSessionState() {
 
 export function useChat() {
   const { invoke } = useElectronIPC();
-  const { isBootstrapping, isSwitching, persistAssistantMessage, persistUserMessage } =
-    useWorkspaceSession();
   const { activeSession } = useActiveSessionState();
   const state = useStore(sessionStore);
 
-  useSubscribeAgentEvents({ persistAssistantMessage });
+  const noopPersist = useCallback(async () => {}, []);
+
+  useSubscribeAgentEvents({ persistAssistantMessage: noopPersist });
 
   const messageEntries = useMemo<MessageEntry[]>(() => {
     return (activeSession?.entries ?? []).filter(isAgentMessageEntry);
@@ -75,8 +74,6 @@ export function useChat() {
       sessionStore.getState().setLoading(sessionId, true);
 
       try {
-        await persistUserMessage(submission.text);
-
         await invoke("prompt", sessionId, submission.text, {
           modelId: submission.model.modelId,
           providerId: submission.model.providerId,
@@ -86,11 +83,11 @@ export function useChat() {
         sessionStore.getState().setLoading(sessionId, false);
       }
     },
-    [state.activeSessionId, invoke, persistUserMessage],
+    [state.activeSessionId, invoke],
   );
 
   return {
-    isLoading: (activeSession?.isLoading ?? false) || isBootstrapping || isSwitching,
+    isLoading: activeSession?.isLoading ?? false,
     messageEntries,
     streamingEntryId: activeSession?.streamingEntryId,
     toolStates,

@@ -15,7 +15,7 @@ import { Separator } from "@renderer/components/ui/separator";
 import { ChevronRightIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import type { ToolExecutionState } from "../../../store/session";
+import type { ToolExecutionState } from "../../../store/sessions";
 import { AssistantResponseMessage } from "./assistant-response-message";
 import { AssistantThinkingMessage } from "./assistant-thinking-message";
 import { AssistantToolMessage } from "./assistant-tool-message";

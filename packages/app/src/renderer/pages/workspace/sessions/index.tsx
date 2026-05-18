@@ -1,11 +1,9 @@
 import { cn } from "@renderer/lib/utils";
-import { sessionStore, type SessionStatus } from "@renderer/store/session";
+import { sessionStore, type SessionStatus } from "@renderer/store/sessions";
 import { Settings, SquarePen } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useStore } from "zustand";
-
-import { useWorkspaceSession } from "../session-provider";
 
 interface SessionSidebarItem {
   id: string;
@@ -48,12 +46,12 @@ function SessionStatusDot({ status }: { status: SessionStatus }) {
 function useSessionSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { activeSessionId, createSession, selectSession, sessions } = useWorkspaceSession();
+  const activeSessionId = useStore(sessionStore, (s) => s.activeSessionId);
   const storeSessions = useStore(sessionStore, (s) => s.sessions);
 
   const handleCreateSession = useCallback(() => {
-    void createSession();
-  }, [createSession]);
+    // TODO: implement session creation after refactor
+  }, []);
 
   const handleOpenSettings = useCallback(() => {
     navigate("/settings");
@@ -61,27 +59,25 @@ function useSessionSidebar() {
 
   const handleSelectSession = useCallback(
     (sessionId: string) => {
-      void selectSession(sessionId);
+      sessionStore.getState().selectSession(sessionId);
       navigate("/");
     },
-    [navigate, selectSession],
+    [navigate],
   );
 
   const renderedSessions = useMemo<SessionSidebarItem[]>(() => {
     const isWorkspaceRoute = location.pathname === "/";
 
-    return sessions.slice(0, 50).map((session) => {
-      const storeSession = storeSessions.find((s) => s.id === session.id);
-      const localStatus = storeSession?.status ?? "idle";
+    return storeSessions.slice(0, 50).map((session) => {
       return {
         id: session.id,
         isActive: isWorkspaceRoute && session.id === activeSessionId,
         label: session.name.trim() || "untitled",
-        updatedAtLabel: formatRelativeTime(session.updatedAt),
-        status: localStatus,
+        updatedAtLabel: formatRelativeTime(new Date(session.updatedAt)),
+        status: session.status,
       };
     });
-  }, [activeSessionId, location.pathname, sessions, storeSessions]);
+  }, [activeSessionId, location.pathname, storeSessions]);
 
   return {
     handleCreateSession,

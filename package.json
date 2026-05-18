@@ -10,7 +10,6 @@
   "scripts": {
     "dev": "pnpm run --parallel dev",
     "build": "pnpm run --parallel build",
-    "dev:server": "pnpm --filter @divisor-agent/server dev",
     "dev:app": "pnpm --filter @divisor-agent/app dev",
     "type-check": "pnpm -r run type-check",
     "test": "vitest",

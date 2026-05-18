@@ -6,7 +6,7 @@ import {
 } from "@renderer/components/ui/collapsible";
 import { ChevronRightIcon } from "lucide-react";
 
-import type { ToolExecutionState } from "../../../store/session";
+import type { ToolExecutionState } from "../../../store/sessions";
 
 interface AssistantToolMessageProps {
   toolName: string;

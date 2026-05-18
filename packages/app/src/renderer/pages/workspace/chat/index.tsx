@@ -1,4 +1,4 @@
-import { sessionStore } from "@renderer/store/session";
+import { sessionStore } from "@renderer/store/sessions";
 import { useStore } from "zustand";
 
 import { ChatMessages } from "./messages";
