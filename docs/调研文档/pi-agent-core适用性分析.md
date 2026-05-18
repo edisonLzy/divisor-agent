@@ -102,12 +102,12 @@ sequenceDiagram
 
 **核心事件类型**：
 
-| 事件 | 说明 |
-|---|---|
-| `agent_start` / `agent_end` | Agent 整体生命周期 |
-| `turn_start` / `turn_end` | 单轮 LLM 调用 + 工具执行 |
-| `message_start` / `message_update` / `message_end` | 消息生命周期（含流式 delta） |
-| `tool_execution_start` / `tool_execution_update` / `tool_execution_end` | 工具执行生命周期 |
+| 事件                                                                    | 说明                         |
+| ----------------------------------------------------------------------- | ---------------------------- |
+| `agent_start` / `agent_end`                                             | Agent 整体生命周期           |
+| `turn_start` / `turn_end`                                               | 单轮 LLM 调用 + 工具执行     |
+| `message_start` / `message_update` / `message_end`                      | 消息生命周期（含流式 delta） |
+| `tool_execution_start` / `tool_execution_update` / `tool_execution_end` | 工具执行生命周期             |
 
 ### 2.4 Steering 和 Follow-up（运行时干预）
 
@@ -203,16 +203,16 @@ for await (const event of agentLoopContinue(context, config)) {
 
 ## 四、与现有方案的对比
 
-| 维度 | pi-agent-core | LangChain.js | Vercel AI SDK |
-|---|---|---|---|
-| 状态管理 | 内置有状态 Agent | 可选 Memory | 可选状态 |
-| 工具定义 | TypeBox schema | Zod / JSON Schema | Zod / TypeBox |
-| 事件流 | 结构化事件（含 delta） | Callback / AsyncIterator | Streaming text |
-| 工具并发 | 支持 parallel/sequential | 支持 | 支持 |
-| 工具拦截 | beforeToolCall / afterToolCall | 工具钩子 | Middleware |
-| 依赖大小 | 轻量（0 外部依赖） | 较重 | 中等 |
-| Provider 抽象 | 依赖 pi-ai（内部） | 多 provider | 多 provider |
-| 适用场景 | 私有 monorepo 内使用 | 通用场景 | 通用场景 |
+| 维度          | pi-agent-core                  | LangChain.js             | Vercel AI SDK  |
+| ------------- | ------------------------------ | ------------------------ | -------------- |
+| 状态管理      | 内置有状态 Agent               | 可选 Memory              | 可选状态       |
+| 工具定义      | TypeBox schema                 | Zod / JSON Schema        | Zod / TypeBox  |
+| 事件流        | 结构化事件（含 delta）         | Callback / AsyncIterator | Streaming text |
+| 工具并发      | 支持 parallel/sequential       | 支持                     | 支持           |
+| 工具拦截      | beforeToolCall / afterToolCall | 工具钩子                 | Middleware     |
+| 依赖大小      | 轻量（0 外部依赖）             | 较重                     | 中等           |
+| Provider 抽象 | 依赖 pi-ai（内部）             | 多 provider              | 多 provider    |
+| 适用场景      | 私有 monorepo 内使用           | 通用场景                 | 通用场景       |
 
 ## 五、适用性分析
 
@@ -241,16 +241,17 @@ for await (const event of agentLoopContinue(context, config)) {
 
 ## 六、关键文件索引
 
-| 文件 | 职责 |
-|---|---|
-| `src/agent.ts` | `Agent` 类，事件订阅，状态管理 |
-| `src/agent-loop.ts` | `agentLoop` / `agentLoopContinue` 底层 API |
-| `src/proxy.ts` | 浏览器端流式代理工具 |
-| `src/types.ts` | 所有类型定义（AgentTool, AgentMessage, Events 等） |
+| 文件                | 职责                                               |
+| ------------------- | -------------------------------------------------- |
+| `src/agent.ts`      | `Agent` 类，事件订阅，状态管理                     |
+| `src/agent-loop.ts` | `agentLoop` / `agentLoopContinue` 底层 API         |
+| `src/proxy.ts`      | 浏览器端流式代理工具                               |
+| `src/types.ts`      | 所有类型定义（AgentTool, AgentMessage, Events 等） |
 
 ## 七、总结
 
 `pi-agent-core` 是一个设计精良的**轻量级有状态 Agent 框架**，核心优势在于：
+
 - 零外部依赖、代码简洁易维护
 - 完整的事件流系统
 - 灵活的工具拦截与运行时干预能力

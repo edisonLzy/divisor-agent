@@ -5,87 +5,84 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 Divisor-agent is a desktop AI agent app using a C/S hybrid architecture:
-- **Server** (`packages/server`): Remote brain — Node.js + Express + tRPC, handles Agent Loop, session storage, LLM calls, and ACP WebSocket server
-- **App** (`packages/app`): Local client — Tauri (Rust) + React Webview, handles local FS/terminal execution, ACP communication, and UI rendering
+
+- **Server** (`packages/server`): Remote brain — Express v5 + tRPC + Zod, handles session persistence and model configuration
+- **App** (`packages/app`): Local client — Electron 39 + React 19, handles agent execution, tools, and UI rendering
 
 ## Common Commands
 
 ```bash
 pnpm dev              # Start all packages in parallel
 pnpm dev:server       # Start server only (tsx --watch)
-pnpm dev:app          # Start Tauri app only
+pnpm dev:app          # Start Electron app with electron-vite
 pnpm build            # Build all packages
-pnpm type-check        # Type-check all packages
+pnpm type-check       # Type-check all packages
 pnpm test             # Run all tests (Vitest workspace)
-pnpm lint             # ESLint check
+pnpm lint             # oxlint check (NOT ESLint)
+pnpm format           # oxfmt auto-format
+pnpm format:check     # oxfmt format check
 ```
 
 Single package commands:
+
 ```bash
 pnpm --filter @divisor-agent/server dev
+pnpm --filter @divisor-agent/app dev
 pnpm --filter @divisor-agent/server test
-pnpm --filter divisor-agent dev
 ```
 
-Rust (app):
+Run a single test file:
+
 ```bash
-cd packages/app/src-tauri
-cargo check           # Check Rust code
-cargo build           # Build Rust
+pnpm vitest run packages/server/__tests__/domain/sessions/service.test.ts
 ```
 
 ## Architecture
 
 ### Communication Layers
 
-| Layer | Protocol | Purpose |
-|---|---|---|
-| Frontend ↔ Server | tRPC (HTTP/SSE) | Session metadata (tree, history, settings) |
-| Frontend ↔ Rust | Tauri IPC (`invoke`/`listen`) | Commands, permission approval, events |
-| Rust ↔ Server | WebSocket (ACP) | Real-time chat stream, tool calls |
+| Layer                    | Protocol                     | Purpose                                      |
+| ------------------------ | ---------------------------- | -------------------------------------------- |
+| Frontend ↔ Electron Main | Electron IPC (contextBridge) | Agent prompt, permissions, model selection   |
+| Frontend ↔ Server        | tRPC (HTTP)                  | Session metadata (tree, history), model list |
+| Electron Main ↔ Server   | HTTP/tRPC                    | Session persistence, model config            |
 
-### Monorepo Structure
+### Key Architectural Patterns
 
-```
-packages/
-  app/                    # Tauri v2 + React 19 + Vite 7 + Tailwind v4
-    src/                  # React frontend
-    src-tauri/            # Rust core
-  server/                 # Express v5 + tRPC + Zod + pino
-    src/
-      domain/             # Feature modules (e.g. health/)
-        health/
-          health.routes.ts   # Route registration
-          health.controller.ts
-          health.service.ts
-          health.dto.ts
-      middlewares/        # Shared middleware
-      shared/             # Logger, utilities
-      errors/             # Error definitions
-      types/              # Shared types
-```
+**tRPC Router**: Root router at `packages/server/src/router.ts` composes domain routers. Currently only `sessionsRouter`. Server uses `superjson` transformer. Client at `packages/app/src/renderer/lib/trpc.ts` connects to `http://localhost:3000/trpc` (configurable via `VITE_SERVER_URL`).
 
-### Key Conventions
+**Agent Runtime** (`packages/app/src/main/agent-runtime.ts`): Extends `Emittery`, orchestrates `@mariozechner/pi-agent-core`. Manages sessions, tools (fs read/write, terminal), permissions, extensions, and models. Events flow: Agent → Emittery → `agent-ipc.ts` → `webContents.send()` → renderer.
+
+**IPC Bridge**: Preload script exposes typed `invoke`/`on` via `contextBridge`. Channel whitelists in `packages/app/src/shared/events-ipc.ts`. 10 main→renderer events (agent lifecycle), 6 renderer→main invocations (prompt, model, session).
+
+**State Management**: Two Zustand stores — `useAgentStore` (React hook, `isProcessing`) and `sessionStore` (vanilla store, entries/toolStates/streaming). Session data persisted server-side via tRPC; renderer hydrates on session select.
+
+**Session Tree**: Server stores entries in a tree with `parentId` links, supporting branching/rewind via `setLeaf`/`rewind` mutations.
+
+### UI Component Library
+
+shadcn/ui (base-nova style) with 25+ components in `packages/app/src/renderer/components/ui/`. Rich text input via TipTap 3.x with @-mention file search. Messages rendered via streamdown (streaming markdown with CJK, code, math, mermaid support). Chat messages virtualized via `@tanstack/react-virtual`.
+
+## Key Conventions
 
 - **Server imports**: Always include `.js` extension for local TypeScript imports (ESM requirement)
 - **Type imports**: Use `import type { ... }` for pure type imports
-- **Catalog**: Shared dependency versions managed via `pnpm-workspace.yaml` `catalog` block — do not pin versions in individual `package.json` for shared deps
-- **Dependencies**: 严格按需引入依赖。严禁安装当前未使用的依赖（例如：在使用 TipTap 时，仅在真正用到某个特定插件时才进行安装，未使用到的插件绝对不要提前引入或安装）。
-- **Testing**: Root `vitest.config.ts` uses workspace mode; each package has its own `vitest.config.ts`
+- **React imports**: React 19 + new JSX Runtime — do NOT manually `import React from 'react'` in `.tsx`/`.jsx` files
+- **Package Manager**: Strictly use `pnpm`. Use `pnpx` instead of `npx`
+- **Node Linker**: `nodeLinker=hoisted` in `.npmrc` for flat `node_modules`
+- **Dependencies**: Strictly on-demand. Never install unused dependencies
+- **Linting/Formatting**: oxlint (not ESLint) + oxfmt. Config at `oxlint.config.ts` and `oxfmt.config.ts`
+- **Git Hooks**: Husky + lint-staged runs `oxlint --fix` and `oxfmt --write` on staged files. Commitlint enforces conventional commits (header/body length unrestricted)
+- **Testing**: Vitest 4.x workspace mode. Each package has `vitest.config.ts` with `__tests__/` directory. Tests use `vi.mock()` with hoisted mocks
 - **Production build**: Server uses `packages/server/tsconfig.build.json` (excludes tests)
 
-## Communication Protocol (ACP)
+## Tech Stack Quick Reference
 
-The ACP (Agent Client Protocol) runs over WebSocket between Rust and Server. Key message types:
-- Session: `session/start`, `session/prompt`, `session/fork`
-- Tools: `fs/read_text_file`, `fs/write_text_file`, `terminal/create`
-- Streaming: `agent_message_chunk` with `text_delta` / `thinking_delta`
-- Permissions: `session/request_permission`, `permission/approve`, `permission/reject`
-
-## MVP Status
-
-The project is in MVP development. Current state:
-- Monorepo scaffolding and tooling are set up
-- Server has a basic Express skeleton with a health-check route
-- App has a blank Tauri + React shell
-- Business capabilities (session tree, ACP tool calls, approval flows, Fork) are in design/implementation phase
+| Layer         | Key Dependencies                                               |
+| ------------- | -------------------------------------------------------------- |
+| Server        | Express 5, tRPC 11, Zod 4, Pino 9, Drizzle ORM (not yet wired) |
+| App/Build     | Electron 39, electron-vite 5, Vite 7                           |
+| App/UI        | React 19, Tailwind CSS 4, shadcn/ui, TipTap 3, Lucide icons    |
+| App/State     | Zustand 5, react-router-dom 7 (memory router)                  |
+| App/Agent     | @mariozechner/pi-agent-core 0.68, Emittery 2                   |
+| App/Rendering | streamdown 2, Shiki 4, @tanstack/react-virtual 3               |
