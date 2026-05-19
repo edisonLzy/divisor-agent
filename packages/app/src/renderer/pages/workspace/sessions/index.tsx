@@ -1,9 +1,11 @@
-import { getSessionDetail, listSessions } from "@renderer/apis/sessions";
+import type { AgentMessage } from "@mariozechner/pi-agent-core";
+import { getSessionEntries, listSessions } from "@renderer/apis/sessions";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { cn } from "@renderer/lib/utils";
 import {
   sessionStore,
   type AgentSession,
+  type MessageEntry,
   type SessionEntry,
   type SessionStatus,
 } from "@renderer/store/sessions";
@@ -99,12 +101,12 @@ function useSessionSidebar() {
       // Fetch entries from API if not cached in store
       if (session && session.entries.length === 0) {
         try {
-          const detail = await getSessionDetail({ id: sessionId });
+          const entries = await getSessionEntries(sessionId);
           sessionStore
             .getState()
-            .setSessionEntries(sessionId, detail.entries as unknown as SessionEntry[]);
+            .setSessionEntries(sessionId, entries as unknown as SessionEntry[]);
         } catch (error) {
-          console.error("Failed to fetch session details:", error);
+          console.error("Failed to fetch session entries:", error);
         }
       }
 
@@ -113,6 +115,19 @@ function useSessionSidebar() {
         await invoke("setSessionId", sessionId);
       } catch (error) {
         console.error("Failed to set session ID:", error);
+      }
+
+      // Set agent's conversation history from stored entries
+      const updatedSession = sessionStore.getState().getSession(sessionId);
+      if (updatedSession && updatedSession.entries.length > 0) {
+        const messages = updatedSession.entries
+          .filter((e): e is MessageEntry => e.type === "message")
+          .map((e) => e.data as AgentMessage);
+        try {
+          await invoke("setHistoryMessages", sessionId, messages);
+        } catch (error) {
+          console.error("Failed to set history messages:", error);
+        }
       }
 
       sessionStore.getState().selectSession(sessionId);

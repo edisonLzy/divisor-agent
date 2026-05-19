@@ -46,18 +46,14 @@ export async function listSessions(): Promise<ListSessionsResponse> {
   return data;
 }
 
-// ── Get Session Detail ──────────────────────────────────────────────────────
+// ── Get Session Entries ──────────────────────────────────────────────────────
 
-export interface GetSessionDetailRequest {
-  id: string;
-}
+export type GetSessionEntriesResponse = Entry[];
 
-export type GetSessionDetailResponse = Session & { entries: Entry[] };
-
-export async function getSessionDetail(
-  req: GetSessionDetailRequest,
-): Promise<GetSessionDetailResponse> {
-  const { data } = await request.get<GetSessionDetailResponse>(`/v1/agent/session/${req.id}`);
+export async function getSessionEntries(sessionId: string): Promise<GetSessionEntriesResponse> {
+  const { data } = await request.get<GetSessionEntriesResponse>(
+    `/v1/agent/session/${sessionId}/entries`,
+  );
   return data;
 }
 
@@ -118,6 +114,7 @@ export async function setLeaf(req: SetLeafRequest): Promise<SetLeafResponse> {
 export interface AppendEntriesRequest {
   sessionId: string;
   entries: Array<{
+    id: string;
     parentId: string | null;
     type: "message" | "model_change";
     data: Record<string, unknown>;

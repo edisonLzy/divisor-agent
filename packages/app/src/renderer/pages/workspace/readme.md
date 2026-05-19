@@ -3,27 +3,26 @@
 ## context
 
 ### 接口
+
 0. base url: localhost:3000
 1. 获取session列表接口: /v1/agent/sessions
 2. 查询session详情接口: /v1/agent/session/:id
 
 ### server实现
+
 1. /Users/zhiyu/Desktop/coding/neon-server/packages/api-gateway/src/routes/agent.routes.ts
 
 ## input data
 
 ### 新增 use-subscribe-agent-events
+
 1. type safe
 
 ```tsx
 useSubscribeAgentEvents({
-  "agent_start": (event) => {
-
-  },
-  "agent_end": (event) => {
-
-  }
-})
+  agent_start: (event) => {},
+  agent_end: (event) => {},
+});
 ```
 
 ### sessions管理
@@ -40,7 +39,7 @@ useSubscribeAgentEvents({
 
 1. 调用接口查询session对应的entires并更新store对应的session的entires.
    1.1 如果前端store中该session已经存在entires,则不需要再调用后端接口,直接使用store中的entires即可.
-       1.1.1 你需要帮我评估下该方案是否合理.
+   1.1.1 你需要帮我评估下该方案是否合理.
 
 2. 调用 main 的 setSessionId 方法, 创建/获取 该sessionId对应的agent.
 
@@ -60,9 +59,10 @@ useSubscribeAgentEvents({
 1. 2.1 参考现有的 use-chat.tsx
 
 ## 验收标准
+
 1. session列表正常渲染, 点击session列表项可以正常切换会话.
 2. 选择会话之后, 发送消息,可以正确渲染 agent 响应的消息.
 
 ## 约束
-1. 使用 react-query 完成数据请求
 
+1. 使用 react-query 完成数据请求

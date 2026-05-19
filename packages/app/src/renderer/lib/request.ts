@@ -37,14 +37,24 @@ request.interceptors.response.use(
 
     // 业务错误
     const message = body.message ?? `请求失败 (code: ${body.code})`;
-    toast.error(message);
+    toast.error(message, {
+      action: {
+        label: "复制",
+        onClick: () => navigator.clipboard.writeText(message),
+      },
+    });
     return Promise.reject(new Error(message));
   },
   (error) => {
     // 网络错误 / HTTP 错误
     const message = error.response?.data?.message ?? error.message ?? "网络请求失败，请检查连接";
 
-    toast.error(message);
+    toast.error(message, {
+      action: {
+        label: "复制",
+        onClick: () => navigator.clipboard.writeText(message),
+      },
+    });
     return Promise.reject(error);
   },
 );
