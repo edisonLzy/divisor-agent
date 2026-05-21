@@ -70,6 +70,7 @@ shadcn/ui (base-nova style) with 25+ components in `packages/app/src/renderer/co
 - **React imports**: React 19 + new JSX Runtime — do NOT manually `import React from 'react'` in `.tsx`/`.jsx` files
 - **Package Manager**: Strictly use `pnpm`. Use `pnpx` instead of `npx`
 - **Node Linker**: `nodeLinker=hoisted` in `.npmrc` for flat `node_modules`
+- **Component file structure**: Main exported component at top of file; internal private sub-components placed below it
 - **Dependencies**: Strictly on-demand. Never install unused dependencies
 - **Linting/Formatting**: oxlint (not ESLint) + oxfmt. Config at `oxlint.config.ts` and `oxfmt.config.ts`
 - **Git Hooks**: Husky + lint-staged runs `oxlint --fix` and `oxfmt --write` on staged files. Commitlint enforces conventional commits (header/body length unrestricted)

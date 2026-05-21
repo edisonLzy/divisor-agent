@@ -9,10 +9,11 @@ import {
   type SessionEntry,
   type SessionStatus,
 } from "@renderer/store/sessions";
-import { Settings, SquarePen } from "lucide-react";
 import { useCallback, useMemo } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 import { useStore } from "zustand";
+
+import { BottomActions } from "./bottom-actions";
+import { TopActions } from "./top-actions";
 
 interface SessionSidebarItem {
   id: string;
@@ -31,6 +32,69 @@ function formatRelativeTime(value: Date | string) {
   if (diffInHours < 24) return `${diffInHours} 小时`;
   const diffInDays = Math.floor(diffInHours / 24);
   return `${diffInDays} 天`;
+}
+
+export function Sessions() {
+  const { activeSessionId, sessions: storeSessions } = useStore(sessionStore);
+  const handleSelectSession = useSelectSessionHandler();
+
+  const renderedSessions = useMemo<SessionSidebarItem[]>(() => {
+    return storeSessions.slice(0, 50).map((session) => ({
+      id: session.id,
+      isActive: session.id === activeSessionId,
+      label: session.name.trim() || "untitled",
+      updatedAtLabel: formatRelativeTime(new Date(session.updatedAt)),
+      status: session.status,
+    }));
+  }, [activeSessionId, storeSessions]);
+
+  return (
+    <div className="flex h-full w-full flex-col bg-sidebar border-r border-sidebar-border select-none">
+      <TopActions />
+
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-4">
+        <div className="flex flex-col px-1">
+          {renderedSessions.length === 0 ? (
+            <div className="px-2 py-2 text-[13px] text-muted-foreground/40 break-keep truncate">
+              暂无对话
+            </div>
+          ) : (
+            renderedSessions.map((session) => {
+              return (
+                <button
+                  key={session.id}
+                  onClick={() => handleSelectSession(session.id)}
+                  className={cn(
+                    "group flex w-full items-center justify-between rounded-md px-3 py-1.5 text-[13px] transition-colors",
+                    session.isActive
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                  )}
+                >
+                  <span className="flex items-center min-w-0 flex-1">
+                    <span className="truncate pr-2">{session.label}</span>
+                    <SessionStatusDot status={session.status} />
+                  </span>
+                  <span
+                    className={cn(
+                      "shrink-0 text-[11px]",
+                      session.isActive
+                        ? "text-sidebar-accent-foreground/70"
+                        : "text-muted-foreground group-hover:text-sidebar-foreground/70",
+                    )}
+                  >
+                    {session.updatedAtLabel}
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      <BottomActions />
+    </div>
+  );
 }
 
 const STATUS_CONFIG: Record<SessionStatus, { label: string; dotClass: string }> = {
@@ -52,15 +116,8 @@ function SessionStatusDot({ status }: { status: SessionStatus }) {
   );
 }
 
-function useSessionSidebar() {
-  const location = useLocation();
-  const navigate = useNavigate();
+function useSelectSessionHandler() {
   const { invoke } = useElectronIPC();
-  const { activeSessionId, sessions: storeSessions } = useStore(sessionStore);
-
-  const handleCreateSession = useCallback(() => {
-    // TODO: implement session creation
-  }, []);
 
   const handleSelectSession = useCallback(
     async (sessionId: string) => {
@@ -117,103 +174,8 @@ function useSessionSidebar() {
 
       sessionStore.getState().setActiveSessionId(sessionId);
     },
-    [navigate, invoke],
+    [invoke],
   );
 
-  const renderedSessions = useMemo<SessionSidebarItem[]>(() => {
-    const isWorkspaceRoute = location.pathname === "/";
-
-    return storeSessions.slice(0, 50).map((session) => ({
-      id: session.id,
-      isActive: isWorkspaceRoute && session.id === activeSessionId,
-      label: session.name.trim() || "untitled",
-      updatedAtLabel: formatRelativeTime(new Date(session.updatedAt)),
-      status: session.status,
-    }));
-  }, [activeSessionId, location.pathname, storeSessions]);
-
-  return {
-    handleCreateSession,
-    handleSelectSession,
-    renderedSessions,
-  };
-}
-
-function SettingsButton() {
-  const navigate = useNavigate();
-
-  return (
-    <button
-      onClick={() => navigate("/settings")}
-      className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground overflow-hidden"
-    >
-      <Settings className="size-4 opacity-70 shrink-0" />
-      <span className="truncate">设置</span>
-    </button>
-  );
-}
-
-export function Sessions() {
-  const { handleCreateSession, handleSelectSession, renderedSessions } = useSessionSidebar();
-
-  return (
-    <div className="flex h-full w-full flex-col bg-sidebar border-r border-sidebar-border select-none">
-      {/* Top Actions */}
-      <div className="flex flex-col px-3 py-4 space-y-[2px]">
-        <button
-          onClick={handleCreateSession}
-          className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground overflow-hidden"
-        >
-          <SquarePen className="size-4 opacity-70 shrink-0" />
-          <span className="truncate">新对话</span>
-        </button>
-      </div>
-
-      <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-4">
-        {/* Session Items */}
-        <div className="flex flex-col px-1">
-          {renderedSessions.length === 0 ? (
-            <div className="px-2 py-2 text-[13px] text-muted-foreground/40 break-keep truncate">
-              暂无对话
-            </div>
-          ) : (
-            renderedSessions.map((session) => {
-              return (
-                <button
-                  key={session.id}
-                  onClick={() => handleSelectSession(session.id)}
-                  className={cn(
-                    "group flex w-full items-center justify-between rounded-md px-3 py-1.5 text-[13px] transition-colors",
-                    session.isActive
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
-                  )}
-                >
-                  <span className="flex items-center min-w-0 flex-1">
-                    <span className="truncate pr-2">{session.label}</span>
-                    <SessionStatusDot status={session.status} />
-                  </span>
-                  <span
-                    className={cn(
-                      "shrink-0 text-[11px]",
-                      session.isActive
-                        ? "text-sidebar-accent-foreground/70"
-                        : "text-muted-foreground group-hover:text-sidebar-foreground/70",
-                    )}
-                  >
-                    {session.updatedAtLabel}
-                  </span>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      {/* Bottom Actions */}
-      <div className="flex flex-col px-3 py-3 border-t border-sidebar-border space-y-[2px]">
-        <SettingsButton />
-      </div>
-    </div>
-  );
+  return handleSelectSession;
 }
