@@ -1,3 +1,4 @@
+import { copyTextToClipboard } from "@renderer/lib/clipboard";
 import axios from "axios";
 import { toast } from "sonner";
 
@@ -23,6 +24,14 @@ interface ApiResponse<T> {
 
 export const request = axios.create({ baseURL: getServerUrl() });
 
+function copyMessage(message: string) {
+  return () => {
+    void copyTextToClipboard(message).catch((error) => {
+      toast.error(error instanceof Error ? error.message : "复制失败");
+    });
+  };
+}
+
 // ── Response Interceptor ─────────────────────────────────────────────────────
 
 request.interceptors.response.use(
@@ -40,7 +49,7 @@ request.interceptors.response.use(
     toast.error(message, {
       action: {
         label: "复制",
-        onClick: () => navigator.clipboard.writeText(message),
+        onClick: copyMessage(message),
       },
     });
     return Promise.reject(new Error(message));
@@ -52,7 +61,7 @@ request.interceptors.response.use(
     toast.error(message, {
       action: {
         label: "复制",
-        onClick: () => navigator.clipboard.writeText(message),
+        onClick: copyMessage(message),
       },
     });
     return Promise.reject(error);

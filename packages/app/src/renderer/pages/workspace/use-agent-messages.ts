@@ -41,7 +41,7 @@ function getToolState(sessionId: string, toolCallId: string) {
  * Lives at WorkspacePage level so events from all sessions (not just the active one)
  * are captured.
  */
-export function useChatMessagesSubscriptions() {
+export function useAgentMessages() {
   const turnContentStartIndicesRef = useRef<Record<string, number>>({});
   const entryCountAtStartRef = useRef<Record<string, number>>({});
   const hasPersistedRef = useRef<Record<string, boolean>>({});
@@ -85,6 +85,8 @@ export function useChatMessagesSubscriptions() {
       }
 
       turnContentStartIndicesRef.current[sessionId] = 0;
+      sessionStore.getState().setStreamingEntryCompletedAt(sessionId, Date.now());
+      sessionStore.getState().setStreamingEntryId(sessionId, undefined);
     },
 
     turn_start: (event) => {
@@ -92,7 +94,8 @@ export function useChatMessagesSubscriptions() {
       const session = sessionStore.getState().getSession(sessionId);
       if (!session) return;
 
-      const { streamingEntryId, entries } = session;
+      const entries = session.entries;
+      const streamingEntryId = sessionStore.getState().streamingEntryIds.get(sessionId);
       if (streamingEntryId) {
         const entry = entries.find((e) => e.id === streamingEntryId);
         if (entry && isAgentMessageEntry(entry)) {
@@ -128,7 +131,8 @@ export function useChatMessagesSubscriptions() {
       const session = sessionStore.getState().getSession(sessionId);
       if (!session) return;
 
-      const { streamingEntryId, entries } = session;
+      const entries = session.entries;
+      const streamingEntryId = sessionStore.getState().streamingEntryIds.get(sessionId);
       if (!streamingEntryId) return;
 
       const entry = entries.find((e) => e.id === streamingEntryId);
@@ -174,7 +178,8 @@ export function useChatMessagesSubscriptions() {
       const session = sessionStore.getState().getSession(sessionId);
       if (!session) return;
 
-      const { streamingEntryId, entries } = session;
+      const entries = session.entries;
+      const streamingEntryId = sessionStore.getState().streamingEntryIds.get(sessionId);
       if (!streamingEntryId) return;
 
       const entry = entries.find((e) => e.id === streamingEntryId);

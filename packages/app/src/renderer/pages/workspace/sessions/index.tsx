@@ -1,17 +1,16 @@
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
-import { getSessionEntries, listSessions } from "@renderer/apis/sessions";
+import { getSessionEntries } from "@renderer/apis/sessions";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { cn } from "@renderer/lib/utils";
 import {
   sessionStore,
-  type AgentSession,
   type MessageEntry,
+  type ModelChangedData,
   type SessionEntry,
   type SessionStatus,
 } from "@renderer/store/sessions";
-import { useQuery } from "@tanstack/react-query";
 import { Settings, SquarePen } from "lucide-react";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useStore } from "zustand";
 
@@ -57,42 +56,11 @@ function useSessionSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { invoke } = useElectronIPC();
-  const activeSessionId = useStore(sessionStore, (s) => s.activeSessionId);
-  const storeSessions = useStore(sessionStore, (s) => s.sessions);
-
-  // Fetch session list from API
-  const { data: apiSessions } = useQuery({
-    queryKey: ["sessions"],
-    queryFn: listSessions,
-  });
-
-  // Sync API sessions to store
-  useEffect(() => {
-    if (apiSessions) {
-      sessionStore.getState().setSessions(
-        apiSessions.map(
-          (s) =>
-            ({
-              ...s,
-              entries: [],
-              model: undefined,
-              isLoading: false,
-              streamingEntryId: undefined,
-              toolStates: new Map(),
-              status: "idle",
-            }) as AgentSession,
-        ),
-      );
-    }
-  }, [apiSessions]);
+  const { activeSessionId, sessions: storeSessions } = useStore(sessionStore);
 
   const handleCreateSession = useCallback(() => {
     // TODO: implement session creation
   }, []);
-
-  const handleOpenSettings = useCallback(() => {
-    navigate("/settings");
-  }, [navigate]);
 
   const handleSelectSession = useCallback(
     async (sessionId: string) => {
@@ -102,9 +70,26 @@ function useSessionSidebar() {
       if (session && session.entries.length === 0) {
         try {
           const entries = await getSessionEntries(sessionId);
-          sessionStore
-            .getState()
-            .setSessionEntries(sessionId, entries as unknown as SessionEntry[]);
+          const current = sessionStore.getState().getSession(sessionId);
+          if (current) {
+            sessionStore.getState().setSessionEntries(
+              sessionId,
+              entries.map((e): SessionEntry => {
+                if (e.type === "message") {
+                  return {
+                    ...e,
+                    type: "message" as const,
+                    data: e.data as unknown as AgentMessage,
+                  };
+                }
+                return {
+                  ...e,
+                  type: "model_change" as const,
+                  data: e.data as unknown as ModelChangedData,
+                };
+              }),
+            );
+          }
         } catch (error) {
           console.error("Failed to fetch session entries:", error);
         }
@@ -130,8 +115,7 @@ function useSessionSidebar() {
         }
       }
 
-      sessionStore.getState().selectSession(sessionId);
-      navigate("/");
+      sessionStore.getState().setActiveSessionId(sessionId);
     },
     [navigate, invoke],
   );
@@ -150,15 +134,27 @@ function useSessionSidebar() {
 
   return {
     handleCreateSession,
-    handleOpenSettings,
     handleSelectSession,
     renderedSessions,
   };
 }
 
+function SettingsButton() {
+  const navigate = useNavigate();
+
+  return (
+    <button
+      onClick={() => navigate("/settings")}
+      className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground overflow-hidden"
+    >
+      <Settings className="size-4 opacity-70 shrink-0" />
+      <span className="truncate">设置</span>
+    </button>
+  );
+}
+
 export function Sessions() {
-  const { handleCreateSession, handleOpenSettings, handleSelectSession, renderedSessions } =
-    useSessionSidebar();
+  const { handleCreateSession, handleSelectSession, renderedSessions } = useSessionSidebar();
 
   return (
     <div className="flex h-full w-full flex-col bg-sidebar border-r border-sidebar-border select-none">
@@ -216,13 +212,7 @@ export function Sessions() {
 
       {/* Bottom Actions */}
       <div className="flex flex-col px-3 py-3 border-t border-sidebar-border space-y-[2px]">
-        <button
-          onClick={handleOpenSettings}
-          className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground overflow-hidden"
-        >
-          <Settings className="size-4 opacity-70 shrink-0" />
-          <span className="truncate">设置</span>
-        </button>
+        <SettingsButton />
       </div>
     </div>
   );
