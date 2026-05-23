@@ -8,14 +8,15 @@ import {
 import { Chat } from "./chat";
 import { Sessions } from "./sessions";
 import { ToggleSidebarButton, useToggleSidebarButton } from "./toggle-sidebar-button";
-import { useChatMessagesSubscriptions } from "./use-chat-messages-subscriptions";
-import { useSessionsSubscriptions } from "./use-sessions-subscriptions";
+import { useAgentMessages } from "./use-agent-messages";
+import { useAgentSessions } from "./use-agent-sessions";
 
 export function WorkspacePage() {
   const { isCollapsed, panelRef, setIsCollapsed, toggle } = useToggleSidebarButton();
 
-  useChatMessagesSubscriptions();
-  useSessionsSubscriptions();
+  void useAgentMessages();
+
+  void useAgentSessions();
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-background font-sans text-foreground">

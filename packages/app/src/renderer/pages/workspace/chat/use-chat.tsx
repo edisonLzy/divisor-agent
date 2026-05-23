@@ -1,42 +1,33 @@
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { isAgentMessageEntry } from "@renderer/lib/is";
-import { sessionStore, type MessageEntry } from "@renderer/store/sessions";
-import { useCallback, useMemo } from "react";
+import { sessionStore, type ToolExecutionState } from "@renderer/store/sessions";
+import { useCallback } from "react";
 import { useStore } from "zustand";
 
 import type { PromptSubmission } from "./prompt-types";
 
-// ── Active session selector ──────────────────────────────────────────────────
-
-function useActiveSessionState() {
-  const activeSessionId = useStore(sessionStore, (s) => s.activeSessionId);
-  const activeSession = useStore(sessionStore, (s) =>
-    activeSessionId ? s.sessions.find((ss) => ss.id === activeSessionId) : undefined,
-  );
-  return { activeSessionId, activeSession };
-}
+const EMPTY_TOOL_STATES = new Map<string, ToolExecutionState>();
 
 // ── Public hook ──────────────────────────────────────────────────────────────
 
 export function useChat() {
   const { invoke } = useElectronIPC();
-  const { activeSession } = useActiveSessionState();
-  const state = useStore(sessionStore);
+  const { activeSessionId, sessions } = useStore(sessionStore);
+  const activeSession = activeSessionId
+    ? sessions.find((session) => session.id === activeSessionId)
+    : undefined;
+  const messageEntries = (activeSession?.entries ?? []).filter(isAgentMessageEntry);
 
-  const messageEntries = useMemo<MessageEntry[]>(() => {
-    return (activeSession?.entries ?? []).filter(isAgentMessageEntry);
-  }, [activeSession?.entries]);
-
-  const toolStates = activeSession?.toolStates ?? new Map();
+  const toolStates = activeSession?.toolStates ?? EMPTY_TOOL_STATES;
 
   const submitPrompt = useCallback(
     async (submission: PromptSubmission) => {
-      const sessionId = state.activeSessionId;
+      const sessionId = activeSessionId;
       if (!sessionId) {
         return;
       }
 
-      sessionStore.getState().setLoading(sessionId, true);
+      sessionStore.getState().setSessionStatus(sessionId, "running");
 
       try {
         await invoke("prompt", sessionId, submission.text, {
@@ -45,16 +36,18 @@ export function useChat() {
         });
       } catch (error) {
         console.error("Failed to submit prompt", error);
-        sessionStore.getState().setLoading(sessionId, false);
+        sessionStore.getState().setSessionStatus(sessionId, "idle");
       }
     },
-    [state.activeSessionId, invoke],
+    [activeSessionId, invoke],
   );
 
   return {
-    isLoading: activeSession?.isLoading ?? false,
+    isLoading: (activeSession?.status ?? "idle") === "running",
     messageEntries,
-    streamingEntryId: activeSession?.streamingEntryId,
+    streamingEntryId: activeSessionId
+      ? sessionStore.getState().streamingEntryIds.get(activeSessionId)
+      : undefined,
     toolStates,
     submitPrompt,
   };

@@ -1,10 +1,10 @@
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import type { AssistantMessage } from "@mariozechner/pi-ai";
-import { Entry, Session } from "@renderer/apis/sessions";
+import type { Entry, Session } from "@renderer/apis/sessions";
 import { isAgentMessageEntry } from "@renderer/lib/is";
 import type { AvailableModel } from "@shared/models-ipc";
 import { v4 as uuidv4 } from "uuid";
-import { createStore } from "zustand/vanilla";
+import { createStore, type StateCreator } from "zustand/vanilla";
 
 // ── Session Status ───────────────────────────────────────────────────────────
 
@@ -73,14 +73,6 @@ export interface AgentSession extends Session {
   entries: SessionEntry[];
   /** Currently selected model for this session */
   model: AvailableModel | undefined;
-  /** Whether the agent is actively processing a prompt (controls loading indicators) */
-  isLoading: boolean;
-  /**
-   * ID of the entry currently being streamed from the assistant.
-   * Set when `message_start` fires for an assistant message, cleared on `message_end`.
-   * Used to route `message_update` events to the correct entry.
-   */
-  streamingEntryId: string | undefined;
   /**
    * Per-tool-call execution states, keyed by toolCallId.
    * Populated by `tool_execution_start`, updated by `tool_execution_update`,
@@ -91,89 +83,53 @@ export interface AgentSession extends Session {
   status: SessionStatus;
 }
 
-export interface SessionSnapshot {
-  entries: SessionEntry[];
-  cwd: string;
-  model: AvailableModel | null;
-  toolStates: Map<string, ToolExecutionState> | ToolExecutionState[];
-}
+// ── Sessions Slice ─────────────────────────────────────────────────────
 
-// ── State ─────────────────────────────────────────────────────────────────────
-
-export interface SessionsState {
+export interface SessionsSlice {
   activeSessionId: string | null;
   sessions: AgentSession[];
-}
-
-// ── Actions ───────────────────────────────────────────────────────────────────
-
-export interface SessionActions {
   /** Get a session by ID, or undefined if not found */
   getSession: (sessionId: string) => AgentSession | undefined;
-  /** Get or lazily create a session's runtime state */
-  getOrCreateSession: (sessionId: string) => AgentSession;
+  /** Append a server-side session to local store (no-op if already exists) */
+  appendSession: (session: Session) => void;
   /** Switch the active session (the one displayed in the UI) */
-  selectSession: (sessionId: string | null) => void;
-  /** Get the active session object */
-  getActiveSession: () => AgentSession | undefined;
+  setActiveSessionId: (sessionId: string | null) => void;
   /** Bulk-set sessions from API list response */
-  setSessions: (sessions: AgentSession[]) => void;
-  /** Set entries for a specific session (from API detail response) */
-  setSessionEntries: (sessionId: string, entries: SessionEntry[]) => void;
-  /**
-   * Append a new message entry to the timeline.
-   * Links to the previous entry via `parentId` and stamps with `Date.now()`.
-   * Returns the generated entry ID (used to set `streamingEntryId` for assistant messages).
-   */
-  appendMessageEntry: (sessionId: string, message: AgentMessage) => string;
-  /**
-   * Update the `data` field of an existing entry.
-   * Used during streaming: each `message_update` event replaces the entry's
-   * partial AssistantMessage with the latest accumulated state.
-   * No-op if `entryId` is not found.
-   */
-  updateMessageEntry: (sessionId: string, entryId: string, message: AssistantMessage) => void;
-  setMessageCompletedAt: (sessionId: string, entryId: string, completedAt: number) => void;
-  /**
-   * Create or overwrite the execution state for a specific tool call.
-   * Called on tool_execution_start (create), tool_execution_update (progress),
-   * and tool_execution_end (final result).
-   */
-  setToolState: (sessionId: string, toolCallId: string, state: ToolExecutionState) => void;
-  /** Toggle the agent loading indicator */
-  setLoading: (sessionId: string, loading: boolean) => void;
-  /**
-   * Set or clear the streaming entry ID.
-   * Set to an entry ID when assistant streaming begins, cleared when it ends.
-   */
-  setStreamingEntryId: (sessionId: string, id: string | undefined) => void;
+  setSessions: (sessions: Session[]) => void;
   /** Set the execution status of a session */
   setSessionStatus: (sessionId: string, status: SessionStatus) => void;
   /** Update the currently selected model for this session */
   setModel: (sessionId: string, model: AvailableModel) => void;
   /** Update the current working directory */
   setCwd: (sessionId: string, cwd: string) => void;
-  /** Replace a session's state with server-persisted data */
-  hydrate: (sessionId: string, snapshot: SessionSnapshot) => void;
-  /** Reset the entire session manager */
-  reset: () => void;
+}
+
+// ── Entries Slice ──────────────────────────────────────────────────────
+
+export interface EntriesSlice {
+  /** Per-session streaming entry IDs (sessionId -> entryId) */
+  streamingEntryIds: Map<string, string>;
+  /** Set or clear the streaming entry ID for a session */
+  setStreamingEntryId: (sessionId: string, id: string | undefined) => void;
+  /** Append a new message entry to the timeline */
+  appendMessageEntry: (sessionId: string, message: AgentMessage) => string;
+  /** Update the `data` field of an existing entry (used during streaming) */
+  updateMessageEntry: (sessionId: string, entryId: string, message: AssistantMessage) => void;
+  /** Set the completedAt timestamp on a message entry */
+  setStreamingEntryCompletedAt: (sessionId: string, completedAt: number) => void;
+  /** Create or overwrite the execution state for a specific tool call */
+  setToolState: (sessionId: string, toolCallId: string, state: ToolExecutionState) => void;
+  /** Set the entries array for a session (replaces existing entries) */
+  setSessionEntries: (sessionId: string, entries: SessionEntry[]) => void;
 }
 
 // ── Initial State ─────────────────────────────────────────────────────────────
 
-function createDefaultSession(sessionId: string): AgentSession {
+function createSessionState(session: Session): AgentSession {
   return {
-    id: sessionId,
-    name: "",
-    cwd: "",
-    parentSessionId: null,
-    leafEntryId: null,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
+    ...session,
     entries: [],
     model: undefined,
-    isLoading: false,
-    streamingEntryId: undefined,
     toolStates: new Map(),
     status: "idle",
   };
@@ -181,7 +137,9 @@ function createDefaultSession(sessionId: string): AgentSession {
 
 // ── Store Implementation ──────────────────────────────────────────────────────
 
-export const sessionStore = createStore<SessionsState & SessionActions>()((set, get) => ({
+type StoreType = SessionsSlice & EntriesSlice;
+
+const createSessionsSlice: StateCreator<StoreType, [], [], SessionsSlice> = (set, get) => ({
   activeSessionId: null,
   sessions: [],
 
@@ -189,39 +147,40 @@ export const sessionStore = createStore<SessionsState & SessionActions>()((set, 
     return get().sessions.find((s) => s.id === sessionId);
   },
 
-  getActiveSession: () => {
-    const { activeSessionId, sessions } = get();
-    return sessions.find((s) => s.id === activeSessionId);
+  appendSession: (session) => {
+    const existing = get().sessions.find((s) => s.id === session.id);
+    if (existing) return;
+
+    const agentSession = createSessionState(session);
+    set((prev) => ({ sessions: [...prev.sessions, agentSession] }));
   },
 
-  getOrCreateSession: (sessionId) => {
-    const existing = get().sessions.find((s) => s.id === sessionId);
-    if (existing) return existing;
-
-    const session = createDefaultSession(sessionId);
-    set((prev) => ({ sessions: [...prev.sessions, session] }));
-    return session;
-  },
-
-  selectSession: (id) => set({ activeSessionId: id }),
+  setActiveSessionId: (id) => set({ activeSessionId: id }),
 
   setSessions: (sessions) => {
     set((prev) => {
-      // Merge: update existing sessions, add new ones
-      const existingMap = new Map(prev.sessions.map((s) => [s.id, s]));
-      for (const session of sessions) {
-        const existing = existingMap.get(session.id);
-        if (existing) {
-          existingMap.set(session.id, { ...existing, ...session, entries: existing.entries });
-        } else {
-          existingMap.set(session.id, session);
-        }
-      }
-      return { sessions: [...existingMap.values()] };
+      const existingMap = new Map(prev.sessions.map((session) => [session.id, session]));
+
+      return {
+        sessions: sessions.map((session) => {
+          const existing = existingMap.get(session.id);
+          if (!existing) {
+            return createSessionState(session);
+          }
+
+          return {
+            ...createSessionState(session),
+            entries: existing.entries,
+            model: existing.model,
+            toolStates: existing.toolStates,
+            status: existing.status,
+          };
+        }),
+      };
     });
   },
 
-  setSessionEntries: (sessionId, entries) => {
+  setSessionStatus: (sessionId, status) => {
     const session = get().getSession(sessionId);
     if (!session) return;
 
@@ -229,11 +188,39 @@ export const sessionStore = createStore<SessionsState & SessionActions>()((set, 
       const idx = prev.sessions.findIndex((s) => s.id === sessionId);
       if (idx < 0) return prev;
       const next = [...prev.sessions];
-      next[idx] = { ...session, entries: [...entries], updatedAt: Date.now() };
+      next[idx] = { ...session, status };
       return { sessions: next };
     });
   },
 
+  setModel: (sessionId, model) => {
+    const session = get().getSession(sessionId);
+    if (!session) return;
+
+    set((prev) => {
+      const idx = prev.sessions.findIndex((s) => s.id === sessionId);
+      if (idx < 0) return prev;
+      const next = [...prev.sessions];
+      next[idx] = { ...session, model };
+      return { sessions: next };
+    });
+  },
+
+  setCwd: (sessionId, cwd) => {
+    const session = get().getSession(sessionId);
+    if (!session) return;
+
+    set((prev) => {
+      const idx = prev.sessions.findIndex((s) => s.id === sessionId);
+      if (idx < 0) return prev;
+      const next = [...prev.sessions];
+      next[idx] = { ...session, cwd };
+      return { sessions: next };
+    });
+  },
+});
+
+const createEntriesSlice: StateCreator<StoreType, [], [], EntriesSlice> = (set, get) => ({
   appendMessageEntry: (sessionId, message) => {
     const entryId = uuidv4();
     const session = get().getSession(sessionId);
@@ -289,7 +276,10 @@ export const sessionStore = createStore<SessionsState & SessionActions>()((set, 
     });
   },
 
-  setMessageCompletedAt: (sessionId, entryId, completedAt) => {
+  setStreamingEntryCompletedAt: (sessionId, completedAt) => {
+    const entryId = get().streamingEntryIds.get(sessionId);
+    if (!entryId) return;
+
     const session = get().getSession(sessionId);
     if (!session) return;
 
@@ -327,7 +317,7 @@ export const sessionStore = createStore<SessionsState & SessionActions>()((set, 
     });
   },
 
-  setLoading: (sessionId, loading) => {
+  setSessionEntries: (sessionId, entries) => {
     const session = get().getSession(sessionId);
     if (!session) return;
 
@@ -335,110 +325,27 @@ export const sessionStore = createStore<SessionsState & SessionActions>()((set, 
       const idx = prev.sessions.findIndex((s) => s.id === sessionId);
       if (idx < 0) return prev;
       const next = [...prev.sessions];
-      next[idx] = { ...session, isLoading: loading };
+      next[idx] = { ...session, entries, updatedAt: Date.now() };
       return { sessions: next };
     });
   },
+
+  streamingEntryIds: new Map(),
 
   setStreamingEntryId: (sessionId, id) => {
-    const session = get().getSession(sessionId);
-    if (!session) return;
-
     set((prev) => {
-      const idx = prev.sessions.findIndex((s) => s.id === sessionId);
-      if (idx < 0) return prev;
-      const next = [...prev.sessions];
-      next[idx] = { ...session, streamingEntryId: id };
-      return { sessions: next };
-    });
-  },
-
-  setSessionStatus: (sessionId, status) => {
-    const session = get().getSession(sessionId);
-    if (!session) return;
-
-    set((prev) => {
-      const idx = prev.sessions.findIndex((s) => s.id === sessionId);
-      if (idx < 0) return prev;
-      const next = [...prev.sessions];
-      next[idx] = { ...session, status };
-      return { sessions: next };
-    });
-  },
-
-  setModel: (sessionId, model) => {
-    const session = get().getSession(sessionId);
-    if (!session) return;
-
-    set((prev) => {
-      const idx = prev.sessions.findIndex((s) => s.id === sessionId);
-      if (idx < 0) return prev;
-      const next = [...prev.sessions];
-      next[idx] = { ...session, model };
-      return { sessions: next };
-    });
-  },
-
-  setCwd: (sessionId, cwd) => {
-    const session = get().getSession(sessionId);
-    if (!session) return;
-
-    set((prev) => {
-      const idx = prev.sessions.findIndex((s) => s.id === sessionId);
-      if (idx < 0) return prev;
-      const next = [...prev.sessions];
-      next[idx] = { ...session, cwd };
-      return { sessions: next };
-    });
-  },
-
-  hydrate: (sessionId, snapshot) => {
-    const existing = get().getSession(sessionId);
-    const toolStates =
-      snapshot.toolStates instanceof Map
-        ? new Map(snapshot.toolStates)
-        : new Map((snapshot.toolStates as ToolExecutionState[]).map((s) => [s.toolCallId, s]));
-
-    const session: AgentSession = existing
-      ? {
-          ...existing,
-          entries: [...snapshot.entries],
-          cwd: snapshot.cwd,
-          model: snapshot.model ?? undefined,
-          toolStates,
-          status: "idle",
-        }
-      : {
-          id: sessionId,
-          name: "",
-          cwd: snapshot.cwd,
-          parentSessionId: null,
-          leafEntryId: null,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          entries: [...snapshot.entries],
-          model: snapshot.model ?? undefined,
-          isLoading: false,
-          streamingEntryId: undefined,
-          toolStates,
-          status: "idle",
-        };
-
-    set((prev) => {
-      const idx = prev.sessions.findIndex((s) => s.id === sessionId);
-      const next = [...prev.sessions];
-      if (idx >= 0) {
-        next[idx] = session;
+      const next = new Map(prev.streamingEntryIds);
+      if (id === undefined) {
+        next.delete(sessionId);
       } else {
-        next.push(session);
+        next.set(sessionId, id);
       }
-      return { sessions: next };
+      return { streamingEntryIds: next };
     });
   },
+});
 
-  reset: () =>
-    set({
-      activeSessionId: null,
-      sessions: [],
-    }),
+export const sessionStore = createStore<StoreType>()((...a) => ({
+  ...createSessionsSlice(...a),
+  ...createEntriesSlice(...a),
 }));

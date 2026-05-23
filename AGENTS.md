@@ -1,0 +1,89 @@
+# AGENTS.md
+
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+
+## Project Overview
+
+Divisor-agent is a desktop AI agent app using a C/S hybrid architecture:
+
+- **Server** (`packages/server`): Remote brain — Express v5 + tRPC + Zod, handles session persistence and model configuration
+- **App** (`packages/app`): Local client — Electron 39 + React 19, handles agent execution, tools, and UI rendering
+
+## Common Commands
+
+```bash
+pnpm dev              # Start all packages in parallel
+pnpm dev:server       # Start server only (tsx --watch)
+pnpm dev:app          # Start Electron app with electron-vite
+pnpm build            # Build all packages
+pnpm type-check       # Type-check all packages
+pnpm test             # Run all tests (Vitest workspace)
+pnpm lint             # oxlint check (NOT ESLint)
+pnpm format           # oxfmt auto-format
+pnpm format:check     # oxfmt format check
+```
+
+Single package commands:
+
+```bash
+pnpm --filter @divisor-agent/server dev
+pnpm --filter @divisor-agent/app dev
+pnpm --filter @divisor-agent/server test
+```
+
+Run a single test file:
+
+```bash
+pnpm vitest run packages/server/__tests__/domain/sessions/service.test.ts
+```
+
+## Architecture
+
+### Communication Layers
+
+| Layer                    | Protocol                     | Purpose                                      |
+| ------------------------ | ---------------------------- | -------------------------------------------- |
+| Frontend ↔ Electron Main | Electron IPC (contextBridge) | Agent prompt, permissions, model selection   |
+| Frontend ↔ Server        | tRPC (HTTP)                  | Session metadata (tree, history), model list |
+| Electron Main ↔ Server   | HTTP/tRPC                    | Session persistence, model config            |
+
+### Key Architectural Patterns
+
+**tRPC Router**: Root router at `packages/server/src/router.ts` composes domain routers. Currently only `sessionsRouter`. Server uses `superjson` transformer. Client at `packages/app/src/renderer/lib/trpc.ts` connects to `http://localhost:3000/trpc` (configurable via `VITE_SERVER_URL`).
+
+**Agent Runtime** (`packages/app/src/main/agent-runtime.ts`): Extends `Emittery`, orchestrates `@mariozechner/pi-agent-core`. Manages sessions, tools (fs read/write, terminal), permissions, extensions, and models. Events flow: Agent → Emittery → `agent-ipc.ts` → `webContents.send()` → renderer.
+
+**IPC Bridge**: Preload script exposes typed `invoke`/`on` via `contextBridge`. Channel whitelists in `packages/app/src/shared/events-ipc.ts`. 10 main→renderer events (agent lifecycle), 6 renderer→main invocations (prompt, model, session).
+
+**State Management**: Two Zustand stores — `useAgentStore` (React hook, `isProcessing`) and `sessionStore` (vanilla store, entries/toolStates/streaming). Session data persisted server-side via tRPC; renderer hydrates on session select.
+
+**Session Tree**: Server stores entries in a tree with `parentId` links, supporting branching/rewind via `setLeaf`/`rewind` mutations.
+
+### UI Component Library
+
+shadcn/ui (base-nova style) with 25+ components in `packages/app/src/renderer/components/ui/`. Rich text input via TipTap 3.x with @-mention file search. Messages rendered via streamdown (streaming markdown with CJK, code, math, mermaid support). Chat messages virtualized via `@tanstack/react-virtual`.
+
+## Key Conventions
+
+- **Server imports**: Always include `.js` extension for local TypeScript imports (ESM requirement)
+- **Type imports**: Use `import type { ... }` for pure type imports
+- **React imports**: React 19 + new JSX Runtime — do NOT manually `import React from 'react'` in `.tsx`/`.jsx` files
+- **Package Manager**: Strictly use `pnpm`. Use `pnpx` instead of `npx`
+- **Node Linker**: `nodeLinker=hoisted` in `.npmrc` for flat `node_modules`
+- **Component file structure**: Main exported component at top of file; internal private sub-components placed below it
+- **Dependencies**: Strictly on-demand. Never install unused dependencies
+- **Linting/Formatting**: oxlint (not ESLint) + oxfmt. Config at `oxlint.config.ts` and `oxfmt.config.ts`
+- **Git Hooks**: Husky + lint-staged runs `oxlint --fix` and `oxfmt --write` on staged files. Commitlint enforces conventional commits (header/body length unrestricted)
+- **Testing**: Vitest 4.x workspace mode. Each package has `vitest.config.ts` with `__tests__/` directory. Tests use `vi.mock()` with hoisted mocks
+- **Production build**: Server uses `packages/server/tsconfig.build.json` (excludes tests)
+
+## Tech Stack Quick Reference
+
+| Layer         | Key Dependencies                                               |
+| ------------- | -------------------------------------------------------------- |
+| Server        | Express 5, tRPC 11, Zod 4, Pino 9, Drizzle ORM (not yet wired) |
+| App/Build     | Electron 39, electron-vite 5, Vite 7                           |
+| App/UI        | React 19, Tailwind CSS 4, shadcn/ui, TipTap 3, Lucide icons    |
+| App/State     | Zustand 5, react-router-dom 7 (memory router)                  |
+| App/Agent     | @mariozechner/pi-agent-core 0.68, Emittery 2                   |
+| App/Rendering | streamdown 2, Shiki 4, @tanstack/react-virtual 3               |
