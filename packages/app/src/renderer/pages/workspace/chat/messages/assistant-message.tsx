@@ -35,7 +35,8 @@ export function AssistantMessage({
   startedAt,
   toolStates,
 }: AssistantMessageProps) {
-  const { processingContent, textContent } = message.content.reduce<{
+  const contentArray = Array.isArray(message.content) ? message.content : [];
+  const { processingContent, textContent } = contentArray.reduce<{
     processingContent: (ThinkingContent | ToolCall)[];
     textContent: TextContent[];
   }>(

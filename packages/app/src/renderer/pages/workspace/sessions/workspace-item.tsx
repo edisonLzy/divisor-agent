@@ -20,7 +20,7 @@ import {
 import { cn } from "@renderer/lib/utils";
 import { sessionStore } from "@renderer/store/sessions";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDownIcon, Pin, PinOff, Plus, MoreHorizontal, Trash2 } from "lucide-react";
+import { Folder, FolderOpen, Pin, PinOff, Plus, MoreHorizontal, Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";
 
 import { SessionItem } from "./session-item";
@@ -104,51 +104,52 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <div className="group flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-[13px] text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground">
-        <CollapsibleTrigger className="flex min-w-0 flex-1 items-center gap-1 text-left">
-          <ChevronDownIcon
-            className={cn(
-              "size-3.5 shrink-0 transition-transform duration-200",
-              open ? "rotate-0" : "-rotate-90",
-            )}
-          />
+      <div className="group flex w-full items-center gap-1 rounded-md px-2 py-1 text-[13px] text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground">
+        <CollapsibleTrigger className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
+          {open ? (
+            <FolderOpen className="size-4 shrink-0 opacity-60" />
+          ) : (
+            <Folder className="size-4 shrink-0 opacity-60" />
+          )}
           <span className="truncate">{workspace.name || "untitled"}</span>
         </CollapsibleTrigger>
 
-        <button
-          onClick={handleTogglePin}
-          className="flex items-center justify-center rounded p-0.5 text-sidebar-foreground/30 transition-colors hover:text-sidebar-foreground"
-          title={workspace.isTop ? "取消置顶" : "置顶"}
-        >
-          {workspace.isTop ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
-        </button>
-
-        <button
-          onClick={handleCreateSession}
-          className="flex items-center justify-center rounded p-0.5 text-sidebar-foreground/30 transition-colors hover:text-sidebar-foreground"
-          title="新建对话"
-        >
-          <Plus className="size-3.5" />
-        </button>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            className="flex items-center justify-center rounded p-0.5 text-sidebar-foreground/30 transition-colors hover:text-sidebar-foreground"
-            onClick={(e) => e.stopPropagation()}
+        <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+          <button
+            onClick={handleTogglePin}
+            className="flex items-center justify-center rounded p-0.5 text-muted-foreground hover:text-sidebar-foreground"
+            title={workspace.isTop ? "取消置顶" : "置顶"}
           >
-            <MoreHorizontal className="size-3.5" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" sideOffset={2}>
-            <DropdownMenuItem variant="destructive" onSelect={handleDelete}>
-              <Trash2 className="size-3.5" />
-              删除工作区
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            {workspace.isTop ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
+          </button>
+
+          <button
+            onClick={handleCreateSession}
+            className="flex items-center justify-center rounded p-0.5 text-muted-foreground hover:text-sidebar-foreground"
+            title="新建对话"
+          >
+            <Plus className="size-3.5" />
+          </button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className="flex items-center justify-center rounded p-0.5 text-muted-foreground hover:text-sidebar-foreground"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreHorizontal className="size-3.5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" sideOffset={2}>
+              <DropdownMenuItem variant="destructive" onSelect={handleDelete}>
+                <Trash2 className="size-3.5 mr-2" />
+                删除工作区
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </span>
       </div>
 
       <CollapsibleContent>
-        <div className="ml-2 space-y-px py-0.5">
+        <div className="pl-4 space-y-[1px] py-0.5">
           {isLoading ? (
             <div className="px-2 py-1 text-[12px] text-muted-foreground/40">加载中...</div>
           ) : sessions.length === 0 ? (

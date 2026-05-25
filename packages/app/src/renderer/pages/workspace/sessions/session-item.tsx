@@ -18,7 +18,7 @@ import {
   sessionStore,
 } from "@renderer/store/sessions";
 import { useQueryClient } from "@tanstack/react-query";
-import { Pin, PinOff, MoreHorizontal, Trash2 } from "lucide-react";
+import { Pin, PinOff, MoreHorizontal, Trash2, Loader2 } from "lucide-react";
 import { useCallback } from "react";
 import { useStore } from "zustand";
 
@@ -112,14 +112,19 @@ export function SessionItem({ session }: SessionItemProps) {
   }, [session.id, queryClient]);
 
   return (
-    <div className="group flex w-full items-center rounded-md px-2 text-[13px] transition-colors hover:bg-sidebar-accent">
+    <div
+      className={cn(
+        "group flex w-full items-center rounded-md px-2 text-[13px] transition-colors",
+        isActive ? "bg-sidebar-accent" : "hover:bg-sidebar-accent",
+      )}
+    >
       <button
         onClick={handleSelectSession}
         className={cn(
-          "flex min-w-0 flex-1 items-center py-1.5 text-left",
+          "flex min-w-0 flex-1 items-center py-1 text-left",
           isActive
-            ? "text-sidebar-accent-foreground"
-            : "text-sidebar-foreground/70 group-hover:text-sidebar-foreground",
+            ? "text-sidebar-accent-foreground font-medium"
+            : "text-sidebar-foreground/80 group-hover:text-sidebar-foreground",
         )}
       >
         <span className="truncate pr-1">{session.name.trim() || "untitled"}</span>
@@ -128,11 +133,16 @@ export function SessionItem({ session }: SessionItemProps) {
         />
       </button>
 
-      <span className="shrink-0 text-[11px] text-muted-foreground/50 group-hover:hidden mr-1">
+      <span
+        className={cn(
+          "shrink-0 text-[11px] text-muted-foreground/40 group-hover:hidden mr-1",
+          isActive && "hidden",
+        )}
+      >
         {formatRelativeTime(new Date(session.updatedAt))}
       </span>
 
-      <span className="hidden shrink-0 items-center group-hover:flex">
+      <span className={cn("hidden shrink-0 items-center", "group-hover:flex", isActive && "flex")}>
         <button
           onClick={handleTogglePin}
           className="flex items-center justify-center rounded p-0.5 text-sidebar-foreground/40 transition-colors hover:text-sidebar-foreground"
@@ -167,13 +177,21 @@ const STATUS_CONFIG: Record<SessionStatus, { label: string; dotClass: string }> 
 };
 
 function SessionStatusDot({ status }: { status: SessionStatus }) {
-  const config = STATUS_CONFIG[status];
   if (status === "idle") return null;
 
+  if (status === "running") {
+    return (
+      <span className="flex items-center gap-1 ml-1.5" title="执行中">
+        <Loader2 className="size-3.5 animate-spin text-muted-foreground/60" />
+      </span>
+    );
+  }
+
+  const config = STATUS_CONFIG[status];
   return (
-    <span className="flex items-center gap-1 ml-1.5" title={config.label}>
-      <span className={cn("size-1.5 rounded-full shrink-0", config.dotClass)} />
-      <span className="text-[11px] text-muted-foreground/60">{config.label}</span>
+    <span className="flex items-center gap-1 ml-1.5" title={config?.label}>
+      <span className={cn("size-1.5 rounded-full shrink-0", config?.dotClass)} />
+      <span className="text-[11px] text-muted-foreground/60">{config?.label}</span>
     </span>
   );
 }

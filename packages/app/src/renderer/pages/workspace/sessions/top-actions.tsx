@@ -2,7 +2,7 @@ import { SquarePen } from "lucide-react";
 
 export function TopActions() {
   return (
-    <div className="flex flex-col px-2 py-4 space-y-0.5">
+    <div className="flex flex-col p-2 pb-0">
       <CreateSessionButton />
     </div>
   );
@@ -16,7 +16,7 @@ function CreateSessionButton() {
   return (
     <button
       onClick={handleCreateSession}
-      className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground overflow-hidden"
+      className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-[13px] font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground overflow-hidden"
     >
       <SquarePen className="size-4 opacity-70 shrink-0" />
       <span className="truncate">新对话</span>

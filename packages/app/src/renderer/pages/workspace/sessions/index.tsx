@@ -60,7 +60,7 @@ function PinGroup() {
           ))}
         </>
       ) : (
-        <div className="px-2 py-1 text-[13px] text-muted-foreground/40 break-keep truncate">
+        <div className="px-2 py-1 text-[12px] text-muted-foreground/40 break-keep truncate">
           暂无置顶
         </div>
       )}
@@ -79,12 +79,12 @@ function WorkspacesGroup() {
   const workspaceList: Workspace[] = workspaces ?? [];
 
   return (
-    <GroupSection title="工作区">
+    <GroupSection title="项目">
       {workspaceList.length > 0 ? (
         workspaceList.map((ws) => <WorkspaceItem key={ws.id} workspace={ws} />)
       ) : (
-        <div className="px-2 py-1 text-[13px] text-muted-foreground/40 break-keep truncate">
-          暂无工作区
+        <div className="px-2 py-1 text-[12px] text-muted-foreground/40 break-keep truncate">
+          暂无项目
         </div>
       )}
     </GroupSection>
@@ -115,10 +115,10 @@ function ChatGroup() {
   return (
     <GroupSection title="对话">
       {isLoading ? (
-        <div className="px-2 py-1 text-[13px] text-muted-foreground/40">加载中...</div>
+        <div className="px-2 py-1 text-[12px] text-muted-foreground/40">加载中...</div>
       ) : sessions.length === 0 ? (
-        <div className="px-2 py-1 text-[13px] text-muted-foreground/40 break-keep truncate">
-          暂无对话
+        <div className="px-2 py-1 text-[12px] text-muted-foreground/40 break-keep truncate">
+          暂无聊天
         </div>
       ) : (
         <>

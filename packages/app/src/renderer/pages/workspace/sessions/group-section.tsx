@@ -13,12 +13,12 @@ interface GroupSectionProps {
 
 export function GroupSection({ title, defaultOpen = true, children }: GroupSectionProps) {
   return (
-    <Collapsible defaultOpen={defaultOpen}>
-      <CollapsibleTrigger className="cursor-pointer flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] font-medium text-sidebar-foreground/50 transition-colors hover:text-sidebar-foreground">
+    <Collapsible defaultOpen={defaultOpen} className="mt-2 mb-2">
+      <CollapsibleTrigger className="cursor-pointer flex w-full items-center px-4 py-1 text-[12px] font-medium text-sidebar-foreground/50 transition-colors hover:text-sidebar-foreground/70">
         <span>{title}</span>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="space-y-px py-1">{children}</div>
+        <div className="space-y-[1px] px-2">{children}</div>
       </CollapsibleContent>
     </Collapsible>
   );
