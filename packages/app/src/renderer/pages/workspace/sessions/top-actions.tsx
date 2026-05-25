@@ -2,7 +2,7 @@ import { SquarePen } from "lucide-react";
 
 export function TopActions() {
   return (
-    <div className="flex flex-col px-3 py-4 space-y-[2px]">
+    <div className="flex flex-col px-2 py-4 space-y-0.5">
       <CreateSessionButton />
     </div>
   );

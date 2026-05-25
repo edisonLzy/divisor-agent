@@ -1,95 +1,25 @@
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
-import { getSessionEntries } from "@renderer/apis/sessions";
-import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
-import { cn } from "@renderer/lib/utils";
-import {
-  sessionStore,
-  type MessageEntry,
-  type ModelChangedData,
-  type SessionEntry,
-  type SessionStatus,
-} from "@renderer/store/sessions";
-import { useCallback, useMemo } from "react";
-import { useStore } from "zustand";
+import type { Session, Workspace } from "@renderer/apis/sessions";
+import { listSessions, listWorkspaces } from "@renderer/apis/sessions";
+import { sessionStore } from "@renderer/store/sessions";
+import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 
 import { BottomActions } from "./bottom-actions";
+import { GroupSection } from "./group-section";
+import { SessionItem } from "./session-item";
 import { TopActions } from "./top-actions";
+import { WorkspaceItem } from "./workspace-item";
 
-interface SessionSidebarItem {
-  id: string;
-  isActive: boolean;
-  label: string;
-  updatedAtLabel: string;
-  status: SessionStatus;
-}
-
-function formatRelativeTime(value: Date | string) {
-  const date = value instanceof Date ? value : new Date(value);
-  const now = new Date();
-  const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / 60000);
-  if (diffInMinutes < 60) return `${Math.max(1, diffInMinutes)} 分`;
-  const diffInHours = Math.floor(diffInMinutes / 60);
-  if (diffInHours < 24) return `${diffInHours} 小时`;
-  const diffInDays = Math.floor(diffInHours / 24);
-  return `${diffInDays} 天`;
-}
+// ── Sessions (Sidebar) ──────────────────────────────────────────────────────
 
 export function Sessions() {
-  const { activeSessionId, sessions: storeSessions } = useStore(sessionStore);
-  const handleSelectSession = useSelectSessionHandler();
-
-  const renderedSessions = useMemo<SessionSidebarItem[]>(() => {
-    return storeSessions.slice(0, 50).map((session) => ({
-      id: session.id,
-      isActive: session.id === activeSessionId,
-      label: session.name.trim() || "untitled",
-      updatedAtLabel: formatRelativeTime(new Date(session.updatedAt)),
-      status: session.status,
-    }));
-  }, [activeSessionId, storeSessions]);
-
   return (
     <div className="flex h-full w-full flex-col bg-sidebar border-r border-sidebar-border select-none">
       <TopActions />
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-4">
-        <div className="flex flex-col px-1">
-          {renderedSessions.length === 0 ? (
-            <div className="px-2 py-2 text-[13px] text-muted-foreground/40 break-keep truncate">
-              暂无对话
-            </div>
-          ) : (
-            renderedSessions.map((session) => {
-              return (
-                <button
-                  key={session.id}
-                  onClick={() => handleSelectSession(session.id)}
-                  className={cn(
-                    "group flex w-full items-center justify-between rounded-md px-3 py-1.5 text-[13px] transition-colors",
-                    session.isActive
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
-                  )}
-                >
-                  <span className="flex items-center min-w-0 flex-1">
-                    <span className="truncate pr-2">{session.label}</span>
-                    <SessionStatusDot status={session.status} />
-                  </span>
-                  <span
-                    className={cn(
-                      "shrink-0 text-[11px]",
-                      session.isActive
-                        ? "text-sidebar-accent-foreground/70"
-                        : "text-muted-foreground group-hover:text-sidebar-foreground/70",
-                    )}
-                  >
-                    {session.updatedAtLabel}
-                  </span>
-                </button>
-              );
-            })
-          )}
-        </div>
+      <div className="flex-1 min-h-0 overflow-y-auto pb-4">
+        <PinGroup />
+        <WorkspacesGroup />
+        <ChatGroup />
       </div>
 
       <BottomActions />
@@ -97,85 +27,115 @@ export function Sessions() {
   );
 }
 
-const STATUS_CONFIG: Record<SessionStatus, { label: string; dotClass: string }> = {
-  idle: { label: "", dotClass: "bg-muted-foreground/30" },
-  running: { label: "执行中", dotClass: "bg-green-500 animate-pulse" },
-  completed: { label: "已完成", dotClass: "bg-blue-500" },
-  failed: { label: "失败", dotClass: "bg-red-500" },
-};
+// ── PinGroup ────────────────────────────────────────────────────────────────
 
-function SessionStatusDot({ status }: { status: SessionStatus }) {
-  const config = STATUS_CONFIG[status];
-  if (status === "idle") return null;
+function PinGroup() {
+  const { data: pinnedData } = useQuery({
+    queryKey: ["sessions", "pinned"],
+    queryFn: async () => {
+      const result = await listSessions({ isTop: true, limit: 100 });
+      sessionStore.getState().addSessions(result.sessions);
+      return result;
+    },
+  });
+
+  const { data: pinnedWorkspaces } = useQuery({
+    queryKey: ["workspaces", "pinned"],
+    queryFn: () => listWorkspaces({ isTop: true }),
+  });
+
+  const pinnedSessions: Session[] = pinnedData?.sessions ?? [];
+  const workspaces: Workspace[] = pinnedWorkspaces ?? [];
+  const hasContent = pinnedSessions.length > 0 || workspaces.length > 0;
 
   return (
-    <span className="flex items-center gap-1 ml-1.5" title={config.label}>
-      <span className={cn("size-1.5 rounded-full shrink-0", config.dotClass)} />
-      <span className="text-[11px] text-muted-foreground/60">{config.label}</span>
-    </span>
+    <GroupSection title="置顶">
+      {hasContent ? (
+        <>
+          {pinnedSessions.map((session) => (
+            <SessionItem key={session.id} session={session} />
+          ))}
+          {workspaces.map((ws) => (
+            <WorkspaceItem key={ws.id} workspace={ws} />
+          ))}
+        </>
+      ) : (
+        <div className="px-2 py-1 text-[13px] text-muted-foreground/40 break-keep truncate">
+          暂无置顶
+        </div>
+      )}
+    </GroupSection>
   );
 }
 
-function useSelectSessionHandler() {
-  const { invoke } = useElectronIPC();
+// ── WorkspacesGroup ─────────────────────────────────────────────────────────
 
-  const handleSelectSession = useCallback(
-    async (sessionId: string) => {
-      const session = sessionStore.getState().getSession(sessionId);
+function WorkspacesGroup() {
+  const { data: workspaces } = useQuery({
+    queryKey: ["workspaces", "non-pinned"],
+    queryFn: () => listWorkspaces({ isTop: false }),
+  });
 
-      // Fetch entries from API if not cached in store
-      if (session && session.entries.length === 0) {
-        try {
-          const entries = await getSessionEntries(sessionId);
-          const current = sessionStore.getState().getSession(sessionId);
-          if (current) {
-            sessionStore.getState().setSessionEntries(
-              sessionId,
-              entries.map((e): SessionEntry => {
-                if (e.type === "message") {
-                  return {
-                    ...e,
-                    type: "message" as const,
-                    data: e.data as unknown as AgentMessage,
-                  };
-                }
-                return {
-                  ...e,
-                  type: "model_change" as const,
-                  data: e.data as unknown as ModelChangedData,
-                };
-              }),
-            );
-          }
-        } catch (error) {
-          console.error("Failed to fetch session entries:", error);
-        }
-      }
+  const workspaceList: Workspace[] = workspaces ?? [];
 
-      // Notify main process to create/get the agent for this session
-      try {
-        await invoke("setSessionId", sessionId);
-      } catch (error) {
-        console.error("Failed to set session ID:", error);
-      }
-
-      // Set agent's conversation history from stored entries
-      const updatedSession = sessionStore.getState().getSession(sessionId);
-      if (updatedSession && updatedSession.entries.length > 0) {
-        const messages = updatedSession.entries
-          .filter((e): e is MessageEntry => e.type === "message")
-          .map((e) => e.data as AgentMessage);
-        try {
-          await invoke("setHistoryMessages", sessionId, messages);
-        } catch (error) {
-          console.error("Failed to set history messages:", error);
-        }
-      }
-
-      sessionStore.getState().setActiveSessionId(sessionId);
-    },
-    [invoke],
+  return (
+    <GroupSection title="工作区">
+      {workspaceList.length > 0 ? (
+        workspaceList.map((ws) => <WorkspaceItem key={ws.id} workspace={ws} />)
+      ) : (
+        <div className="px-2 py-1 text-[13px] text-muted-foreground/40 break-keep truncate">
+          暂无工作区
+        </div>
+      )}
+    </GroupSection>
   );
+}
 
-  return handleSelectSession;
+// ── ChatGroup ───────────────────────────────────────────────────────────────
+
+function ChatGroup() {
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery({
+    queryKey: ["sessions", "standalone"],
+    queryFn: async ({ pageParam = 0 }) => {
+      const result = await listSessions({
+        workspaceId: null,
+        limit: 50,
+        offset: pageParam,
+      });
+      sessionStore.getState().addSessions(result.sessions);
+      return result;
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasMore ? lastPage.offset + lastPage.limit : undefined,
+  });
+
+  const sessions: Session[] = data?.pages.flatMap((page) => page.sessions) ?? [];
+
+  return (
+    <GroupSection title="对话">
+      {isLoading ? (
+        <div className="px-2 py-1 text-[13px] text-muted-foreground/40">加载中...</div>
+      ) : sessions.length === 0 ? (
+        <div className="px-2 py-1 text-[13px] text-muted-foreground/40 break-keep truncate">
+          暂无对话
+        </div>
+      ) : (
+        <>
+          {sessions.map((session) => (
+            <SessionItem key={session.id} session={session} />
+          ))}
+          {hasNextPage && (
+            <button
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+              className="w-full px-2 py-1 text-left text-[12px] text-muted-foreground/40 transition-colors hover:text-sidebar-foreground/70"
+            >
+              {isFetchingNextPage ? "加载中..." : "加载更多"}
+            </button>
+          )}
+        </>
+      )}
+    </GroupSection>
+  );
 }

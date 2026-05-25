@@ -6,10 +6,12 @@ export interface Session {
   id: string;
   name: string;
   cwd: string;
+  workspaceId: string | null;
   parentSessionId: string | null;
   leafEntryId: string | null;
   createdAt: number;
   updatedAt: number;
+  isTop: boolean;
 }
 
 export interface Entry {
@@ -21,12 +23,24 @@ export interface Entry {
   data: Record<string, unknown>;
 }
 
+// ── Workspace Types ──────────────────────────────────────────────────────────
+
+export interface Workspace {
+  id: string;
+  name: string;
+  systemPrompt: string | null;
+  context: Record<string, unknown> | null;
+  isTop: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
 // ── Create Session ──────────────────────────────────────────────────────────
 
 export interface CreateSessionRequest {
   id?: string;
   name?: string;
-  cwd?: string;
+  workspaceId?: string | null;
   parentSessionId?: string | null;
 }
 
@@ -39,10 +53,31 @@ export async function createSession(req: CreateSessionRequest): Promise<CreateSe
 
 // ── List Sessions ───────────────────────────────────────────────────────────
 
-export type ListSessionsResponse = Session[];
+export interface ListSessionsParams {
+  workspaceId?: string | null;
+  isTop?: boolean;
+  limit?: number;
+  offset?: number;
+}
 
-export async function listSessions(): Promise<ListSessionsResponse> {
-  const { data } = await request.get<ListSessionsResponse>("/v1/agent/sessions");
+export interface PaginatedSessionsResponse {
+  sessions: Session[];
+  hasMore: boolean;
+  limit: number;
+  offset: number;
+}
+
+export async function listSessions(
+  params?: ListSessionsParams,
+): Promise<PaginatedSessionsResponse> {
+  const { data } = await request.get<PaginatedSessionsResponse>("/v1/agent/sessions", { params });
+  return data;
+}
+
+// ── Get Session ─────────────────────────────────────────────────────────────
+
+export async function getSession(sessionId: string): Promise<Session> {
+  const { data } = await request.get<Session>(`/v1/agent/session/${sessionId}`);
   return data;
 }
 
@@ -64,15 +99,10 @@ export interface RenameSessionRequest {
   name: string;
 }
 
-export interface RenameSessionResponse {
-  success: boolean;
-}
-
-export async function renameSession(req: RenameSessionRequest): Promise<RenameSessionResponse> {
-  const { data } = await request.patch<RenameSessionResponse>(
-    `/v1/agent/session/${req.id}/rename`,
-    { name: req.name },
-  );
+export async function renameSession(req: RenameSessionRequest): Promise<{ success: boolean }> {
+  const { data } = await request.patch<{ success: boolean }>(`/v1/agent/session/${req.id}/rename`, {
+    name: req.name,
+  });
   return data;
 }
 
@@ -82,12 +112,34 @@ export interface DeleteSessionRequest {
   id: string;
 }
 
-export interface DeleteSessionResponse {
-  success: boolean;
+export async function deleteSession(req: DeleteSessionRequest): Promise<{ success: boolean }> {
+  const { data } = await request.delete<{ success: boolean }>(`/v1/agent/session/${req.id}`);
+  return data;
 }
 
-export async function deleteSession(req: DeleteSessionRequest): Promise<DeleteSessionResponse> {
-  const { data } = await request.delete<DeleteSessionResponse>(`/v1/agent/session/${req.id}`);
+// ── Pin Session ──────────────────────────────────────────────────────────────
+
+export async function pinSession(
+  sessionId: string,
+  req: { isTop: boolean },
+): Promise<{ success: boolean }> {
+  const { data } = await request.patch<{ success: boolean }>(
+    `/v1/agent/session/${sessionId}/pin`,
+    req,
+  );
+  return data;
+}
+
+// ── Assign Session Workspace ─────────────────────────────────────────────────
+
+export async function assignSessionWorkspace(
+  sessionId: string,
+  req: { workspaceId: string | null },
+): Promise<{ success: boolean }> {
+  const { data } = await request.patch<{ success: boolean }>(
+    `/v1/agent/session/${sessionId}/workspace`,
+    req,
+  );
   return data;
 }
 
@@ -98,14 +150,13 @@ export interface SetLeafRequest {
   entryId: string;
 }
 
-export interface SetLeafResponse {
-  success: boolean;
-}
-
-export async function setLeaf(req: SetLeafRequest): Promise<SetLeafResponse> {
-  const { data } = await request.put<SetLeafResponse>(`/v1/agent/session/${req.sessionId}/leaf`, {
-    entryId: req.entryId,
-  });
+export async function setLeaf(req: SetLeafRequest): Promise<{ success: boolean }> {
+  const { data } = await request.put<{ success: boolean }>(
+    `/v1/agent/session/${req.sessionId}/leaf`,
+    {
+      entryId: req.entryId,
+    },
+  );
   return data;
 }
 
@@ -130,5 +181,55 @@ export async function appendEntries(req: AppendEntriesRequest): Promise<AppendEn
     `/v1/agent/session/${req.sessionId}/entries`,
     { entries: req.entries },
   );
+  return data;
+}
+
+// ── List Workspaces ──────────────────────────────────────────────────────────
+
+export async function listWorkspaces(params?: { isTop?: boolean }): Promise<Workspace[]> {
+  const { data } = await request.get<Workspace[]>("/v1/agent/workspaces", { params });
+  return data;
+}
+
+// ── Create Workspace ─────────────────────────────────────────────────────────
+
+export interface CreateWorkspaceRequest {
+  name: string;
+  systemPrompt?: string | null;
+  context?: Record<string, unknown> | null;
+}
+
+export async function createWorkspace(req: CreateWorkspaceRequest): Promise<Workspace> {
+  const { data } = await request.post<Workspace>("/v1/agent/workspace", req);
+  return data;
+}
+
+// ── Update Workspace ─────────────────────────────────────────────────────────
+
+export interface UpdateWorkspaceRequest {
+  name?: string;
+  systemPrompt?: string | null;
+  context?: Record<string, unknown> | null;
+}
+
+export async function updateWorkspace(id: string, req: UpdateWorkspaceRequest): Promise<Workspace> {
+  const { data } = await request.patch<Workspace>(`/v1/agent/workspace/${id}`, req);
+  return data;
+}
+
+// ── Delete Workspace ─────────────────────────────────────────────────────────
+
+export async function deleteWorkspace(id: string): Promise<{ success: boolean }> {
+  const { data } = await request.delete<{ success: boolean }>(`/v1/agent/workspace/${id}`);
+  return data;
+}
+
+// ── Pin Workspace ────────────────────────────────────────────────────────────
+
+export async function pinWorkspace(
+  id: string,
+  req: { isTop: boolean },
+): Promise<{ success: boolean }> {
+  const { data } = await request.patch<{ success: boolean }>(`/v1/agent/workspace/${id}/pin`, req);
   return data;
 }

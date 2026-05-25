@@ -94,8 +94,8 @@ export interface SessionsSlice {
   appendSession: (session: Session) => void;
   /** Switch the active session (the one displayed in the UI) */
   setActiveSessionId: (sessionId: string | null) => void;
-  /** Bulk-set sessions from API list response */
-  setSessions: (sessions: Session[]) => void;
+  /** Bulk-add sessions to store (no-op for existing IDs) */
+  addSessions: (sessions: Session[]) => void;
   /** Set the execution status of a session */
   setSessionStatus: (sessionId: string, status: SessionStatus) => void;
   /** Update the currently selected model for this session */
@@ -157,26 +157,14 @@ const createSessionsSlice: StateCreator<StoreType, [], [], SessionsSlice> = (set
 
   setActiveSessionId: (id) => set({ activeSessionId: id }),
 
-  setSessions: (sessions) => {
+  addSessions: (sessions) => {
     set((prev) => {
-      const existingMap = new Map(prev.sessions.map((session) => [session.id, session]));
-
-      return {
-        sessions: sessions.map((session) => {
-          const existing = existingMap.get(session.id);
-          if (!existing) {
-            return createSessionState(session);
-          }
-
-          return {
-            ...createSessionState(session),
-            entries: existing.entries,
-            model: existing.model,
-            toolStates: existing.toolStates,
-            status: existing.status,
-          };
-        }),
-      };
+      const existingIds = new Set(prev.sessions.map((s) => s.id));
+      const newSessions = sessions
+        .filter((s) => !existingIds.has(s.id))
+        .map((s) => createSessionState(s));
+      if (newSessions.length === 0) return prev;
+      return { sessions: [...prev.sessions, ...newSessions] };
     });
   },
 

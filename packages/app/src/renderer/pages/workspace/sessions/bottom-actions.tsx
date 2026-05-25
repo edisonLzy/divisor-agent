@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 export function BottomActions() {
   return (
-    <div className="flex flex-col px-3 py-3 border-t border-sidebar-border space-y-[2px]">
+    <div className="flex flex-col px-2 py-3 border-t border-sidebar-border space-y-[2px]">
       <SettingsButton />
     </div>
   );
