@@ -55,6 +55,7 @@ export async function createSession(req: CreateSessionRequest): Promise<CreateSe
 
 export interface ListSessionsParams {
   workspaceId?: string | null;
+  noWorkspace?: boolean;
   isTop?: boolean;
   limit?: number;
   offset?: number;

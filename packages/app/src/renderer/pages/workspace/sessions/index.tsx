@@ -98,7 +98,8 @@ function ChatGroup() {
     queryKey: ["sessions", "standalone"],
     queryFn: async ({ pageParam = 0 }) => {
       const result = await listSessions({
-        workspaceId: null,
+        noWorkspace: true,
+        isTop: false,
         limit: 50,
         offset: pageParam,
       });
