@@ -1,12 +1,16 @@
-import type { Session, Workspace } from "@renderer/apis/sessions";
-import { listSessions, listWorkspaces } from "@renderer/apis/sessions";
-import { sessionStore } from "@renderer/store/sessions";
-import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
+import {
+  CollapsibleContent,
+  CollapsibleTrigger,
+  Collapsible,
+} from "@renderer/components/ui/collapsible";
+import type { ReactNode } from "react";
 
 import { BottomActions } from "./bottom-actions";
-import { GroupSection } from "./group-section";
 import { SessionItem } from "./session-item";
 import { TopActions } from "./top-actions";
+import { usePinnedSessions } from "./use-pinned-sessions";
+import { useStandaloneSessions } from "./use-standalone-sessions";
+import { useWorkspaces } from "./use-workspaces";
 import { WorkspaceItem } from "./workspace-item";
 
 // ── Sessions (Sidebar) ──────────────────────────────────────────────────────
@@ -30,23 +34,8 @@ export function Sessions() {
 // ── PinGroup ────────────────────────────────────────────────────────────────
 
 function PinGroup() {
-  const { data: pinnedData } = useQuery({
-    queryKey: ["sessions", "pinned"],
-    queryFn: async () => {
-      const result = await listSessions({ isTop: true, limit: 100 });
-      sessionStore.getState().addSessions(result.sessions);
-      return result;
-    },
-  });
-
-  const { data: pinnedWorkspaces } = useQuery({
-    queryKey: ["workspaces", "pinned"],
-    queryFn: () => listWorkspaces({ isTop: true }),
-  });
-
-  const pinnedSessions: Session[] = pinnedData?.sessions ?? [];
-  const workspaces: Workspace[] = pinnedWorkspaces ?? [];
-  const hasContent = pinnedSessions.length > 0 || workspaces.length > 0;
+  const { pinnedSessions, pinnedWorkspaces } = usePinnedSessions();
+  const hasContent = pinnedSessions.length > 0 || pinnedWorkspaces.length > 0;
 
   return (
     <GroupSection title="置顶">
@@ -55,7 +44,7 @@ function PinGroup() {
           {pinnedSessions.map((session) => (
             <SessionItem key={session.id} session={session} />
           ))}
-          {workspaces.map((ws) => (
+          {pinnedWorkspaces.map((ws) => (
             <WorkspaceItem key={ws.id} workspace={ws} />
           ))}
         </>
@@ -71,17 +60,12 @@ function PinGroup() {
 // ── WorkspacesGroup ─────────────────────────────────────────────────────────
 
 function WorkspacesGroup() {
-  const { data: workspaces } = useQuery({
-    queryKey: ["workspaces", "non-pinned"],
-    queryFn: () => listWorkspaces({ isTop: false }),
-  });
-
-  const workspaceList: Workspace[] = workspaces ?? [];
+  const { workspaces } = useWorkspaces();
 
   return (
     <GroupSection title="项目">
-      {workspaceList.length > 0 ? (
-        workspaceList.map((ws) => <WorkspaceItem key={ws.id} workspace={ws} />)
+      {workspaces.length > 0 ? (
+        workspaces.map((ws) => <WorkspaceItem key={ws.id} workspace={ws} />)
       ) : (
         <div className="px-2 py-1 text-[12px] text-muted-foreground/40 break-keep truncate">
           暂无项目
@@ -94,24 +78,8 @@ function WorkspacesGroup() {
 // ── ChatGroup ───────────────────────────────────────────────────────────────
 
 function ChatGroup() {
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery({
-    queryKey: ["sessions", "standalone"],
-    queryFn: async ({ pageParam = 0 }) => {
-      const result = await listSessions({
-        noWorkspace: true,
-        isTop: false,
-        limit: 50,
-        offset: pageParam,
-      });
-      sessionStore.getState().addSessions(result.sessions);
-      return result;
-    },
-    initialPageParam: 0,
-    getNextPageParam: (lastPage) =>
-      lastPage.hasMore ? lastPage.offset + lastPage.limit : undefined,
-  });
-
-  const sessions: Session[] = data?.pages.flatMap((page) => page.sessions) ?? [];
+  const { sessions, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
+    useStandaloneSessions();
 
   return (
     <GroupSection title="对话">
@@ -138,5 +106,26 @@ function ChatGroup() {
         </>
       )}
     </GroupSection>
+  );
+}
+
+// ── GroupSection ────────────────────────────────────────────────────────────
+
+interface GroupSectionProps {
+  title: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}
+
+function GroupSection({ title, defaultOpen = true, children }: GroupSectionProps) {
+  return (
+    <Collapsible defaultOpen={defaultOpen} className="mt-2 mb-2">
+      <CollapsibleTrigger className="cursor-pointer flex w-full items-center px-4 py-1 text-[12px] font-medium text-sidebar-foreground/50 transition-colors hover:text-sidebar-foreground/70">
+        <span>{title}</span>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="space-y-px px-2">{children}</div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

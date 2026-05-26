@@ -4,6 +4,7 @@ import { sessionStore, type ToolExecutionState } from "@renderer/store/sessions"
 import { useCallback } from "react";
 import { useStore } from "zustand";
 
+import { useCreateSession } from "../use-create-session";
 import type { PromptSubmission } from "./prompt-types";
 
 const EMPTY_TOOL_STATES = new Map<string, ToolExecutionState>();
@@ -12,6 +13,7 @@ const EMPTY_TOOL_STATES = new Map<string, ToolExecutionState>();
 
 export function useChat() {
   const { invoke } = useElectronIPC();
+  const { handleSubmitPrompt } = useCreateSession();
   const { activeSessionId, sessions } = useStore(sessionStore);
   const activeSession = activeSessionId
     ? sessions.find((session) => session.id === activeSessionId)
@@ -22,9 +24,15 @@ export function useChat() {
 
   const submitPrompt = useCallback(
     async (submission: PromptSubmission) => {
-      const sessionId = activeSessionId;
+      let sessionId = activeSessionId;
+
+      // If no active session, check if there's a pending session to promote
       if (!sessionId) {
-        return;
+        const handled = await handleSubmitPrompt();
+        if (!handled) return;
+        // Re-read from store — handleSubmitPrompt set the new activeSessionId
+        sessionId = sessionStore.getState().activeSessionId;
+        if (!sessionId) return;
       }
 
       sessionStore.getState().setSessionStatus(sessionId, "running");
@@ -39,7 +47,7 @@ export function useChat() {
         sessionStore.getState().setSessionStatus(sessionId, "idle");
       }
     },
-    [activeSessionId, invoke],
+    [activeSessionId, invoke, handleSubmitPrompt],
   );
 
   return {

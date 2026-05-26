@@ -1,16 +1,20 @@
 import type { Workspace, Session } from "@renderer/apis/sessions";
-import {
-  listSessions,
-  pinWorkspace,
-  deleteWorkspace,
-  updateWorkspace,
-  createSession,
-} from "@renderer/apis/sessions";
+import { listSessions, pinWorkspace, deleteWorkspace } from "@renderer/apis/sessions";
+import { Button } from "@renderer/components/ui/button";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@renderer/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogClose,
+} from "@renderer/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +27,7 @@ import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { Folder, FolderOpen, Pin, PinOff, Plus, MoreHorizontal, Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";
 
+import { useCreateSession } from "../use-create-session";
 import { SessionItem } from "./session-item";
 
 // ── Props ───────────────────────────────────────────────────────────────────
@@ -35,6 +40,8 @@ interface WorkspaceItemProps {
 
 export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
   const [open, setOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery({
@@ -72,9 +79,14 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
     [workspace.id, workspace.isTop, queryClient],
   );
 
-  const handleDelete = useCallback(async () => {
+  const confirmDelete = useCallback(async () => {
     try {
       await deleteWorkspace(workspace.id);
+      // Clean up sessions belonging to this workspace from local store
+      const store = sessionStore.getState();
+      store.sessions
+        .filter((s) => s.workspaceId === workspace.id)
+        .forEach((s) => store.removeSession(s.id));
       await queryClient.invalidateQueries({ queryKey: ["workspaces"] });
       await queryClient.invalidateQueries({ queryKey: ["sessions"] });
     } catch (error) {
@@ -82,24 +94,20 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
     }
   }, [workspace.id, queryClient]);
 
-  const handleCreateSession = useCallback(
-    async (e: React.MouseEvent) => {
+  const handleDelete = useCallback(() => {
+    setDeleteDialogOpen(true);
+  }, []);
+
+  const { handleCreateSession: createPendingSession } = useCreateSession();
+
+  const handleCreateWorkflowSession = useCallback(
+    (e: React.MouseEvent) => {
       e.stopPropagation();
-      try {
-        const newSession = await createSession({
-          name: "新对话",
-          workspaceId: workspace.id,
-          parentSessionId: null,
-        });
-        sessionStore.getState().addSessions([newSession]);
-        await queryClient.invalidateQueries({ queryKey: ["sessions"] });
-        // Expand the workspace to show the new session
-        setOpen(true);
-      } catch (error) {
-        console.error("Failed to create session:", error);
-      }
+      createPendingSession(workspace.id);
+      // Expand the workspace to show pending state
+      setOpen(true);
     },
-    [workspace.id, queryClient],
+    [workspace.id, createPendingSession],
   );
 
   return (
@@ -114,7 +122,13 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
           <span className="truncate">{workspace.name || "untitled"}</span>
         </CollapsibleTrigger>
 
-        <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+        <span
+          className={cn(
+            "hidden shrink-0 items-center gap-0.5",
+            "group-hover:flex",
+            dropdownOpen && "flex",
+          )}
+        >
           <button
             onClick={handleTogglePin}
             className="flex items-center justify-center rounded p-0.5 text-muted-foreground hover:text-sidebar-foreground"
@@ -124,14 +138,14 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
           </button>
 
           <button
-            onClick={handleCreateSession}
+            onClick={handleCreateWorkflowSession}
             className="flex items-center justify-center rounded p-0.5 text-muted-foreground hover:text-sidebar-foreground"
             title="新建对话"
           >
             <Plus className="size-3.5" />
           </button>
 
-          <DropdownMenu>
+          <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
             <DropdownMenuTrigger
               className="flex items-center justify-center rounded p-0.5 text-muted-foreground hover:text-sidebar-foreground"
               onClick={(e) => e.stopPropagation()}
@@ -139,7 +153,7 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
               <MoreHorizontal className="size-3.5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" sideOffset={2}>
-              <DropdownMenuItem variant="destructive" onSelect={handleDelete}>
+              <DropdownMenuItem variant="destructive" onClick={handleDelete}>
                 <Trash2 className="size-3.5 mr-2" />
                 删除工作区
               </DropdownMenuItem>
@@ -174,6 +188,30 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
           )}
         </div>
       </CollapsibleContent>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>删除工作区</DialogTitle>
+            <DialogDescription>
+              确定要删除工作区「{workspace.name || "untitled"}
+              」吗？该工作区下的所有对话也将被一并删除，此操作不可撤销。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline">取消</Button>} />
+            <Button
+              variant="destructive"
+              onClick={() => {
+                void confirmDelete();
+                setDeleteDialogOpen(false);
+              }}
+            >
+              删除
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Collapsible>
   );
 }

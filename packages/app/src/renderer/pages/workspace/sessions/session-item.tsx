@@ -19,7 +19,7 @@ import {
 } from "@renderer/store/sessions";
 import { useQueryClient } from "@tanstack/react-query";
 import { Pin, PinOff, MoreHorizontal, Trash2, Loader2 } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useStore } from "zustand";
 
 // ── Props ───────────────────────────────────────────────────────────────────
@@ -34,6 +34,7 @@ export function SessionItem({ session }: SessionItemProps) {
   const { activeSessionId } = useStore(sessionStore);
   const { invoke } = useElectronIPC();
   const queryClient = useQueryClient();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const isActive = session.id === activeSessionId;
 
   const handleSelectSession = useCallback(async () => {
@@ -104,6 +105,7 @@ export function SessionItem({ session }: SessionItemProps) {
   const handleDelete = useCallback(async () => {
     try {
       await deleteSession({ id: session.id });
+      sessionStore.getState().removeSession(session.id);
       await queryClient.invalidateQueries({ queryKey: ["sessions"] });
       await queryClient.invalidateQueries({ queryKey: ["workspaces"] });
     } catch (error) {
@@ -142,7 +144,14 @@ export function SessionItem({ session }: SessionItemProps) {
         {formatRelativeTime(new Date(session.updatedAt))}
       </span>
 
-      <span className={cn("hidden shrink-0 items-center", "group-hover:flex", isActive && "flex")}>
+      <span
+        className={cn(
+          "hidden shrink-0 items-center",
+          "group-hover:flex",
+          isActive && "flex",
+          dropdownOpen && "flex",
+        )}
+      >
         <button
           onClick={handleTogglePin}
           className="flex items-center justify-center rounded p-0.5 text-sidebar-foreground/40 transition-colors hover:text-sidebar-foreground"
@@ -151,12 +160,12 @@ export function SessionItem({ session }: SessionItemProps) {
           {session.isTop ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
         </button>
 
-        <DropdownMenu>
+        <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
           <DropdownMenuTrigger className="flex items-center justify-center rounded p-0.5 text-sidebar-foreground/40 transition-colors hover:text-sidebar-foreground">
             <MoreHorizontal className="size-3.5" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" sideOffset={2}>
-            <DropdownMenuItem onSelect={handleDelete} variant="destructive">
+            <DropdownMenuItem onClick={handleDelete} variant="destructive">
               <Trash2 className="size-3.5" />
               删除
             </DropdownMenuItem>
