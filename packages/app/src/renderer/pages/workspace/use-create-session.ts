@@ -20,14 +20,13 @@ export function useCreateSession() {
 
   const handleCreateSession = useCallback((workspaceId?: string | null) => {
     const store = sessionStore.getState();
+    store.setActiveSessionId(null);
 
     if (store.pendingSession) {
-      // Pending session already exists — just activate it
-      store.setActiveSessionId(null);
-    } else {
-      // Create a new pending session
-      store.createPendingSession(workspaceId);
+      return;
     }
+    // Create a new pending session
+    store.createPendingSession(workspaceId);
   }, []);
 
   /**
