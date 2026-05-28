@@ -15,19 +15,12 @@ import {
   DialogTitle,
   DialogClose,
 } from "@renderer/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@renderer/components/ui/dropdown-menu";
 import { cn } from "@renderer/lib/utils";
 import { sessionStore } from "@renderer/store/sessions";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { Folder, FolderOpen, Pin, PinOff, Plus, Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";
 
-import { useCreateSession } from "../use-create-session";
 import { SessionItem } from "./session-item";
 
 // ── Props ───────────────────────────────────────────────────────────────────
@@ -40,7 +33,6 @@ interface WorkspaceItemProps {
 
 export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
   const [open, setOpen] = useState(false);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -94,29 +86,21 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
     }
   }, [workspace.id, queryClient]);
 
-  const handleDelete = useCallback(() => {
-    setDeleteDialogOpen(true);
-  }, []);
-
-  const { handleCreateSession: createPendingSession } = useCreateSession();
-
   const handleCreateWorkflowSession = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
-      createPendingSession(workspace.id);
-      // Expand the workspace to show pending state
+      // Always update the pending session with this workspace, even if one already exists
+      const store = sessionStore.getState();
+      store.setActiveSessionId(null);
+      store.createPendingSession(workspace.id);
       setOpen(true);
     },
-    [workspace.id, createPendingSession],
+    [workspace.id],
   );
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <div
-        onContextMenu={(e) => {
-          e.preventDefault();
-          setDropdownOpen(true);
-        }}
         className={cn(
           "group flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] transition-[background-color,color]",
           open
@@ -133,13 +117,7 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
           <span className="truncate">{workspace.name || "untitled"}</span>
         </CollapsibleTrigger>
 
-        <span
-          className={cn(
-            "relative flex shrink-0 items-center gap-0.5",
-            "opacity-0 group-hover:opacity-100 transition-opacity",
-            dropdownOpen && "flex",
-          )}
-        >
+        <span className="relative flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={handleTogglePin}
             className="flex items-center justify-center rounded-md p-1 text-sidebar-foreground/32 transition-colors hover:bg-black/10 hover:text-sidebar-foreground"
@@ -147,7 +125,13 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
           >
             {workspace.isTop ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
           </button>
-
+          <button
+            onClick={() => setDeleteDialogOpen(true)}
+            className="flex items-center justify-center rounded-md p-1 text-sidebar-foreground/32 transition-colors hover:bg-black/10 hover:text-red-400"
+            title="删除"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
           <button
             onClick={handleCreateWorkflowSession}
             className="flex items-center justify-center rounded-md p-1 text-sidebar-foreground/32 transition-colors hover:bg-black/10 hover:text-sidebar-foreground"
@@ -155,19 +139,6 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
           >
             <Plus className="size-3.5" />
           </button>
-
-          <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
-            <DropdownMenuTrigger
-              className="absolute right-0 size-7 opacity-0"
-              aria-label="更多操作"
-            />
-            <DropdownMenuContent align="end" sideOffset={2}>
-              <DropdownMenuItem variant="destructive" onClick={handleDelete}>
-                <Trash2 className="size-3.5 mr-2" />
-                删除工作区
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </span>
       </div>
 

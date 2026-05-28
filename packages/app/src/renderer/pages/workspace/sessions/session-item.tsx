@@ -1,12 +1,6 @@
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import type { Session } from "@renderer/apis/sessions";
 import { pinSession, deleteSession, getSessionEntries } from "@renderer/apis/sessions";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@renderer/components/ui/dropdown-menu";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { formatRelativeTime } from "@renderer/lib/date";
 import { cn } from "@renderer/lib/utils";
@@ -19,7 +13,7 @@ import {
 } from "@renderer/store/sessions";
 import { useQueryClient } from "@tanstack/react-query";
 import { Pin, PinOff, Trash2, Loader2 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { useStore } from "zustand";
 
 // ── Props ───────────────────────────────────────────────────────────────────
@@ -34,7 +28,6 @@ export function SessionItem({ session }: SessionItemProps) {
   const { activeSessionId } = useStore(sessionStore);
   const { invoke } = useElectronIPC();
   const queryClient = useQueryClient();
-  const [dropdownOpen, setDropdownOpen] = useState(false);
   const isActive = session.id === activeSessionId;
 
   const handleSelectSession = useCallback(async () => {
@@ -102,23 +95,23 @@ export function SessionItem({ session }: SessionItemProps) {
     [session.id, session.isTop, queryClient],
   );
 
-  const handleDelete = useCallback(async () => {
-    try {
-      await deleteSession({ id: session.id });
-      sessionStore.getState().removeSession(session.id);
-      await queryClient.invalidateQueries({ queryKey: ["sessions"] });
-      await queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-    } catch (error) {
-      console.error("Failed to delete session:", error);
-    }
-  }, [session.id, queryClient]);
+  const handleDelete = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      try {
+        await deleteSession({ id: session.id });
+        sessionStore.getState().removeSession(session.id);
+        await queryClient.invalidateQueries({ queryKey: ["sessions"] });
+        await queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      } catch (error) {
+        console.error("Failed to delete session:", error);
+      }
+    },
+    [session.id, queryClient],
+  );
 
   return (
     <div
-      onContextMenu={(e) => {
-        e.preventDefault();
-        setDropdownOpen(true);
-      }}
       className={cn(
         "group flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] transition-[background-color,color]",
         isActive
@@ -153,10 +146,9 @@ export function SessionItem({ session }: SessionItemProps) {
 
         <span
           className={cn(
-            "absolute inset-0 flex items-center justify-end",
+            "absolute inset-0 flex items-center justify-end gap-0.5",
             "opacity-0 group-hover:opacity-100 transition-opacity",
             isActive && "opacity-100",
-            dropdownOpen && "opacity-100",
           )}
         >
           <button
@@ -166,19 +158,13 @@ export function SessionItem({ session }: SessionItemProps) {
           >
             {session.isTop ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
           </button>
-
-          <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
-            <DropdownMenuTrigger
-              className="absolute right-0 size-7 opacity-0"
-              aria-label="更多操作"
-            />
-            <DropdownMenuContent align="end" sideOffset={2}>
-              <DropdownMenuItem onClick={handleDelete} variant="destructive">
-                <Trash2 className="size-3.5" />
-                删除
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <button
+            onClick={handleDelete}
+            className="flex items-center justify-center rounded-md p-1 text-sidebar-foreground/32 transition-colors hover:bg-black/10 hover:text-red-400"
+            title="删除"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
         </span>
       </div>
     </div>

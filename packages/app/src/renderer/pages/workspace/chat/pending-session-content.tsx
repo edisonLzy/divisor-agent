@@ -1,4 +1,4 @@
-import { createSession, listWorkspaces, type Workspace } from "@renderer/apis/sessions";
+import { createSession, type Workspace } from "@renderer/apis/sessions";
 import {
   Command,
   CommandEmpty,
@@ -10,22 +10,18 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@renderer/components/ui/popover";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { sessionStore } from "@renderer/store/sessions";
-import { useQuery } from "@tanstack/react-query";
-import { Check, ChevronDown, ChevronRight, Folder, FolderPlus, FolderX, X } from "lucide-react";
+import { Check, ChevronDown, Folder, X } from "lucide-react";
 import { useState } from "react";
 import { useStore } from "zustand";
 
 import { useInvalidateStandaloneSessions } from "../sessions/use-standalone-sessions";
+import { useWorkspaceList } from "../sessions/use-workspace-list";
 import { useInvalidateWorkspaceSessions } from "../sessions/use-workspaces";
 import { PromptInput } from "./prompt-input";
 import type { PromptSubmission } from "./prompt-types";
 
 export function PendingSessionContent() {
   const { invoke } = useElectronIPC();
-  const pendingWorkspaceId = useStore(
-    sessionStore,
-    (state) => state.pendingSession?.workspaceId ?? null,
-  );
   const invalidateStandalone = useInvalidateStandaloneSessions();
   const invalidateWorkspaceSessions = useInvalidateWorkspaceSessions();
   const [isLoading, setIsLoading] = useState(false);
@@ -92,113 +88,97 @@ export function PendingSessionContent() {
   );
 }
 
+export function useWorkspaceSelector() {
+  const value = useStore(sessionStore, (state) => state.pendingSession?.workspaceId ?? null);
+
+  const onChange = (nextWorkspaceId: string | null) => {
+    sessionStore.getState().createPendingSession(nextWorkspaceId);
+  };
+
+  return {
+    value,
+    onChange,
+  };
+}
+
 function SessionProfile() {
+  const workspaceSelectorProps = useWorkspaceSelector();
+
   return (
     <div className="mt-2.5 flex items-center gap-2 pl-2">
-      <WorkspaceSelector />
+      <WorkspaceSelector {...workspaceSelectorProps} />
     </div>
   );
 }
 
-function WorkspaceSelector() {
-  const pendingWorkspaceId = useStore(
-    sessionStore,
-    (state) => state.pendingSession?.workspaceId ?? null,
-  );
+interface WorkspaceSelectorProps {
+  value: string | null;
+  onChange: (value: string | null) => void;
+}
 
+function WorkspaceSelector({ value, onChange }: WorkspaceSelectorProps) {
   const [open, setOpen] = useState(false);
-  const { data } = useQuery({
-    queryKey: ["workspaces", "pending-selector"],
-    queryFn: () => listWorkspaces(),
-  });
+  const [search, setSearch] = useState("");
 
-  const workspaces = data ?? [];
-  const selectedWorkspace = workspaces.find((w) => w.id === pendingWorkspaceId);
-
-  const handleSelect = (id: string | null) => {
-    const { pendingSession, createPendingSession } = sessionStore.getState();
-    createPendingSession(id);
-    setOpen(false);
-  };
-
-  const handleClear = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    handleSelect(null);
-  };
+  const { data: workspaces = [] } = useWorkspaceList();
+  const selectedWorkspace = value ? workspaces.find((w) => w.id === value) : null;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button className="group flex items-center gap-1.5 rounded-xl border border-border bg-muted/50 px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-          <Folder className="size-3.5" />
-          <span className="font-medium text-foreground">
-            {selectedWorkspace ? selectedWorkspace.name : "选择项目"}
-          </span>
+        <button className="group flex h-6 w-auto max-w-[200px] items-center gap-1.5 rounded-[8px] border-none bg-muted/50 px-2.5 py-0 text-xs text-muted-foreground shadow-none hover:bg-muted/80 hover:text-foreground focus:outline-hidden">
           {selectedWorkspace ? (
-            <div className="relative ml-0.5 flex size-3 items-center justify-center">
-              <ChevronDown className="absolute size-3 transition-opacity group-hover:opacity-0" />
-              <X
-                className="absolute size-3 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
-                onClick={handleClear}
-              />
-            </div>
+            <>
+              <Folder className="size-3.5 opacity-50" />
+              <span className="truncate text-foreground">{selectedWorkspace.name}</span>
+              <div
+                className="hidden items-center justify-center group-hover:flex"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onChange(null);
+                }}
+              >
+                <X className="size-3.5 opacity-50 hover:opacity-100" />
+              </div>
+              <div className="flex items-center justify-center group-hover:hidden">
+                <ChevronDown className="size-3.5 opacity-50" />
+              </div>
+            </>
           ) : (
-            <ChevronDown className="ml-0.5 size-3" />
+            <>
+              <Folder className="size-3.5 opacity-50" />
+              <span className="truncate">选择工作区</span>
+              <ChevronDown className="size-3.5 opacity-50" />
+            </>
           )}
         </button>
       </PopoverTrigger>
 
-      <PopoverContent align="start" className="w-[240px] p-0 shadow-2xl">
+      <PopoverContent align="start" className="w-[180px] p-0" sideOffset={8}>
         <Command>
-          <CommandInput placeholder="搜索项目" className="h-9 text-xs" />
-          <CommandList className="max-h-[180px]">
-            <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
-              无匹配的项目
-            </CommandEmpty>
+          <CommandInput placeholder="搜索项目" value={search} onValueChange={setSearch} />
+          <CommandList>
+            <CommandEmpty>无匹配的项目</CommandEmpty>
             <CommandGroup>
-              {workspaces.map((workspace) => (
+              {workspaces.map((workspace: Workspace) => (
                 <CommandItem
                   key={workspace.id}
                   value={workspace.name || workspace.id}
-                  onSelect={() => handleSelect(workspace.id)}
-                  className="flex cursor-pointer items-center justify-between gap-2 p-1.5 text-xs text-muted-foreground hover:bg-muted/50 aria-selected:bg-muted/50 aria-selected:text-foreground"
+                  onSelect={() => {
+                    onChange(workspace.id);
+                    setOpen(false);
+                  }}
                 >
-                  <div className="flex min-w-0 items-center gap-2">
-                    <Folder className="size-3.5 shrink-0" />
-                    <span className="truncate text-foreground">{workspace.name || "untitled"}</span>
-                  </div>
-                  {workspace.id === pendingWorkspaceId && (
-                    <Check className="size-3.5 shrink-0 text-primary" />
-                  )}
+                  <span className="flex w-full min-w-0 items-center gap-2">
+                    <Folder className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="truncate">{workspace.name}</span>
+                  </span>
+                  {value === workspace.id && <Check className="ml-auto size-4 shrink-0" />}
                 </CommandItem>
               ))}
             </CommandGroup>
           </CommandList>
-
-          <div className="my-1 border-t border-border/50" />
-
-          <div className="p-1">
-            <button
-              onClick={() => {
-                setOpen(false);
-              }}
-              className="flex w-full cursor-pointer items-center justify-between rounded-md p-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              <div className="flex items-center gap-2">
-                <FolderPlus className="size-3.5" />
-                <span>添加新项目</span>
-              </div>
-              <ChevronRight className="size-3.5 opacity-50" />
-            </button>
-            <button
-              onClick={() => handleSelect(null)}
-              className="flex w-full cursor-pointer items-center gap-2 rounded-md p-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              <FolderX className="size-3.5" />
-              <span>不使用项目</span>
-            </button>
-          </div>
         </Command>
       </PopoverContent>
     </Popover>

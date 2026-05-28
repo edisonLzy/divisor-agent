@@ -10,7 +10,13 @@ export function Chat() {
   const shouldRenderPendingState = !activeSessionId;
 
   return (
-    <div className="flex h-full flex-col bg-background">
+    <div
+      className="flex h-full flex-col rounded-tr-3xl overflow-hidden ring-1 ring-white/8"
+      style={{
+        background:
+          "radial-gradient(circle at 10% 0%, rgba(255,255,255,0.06), transparent 40%), rgba(17,17,17,0.88)",
+      }}
+    >
       <ErrorBoundary>
         {shouldRenderPendingState ? <PendingSessionContent /> : <ActiveSessionContent />}
       </ErrorBoundary>

@@ -2,6 +2,8 @@ import { listWorkspaces } from "@renderer/apis/sessions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 
+import { useInvalidateWorkspaceList } from "./use-workspace-list";
+
 // ── Data Hook ───────────────────────────────────────────────────────────────
 
 export function useWorkspaces() {
@@ -16,10 +18,7 @@ export function useWorkspaces() {
 // ── Invalidation Hooks ──────────────────────────────────────────────────────
 
 export function useInvalidateWorkspaces() {
-  const queryClient = useQueryClient();
-  return useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: ["workspaces", "non-pinned"] });
-  }, [queryClient]);
+  return useInvalidateWorkspaceList();
 }
 
 export function useInvalidateWorkspaceSessions() {
