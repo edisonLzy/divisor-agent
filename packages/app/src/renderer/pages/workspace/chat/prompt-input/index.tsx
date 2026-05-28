@@ -1,7 +1,7 @@
 import { Button } from "@renderer/components/ui/button";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { cn } from "@renderer/lib/utils";
-import { ArrowUp, ChevronDown, Hand, Plus } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 
 import type { PromptSubmission } from "../prompt-types";
@@ -73,56 +73,21 @@ export function PromptInput({ disabled = false, onSubmit, sessionId }: PromptInp
         className="min-h-14"
       />
 
-      <div className="flex items-center justify-between gap-2 px-3 py-3">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Button
-            type="button"
-            size="icon-sm"
-            variant="ghost"
-            className="size-7 rounded-sm hover:bg-muted"
-            aria-label="Add attachment"
-          >
-            <Plus className="size-4" />
-          </Button>
+      <div className="flex items-center justify-end gap-2 px-3 py-3">
+        <ModalSelector {...modelSelectorProps} />
 
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1 rounded-sm px-2 text-xs font-normal hover:bg-muted"
-          >
-            <Hand className="size-3.5" />
-            <span>默认权限</span>
-            <ChevronDown className="size-3" />
-          </Button>
-        </div>
-
-        <div className="ml-auto flex items-center gap-2">
-          <ModalSelector {...modelSelectorProps} />
-
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1 rounded-sm px-2 text-xs font-normal hover:bg-muted"
-          >
-            <span>自定义 中</span>
-            <ChevronDown className="size-3" />
-          </Button>
-
-          <Button
-            type="button"
-            onClick={() => {
-              void handleSubmit();
-            }}
-            disabled={!canSubmit}
-            size="icon-sm"
-            className="size-7 rounded-full bg-muted-foreground/20 text-muted-foreground transition-colors hover:bg-muted-foreground/30 disabled:bg-muted disabled:text-muted-foreground/50"
-            aria-label="Send prompt"
-          >
-            <ArrowUp className="size-3.5" />
-          </Button>
-        </div>
+        <Button
+          type="button"
+          onClick={() => {
+            void handleSubmit();
+          }}
+          disabled={!canSubmit}
+          size="icon-sm"
+          className="size-7 rounded-full bg-muted-foreground/20 text-muted-foreground transition-colors hover:bg-muted-foreground/30 disabled:bg-muted disabled:text-muted-foreground/50"
+          aria-label="Send prompt"
+        >
+          <ArrowUp className="size-3.5" />
+        </Button>
       </div>
     </div>
   );

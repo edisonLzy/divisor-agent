@@ -19,7 +19,7 @@ export function WorkspacePage() {
   void useAgentSessions();
 
   return (
-    <div className="flex h-screen w-full flex-col overflow-hidden bg-background font-sans text-foreground">
+    <div className="flex h-screen w-full flex-col overflow-hidden bg-transparent font-sans text-foreground">
       <Titlebar>
         <ToggleSidebarButton isCollapsed={isCollapsed} onToggle={toggle} />
         <span className="text-[13px] font-medium text-sidebar-foreground/80">divisor-agent</span>

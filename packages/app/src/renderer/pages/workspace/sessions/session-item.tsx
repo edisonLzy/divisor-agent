@@ -18,7 +18,7 @@ import {
   sessionStore,
 } from "@renderer/store/sessions";
 import { useQueryClient } from "@tanstack/react-query";
-import { Pin, PinOff, MoreHorizontal, Trash2, Loader2 } from "lucide-react";
+import { Pin, PinOff, Trash2, Loader2 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useStore } from "zustand";
 
@@ -115,63 +115,72 @@ export function SessionItem({ session }: SessionItemProps) {
 
   return (
     <div
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setDropdownOpen(true);
+      }}
       className={cn(
-        "group flex w-full items-center rounded-md px-2 text-[13px] transition-colors",
-        isActive ? "bg-sidebar-accent" : "hover:bg-sidebar-accent",
+        "group flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] transition-[background-color,color]",
+        isActive
+          ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-[inset_0_0_0_1px_rgb(255_255_255/0.03)]"
+          : "hover:bg-sidebar-accent/80",
       )}
     >
       <button
         onClick={handleSelectSession}
         className={cn(
-          "flex min-w-0 flex-1 items-center py-1 text-left",
+          "flex min-w-0 flex-1 items-center overflow-hidden text-left leading-5",
           isActive
-            ? "text-sidebar-accent-foreground font-medium"
-            : "text-sidebar-foreground/80 group-hover:text-sidebar-foreground",
+            ? "font-medium text-sidebar-accent-foreground"
+            : "text-sidebar-foreground/78 group-hover:text-sidebar-foreground",
         )}
       >
-        <span className="truncate pr-1">{session.name.trim() || "untitled"}</span>
+        <span className="truncate pr-2">{session.name.trim() || "untitled"}</span>
         <SessionStatusDot
           status={sessionStore.getState().getSession(session.id)?.status ?? "idle"}
         />
       </button>
 
-      <span
-        className={cn(
-          "shrink-0 text-[11px] text-muted-foreground/40 group-hover:hidden mr-1",
-          isActive && "hidden",
-        )}
-      >
-        {formatRelativeTime(new Date(session.updatedAt))}
-      </span>
-
-      <span
-        className={cn(
-          "hidden shrink-0 items-center",
-          "group-hover:flex",
-          isActive && "flex",
-          dropdownOpen && "flex",
-        )}
-      >
-        <button
-          onClick={handleTogglePin}
-          className="flex items-center justify-center rounded p-0.5 text-sidebar-foreground/40 transition-colors hover:text-sidebar-foreground"
-          title={session.isTop ? "取消置顶" : "置顶"}
+      <div className="relative shrink-0 flex justify-end min-w-[3.25rem]">
+        <span
+          className={cn(
+            "text-[11px] text-sidebar-foreground/32 group-hover:invisible",
+            isActive && "hidden pointer-events-none",
+          )}
         >
-          {session.isTop ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
-        </button>
+          {formatRelativeTime(new Date(session.updatedAt))}
+        </span>
 
-        <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
-          <DropdownMenuTrigger className="flex items-center justify-center rounded p-0.5 text-sidebar-foreground/40 transition-colors hover:text-sidebar-foreground">
-            <MoreHorizontal className="size-3.5" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" sideOffset={2}>
-            <DropdownMenuItem onClick={handleDelete} variant="destructive">
-              <Trash2 className="size-3.5" />
-              删除
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </span>
+        <span
+          className={cn(
+            "absolute inset-0 flex items-center justify-end",
+            "opacity-0 group-hover:opacity-100 transition-opacity",
+            isActive && "opacity-100",
+            dropdownOpen && "opacity-100",
+          )}
+        >
+          <button
+            onClick={handleTogglePin}
+            className="flex items-center justify-center rounded-md p-1 text-sidebar-foreground/32 transition-colors hover:bg-black/10 hover:text-sidebar-foreground"
+            title={session.isTop ? "取消置顶" : "置顶"}
+          >
+            {session.isTop ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
+          </button>
+
+          <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
+            <DropdownMenuTrigger
+              className="absolute right-0 size-7 opacity-0"
+              aria-label="更多操作"
+            />
+            <DropdownMenuContent align="end" sideOffset={2}>
+              <DropdownMenuItem onClick={handleDelete} variant="destructive">
+                <Trash2 className="size-3.5" />
+                删除
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </span>
+      </div>
     </div>
   );
 }
@@ -190,17 +199,17 @@ function SessionStatusDot({ status }: { status: SessionStatus }) {
 
   if (status === "running") {
     return (
-      <span className="flex items-center gap-1 ml-1.5" title="执行中">
-        <Loader2 className="size-3.5 animate-spin text-muted-foreground/60" />
+      <span className="ml-1.5 flex items-center gap-1" title="执行中">
+        <Loader2 className="size-3.5 animate-spin text-sidebar-foreground/45" />
       </span>
     );
   }
 
   const config = STATUS_CONFIG[status];
   return (
-    <span className="flex items-center gap-1 ml-1.5" title={config?.label}>
+    <span className="ml-1.5 flex items-center gap-1" title={config?.label}>
       <span className={cn("size-1.5 rounded-full shrink-0", config?.dotClass)} />
-      <span className="text-[11px] text-muted-foreground/60">{config?.label}</span>
+      <span className="text-[11px] text-sidebar-foreground/45">{config?.label}</span>
     </span>
   );
 }

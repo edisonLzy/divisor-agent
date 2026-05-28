@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 export function BottomActions() {
   return (
-    <div className="flex flex-col p-2 space-y-[2px]">
+    <div className="shrink-0 p-3">
       <SettingsButton />
     </div>
   );
@@ -15,9 +15,9 @@ function SettingsButton() {
   return (
     <button
       onClick={() => navigate("/settings")}
-      className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-[13px] font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground overflow-hidden"
+      className="flex w-full items-center gap-2 overflow-hidden rounded-lg px-3 py-2 text-[13px] font-medium text-sidebar-foreground/75 transition-[background-color,color] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
     >
-      <Settings className="size-4 opacity-70 shrink-0" />
+      <Settings className="size-4 shrink-0 text-sidebar-foreground/55" />
       <span className="truncate">设置</span>
     </button>
   );

@@ -1,26 +1,42 @@
+import { createWorkspace } from "@renderer/apis/sessions";
+import { Button } from "@renderer/components/ui/button";
 import {
   CollapsibleContent,
   CollapsibleTrigger,
   Collapsible,
 } from "@renderer/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@renderer/components/ui/dialog";
+import { Input } from "@renderer/components/ui/input";
+import { Textarea } from "@renderer/components/ui/textarea";
+import { FolderPlus, MessageSquarePlus } from "lucide-react";
 import type { ReactNode } from "react";
+import { useCallback, useState } from "react";
 
+import { useCreateSession } from "../use-create-session";
 import { BottomActions } from "./bottom-actions";
 import { SessionItem } from "./session-item";
 import { TopActions } from "./top-actions";
 import { usePinnedSessions } from "./use-pinned-sessions";
 import { useStandaloneSessions } from "./use-standalone-sessions";
-import { useWorkspaces } from "./use-workspaces";
+import { useWorkspaces, useInvalidateWorkspaces } from "./use-workspaces";
 import { WorkspaceItem } from "./workspace-item";
 
 // ── Sessions (Sidebar) ──────────────────────────────────────────────────────
 
 export function Sessions() {
   return (
-    <div className="flex h-full w-full flex-col bg-sidebar border-r border-sidebar-border select-none">
+    <div className="flex h-full w-full flex-col overflow-hidden border-r border-sidebar-border bg-sidebar/75 text-[13px] text-sidebar-foreground/70 select-none backdrop-blur-xl">
       <TopActions />
 
-      <div className="flex-1 min-h-0 overflow-y-auto pb-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-2 py-4">
         <PinGroup />
         <WorkspacesGroup />
         <ChatGroup />
@@ -49,7 +65,7 @@ function PinGroup() {
           ))}
         </>
       ) : (
-        <div className="px-2 py-1 text-[12px] text-muted-foreground/40 break-keep truncate">
+        <div className="truncate break-keep px-3 py-1.5 text-[12px] text-sidebar-foreground/30">
           暂无置顶
         </div>
       )}
@@ -63,11 +79,11 @@ function WorkspacesGroup() {
   const { workspaces } = useWorkspaces();
 
   return (
-    <GroupSection title="项目">
+    <GroupSection title="项目" action={<CreateWorkspaceButton />}>
       {workspaces.length > 0 ? (
         workspaces.map((ws) => <WorkspaceItem key={ws.id} workspace={ws} />)
       ) : (
-        <div className="px-2 py-1 text-[12px] text-muted-foreground/40 break-keep truncate">
+        <div className="truncate break-keep px-3 py-1.5 text-[12px] text-sidebar-foreground/30">
           暂无项目
         </div>
       )}
@@ -75,18 +91,106 @@ function WorkspacesGroup() {
   );
 }
 
-// ── ChatGroup ───────────────────────────────────────────────────────────────
+// ── CreateWorkspaceButton ────────────────────────────────────────────────────
 
+function CreateWorkspaceButton() {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [systemPrompt, setSystemPrompt] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const invalidateWorkspaces = useInvalidateWorkspaces();
+
+  const handleCreate = useCallback(async () => {
+    if (!name.trim()) return;
+    setIsCreating(true);
+    try {
+      await createWorkspace({ name: name.trim(), systemPrompt: systemPrompt.trim() || null });
+      setName("");
+      setSystemPrompt("");
+      setDialogOpen(false);
+      await invalidateWorkspaces();
+    } catch (error) {
+      console.error("Failed to create workspace:", error);
+    } finally {
+      setIsCreating(false);
+    }
+  }, [name, systemPrompt, invalidateWorkspaces]);
+
+  return (
+    <>
+      <button
+        onClick={() => setDialogOpen(true)}
+        className="flex items-center justify-center rounded-md p-0.5 text-sidebar-foreground/32 transition-colors hover:bg-black/10 hover:text-sidebar-foreground"
+        title="创建项目"
+      >
+        <FolderPlus className="size-3.5" />
+      </button>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>创建项目</DialogTitle>
+            <DialogDescription>创建一个新的工作区来组织相关对话。</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-foreground/80">名称</label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="输入工作区名称"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (name.trim()) handleCreate();
+                  }
+                }}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-foreground/80">系统提示（可选）</label>
+              <Textarea
+                value={systemPrompt}
+                onChange={(e) => setSystemPrompt(e.target.value)}
+                placeholder="输入系统提示词..."
+                className="min-h-[80px] resize-none"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline">取消</Button>} />
+            <Button onClick={handleCreate} disabled={!name.trim() || isCreating}>
+              {isCreating ? "创建中..." : "创建"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
 function ChatGroup() {
   const { sessions, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
     useStandaloneSessions();
+  const { handleCreateSession } = useCreateSession();
 
   return (
-    <GroupSection title="对话">
+    <GroupSection
+      title="对话"
+      action={
+        <button
+          onClick={() => handleCreateSession()}
+          className="flex items-center justify-center rounded-md p-0.5 text-sidebar-foreground/32 transition-colors hover:bg-black/10 hover:text-sidebar-foreground"
+          title="新对话"
+        >
+          <MessageSquarePlus className="size-3.5" />
+        </button>
+      }
+    >
       {isLoading ? (
-        <div className="px-2 py-1 text-[12px] text-muted-foreground/40">加载中...</div>
+        <div className="px-3 py-1.5 text-[12px] text-sidebar-foreground/30">加载中...</div>
       ) : sessions.length === 0 ? (
-        <div className="px-2 py-1 text-[12px] text-muted-foreground/40 break-keep truncate">
+        <div className="truncate break-keep px-3 py-1.5 text-[12px] text-sidebar-foreground/30">
           暂无聊天
         </div>
       ) : (
@@ -98,7 +202,7 @@ function ChatGroup() {
             <button
               onClick={() => fetchNextPage()}
               disabled={isFetchingNextPage}
-              className="w-full px-2 py-1 text-left text-[12px] text-muted-foreground/40 transition-colors hover:text-sidebar-foreground/70"
+              className="mt-1 w-full rounded-lg px-3 py-1.5 text-left text-[12px] text-sidebar-foreground/35 transition-colors hover:bg-sidebar-accent/80 hover:text-sidebar-foreground disabled:cursor-default disabled:hover:bg-transparent"
             >
               {isFetchingNextPage ? "加载中..." : "加载更多"}
             </button>
@@ -114,17 +218,26 @@ function ChatGroup() {
 interface GroupSectionProps {
   title: string;
   defaultOpen?: boolean;
+  action?: ReactNode;
   children: ReactNode;
 }
 
-function GroupSection({ title, defaultOpen = true, children }: GroupSectionProps) {
+function GroupSection({ title, defaultOpen = true, action, children }: GroupSectionProps) {
   return (
-    <Collapsible defaultOpen={defaultOpen} className="mt-2 mb-2">
-      <CollapsibleTrigger className="cursor-pointer flex w-full items-center px-4 py-1 text-[12px] font-medium text-sidebar-foreground/50 transition-colors hover:text-sidebar-foreground/70">
+    <Collapsible defaultOpen={defaultOpen} className="space-y-1.5">
+      <CollapsibleTrigger className="group/section flex w-full cursor-pointer items-center gap-1 px-3 py-0.5 text-[11px] font-semibold tracking-[0.14em] text-sidebar-foreground/35 transition-colors hover:text-sidebar-foreground/55">
         <span>{title}</span>
+        {action && (
+          <span
+            className="ml-auto flex shrink-0 opacity-0 transition-opacity group-hover/section:opacity-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {action}
+          </span>
+        )}
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="space-y-px px-2">{children}</div>
+        <div className="space-y-0.5">{children}</div>
       </CollapsibleContent>
     </Collapsible>
   );

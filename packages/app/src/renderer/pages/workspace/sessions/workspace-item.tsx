@@ -24,7 +24,7 @@ import {
 import { cn } from "@renderer/lib/utils";
 import { sessionStore } from "@renderer/store/sessions";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
-import { Folder, FolderOpen, Pin, PinOff, Plus, MoreHorizontal, Trash2 } from "lucide-react";
+import { Folder, FolderOpen, Pin, PinOff, Plus, Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";
 
 import { useCreateSession } from "../use-create-session";
@@ -112,26 +112,37 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <div className="group flex w-full items-center gap-1 rounded-md px-2 py-1 text-[13px] text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground">
-        <CollapsibleTrigger className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
+      <div
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setDropdownOpen(true);
+        }}
+        className={cn(
+          "group flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] transition-[background-color,color]",
+          open
+            ? "bg-sidebar-accent/70 text-sidebar-foreground"
+            : "text-sidebar-foreground/78 hover:bg-sidebar-accent/80 hover:text-sidebar-foreground",
+        )}
+      >
+        <CollapsibleTrigger className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-left leading-5">
           {open ? (
-            <FolderOpen className="size-4 shrink-0 opacity-60" />
+            <FolderOpen className="size-4 shrink-0 text-sidebar-foreground/55" />
           ) : (
-            <Folder className="size-4 shrink-0 opacity-60" />
+            <Folder className="size-4 shrink-0 text-sidebar-foreground/40" />
           )}
           <span className="truncate">{workspace.name || "untitled"}</span>
         </CollapsibleTrigger>
 
         <span
           className={cn(
-            "hidden shrink-0 items-center gap-0.5",
-            "group-hover:flex",
+            "relative flex shrink-0 items-center gap-0.5",
+            "opacity-0 group-hover:opacity-100 transition-opacity",
             dropdownOpen && "flex",
           )}
         >
           <button
             onClick={handleTogglePin}
-            className="flex items-center justify-center rounded p-0.5 text-muted-foreground hover:text-sidebar-foreground"
+            className="flex items-center justify-center rounded-md p-1 text-sidebar-foreground/32 transition-colors hover:bg-black/10 hover:text-sidebar-foreground"
             title={workspace.isTop ? "取消置顶" : "置顶"}
           >
             {workspace.isTop ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
@@ -139,7 +150,7 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
 
           <button
             onClick={handleCreateWorkflowSession}
-            className="flex items-center justify-center rounded p-0.5 text-muted-foreground hover:text-sidebar-foreground"
+            className="flex items-center justify-center rounded-md p-1 text-sidebar-foreground/32 transition-colors hover:bg-black/10 hover:text-sidebar-foreground"
             title="新建对话"
           >
             <Plus className="size-3.5" />
@@ -147,11 +158,9 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
 
           <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
             <DropdownMenuTrigger
-              className="flex items-center justify-center rounded p-0.5 text-muted-foreground hover:text-sidebar-foreground"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <MoreHorizontal className="size-3.5" />
-            </DropdownMenuTrigger>
+              className="absolute right-0 size-7 opacity-0"
+              aria-label="更多操作"
+            />
             <DropdownMenuContent align="end" sideOffset={2}>
               <DropdownMenuItem variant="destructive" onClick={handleDelete}>
                 <Trash2 className="size-3.5 mr-2" />
@@ -163,11 +172,11 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
       </div>
 
       <CollapsibleContent>
-        <div className="pl-4 space-y-[1px] py-0.5">
+        <div className="space-y-0.5 py-1 pl-4">
           {isLoading ? (
-            <div className="px-2 py-1 text-[12px] text-muted-foreground/40">加载中...</div>
+            <div className="px-3 py-1.5 text-[12px] text-sidebar-foreground/30">加载中...</div>
           ) : sessions.length === 0 ? (
-            <div className="px-2 py-1 text-[12px] text-muted-foreground/40 break-keep truncate">
+            <div className="truncate break-keep px-3 py-1.5 text-[12px] text-sidebar-foreground/30">
               暂无对话
             </div>
           ) : (
@@ -179,7 +188,7 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
                 <button
                   onClick={() => fetchNextPage()}
                   disabled={isFetchingNextPage}
-                  className="w-full px-2 py-1 text-left text-[12px] text-muted-foreground/40 transition-colors hover:text-sidebar-foreground/70"
+                  className="mt-1 w-full rounded-lg px-3 py-1.5 text-left text-[12px] text-sidebar-foreground/35 transition-colors hover:bg-sidebar-accent/80 hover:text-sidebar-foreground disabled:cursor-default disabled:hover:bg-transparent"
                 >
                   {isFetchingNextPage ? "加载中..." : "加载更多"}
                 </button>

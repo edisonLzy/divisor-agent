@@ -7,6 +7,8 @@ import { AgentPool } from "./agent-pool.js";
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
+    transparent: true,
+    vibrancy: "sidebar",
     width: 1200,
     height: 800,
     x: 100,
