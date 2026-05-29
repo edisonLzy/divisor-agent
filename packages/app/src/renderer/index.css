@@ -222,7 +222,8 @@
     @apply font-sans h-full;
   }
   body {
-    @apply bg-background text-foreground m-0 h-full;
+    @apply text-foreground m-0 h-full;
+    background: transparent;
   }
 }
 

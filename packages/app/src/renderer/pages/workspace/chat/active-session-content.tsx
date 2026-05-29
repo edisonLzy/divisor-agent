@@ -4,39 +4,59 @@ import { sessionStore, type ToolExecutionState } from "@renderer/store/sessions"
 import { useCallback } from "react";
 import { useStore } from "zustand";
 
+import { ChatMessages } from "./messages";
+import { PromptInput } from "./prompt-input";
 import type { PromptSubmission } from "./prompt-types";
+
+export function ActiveSessionContent() {
+  const { isLoading, messageEntries, streamingEntryId, toolStates, submitPrompt } =
+    useActiveSessionChat();
+  const activeSessionId = useStore(sessionStore, (state) => state.activeSessionId);
+
+  return (
+    <>
+      <section className="min-h-0 flex-1 px-6 pt-6">
+        <ChatMessages
+          messageEntries={messageEntries}
+          streamingEntryId={streamingEntryId}
+          toolStates={toolStates}
+        />
+      </section>
+
+      <section className="shrink-0 px-6 pb-6 pt-4">
+        <PromptInput disabled={isLoading} onSubmit={submitPrompt} sessionId={activeSessionId} />
+      </section>
+    </>
+  );
+}
 
 const EMPTY_TOOL_STATES = new Map<string, ToolExecutionState>();
 
-// ── Public hook ──────────────────────────────────────────────────────────────
-
-export function useChat() {
+function useActiveSessionChat() {
   const { invoke } = useElectronIPC();
   const { activeSessionId, sessions } = useStore(sessionStore);
   const activeSession = activeSessionId
     ? sessions.find((session) => session.id === activeSessionId)
     : undefined;
   const messageEntries = (activeSession?.entries ?? []).filter(isAgentMessageEntry);
-
   const toolStates = activeSession?.toolStates ?? EMPTY_TOOL_STATES;
 
   const submitPrompt = useCallback(
     async (submission: PromptSubmission) => {
-      const sessionId = activeSessionId;
-      if (!sessionId) {
+      if (!activeSessionId) {
         return;
       }
 
-      sessionStore.getState().setSessionStatus(sessionId, "running");
+      sessionStore.getState().setSessionStatus(activeSessionId, "running");
 
       try {
-        await invoke("prompt", sessionId, submission.text, {
+        await invoke("prompt", activeSessionId, submission.text, {
           modelId: submission.model.modelId,
           providerId: submission.model.providerId,
         });
       } catch (error) {
         console.error("Failed to submit prompt", error);
-        sessionStore.getState().setSessionStatus(sessionId, "idle");
+        sessionStore.getState().setSessionStatus(activeSessionId, "idle");
       }
     },
     [activeSessionId, invoke],

@@ -10,6 +10,12 @@ import { createStore, type StateCreator } from "zustand/vanilla";
 
 export type SessionStatus = "idle" | "running" | "completed" | "failed";
 
+// ── Pending Session Constants ──────────────────────────────────────────────
+
+/** Shared Symbol used for all pending session IDs.
+ * Only one pending session exists at a time, so a single Symbol suffices. */
+const PENDING_SESSION_SYMBOL = Symbol("pending-session");
+
 // ── Entry Types ──────────────────────────────────────────────────────────────
 
 /** Possible states during a tool call's lifecycle */
@@ -83,10 +89,22 @@ export interface AgentSession extends Session {
   status: SessionStatus;
 }
 
+// ── Pending Session (frontend-only) ────────────────────────────────────────
+
+export interface AgentPendingSession {
+  /** Symbol-based ID, unique within the frontend session */
+  id: symbol;
+  /** Optional workspace ID if created from a workspace */
+  workspaceId: string | null;
+  /** When this pending session was created */
+  createdAt: number;
+}
+
 // ── Sessions Slice ─────────────────────────────────────────────────────
 
 export interface SessionsSlice {
   activeSessionId: string | null;
+  pendingSession: AgentPendingSession | null;
   sessions: AgentSession[];
   /** Get a session by ID, or undefined if not found */
   getSession: (sessionId: string) => AgentSession | undefined;
@@ -94,8 +112,14 @@ export interface SessionsSlice {
   appendSession: (session: Session) => void;
   /** Switch the active session (the one displayed in the UI) */
   setActiveSessionId: (sessionId: string | null) => void;
-  /** Bulk-set sessions from API list response */
-  setSessions: (sessions: Session[]) => void;
+  /** Create a pending session (frontend-only, not persisted to server) */
+  createPendingSession: (workspaceId?: string | null) => AgentPendingSession;
+  /** Clear the current pending session */
+  clearPendingSession: () => void;
+  /** Remove a session from the local store by ID */
+  removeSession: (sessionId: string) => void;
+  /** Bulk-add sessions to store (no-op for existing IDs) */
+  addSessions: (sessions: Session[]) => void;
   /** Set the execution status of a session */
   setSessionStatus: (sessionId: string, status: SessionStatus) => void;
   /** Update the currently selected model for this session */
@@ -141,6 +165,7 @@ type StoreType = SessionsSlice & EntriesSlice;
 
 const createSessionsSlice: StateCreator<StoreType, [], [], SessionsSlice> = (set, get) => ({
   activeSessionId: null,
+  pendingSession: null,
   sessions: [],
 
   getSession: (sessionId) => {
@@ -157,26 +182,37 @@ const createSessionsSlice: StateCreator<StoreType, [], [], SessionsSlice> = (set
 
   setActiveSessionId: (id) => set({ activeSessionId: id }),
 
-  setSessions: (sessions) => {
+  createPendingSession: (workspaceId) => {
+    const pending: AgentPendingSession = {
+      id: PENDING_SESSION_SYMBOL,
+      workspaceId: workspaceId ?? null,
+      createdAt: Date.now(),
+    };
+    set({ pendingSession: pending, activeSessionId: null });
+    return pending;
+  },
+
+  clearPendingSession: () => {
+    set({ pendingSession: null });
+  },
+
+  removeSession: (sessionId) => {
+    const state = get();
     set((prev) => {
-      const existingMap = new Map(prev.sessions.map((session) => [session.id, session]));
+      const sessions = prev.sessions.filter((s) => s.id !== sessionId);
+      const activeSessionId = prev.activeSessionId === sessionId ? null : prev.activeSessionId;
+      return { sessions, activeSessionId };
+    });
+  },
 
-      return {
-        sessions: sessions.map((session) => {
-          const existing = existingMap.get(session.id);
-          if (!existing) {
-            return createSessionState(session);
-          }
-
-          return {
-            ...createSessionState(session),
-            entries: existing.entries,
-            model: existing.model,
-            toolStates: existing.toolStates,
-            status: existing.status,
-          };
-        }),
-      };
+  addSessions: (sessions) => {
+    set((prev) => {
+      const existingIds = new Set(prev.sessions.map((s) => s.id));
+      const newSessions = sessions
+        .filter((s) => !existingIds.has(s.id))
+        .map((s) => createSessionState(s));
+      if (newSessions.length === 0) return prev;
+      return { sessions: [...prev.sessions, ...newSessions] };
     });
   },
 

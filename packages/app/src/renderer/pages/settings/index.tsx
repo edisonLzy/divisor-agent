@@ -152,7 +152,7 @@ export function SettingsPage() {
   ];
 
   return (
-    <div className="flex h-screen w-full flex-col overflow-hidden bg-background text-foreground">
+    <div className="flex h-screen w-full flex-col overflow-hidden bg-transparent text-foreground">
       <Titlebar>
         <button
           onClick={() => navigate("/")}
@@ -165,7 +165,7 @@ export function SettingsPage() {
       </Titlebar>
       <ResizablePanelGroup orientation="horizontal" className="flex-1">
         <ResizablePanel defaultSize="20%" minSize="16%" maxSize="24%">
-          <aside className="flex h-full flex-col border-r border-border bg-card px-3 py-4 text-foreground select-none">
+          <aside className="flex h-full flex-col border-r border-white/8 bg-white/6 px-3 py-4 text-foreground select-none pt-9">
             <nav className="flex flex-col space-y-0.5">
               {SECTIONS.map((section) => {
                 const isActive = section.id === activeSection;
@@ -193,7 +193,15 @@ export function SettingsPage() {
         <ResizableHandle withHandle />
 
         <ResizablePanel defaultSize="80%" minSize="60%">
-          <main className="h-full overflow-y-auto bg-background">
+          <main
+            className="h-full overflow-y-auto rounded-tl-xl"
+            style={
+              {
+                background:
+                  "radial-gradient(circle at 10% 0%, rgba(255,255,255,0.06), transparent 40%), rgba(17,17,17,0.88)",
+              } as React.CSSProperties
+            }
+          >
             <div className="mx-auto flex min-h-full w-full max-w-160 flex-col px-10 py-12">
               <h1 className="mb-8 text-center text-[20px] font-medium text-foreground">
                 {SECTIONS.find((section) => section.id === activeSection)?.label}

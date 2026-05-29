@@ -1,27 +1,25 @@
+import { ErrorBoundary } from "@renderer/components/ui/error-boundary";
 import { sessionStore } from "@renderer/store/sessions";
 import { useStore } from "zustand";
 
-import { ChatMessages } from "./messages";
-import { PromptInput } from "./prompt-input";
-import { useChat } from "./use-chat";
+import { ActiveSessionContent } from "./active-session-content";
+import { PendingSessionContent } from "./pending-session-content";
 
 export function Chat() {
-  const { isLoading, messageEntries, streamingEntryId, toolStates, submitPrompt } = useChat();
-  const activeSessionId = useStore(sessionStore, (s) => s.activeSessionId);
+  const activeSessionId = useStore(sessionStore, (state) => state.activeSessionId);
+  const shouldRenderPendingState = !activeSessionId;
 
   return (
-    <div className="flex h-full flex-col bg-background">
-      <section className="min-h-0 flex-1 px-6 pt-6">
-        <ChatMessages
-          messageEntries={messageEntries}
-          streamingEntryId={streamingEntryId}
-          toolStates={toolStates}
-        />
-      </section>
-
-      <section className="shrink-0 px-6 pb-6 pt-4">
-        <PromptInput disabled={isLoading} onSubmit={submitPrompt} sessionId={activeSessionId} />
-      </section>
+    <div
+      className="flex h-full flex-col rounded-tr-3xl overflow-hidden ring-1 ring-white/8"
+      style={{
+        background:
+          "radial-gradient(circle at 10% 0%, rgba(255,255,255,0.06), transparent 40%), rgba(17,17,17,0.88)",
+      }}
+    >
+      <ErrorBoundary>
+        {shouldRenderPendingState ? <PendingSessionContent /> : <ActiveSessionContent />}
+      </ErrorBoundary>
     </div>
   );
 }

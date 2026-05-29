@@ -8,7 +8,7 @@ export function Titlebar({ children }: TitlebarProps) {
   return (
     <div
       className={cn(
-        "flex h-11.5 shrink-0 items-center gap-3 bg-sidebar border-b border-sidebar-border",
+        "absolute top-0 left-0 right-0 z-10 flex h-9 items-center gap-3",
         "pl-20 pr-4 select-none",
       )}
       style={{ WebkitAppRegion: "drag" } as React.CSSProperties}

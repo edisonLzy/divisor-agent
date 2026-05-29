@@ -8,7 +8,127 @@ import { FileIcon } from "lucide-react";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
-// ── File item type ─────────────────────────────────────────────────────────
+export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(function PromptEditor(
+  { disabled = false, onSubmit, onContentChange, onSearchFiles, className },
+  ref,
+) {
+  const editorRef = useRef<Editor | null>(null);
+  const onSubmitRef = useRef(onSubmit);
+  onSubmitRef.current = onSubmit;
+
+  const suggestionOpenRef = useRef(false);
+  const skipNextSubmitRef = useRef(false);
+
+  const onContentChangeRef = useRef(onContentChange);
+  onContentChangeRef.current = onContentChange;
+
+  const handleSearchFiles = useCallback((query: string) => onSearchFiles(query), [onSearchFiles]);
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: false,
+        blockquote: false,
+        codeBlock: false,
+        horizontalRule: false,
+        orderedList: false,
+        bulletList: false,
+      }),
+      Placeholder.configure({
+        placeholder: "Ask anything...",
+      }),
+      Mention.configure({
+        HTMLAttributes: {
+          class:
+            "inline-flex items-center gap-1 rounded-md bg-accent px-1.5 py-0.5 text-sm font-medium text-accent-foreground",
+        },
+        renderText({ node, suggestion }) {
+          return `${suggestion?.char ?? "@"}${node.attrs.label ?? node.attrs.id ?? ""}`;
+        },
+        suggestion: createSuggestion(handleSearchFiles, {
+          onOpenChange: (isOpen) => {
+            suggestionOpenRef.current = isOpen;
+          },
+          onSelect: () => {
+            skipNextSubmitRef.current = true;
+          },
+        }),
+      }),
+    ],
+    editorProps: {
+      attributes: {
+        class:
+          "ProseMirror min-h-[48px] max-h-[160px] overflow-y-auto text-[14px] leading-6 text-foreground caret-foreground outline-none",
+      },
+    },
+    editable: !disabled,
+    onUpdate: ({ editor: nextEditor }) => {
+      onContentChangeRef.current?.(nextEditor.getText().trim().length > 0);
+    },
+  });
+
+  useEffect(() => {
+    editorRef.current = editor;
+  }, [editor]);
+
+  useEffect(() => {
+    editor?.setEditable(!disabled);
+  }, [disabled, editor]);
+
+  useEffect(() => {
+    if (!editor) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.key === "Enter" &&
+        !event.shiftKey &&
+        !event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.isComposing
+      ) {
+        if (skipNextSubmitRef.current) {
+          skipNextSubmitRef.current = false;
+          event.preventDefault();
+          return;
+        }
+
+        if (suggestionOpenRef.current) {
+          event.preventDefault();
+          return;
+        }
+
+        event.preventDefault();
+        onSubmitRef.current();
+      }
+    };
+
+    const dom = editor.view.dom;
+    dom.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      dom.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [editor]);
+
+  useImperativeHandle(ref, () => ({
+    clear: () => {
+      editorRef.current?.commands.clearContent();
+    },
+    getText: () => {
+      return editorRef.current?.getText() ?? "";
+    },
+    getEditor: () => editorRef.current,
+  }));
+
+  return (
+    <div className={cn("relative px-3.5 py-2.5", className)}>
+      <EditorContent editor={editor} className="prompt-editor max-w-none" />
+    </div>
+  );
+});
 
 export interface FileItem {
   id: string;
@@ -17,7 +137,19 @@ export interface FileItem {
   name: string;
 }
 
-// ── Suggestion popup ───────────────────────────────────────────────────────
+export interface PromptEditorHandle {
+  clear: () => void;
+  getText: () => string;
+  getEditor: () => Editor | null;
+}
+
+interface PromptEditorProps {
+  disabled?: boolean;
+  onSubmit: () => void;
+  onContentChange?: (hasContent: boolean) => void;
+  onSearchFiles: (query: string) => FileItem[] | Promise<FileItem[]>;
+  className?: string;
+}
 
 interface FileSuggestionPopupProps {
   items: FileItem[];
@@ -25,6 +157,11 @@ interface FileSuggestionPopupProps {
   command: (item: FileItem) => void;
   onHighlight: (index: number) => void;
   maxHeight: number;
+}
+
+interface SuggestionLifecycleCallbacks {
+  onOpenChange?: (isOpen: boolean) => void;
+  onSelect?: () => void;
 }
 
 function FileSuggestionPopup({
@@ -37,8 +174,8 @@ function FileSuggestionPopup({
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const el = listRef.current?.children[selectedIndex] as HTMLElement | undefined;
-    el?.scrollIntoView({ block: "nearest" });
+    const element = listRef.current?.children[selectedIndex] as HTMLElement | undefined;
+    element?.scrollIntoView({ block: "nearest" });
   }, [selectedIndex]);
 
   if (items.length === 0) {
@@ -83,22 +220,15 @@ function FileSuggestionPopup({
   );
 }
 
-// ── Suggestion configuration ────────────────────────────────────────────────
-
-interface SuggestionLifecycleCallbacks {
-  onOpenChange?: (isOpen: boolean) => void;
-  onSelect?: () => void;
-}
-
 function createSuggestion(
   onSearch: (query: string) => FileItem[] | Promise<FileItem[]>,
   callbacks: SuggestionLifecycleCallbacks,
 ): Omit<SuggestionOptions<FileItem>, "editor"> {
-  const POPUP_GAP = 8;
-  const VIEWPORT_MARGIN = 16;
-  const MAX_POPUP_HEIGHT = 352;
-  const MIN_POPUP_HEIGHT = 140;
-  const POPUP_WIDTH = 760;
+  const popupGap = 8;
+  const viewportMargin = 16;
+  const maxPopupHeight = 352;
+  const minPopupHeight = 140;
+  const popupWidth = 760;
 
   return {
     char: "@",
@@ -109,11 +239,11 @@ function createSuggestion(
     decorationEmptyClass: "is-empty",
     items: ({ query }) => onSearch(query),
     render: () => {
-      let popupEl: HTMLDivElement | null = null;
+      let popupElement: HTMLDivElement | null = null;
       let root: Root | null = null;
       let selectedIndex = 0;
       let currentItemsKey = "";
-      let popupMaxHeight = MAX_POPUP_HEIGHT;
+      let popupMaxHeight = maxPopupHeight;
       let rafId: number | null = null;
       let latestProps: {
         items: FileItem[];
@@ -123,7 +253,9 @@ function createSuggestion(
       } | null = null;
 
       function renderPopup() {
-        if (!root || !latestProps) return;
+        if (!root || !latestProps) {
+          return;
+        }
 
         root.render(
           <FileSuggestionPopup
@@ -140,39 +272,43 @@ function createSuggestion(
       }
 
       function positionPopup() {
-        if (!popupEl || !latestProps) return;
+        if (!popupElement || !latestProps) {
+          return;
+        }
 
         const rect = latestProps.clientRect?.();
-        if (!rect) return;
+        if (!rect) {
+          return;
+        }
 
-        const popupWidth = Math.min(POPUP_WIDTH, window.innerWidth - VIEWPORT_MARGIN * 2);
-        const spaceBelow = window.innerHeight - rect.bottom - VIEWPORT_MARGIN;
-        const spaceAbove = rect.top - VIEWPORT_MARGIN;
+        const resolvedPopupWidth = Math.min(popupWidth, window.innerWidth - viewportMargin * 2);
+        const spaceBelow = window.innerHeight - rect.bottom - viewportMargin;
+        const spaceAbove = rect.top - viewportMargin;
 
-        popupEl.style.width = `${popupWidth}px`;
-        popupEl.style.display = "block";
+        popupElement.style.width = `${resolvedPopupWidth}px`;
+        popupElement.style.display = "block";
 
-        const measuredHeight = popupEl.offsetHeight || MAX_POPUP_HEIGHT;
+        const measuredHeight = popupElement.offsetHeight || maxPopupHeight;
         const shouldFlip =
-          spaceBelow < Math.min(measuredHeight, MAX_POPUP_HEIGHT) + POPUP_GAP &&
+          spaceBelow < Math.min(measuredHeight, maxPopupHeight) + popupGap &&
           spaceAbove > spaceBelow;
         const availableSpace = shouldFlip ? spaceAbove : spaceBelow;
 
-        popupMaxHeight = Math.max(MIN_POPUP_HEIGHT, Math.min(availableSpace, MAX_POPUP_HEIGHT));
+        popupMaxHeight = Math.max(minPopupHeight, Math.min(availableSpace, maxPopupHeight));
         renderPopup();
 
-        const finalHeight = popupEl.offsetHeight || popupMaxHeight;
+        const finalHeight = popupElement.offsetHeight || popupMaxHeight;
         const left = Math.max(
-          VIEWPORT_MARGIN,
-          Math.min(rect.left, window.innerWidth - popupWidth - VIEWPORT_MARGIN),
+          viewportMargin,
+          Math.min(rect.left, window.innerWidth - resolvedPopupWidth - viewportMargin),
         );
         const top = shouldFlip
-          ? Math.max(VIEWPORT_MARGIN, rect.top - finalHeight - POPUP_GAP)
-          : Math.min(window.innerHeight - VIEWPORT_MARGIN - finalHeight, rect.bottom + POPUP_GAP);
+          ? Math.max(viewportMargin, rect.top - finalHeight - popupGap)
+          : Math.min(window.innerHeight - viewportMargin - finalHeight, rect.bottom + popupGap);
 
-        popupEl.dataset.side = shouldFlip ? "top" : "bottom";
-        popupEl.style.left = `${left}px`;
-        popupEl.style.top = `${top}px`;
+        popupElement.dataset.side = shouldFlip ? "top" : "bottom";
+        popupElement.style.left = `${left}px`;
+        popupElement.style.top = `${top}px`;
       }
 
       function schedulePosition() {
@@ -194,7 +330,9 @@ function createSuggestion(
       }) {
         latestProps = props;
 
-        if (!popupEl || !root) return;
+        if (!popupElement || !root) {
+          return;
+        }
 
         const nextItemsKey = props.items.map((item) => item.id).join("\n");
         if (nextItemsKey !== currentItemsKey) {
@@ -212,14 +350,14 @@ function createSuggestion(
 
       return {
         onStart: (props) => {
-          popupEl = document.createElement("div");
-          popupEl.dataset.suggestion = "files";
-          popupEl.style.position = "fixed";
-          popupEl.style.zIndex = "50";
-          popupEl.style.pointerEvents = "auto";
-          document.body.appendChild(popupEl);
+          popupElement = document.createElement("div");
+          popupElement.dataset.suggestion = "files";
+          popupElement.style.position = "fixed";
+          popupElement.style.zIndex = "50";
+          popupElement.style.pointerEvents = "auto";
+          document.body.appendChild(popupElement);
 
-          root = createRoot(popupEl);
+          root = createRoot(popupElement);
           callbacks.onOpenChange?.(true);
 
           window.addEventListener("resize", schedulePosition);
@@ -256,8 +394,8 @@ function createSuggestion(
           }
 
           if (props.event.key === "Escape") {
-            if (popupEl) {
-              popupEl.style.display = "none";
+            if (popupElement) {
+              popupElement.style.display = "none";
             }
             return true;
           }
@@ -268,155 +406,23 @@ function createSuggestion(
           callbacks.onOpenChange?.(false);
           window.removeEventListener("resize", schedulePosition);
           window.removeEventListener("scroll", schedulePosition, true);
+
           if (rafId !== null) {
             window.cancelAnimationFrame(rafId);
             rafId = null;
           }
+
           if (root) {
             root.unmount();
             root = null;
           }
-          if (popupEl) {
-            popupEl.remove();
-            popupEl = null;
+
+          if (popupElement) {
+            popupElement.remove();
+            popupElement = null;
           }
         },
       };
     },
   };
 }
-
-// ── PromptEditor ────────────────────────────────────────────────────────────
-
-export interface PromptEditorHandle {
-  clear: () => void;
-  getText: () => string;
-  getEditor: () => Editor | null;
-}
-
-interface PromptEditorProps {
-  disabled?: boolean;
-  onSubmit: () => void;
-  onContentChange?: (hasContent: boolean) => void;
-  onSearchFiles: (query: string) => FileItem[] | Promise<FileItem[]>;
-  className?: string;
-}
-
-export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(function PromptEditor(
-  { disabled = false, onSubmit, onContentChange, onSearchFiles, className },
-  ref,
-) {
-  const editorRef = useRef<Editor | null>(null);
-  const onSubmitRef = useRef(onSubmit);
-  onSubmitRef.current = onSubmit;
-  const suggestionOpenRef = useRef(false);
-  const skipNextSubmitRef = useRef(false);
-
-  const onContentChangeRef = useRef(onContentChange);
-  onContentChangeRef.current = onContentChange;
-
-  const handleSearchFiles = useCallback((query: string) => onSearchFiles(query), [onSearchFiles]);
-
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: false,
-        blockquote: false,
-        codeBlock: false,
-        horizontalRule: false,
-        orderedList: false,
-        bulletList: false,
-      }),
-      Placeholder.configure({
-        placeholder: "Ask anything...",
-      }),
-      Mention.configure({
-        HTMLAttributes: {
-          class:
-            "inline-flex items-center gap-1 rounded-md bg-accent px-1.5 py-0.5 text-accent-foreground font-medium text-sm",
-        },
-        renderText({ node, suggestion }) {
-          return `${suggestion?.char ?? "@"}${node.attrs.label ?? node.attrs.id ?? ""}`;
-        },
-        suggestion: createSuggestion(handleSearchFiles, {
-          onOpenChange: (isOpen) => {
-            suggestionOpenRef.current = isOpen;
-          },
-          onSelect: () => {
-            skipNextSubmitRef.current = true;
-          },
-        }),
-      }),
-    ],
-    editorProps: {
-      attributes: {
-        class:
-          "outline-none min-h-[48px] max-h-[160px] overflow-y-auto text-[14px] leading-6 text-foreground caret-foreground ProseMirror",
-      },
-    },
-    editable: !disabled,
-    onUpdate: ({ editor: nextEditor }) => {
-      onContentChangeRef.current?.(nextEditor.getText().trim().length > 0);
-    },
-  });
-
-  useEffect(() => {
-    editorRef.current = editor;
-  }, [editor]);
-
-  useEffect(() => {
-    editor?.setEditable(!disabled);
-  }, [disabled, editor]);
-
-  // Handle Enter to submit — check for tiptap suggestion popup in DOM
-  useEffect(() => {
-    if (!editor) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (
-        event.key === "Enter" &&
-        !event.shiftKey &&
-        !event.altKey &&
-        !event.ctrlKey &&
-        !event.metaKey &&
-        !event.isComposing
-      ) {
-        if (skipNextSubmitRef.current) {
-          skipNextSubmitRef.current = false;
-          event.preventDefault();
-          return;
-        }
-
-        if (suggestionOpenRef.current) {
-          event.preventDefault();
-          return;
-        }
-
-        event.preventDefault();
-        onSubmitRef.current();
-      }
-    };
-
-    const dom = editor.view.dom;
-    dom.addEventListener("keydown", handleKeyDown);
-    return () => {
-      dom.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [editor]);
-
-  useImperativeHandle(ref, () => ({
-    clear: () => {
-      editorRef.current?.commands.clearContent();
-    },
-    getText: () => {
-      return editorRef.current?.getText() ?? "";
-    },
-    getEditor: () => editorRef.current,
-  }));
-
-  return (
-    <div className={cn("relative px-3.5 py-2.5", className)}>
-      <EditorContent editor={editor} className="prompt-editor max-w-none" />
-    </div>
-  );
-});

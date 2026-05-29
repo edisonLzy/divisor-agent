@@ -10,23 +10,7 @@ import {
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { cn } from "@renderer/lib/utils";
 import type { AvailableModel } from "@shared/models-ipc";
-import { Bot } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-
-export interface ModalSelectorProps {
-  value: AvailableModel | null;
-  onChange: (value: AvailableModel | null) => void;
-}
-
-export function useModalSelector(initialValue: AvailableModel | null = null): ModalSelectorProps {
-  const [value, setValue] = useState<AvailableModel | null>(initialValue);
-
-  const handleChange = useCallback((nextValue: AvailableModel | null) => {
-    setValue(nextValue);
-  }, []);
-
-  return useMemo(() => ({ value, onChange: handleChange }), [handleChange, value]);
-}
 
 export function ModalSelector({ value, onChange }: ModalSelectorProps) {
   const { invoke } = useElectronIPC();
@@ -40,6 +24,7 @@ export function ModalSelector({ value, onChange }: ModalSelectorProps) {
 
     const loadModels = async () => {
       setIsLoading(true);
+
       try {
         const nextModels = await invoke("getAvailableModels");
         if (isActive) {
@@ -78,10 +63,8 @@ export function ModalSelector({ value, onChange }: ModalSelectorProps) {
     }
 
     return models.filter((model) => {
-      return [model.modelName, model.providerName, model.providerId, model.modelId].some(
-        (field) => {
-          return field.toLowerCase().includes(normalizedQuery);
-        },
+      return [model.modelName, model.providerName, model.providerId, model.modelId].some((field) =>
+        field.toLowerCase().includes(normalizedQuery),
       );
     });
   }, [models, normalizedQuery]);
@@ -104,32 +87,22 @@ export function ModalSelector({ value, onChange }: ModalSelectorProps) {
       disabled={isLoading || models.length === 0}
     >
       <SelectTrigger
-        className="h-8 w-auto max-w-[200px] gap-2 rounded-full border-border bg-background/80 px-2.5 text-foreground shadow-sm hover:bg-muted data-popup-open:border-ring data-popup-open:bg-muted **:data-[slot=select-value]:items-center **:data-[slot=select-value]:line-clamp-none overflow-hidden"
+        className="h-7 w-auto max-w-50 gap-1 rounded-sm border-none bg-transparent px-2 text-foreground shadow-none hover:bg-muted data-popup-open:bg-muted focus:ring-0"
         aria-label="Select model"
       >
-        <SelectValue className="min-w-0 pointer-events-none">
+        <SelectValue className="pointer-events-none min-w-0">
           {value ? (
-            <div className="flex min-w-0 items-center gap-1.5 text-left">
-              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                <Bot className="size-3" />
-              </span>
-
-              <span className="min-w-0 flex flex-col leading-none">
-                <span className="block truncate text-[12px] font-medium text-foreground">
-                  {value.modelName}
-                </span>
-                <span className="block truncate text-[10px] text-muted-foreground mt-[2px]">
-                  {value.providerName}
-                </span>
-              </span>
+            <div className="flex min-w-0 items-center gap-1.5 text-left text-xs font-normal text-muted-foreground">
+              <span className="block truncate">{value.modelName}</span>
             </div>
           ) : (
-            <span className="truncate text-sm text-muted-foreground">
-              {isLoading ? "Loading models..." : "Select model"}
+            <span className="truncate text-xs text-muted-foreground">
+              {isLoading ? "Loading..." : "Select model"}
             </span>
           )}
         </SelectValue>
       </SelectTrigger>
+
       <SelectContent
         align="end"
         sideOffset={10}
@@ -182,4 +155,19 @@ export function ModalSelector({ value, onChange }: ModalSelectorProps) {
       </SelectContent>
     </Select>
   );
+}
+
+interface ModalSelectorProps {
+  value: AvailableModel | null;
+  onChange: (value: AvailableModel | null) => void;
+}
+
+export function useModalSelector(initialValue: AvailableModel | null = null): ModalSelectorProps {
+  const [value, setValue] = useState<AvailableModel | null>(initialValue);
+
+  const handleChange = useCallback((nextValue: AvailableModel | null) => {
+    setValue(nextValue);
+  }, []);
+
+  return useMemo(() => ({ value, onChange: handleChange }), [handleChange, value]);
 }

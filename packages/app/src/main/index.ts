@@ -7,13 +7,16 @@ import { AgentPool } from "./agent-pool.js";
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
+    frame: false,
+    titleBarStyle: "hiddenInset",
+    vibrancy: "under-window",
+    visualEffectState: "active",
+    backgroundColor: "#00000000",
     width: 1200,
     height: 800,
     x: 100,
     y: 100,
     title: "Divisor Agent",
-    titleBarStyle: "hidden",
-    trafficLightPosition: { x: 12, y: 12 },
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,
