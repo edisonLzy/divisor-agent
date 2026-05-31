@@ -11,10 +11,10 @@ export function Chat() {
 
   return (
     <div
-      className="flex h-full flex-col rounded-tr-3xl overflow-hidden ring-1 ring-white/8"
+      className="flex h-full flex-col overflow-hidden rounded-tr-3xl ring-1 ring-border/70 supports-backdrop-filter:backdrop-blur-xl"
       style={{
         background:
-          "radial-gradient(circle at 10% 0%, rgba(255,255,255,0.06), transparent 40%), rgba(17,17,17,0.88)",
+          "radial-gradient(circle at 10% 0%, var(--workspace-glow), transparent 40%), var(--workspace-surface)",
       }}
     >
       <ErrorBoundary>

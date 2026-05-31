@@ -153,6 +153,10 @@
   --sidebar-border: oklch(0.922 0 0);
 
   --sidebar-ring: oklch(0.708 0 0);
+
+  --workspace-surface: rgba(255, 255, 255, 0.82);
+
+  --workspace-glow: rgba(255, 255, 255, 0.55);
 }
 
 [data-theme="dark"] {
@@ -212,6 +216,10 @@
   --sidebar-border: #2c2c2c;
 
   --sidebar-ring: #666666;
+
+  --workspace-surface: rgba(17, 17, 17, 0.88);
+
+  --workspace-glow: rgba(255, 255, 255, 0.06);
 }
 
 @layer base {

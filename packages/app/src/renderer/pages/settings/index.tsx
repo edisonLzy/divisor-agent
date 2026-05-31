@@ -165,7 +165,7 @@ export function SettingsPage() {
       </Titlebar>
       <ResizablePanelGroup orientation="horizontal" className="flex-1">
         <ResizablePanel defaultSize="20%" minSize="16%" maxSize="24%">
-          <aside className="flex h-full flex-col border-r border-white/8 bg-white/6 px-3 py-4 text-foreground select-none pt-9">
+          <aside className="flex h-full flex-col border-r border-sidebar-border/70 bg-sidebar/78 px-3 py-4 text-foreground select-none pt-9 supports-backdrop-filter:bg-sidebar/68 supports-backdrop-filter:backdrop-blur-xl">
             <nav className="flex flex-col space-y-0.5">
               {SECTIONS.map((section) => {
                 const isActive = section.id === activeSection;
@@ -194,11 +194,11 @@ export function SettingsPage() {
 
         <ResizablePanel defaultSize="80%" minSize="60%">
           <main
-            className="h-full overflow-y-auto rounded-tl-xl"
+            className="h-full overflow-y-auto rounded-tl-xl supports-backdrop-filter:backdrop-blur-xl"
             style={
               {
                 background:
-                  "radial-gradient(circle at 10% 0%, rgba(255,255,255,0.06), transparent 40%), rgba(17,17,17,0.88)",
+                  "radial-gradient(circle at 10% 0%, var(--workspace-glow), transparent 40%), var(--workspace-surface)",
               } as React.CSSProperties
             }
           >

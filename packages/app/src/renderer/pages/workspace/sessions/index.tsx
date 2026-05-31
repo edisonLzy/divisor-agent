@@ -33,7 +33,7 @@ import { WorkspaceItem } from "./workspace-item";
 
 export function Sessions() {
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden bg-white/6 text-[13px] text-sidebar-foreground/70 select-none pt-9">
+    <div className="flex h-full w-full flex-col overflow-hidden bg-sidebar/78 text-[13px] text-sidebar-foreground/70 select-none pt-9 supports-backdrop-filter:bg-sidebar/68 supports-backdrop-filter:backdrop-blur-xl">
       <TopActions />
 
       <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-2 py-4">
