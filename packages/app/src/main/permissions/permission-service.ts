@@ -40,9 +40,4 @@ export class PermissionService {
       this.pendingPermissions.delete(requestId);
     }
   }
-
-  isHighRisk(operation: string): boolean {
-    const highRisk = ["fs/write_text_file", "terminal/create"];
-    return highRisk.includes(operation);
-  }
 }

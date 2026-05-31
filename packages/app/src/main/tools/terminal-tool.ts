@@ -1,8 +1,9 @@
 import { spawn } from "node:child_process";
 
-import type { AgentTool } from "@mariozechner/pi-agent-core";
 import { Type } from "@mariozechner/pi-ai";
 import type { Static } from "@sinclair/typebox";
+
+import type { AppTool } from "./types.js";
 
 const TerminalParams = Type.Object({
   command: Type.String({ description: "The shell command to execute" }),
@@ -11,10 +12,11 @@ const TerminalParams = Type.Object({
 
 const DANGEROUS_PATTERNS = [/^rm\s+-rf\s+\//, /^dd\s+/, /^mkfs\//];
 
-export const terminalCreateTool: AgentTool<typeof TerminalParams> = {
+export const terminalCreateTool: AppTool<typeof TerminalParams> = {
   name: "terminal/create",
   label: "Run Terminal Command",
   description: "Execute a shell command in the local terminal",
+  riskLevel: "high",
   parameters: TerminalParams,
   async execute(toolCallId, params) {
     const { command, cwd } = params as Static<typeof TerminalParams>;

@@ -12,6 +12,7 @@ import type { PermissionMode } from "../shared/permissions-ipc.js";
 import type { AgentSessionIPC, WorkspaceFileItem } from "../shared/session-ipc.js";
 import { ModelRegistry } from "./models/index.js";
 import { PermissionService } from "./permissions/index.js";
+import type { AppTool } from "./tools/index.js";
 import { fsReadTextFileTool, fsWriteTextFileTool, terminalCreateTool } from "./tools/index.js";
 
 // ── Derived runtime delegate type ──────────────────────────────────────────
@@ -123,14 +124,14 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
           return undefined;
         }
 
-        if (!this.permissionService.isHighRisk(context.toolCall.name)) {
+        const tool = context.context.tools?.find(
+          (candidate) => candidate.name === context.toolCall.name,
+        ) as AppTool | undefined;
+        const args = isRecord(context.args) ? context.args : {};
+        if ((tool?.riskLevel ?? "safe") !== "high") {
           return undefined;
         }
 
-        const tool = context.context.tools?.find(
-          (candidate) => candidate.name === context.toolCall.name,
-        );
-        const args = isRecord(context.args) ? context.args : {};
         const resolution = await this.permissionService.requestPermission({
           requestId: randomUUID(),
           toolCallId: context.toolCall.id,

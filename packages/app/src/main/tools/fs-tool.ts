@@ -1,8 +1,9 @@
 import { readFile, writeFile } from "node:fs/promises";
 
-import type { AgentTool } from "@mariozechner/pi-agent-core";
 import { Type } from "@mariozechner/pi-ai";
 import type { Static } from "@sinclair/typebox";
+
+import type { AppTool } from "./types.js";
 
 const PathParams = Type.Object({
   path: Type.String({ description: "Absolute path to the file to read" }),
@@ -13,10 +14,11 @@ const WriteParams = Type.Object({
   content: Type.String({ description: "Content to write to the file" }),
 });
 
-export const fsReadTextFileTool: AgentTool<typeof PathParams> = {
+export const fsReadTextFileTool: AppTool<typeof PathParams> = {
   name: "fs/read_text_file",
   label: "Read File",
   description: "Read the contents of a text file from the local filesystem",
+  riskLevel: "medium",
   parameters: PathParams,
   async execute(toolCallId, params) {
     const { path } = params as Static<typeof PathParams>;
@@ -36,10 +38,11 @@ export const fsReadTextFileTool: AgentTool<typeof PathParams> = {
   },
 };
 
-export const fsWriteTextFileTool: AgentTool<typeof WriteParams> = {
+export const fsWriteTextFileTool: AppTool<typeof WriteParams> = {
   name: "fs/write_text_file",
   label: "Write File",
   description: "Write content to a text file on the local filesystem",
+  riskLevel: "high",
   parameters: WriteParams,
   async execute(toolCallId, params) {
     const { path, content } = params as Static<typeof WriteParams>;
