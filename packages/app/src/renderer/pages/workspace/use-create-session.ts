@@ -1,6 +1,6 @@
 import { createSession } from "@renderer/apis/sessions";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
-import { sessionStore } from "@renderer/store/sessions";
+import { sessionStore } from "@renderer/store";
 import { useCallback } from "react";
 
 import { useInvalidateStandaloneSessions } from "./sessions/use-standalone-sessions";

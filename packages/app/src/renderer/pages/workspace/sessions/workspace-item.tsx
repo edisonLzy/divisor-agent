@@ -16,7 +16,7 @@ import {
   DialogClose,
 } from "@renderer/components/ui/dialog";
 import { cn } from "@renderer/lib/utils";
-import { sessionStore } from "@renderer/store/sessions";
+import { sessionStore } from "@renderer/store";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { Folder, FolderOpen, Pin, PinOff, Plus, Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";

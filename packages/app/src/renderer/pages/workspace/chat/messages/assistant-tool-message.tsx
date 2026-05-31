@@ -4,9 +4,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@renderer/components/ui/collapsible";
+import type { ToolExecutionState } from "@renderer/store";
 import { ChevronRightIcon } from "lucide-react";
-
-import type { ToolExecutionState } from "../../../store/sessions";
 
 interface AssistantToolMessageProps {
   toolName: string;
@@ -25,6 +24,8 @@ function formatArgs(value: unknown): string {
 
 function statusLabel(status?: ToolExecutionState["status"]): string {
   switch (status) {
+    case "awaiting_approval":
+      return "等待确认";
     case "done":
       return "已处理";
     case "error":
@@ -38,6 +39,9 @@ function statusLabel(status?: ToolExecutionState["status"]): string {
 
 export function AssistantToolMessage({ toolName, args, toolState }: AssistantToolMessageProps) {
   const isRunning = toolState?.status === "running";
+  const output =
+    toolState?.output ||
+    (toolState?.status === "awaiting_approval" ? "Waiting for permission approval…" : "");
 
   return (
     <Collapsible defaultOpen={false}>
@@ -61,7 +65,7 @@ export function AssistantToolMessage({ toolName, args, toolState }: AssistantToo
 
           <section className="rounded-2xl border border-border/70 bg-card/80 p-3">
             <pre className="overflow-x-auto whitespace-pre-wrap wrap-break-word text-xs leading-6 text-card-foreground">
-              {toolState?.output}
+              {output}
             </pre>
           </section>
         </div>

@@ -2,7 +2,7 @@ import type { AssistantMessage, ToolCall, ToolResultMessage } from "@mariozechne
 import { appendEntries } from "@renderer/apis/sessions";
 import { useSubscribeAgentEvents } from "@renderer/hooks/use-subscribe-agent-events";
 import { isAgentMessageEntry } from "@renderer/lib/is";
-import { sessionStore } from "@renderer/store/sessions";
+import { sessionStore } from "@renderer/store";
 import { useRef } from "react";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -228,6 +228,8 @@ export function useAgentMessages() {
         status: "running",
         args,
         output: existing.output ?? "",
+        requestId: existing.requestId,
+        approvalStatus: existing.approvalStatus,
       });
     },
 
@@ -245,6 +247,24 @@ export function useAgentMessages() {
         status: isError ? "error" : "done",
         args: existing?.args ?? {},
         output,
+        requestId: existing?.requestId,
+        approvalStatus: existing?.approvalStatus,
+      });
+    },
+
+    permission_requested: (event) => {
+      const { sessionId, type: _type, ...request } = event;
+      const existing = getToolState(sessionId, request.toolCallId);
+
+      sessionStore.getState().enqueuePermissionRequest(sessionId, request);
+      sessionStore.getState().setToolState(sessionId, request.toolCallId, {
+        toolCallId: request.toolCallId,
+        toolName: request.toolName,
+        status: "awaiting_approval",
+        args: existing?.args ?? request.args,
+        output: existing?.output ?? "Waiting for permission approval…",
+        requestId: request.requestId,
+        approvalStatus: "pending",
       });
     },
   });

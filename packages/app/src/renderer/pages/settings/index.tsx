@@ -165,7 +165,7 @@ export function SettingsPage() {
       </Titlebar>
       <ResizablePanelGroup orientation="horizontal" className="flex-1">
         <ResizablePanel defaultSize="20%" minSize="16%" maxSize="24%">
-          <aside className="flex h-full flex-col border-r border-white/8 bg-white/6 px-3 py-4 text-foreground select-none pt-9">
+          <aside className="flex h-full flex-col border-r border-sidebar-border/70 bg-sidebar/78 px-3 py-4 text-foreground select-none pt-9 supports-backdrop-filter:bg-sidebar/68 supports-backdrop-filter:backdrop-blur-xl">
             <nav className="flex flex-col space-y-0.5">
               {SECTIONS.map((section) => {
                 const isActive = section.id === activeSection;
@@ -190,104 +190,106 @@ export function SettingsPage() {
           </aside>
         </ResizablePanel>
 
-        <ResizableHandle withHandle />
+        <ResizableHandle />
 
         <ResizablePanel defaultSize="80%" minSize="60%">
-          <main
-            className="h-full overflow-y-auto rounded-tl-xl"
-            style={
-              {
-                background:
-                  "radial-gradient(circle at 10% 0%, rgba(255,255,255,0.06), transparent 40%), rgba(17,17,17,0.88)",
-              } as React.CSSProperties
-            }
-          >
-            <div className="mx-auto flex min-h-full w-full max-w-160 flex-col px-10 py-12">
-              <h1 className="mb-8 text-center text-[20px] font-medium text-foreground">
-                {SECTIONS.find((section) => section.id === activeSection)?.label}
-              </h1>
-              {activeSection === "appearance" && (
-                <div className="space-y-6">
-                  {/* Theme Settings Panel */}
-                  <div className="overflow-hidden rounded-lg border border-border bg-card">
-                    {/* Theme Header */}
-                    <div className="flex flex-col gap-4 border-b border-border px-4 py-4 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <div className="text-[13px] font-medium text-foreground">主题</div>
-                        <div className="mt-0.5 text-[11px] text-muted-foreground">
-                          使用浅色、深色，或匹配系统设置
+          <div className="h-full w-full bg-sidebar/78 supports-backdrop-filter:bg-sidebar/68 supports-backdrop-filter:backdrop-blur-xl">
+            <main
+              className="-ml-px h-full overflow-y-auto rounded-l-[20px] border border-border/70 border-l-0 supports-backdrop-filter:backdrop-blur-xl"
+              style={
+                {
+                  background:
+                    "radial-gradient(circle at 10% 0%, var(--workspace-glow), transparent 40%), var(--workspace-surface)",
+                } as React.CSSProperties
+              }
+            >
+              <div className="mx-auto flex min-h-full w-full max-w-160 flex-col px-10 py-12">
+                <h1 className="mb-8 text-center text-[20px] font-medium text-foreground">
+                  {SECTIONS.find((section) => section.id === activeSection)?.label}
+                </h1>
+                {activeSection === "appearance" && (
+                  <div className="space-y-6">
+                    {/* Theme Settings Panel */}
+                    <div className="overflow-hidden rounded-lg border border-border bg-card">
+                      {/* Theme Header */}
+                      <div className="flex flex-col gap-4 border-b border-border px-4 py-4 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <div className="text-[13px] font-medium text-foreground">主题</div>
+                          <div className="mt-0.5 text-[11px] text-muted-foreground">
+                            使用浅色、深色，或匹配系统设置
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-background p-1">
+                          {THEME_OPTIONS.map((option) => {
+                            const Icon = option.icon;
+                            const isActive = option.value === theme;
+
+                            return (
+                              <button
+                                key={option.value}
+                                type="button"
+                                aria-pressed={isActive}
+                                onClick={() => setTheme(option.value)}
+                                className={cn(
+                                  "flex items-center gap-1.5 rounded px-3 py-1.5 text-[12px] transition-colors",
+                                  isActive
+                                    ? "bg-accent text-foreground shadow-sm"
+                                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                                )}
+                              >
+                                <Icon className="size-3" />
+                                {option.label}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-background p-1">
-                        {THEME_OPTIONS.map((option) => {
-                          const Icon = option.icon;
-                          const isActive = option.value === theme;
 
-                          return (
-                            <button
-                              key={option.value}
-                              type="button"
-                              aria-pressed={isActive}
-                              onClick={() => setTheme(option.value)}
-                              className={cn(
-                                "flex items-center gap-1.5 rounded px-3 py-1.5 text-[12px] transition-colors",
-                                isActive
-                                  ? "bg-accent text-foreground shadow-sm"
-                                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                              )}
-                            >
-                              <Icon className="size-3" />
-                              {option.label}
-                            </button>
-                          );
-                        })}
+                      <div className="grid gap-3 border-b border-border bg-background/30 px-4 py-4 md:grid-cols-3">
+                        <StatusCard
+                          label="当前选择"
+                          value={selectedTheme.label}
+                          description={selectedTheme.description}
+                        />
+                        <StatusCard
+                          label="实际生效"
+                          value={effectiveThemeLabel}
+                          description={
+                            theme === "system" ? "由系统外观实时决定" : "已固定为当前外观模式"
+                          }
+                        />
+                        <StatusCard
+                          label="偏好保存"
+                          value="已持久化"
+                          description="主题偏好会保存在当前设备的本地存储中"
+                        />
                       </div>
-                    </div>
 
-                    <div className="grid gap-3 border-b border-border bg-background/30 px-4 py-4 md:grid-cols-3">
-                      <StatusCard
-                        label="当前选择"
-                        value={selectedTheme.label}
-                        description={selectedTheme.description}
-                      />
-                      <StatusCard
-                        label="实际生效"
-                        value={effectiveThemeLabel}
-                        description={
-                          theme === "system" ? "由系统外观实时决定" : "已固定为当前外观模式"
-                        }
-                      />
-                      <StatusCard
-                        label="偏好保存"
-                        value="已持久化"
-                        description="主题偏好会保存在当前设备的本地存储中"
-                      />
-                    </div>
-
-                    {/* Theme Preview */}
-                    <div className="border-b border-border bg-muted/25 p-4">
-                      <div className="flex overflow-hidden rounded border border-border bg-background text-[11px] font-mono leading-relaxed max-md:flex-col">
-                        <div className="border-r border-border max-md:border-b max-md:border-r-0 md:flex-1">
-                          <CodePreviewPane
-                            title="Preference"
-                            description="展示当前保存的主题偏好。"
-                            lines={preferenceLines}
-                          />
-                        </div>
-                        <div className="md:flex-1">
-                          <CodePreviewPane
-                            title="Runtime"
-                            description="展示当前页面实际使用的外观结果。"
-                            lines={runtimeLines}
-                          />
+                      {/* Theme Preview */}
+                      <div className="border-b border-border bg-muted/25 p-4">
+                        <div className="flex overflow-hidden rounded border border-border bg-background text-[11px] font-mono leading-relaxed max-md:flex-col">
+                          <div className="border-r border-border max-md:border-b max-md:border-r-0 md:flex-1">
+                            <CodePreviewPane
+                              title="Preference"
+                              description="展示当前保存的主题偏好。"
+                              lines={preferenceLines}
+                            />
+                          </div>
+                          <div className="md:flex-1">
+                            <CodePreviewPane
+                              title="Runtime"
+                              description="展示当前页面实际使用的外观结果。"
+                              lines={runtimeLines}
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-          </main>
+                )}
+              </div>
+            </main>
+          </div>
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

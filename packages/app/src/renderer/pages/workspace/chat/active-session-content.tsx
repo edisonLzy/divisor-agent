@@ -1,17 +1,25 @@
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { isAgentMessageEntry } from "@renderer/lib/is";
-import { sessionStore, type ToolExecutionState } from "@renderer/store/sessions";
+import { sessionStore, type ToolExecutionState } from "@renderer/store";
 import { useCallback } from "react";
 import { useStore } from "zustand";
 
 import { ChatMessages } from "./messages";
+import { PermissionApprovalPanel } from "./permission";
 import { PromptInput } from "./prompt-input";
 import type { PromptSubmission } from "./prompt-types";
 
 export function ActiveSessionContent() {
-  const { isLoading, messageEntries, streamingEntryId, toolStates, submitPrompt } =
+  const { isRunning, messageEntries, streamingEntryId, stopPrompt, toolStates, submitPrompt } =
     useActiveSessionChat();
   const activeSessionId = useStore(sessionStore, (state) => state.activeSessionId);
+  const pendingPermissionRequest = useStore(sessionStore, (state) => {
+    if (!activeSessionId) {
+      return null;
+    }
+
+    return state.getPermissionState(activeSessionId).requests[0] ?? null;
+  });
 
   return (
     <>
@@ -24,7 +32,17 @@ export function ActiveSessionContent() {
       </section>
 
       <section className="shrink-0 px-6 pb-6 pt-4">
-        <PromptInput disabled={isLoading} onSubmit={submitPrompt} sessionId={activeSessionId} />
+        {activeSessionId && pendingPermissionRequest ? (
+          <PermissionApprovalPanel sessionId={activeSessionId} />
+        ) : (
+          <PromptInput
+            disabled={false}
+            isRunning={isRunning}
+            onStop={stopPrompt}
+            onSubmit={submitPrompt}
+            sessionId={activeSessionId}
+          />
+        )}
       </section>
     </>
   );
@@ -62,12 +80,25 @@ function useActiveSessionChat() {
     [activeSessionId, invoke],
   );
 
+  const stopPrompt = useCallback(async () => {
+    if (!activeSessionId) {
+      return;
+    }
+
+    try {
+      await invoke("abortPrompt", activeSessionId);
+    } catch (error) {
+      console.error("Failed to stop prompt", error);
+    }
+  }, [activeSessionId, invoke]);
+
   return {
-    isLoading: (activeSession?.status ?? "idle") === "running",
+    isRunning: (activeSession?.status ?? "idle") === "running",
     messageEntries,
     streamingEntryId: activeSessionId
       ? sessionStore.getState().streamingEntryIds.get(activeSessionId)
       : undefined,
+    stopPrompt,
     toolStates,
     submitPrompt,
   };
