@@ -64,6 +64,16 @@ export function useCurrentPermissionRequest(sessionId: string | null) {
     await resolveRequest({ approved: true });
   }, [resolveRequest]);
 
+  const approveWithRememberedPrefix = useCallback(
+    async (rememberCommandPrefix?: string) => {
+      await resolveRequest({
+        approved: true,
+        rememberCommandPrefix: rememberCommandPrefix?.trim() || undefined,
+      });
+    },
+    [resolveRequest],
+  );
+
   const deny = useCallback(
     async (reason?: string) => {
       await resolveRequest({
@@ -78,6 +88,7 @@ export function useCurrentPermissionRequest(sessionId: string | null) {
     request,
     isSubmitting,
     approve,
+    approveWithRememberedPrefix,
     deny,
   };
 }

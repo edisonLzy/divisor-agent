@@ -46,11 +46,38 @@ describe("PermissionService", () => {
     });
   });
 
-  it("identifies the current high-risk operations", () => {
+  it("auto-approves future commands after remembering a command prefix", async () => {
     const service = new PermissionService();
+    const request = {
+      requestId: "request-3",
+      toolCallId: "tool-call-3",
+      toolName: "terminal/create",
+      toolLabel: "Run Terminal Command",
+      operation: "terminal/create",
+      args: { command: "pnpm lint packages/app" },
+      createdAt: Date.now(),
+    };
 
-    expect(service.isHighRisk("fs/write_text_file")).toBe(true);
-    expect(service.isHighRisk("terminal/create")).toBe(true);
-    expect(service.isHighRisk("fs/read_text_file")).toBe(false);
+    const permissionPromise = service.requestPermission(request);
+    service.rememberApproval(request.requestId, "pnpm lint");
+    service.approve(request.requestId);
+
+    await expect(permissionPromise).resolves.toEqual({ approved: true });
+
+    expect(
+      service.shouldAutoApprove({
+        toolName: "terminal/create",
+        operation: "terminal/create",
+        args: { command: "pnpm lint packages/app/src" },
+      }),
+    ).toBe(true);
+
+    expect(
+      service.shouldAutoApprove({
+        toolName: "terminal/create",
+        operation: "terminal/create",
+        args: { command: "pnpm test" },
+      }),
+    ).toBe(false);
   });
 });

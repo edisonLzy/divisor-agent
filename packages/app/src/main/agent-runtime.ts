@@ -132,7 +132,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
           return undefined;
         }
 
-        const resolution = await this.permissionService.requestPermission({
+        const permissionRequest = {
           requestId: randomUUID(),
           toolCallId: context.toolCall.id,
           toolName: context.toolCall.name,
@@ -140,7 +140,13 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
           operation: context.toolCall.name,
           args,
           createdAt: Date.now(),
-        });
+        };
+
+        if (this.permissionService.shouldAutoApprove(permissionRequest)) {
+          return undefined;
+        }
+
+        const resolution = await this.permissionService.requestPermission(permissionRequest);
 
         if (resolution.approved) {
           return undefined;
@@ -206,6 +212,10 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
     resolution,
   ) => {
     if (resolution.approved) {
+      if (resolution.rememberCommandPrefix) {
+        this.permissionService.rememberApproval(requestId, resolution.rememberCommandPrefix);
+      }
+
       this.permissionService.approve(requestId);
       return;
     }
