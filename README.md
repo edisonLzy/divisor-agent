@@ -46,10 +46,10 @@
 
 ### 通信层
 
-| 方向 | 协议 | 用途 |
-|------|------|------|
+| 方向            | 协议                         | 用途                                             |
+| --------------- | ---------------------------- | ------------------------------------------------ |
 | Renderer ↔ Main | Electron IPC (contextBridge) | Agent prompt、权限审批、模型选择、工作区文件搜索 |
-| App → Server | HTTP (Axios) | 会话元数据持久化（Server 尚未实现） |
+| App → Server    | HTTP (Axios)                 | 会话元数据持久化（Server 尚未实现）              |
 
 ## 核心功能
 
@@ -73,27 +73,29 @@
 ## 技术栈
 
 ### 核心
-| 类别 | 技术 |
-|------|------|
-| 框架 | Electron 39 + React 19 + Vite 7 |
-| 构建 | electron-vite 5 |
-| 样式 | Tailwind CSS v4 + shadcn/ui |
-| 状态 | Zustand 5 (vanilla stores) |
-| Agent | @mariozechner/pi-agent-core 0.68 |
-| 类型验证 | Zod 4 + @sinclair/typebox |
+
+| 类别     | 技术                             |
+| -------- | -------------------------------- |
+| 框架     | Electron 39 + React 19 + Vite 7  |
+| 构建     | electron-vite 5                  |
+| 样式     | Tailwind CSS v4 + shadcn/ui      |
+| 状态     | Zustand 5 (vanilla stores)       |
+| Agent    | @mariozechner/pi-agent-core 0.68 |
+| 类型验证 | Zod 4 + @sinclair/typebox        |
 
 ### 渲染器
-| 类别 | 技术 |
-|------|------|
-| Markdown | streamdown 2 (CJK / code / math / mermaid 插件) |
-| 代码高亮 | Shiki 4 |
-| 富文本编辑 | TipTap 3 + ProseMirror |
-| 消息虚拟化 | @tanstack/react-virtual 3 |
-| 数据获取 | @tanstack/react-query 5 + Axios |
-| 路由 | react-router-dom 7 (memory router) |
-| 动画 | Framer Motion (motion) |
-| 图标 | Lucide React |
-| Toast 通知 | Sonner |
+
+| 类别       | 技术                                            |
+| ---------- | ----------------------------------------------- |
+| Markdown   | streamdown 2 (CJK / code / math / mermaid 插件) |
+| 代码高亮   | Shiki 4                                         |
+| 富文本编辑 | TipTap 3 + ProseMirror                          |
+| 消息虚拟化 | @tanstack/react-virtual 3                       |
+| 数据获取   | @tanstack/react-query 5 + Axios                 |
+| 路由       | react-router-dom 7 (memory router)              |
+| 动画       | Framer Motion (motion)                          |
+| 图标       | Lucide React                                    |
+| Toast 通知 | Sonner                                          |
 
 ## 目录结构
 
