@@ -24,6 +24,7 @@ function registerIPCHandlers(agentPool: AgentPool) {
   typedIpcMain.handle("setModel", agentPool.setModel);
   typedIpcMain.handle("getAvailableModels", agentPool.getAvailableModels);
   typedIpcMain.handle("prompt", agentPool.prompt);
+  typedIpcMain.handle("abortPrompt", agentPool.abortPrompt);
   typedIpcMain.handle("setHistoryMessages", agentPool.setHistoryMessages);
   typedIpcMain.handle("setSessionId", agentPool.setSessionId);
   typedIpcMain.handle("searchWorkspaceFiles", agentPool.searchWorkspaceFiles);

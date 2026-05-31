@@ -199,6 +199,10 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
     this.agent.prompt(content);
   };
 
+  public abortPrompt: AgentRuntimeDelegate["abortPrompt"] = async () => {
+    this.agent.abort();
+  };
+
   public searchWorkspaceFiles: AgentRuntimeDelegate["searchWorkspaceFiles"] = (query) => {
     return this.searchFiles(query);
   };

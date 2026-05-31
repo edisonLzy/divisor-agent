@@ -113,6 +113,15 @@ export class AgentPool
     runtime.prompt(content, model);
   };
 
+  public abortPrompt: AgentSessionIPC["abortPrompt"] = async (sessionId) => {
+    const runtime = this.runtimes.get(sessionId);
+    if (!runtime) {
+      return;
+    }
+
+    await runtime.abortPrompt();
+  };
+
   // ── Implements AgentModelsIPC ────────────────────────────────────────────
 
   public setModel: AgentModelsIPC["setModel"] = async (sessionId, model) => {

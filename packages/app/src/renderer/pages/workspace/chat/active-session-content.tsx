@@ -10,7 +10,7 @@ import { PromptInput } from "./prompt-input";
 import type { PromptSubmission } from "./prompt-types";
 
 export function ActiveSessionContent() {
-  const { isLoading, messageEntries, streamingEntryId, toolStates, submitPrompt } =
+  const { isRunning, messageEntries, streamingEntryId, stopPrompt, toolStates, submitPrompt } =
     useActiveSessionChat();
   const activeSessionId = useStore(sessionStore, (state) => state.activeSessionId);
   const pendingPermissionRequest = useStore(sessionStore, (state) => {
@@ -35,7 +35,13 @@ export function ActiveSessionContent() {
         {activeSessionId && pendingPermissionRequest ? (
           <PermissionApprovalPanel sessionId={activeSessionId} />
         ) : (
-          <PromptInput disabled={isLoading} onSubmit={submitPrompt} sessionId={activeSessionId} />
+          <PromptInput
+            disabled={false}
+            isRunning={isRunning}
+            onStop={stopPrompt}
+            onSubmit={submitPrompt}
+            sessionId={activeSessionId}
+          />
         )}
       </section>
     </>
@@ -74,12 +80,25 @@ function useActiveSessionChat() {
     [activeSessionId, invoke],
   );
 
+  const stopPrompt = useCallback(async () => {
+    if (!activeSessionId) {
+      return;
+    }
+
+    try {
+      await invoke("abortPrompt", activeSessionId);
+    } catch (error) {
+      console.error("Failed to stop prompt", error);
+    }
+  }, [activeSessionId, invoke]);
+
   return {
-    isLoading: (activeSession?.status ?? "idle") === "running",
+    isRunning: (activeSession?.status ?? "idle") === "running",
     messageEntries,
     streamingEntryId: activeSessionId
       ? sessionStore.getState().streamingEntryIds.get(activeSessionId)
       : undefined,
+    stopPrompt,
     toolStates,
     submitPrompt,
   };

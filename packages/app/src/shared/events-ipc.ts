@@ -38,6 +38,7 @@ export const ALLOWED_RENDER_INVOKE_EVENTS: (keyof AgentRuntimeIPC)[] = [
   "setModel",
   "getAvailableModels",
   "prompt",
+  "abortPrompt",
   "setHistoryMessages",
   "setSessionId",
   "searchWorkspaceFiles",
