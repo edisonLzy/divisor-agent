@@ -36,10 +36,12 @@ export function WorkspacePage() {
           <Sessions />
         </ResizablePanel>
 
-        <ResizableHandle withHandle />
+        <ResizableHandle />
 
         <ResizablePanel defaultSize="74%" minSize="60%">
-          <Chat />
+          <div className="h-full w-full bg-sidebar/78 supports-backdrop-filter:bg-sidebar/68 supports-backdrop-filter:backdrop-blur-xl">
+            <Chat />
+          </div>
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

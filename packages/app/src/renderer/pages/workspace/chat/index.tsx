@@ -11,7 +11,7 @@ export function Chat() {
 
   return (
     <div
-      className="flex h-full flex-col overflow-hidden rounded-tr-3xl ring-1 ring-border/70 supports-backdrop-filter:backdrop-blur-xl"
+      className="-ml-px flex h-full flex-col overflow-hidden rounded-l-[20px] border border-border/70 border-l-0 supports-backdrop-filter:backdrop-blur-xl"
       style={{
         background:
           "radial-gradient(circle at 10% 0%, var(--workspace-glow), transparent 40%), var(--workspace-surface)",
