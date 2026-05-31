@@ -1,5 +1,5 @@
 import { useSubscribeAgentEvents } from "@renderer/hooks/use-subscribe-agent-events";
-import { sessionStore } from "@renderer/store/sessions";
+import { sessionStore } from "@renderer/store";
 
 /**
  * Subscribes to agent lifecycle events to manage session UI state

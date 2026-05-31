@@ -94,6 +94,20 @@ export class AgentPool
     return runtime.searchWorkspaceFiles(query);
   };
 
+  public setPermissionMode: AgentSessionIPC["setPermissionMode"] = async (sessionId, mode) => {
+    const runtime = this.getOrCreateRuntime(sessionId);
+    await runtime.setPermissionMode(mode);
+  };
+
+  public resolvePermissionRequest: AgentSessionIPC["resolvePermissionRequest"] = async (
+    sessionId,
+    requestId,
+    resolution,
+  ) => {
+    const runtime = this.getOrCreateRuntime(sessionId);
+    await runtime.resolvePermissionRequest(requestId, resolution);
+  };
+
   public prompt: AgentSessionIPC["prompt"] = async (sessionId, content, model) => {
     const runtime = this.getOrCreateRuntime(sessionId);
     runtime.prompt(content, model);

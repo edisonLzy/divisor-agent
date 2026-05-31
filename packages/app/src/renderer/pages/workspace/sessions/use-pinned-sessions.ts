@@ -1,5 +1,5 @@
 import { listSessions, listWorkspaces } from "@renderer/apis/sessions";
-import { sessionStore } from "@renderer/store/sessions";
+import { sessionStore } from "@renderer/store";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 

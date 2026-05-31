@@ -1,5 +1,5 @@
 import { ErrorBoundary } from "@renderer/components/ui/error-boundary";
-import { sessionStore } from "@renderer/store/sessions";
+import { sessionStore } from "@renderer/store";
 import { useStore } from "zustand";
 
 import { ActiveSessionContent } from "./active-session-content";

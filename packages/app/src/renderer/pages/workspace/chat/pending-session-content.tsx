@@ -9,7 +9,7 @@ import {
 } from "@renderer/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@renderer/components/ui/popover";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
-import { sessionStore } from "@renderer/store/sessions";
+import { sessionStore } from "@renderer/store";
 import { Check, ChevronDown, Folder, X } from "lucide-react";
 import { useState } from "react";
 import { useStore } from "zustand";
@@ -125,34 +125,32 @@ function WorkspaceSelector({ value, onChange }: WorkspaceSelectorProps) {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button className="group flex h-6 w-auto max-w-[200px] items-center gap-1.5 rounded-[8px] border-none bg-muted/50 px-2.5 py-0 text-xs text-muted-foreground shadow-none hover:bg-muted/80 hover:text-foreground focus:outline-hidden">
-          {selectedWorkspace ? (
-            <>
-              <Folder className="size-3.5 opacity-50" />
-              <span className="truncate text-foreground">{selectedWorkspace.name}</span>
-              <div
-                className="hidden items-center justify-center group-hover:flex"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onChange(null);
-                }}
-              >
-                <X className="size-3.5 opacity-50 hover:opacity-100" />
-              </div>
-              <div className="flex items-center justify-center group-hover:hidden">
-                <ChevronDown className="size-3.5 opacity-50" />
-              </div>
-            </>
-          ) : (
-            <>
-              <Folder className="size-3.5 opacity-50" />
-              <span className="truncate">选择工作区</span>
+      <PopoverTrigger className="group flex h-6 w-auto max-w-[200px] items-center gap-1.5 rounded-[8px] border-none bg-muted/50 px-2.5 py-0 text-xs text-muted-foreground shadow-none hover:bg-muted/80 hover:text-foreground focus:outline-hidden">
+        {selectedWorkspace ? (
+          <>
+            <Folder className="size-3.5 opacity-50" />
+            <span className="truncate text-foreground">{selectedWorkspace.name}</span>
+            <div
+              className="hidden items-center justify-center group-hover:flex"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onChange(null);
+              }}
+            >
+              <X className="size-3.5 opacity-50 hover:opacity-100" />
+            </div>
+            <div className="flex items-center justify-center group-hover:hidden">
               <ChevronDown className="size-3.5 opacity-50" />
-            </>
-          )}
-        </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <Folder className="size-3.5 opacity-50" />
+            <span className="truncate">选择工作区</span>
+            <ChevronDown className="size-3.5 opacity-50" />
+          </>
+        )}
       </PopoverTrigger>
 
       <PopoverContent align="start" className="w-[180px] p-0" sideOffset={8}>

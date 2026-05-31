@@ -1,4 +1,4 @@
-import type { MessageEntry, ModelChangedEntry, SessionEntry } from "@renderer/store/sessions";
+import type { MessageEntry, ModelChangedEntry, SessionEntry } from "@renderer/store";
 
 export function isAgentMessageEntry(entry: SessionEntry): entry is MessageEntry {
   return entry.type === "message";

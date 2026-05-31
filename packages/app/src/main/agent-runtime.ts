@@ -1,15 +1,17 @@
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { Agent } from "@mariozechner/pi-agent-core";
 import Emittery from "emittery";
 
 import type { AllowedMainExposeEvents } from "../shared/events-ipc.js";
 import type { AgentModelsIPC } from "../shared/models-ipc.js";
+import type { PermissionMode } from "../shared/permissions-ipc.js";
 import type { AgentSessionIPC, WorkspaceFileItem } from "../shared/session-ipc.js";
 import { ModelRegistry } from "./models/index.js";
+import { PermissionService } from "./permissions/index.js";
 import { fsReadTextFileTool, fsWriteTextFileTool, terminalCreateTool } from "./tools/index.js";
 
 // ── Derived runtime delegate type ──────────────────────────────────────────
@@ -93,18 +95,61 @@ function resolveWorkspaceRoot(startDir = process.cwd()) {
  */
 export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentRuntimeDelegate {
   private agent: Agent;
+  private permissionMode: PermissionMode;
+  private permissionService: PermissionService;
   private workspaceRoot: string;
   private workspaceFilesCache: WorkspaceFileItem[] | null;
 
   constructor(private modelRegistry: ModelRegistry) {
     super();
+    this.permissionMode = "default";
+    this.permissionService = new PermissionService();
     this.workspaceRoot = resolveWorkspaceRoot();
     this.workspaceFilesCache = null;
     this.agent = this.createInternalAgent();
   }
 
   private createInternalAgent() {
+    this.permissionService.setRequestCallback((request) => {
+      this.emit("permission_requested", {
+        type: "permission_requested",
+        ...request,
+      });
+    });
+
     const agent = new Agent({
+      beforeToolCall: async (context) => {
+        if (this.permissionMode === "bypasspermission") {
+          return undefined;
+        }
+
+        if (!this.permissionService.isHighRisk(context.toolCall.name)) {
+          return undefined;
+        }
+
+        const tool = context.context.tools?.find(
+          (candidate) => candidate.name === context.toolCall.name,
+        );
+        const args = isRecord(context.args) ? context.args : {};
+        const resolution = await this.permissionService.requestPermission({
+          requestId: randomUUID(),
+          toolCallId: context.toolCall.id,
+          toolName: context.toolCall.name,
+          toolLabel: tool?.label ?? context.toolCall.name,
+          operation: context.toolCall.name,
+          args,
+          createdAt: Date.now(),
+        });
+
+        if (resolution.approved) {
+          return undefined;
+        }
+
+        return {
+          block: true,
+          reason: resolution.reason?.trim() || "Permission request denied by user",
+        };
+      },
       getApiKey: (provider) => {
         return this.modelRegistry.resolveApiKey(provider);
       },
@@ -149,6 +194,22 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
 
   public searchWorkspaceFiles: AgentRuntimeDelegate["searchWorkspaceFiles"] = (query) => {
     return this.searchFiles(query);
+  };
+
+  public setPermissionMode: AgentRuntimeDelegate["setPermissionMode"] = async (mode) => {
+    this.permissionMode = mode;
+  };
+
+  public resolvePermissionRequest: AgentRuntimeDelegate["resolvePermissionRequest"] = async (
+    requestId,
+    resolution,
+  ) => {
+    if (resolution.approved) {
+      this.permissionService.approve(requestId);
+      return;
+    }
+
+    this.permissionService.reject(requestId, resolution.reason);
   };
 
   public destroy() {
@@ -233,4 +294,8 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
       .slice(0, MAX_FILE_SEARCH_RESULTS)
       .map((entry) => entry.file);
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

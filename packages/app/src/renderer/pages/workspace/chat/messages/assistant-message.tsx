@@ -12,7 +12,7 @@ import {
   CollapsibleTrigger,
 } from "@renderer/components/ui/collapsible";
 import { Separator } from "@renderer/components/ui/separator";
-import type { ToolExecutionState } from "@renderer/store/sessions";
+import type { ToolExecutionState } from "@renderer/store";
 import { ChevronRightIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 

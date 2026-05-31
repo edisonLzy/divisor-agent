@@ -10,7 +10,7 @@ import {
   type SessionEntry,
   type SessionStatus,
   sessionStore,
-} from "@renderer/store/sessions";
+} from "@renderer/store";
 import { useQueryClient } from "@tanstack/react-query";
 import { Pin, PinOff, Trash2, Loader2 } from "lucide-react";
 import { useCallback } from "react";

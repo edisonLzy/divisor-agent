@@ -1,10 +1,11 @@
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { isAgentMessageEntry } from "@renderer/lib/is";
-import { sessionStore, type ToolExecutionState } from "@renderer/store/sessions";
+import { sessionStore, type ToolExecutionState } from "@renderer/store";
 import { useCallback } from "react";
 import { useStore } from "zustand";
 
 import { ChatMessages } from "./messages";
+import { PermissionApprovalPanel } from "./permission";
 import { PromptInput } from "./prompt-input";
 import type { PromptSubmission } from "./prompt-types";
 
@@ -12,6 +13,13 @@ export function ActiveSessionContent() {
   const { isLoading, messageEntries, streamingEntryId, toolStates, submitPrompt } =
     useActiveSessionChat();
   const activeSessionId = useStore(sessionStore, (state) => state.activeSessionId);
+  const pendingPermissionRequest = useStore(sessionStore, (state) => {
+    if (!activeSessionId) {
+      return null;
+    }
+
+    return state.getPermissionState(activeSessionId).requests[0] ?? null;
+  });
 
   return (
     <>
@@ -24,7 +32,11 @@ export function ActiveSessionContent() {
       </section>
 
       <section className="shrink-0 px-6 pb-6 pt-4">
-        <PromptInput disabled={isLoading} onSubmit={submitPrompt} sessionId={activeSessionId} />
+        {activeSessionId && pendingPermissionRequest ? (
+          <PermissionApprovalPanel sessionId={activeSessionId} />
+        ) : (
+          <PromptInput disabled={isLoading} onSubmit={submitPrompt} sessionId={activeSessionId} />
+        )}
       </section>
     </>
   );

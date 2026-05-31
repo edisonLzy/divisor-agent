@@ -27,6 +27,8 @@ function registerIPCHandlers(agentPool: AgentPool) {
   typedIpcMain.handle("setHistoryMessages", agentPool.setHistoryMessages);
   typedIpcMain.handle("setSessionId", agentPool.setSessionId);
   typedIpcMain.handle("searchWorkspaceFiles", agentPool.searchWorkspaceFiles);
+  typedIpcMain.handle("setPermissionMode", agentPool.setPermissionMode);
+  typedIpcMain.handle("resolvePermissionRequest", agentPool.resolvePermissionRequest);
 
   return () => {
     typedIpcMain.removeAllListeners();

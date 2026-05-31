@@ -6,6 +6,7 @@ import { useCallback, useRef, useState } from "react";
 
 import type { PromptSubmission } from "../prompt-types";
 import { ModalSelector, useModalSelector } from "./modal-selector";
+import { PermissionSelector, usePermissionSelector } from "./permission-selector";
 import { type FileItem, PromptEditor, type PromptEditorHandle } from "./prompt-editor";
 
 interface PromptInputProps {
@@ -17,6 +18,7 @@ interface PromptInputProps {
 export function PromptInput({ disabled = false, onSubmit, sessionId }: PromptInputProps) {
   const { invoke } = useElectronIPC();
   const modelSelectorProps = useModalSelector();
+  const permissionSelectorProps = usePermissionSelector(sessionId);
   const editorRef = useRef<PromptEditorHandle>(null);
   const [hasContent, setHasContent] = useState(false);
   const canSubmit = !disabled && hasContent && modelSelectorProps.value !== null;
@@ -73,21 +75,27 @@ export function PromptInput({ disabled = false, onSubmit, sessionId }: PromptInp
         className="min-h-14"
       />
 
-      <div className="flex items-center justify-end gap-2 px-3 py-3">
-        <ModalSelector {...modelSelectorProps} />
+      <div className="flex items-center justify-between gap-3 px-3 py-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <PermissionSelector {...permissionSelectorProps} />
+        </div>
 
-        <Button
-          type="button"
-          onClick={() => {
-            void handleSubmit();
-          }}
-          disabled={!canSubmit}
-          size="icon-sm"
-          className="size-7 rounded-full bg-muted-foreground/20 text-muted-foreground transition-colors hover:bg-muted-foreground/30 disabled:bg-muted disabled:text-muted-foreground/50"
-          aria-label="Send prompt"
-        >
-          <ArrowUp className="size-3.5" />
-        </Button>
+        <div className="flex items-center justify-end gap-2">
+          <ModalSelector {...modelSelectorProps} />
+
+          <Button
+            type="button"
+            onClick={() => {
+              void handleSubmit();
+            }}
+            disabled={!canSubmit}
+            size="icon-sm"
+            className="size-7 rounded-full bg-muted-foreground/20 text-muted-foreground transition-colors hover:bg-muted-foreground/30 disabled:bg-muted disabled:text-muted-foreground/50"
+            aria-label="Send prompt"
+          >
+            <ArrowUp className="size-3.5" />
+          </Button>
+        </div>
       </div>
     </div>
   );
