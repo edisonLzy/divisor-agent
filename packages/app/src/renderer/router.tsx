@@ -1,7 +1,9 @@
-import { createMemoryRouter } from "react-router-dom";
+import { createMemoryRouter, Navigate } from "react-router-dom";
 
 import { NotFoundRedirect } from "./Layout";
 import { SettingsPage } from "./pages/settings";
+import { SettingsAppearancePage } from "./pages/settings/appearance";
+import { SettingsModelsPage } from "./pages/settings/models";
 import { WorkspacePage } from "./pages/workspace";
 
 export const router = createMemoryRouter([
@@ -12,6 +14,20 @@ export const router = createMemoryRouter([
   {
     path: "/settings",
     element: <SettingsPage />,
+    children: [
+      {
+        index: true,
+        element: <Navigate to="appearance" replace />,
+      },
+      {
+        path: "appearance",
+        element: <SettingsAppearancePage />,
+      },
+      {
+        path: "models",
+        element: <SettingsModelsPage />,
+      },
+    ],
   },
   {
     path: "*",

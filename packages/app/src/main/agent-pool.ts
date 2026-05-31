@@ -123,7 +123,9 @@ export class AgentPool
   };
 
   public getAvailableModels: AgentModelsIPC["getAvailableModels"] = async () => {
-    return this.modelRegistry.getAvailableModels().map((m) => {
+    const models = await this.modelRegistry.getAvailableModels();
+
+    return models.map((m) => {
       return {
         modelId: m.id,
         providerId: m.provider,
@@ -131,5 +133,13 @@ export class AgentPool
         modelName: m.name ?? m.id,
       };
     });
+  };
+
+  public getModelConfig: AgentModelsIPC["getModelConfig"] = async () => {
+    return this.modelRegistry.getConfig();
+  };
+
+  public saveModelConfig: AgentModelsIPC["saveModelConfig"] = async (config) => {
+    await this.modelRegistry.saveConfig(config);
   };
 }
