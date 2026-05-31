@@ -7,9 +7,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@renderer/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@renderer/components/ui/tooltip";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { cn } from "@renderer/lib/utils";
 import type { AvailableModel } from "@shared/models-ipc";
+import { CircleHelp, Cpu } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 export function ModalSelector({ value, onChange }: ModalSelectorProps) {
@@ -97,7 +104,7 @@ export function ModalSelector({ value, onChange }: ModalSelectorProps) {
             </div>
           ) : (
             <span className="truncate text-xs text-muted-foreground">
-              {isLoading ? "Loading..." : "Select model"}
+              {isLoading ? "加载中..." : "选择模型"}
             </span>
           )}
         </SelectValue>
@@ -105,10 +112,11 @@ export function ModalSelector({ value, onChange }: ModalSelectorProps) {
 
       <SelectContent
         align="end"
-        sideOffset={10}
-        className="w-80 min-w-80 max-h-none overflow-hidden rounded-2xl border border-border bg-popover p-0 text-popover-foreground shadow-[0_20px_48px_rgb(15_23_42/0.16)] dark:shadow-[0_20px_48px_rgb(0_0_0/0.4)]"
+        alignItemWithTrigger={false}
+        sideOffset={8}
+        className="w-max min-w-56 max-w-80 max-h-none overflow-hidden rounded-2xl border border-border/80 bg-popover/96 p-0 text-popover-foreground shadow-[0_18px_48px_rgb(15_23_42/0.16)] backdrop-blur-xl dark:shadow-[0_18px_48px_rgb(0_0_0/0.4)]"
       >
-        <div className="border-b border-border px-3 py-2.5">
+        <div className="border-b border-border/70 px-2 py-2.5">
           <Input
             autoFocus
             value={query}
@@ -116,39 +124,70 @@ export function ModalSelector({ value, onChange }: ModalSelectorProps) {
             onKeyDownCapture={(event) => {
               event.stopPropagation();
             }}
-            placeholder="Filter models..."
-            className="h-8 border-border bg-background text-foreground placeholder:text-muted-foreground"
+            placeholder="搜索模型..."
+            className="h-8 rounded-xl border-border/70 bg-background/70 px-3 text-[12px] text-foreground placeholder:text-muted-foreground"
           />
         </div>
 
-        <div className="max-h-56 overflow-x-hidden overflow-y-auto px-2 py-2">
-          <SelectGroup className="min-w-0 p-0">
-            {filteredModels.map((model) => (
-              <SelectItem
-                key={`${model.providerId}/${model.modelId}`}
-                value={`${model.providerId}/${model.modelId}`}
-                className="w-full overflow-hidden rounded-xl px-3 py-2 text-foreground focus:bg-accent focus:text-accent-foreground"
-              >
-                <div className="min-w-0 flex flex-1 flex-col gap-0.5 overflow-hidden pr-3">
-                  <span className="block min-w-0 truncate text-sm font-medium text-current">
-                    {model.modelName}
-                  </span>
-                  <span className="block min-w-0 truncate text-xs text-muted-foreground">
-                    {model.providerName}
-                  </span>
-                </div>
-              </SelectItem>
-            ))}
-          </SelectGroup>
+        <div className="max-h-60 overflow-x-hidden overflow-y-auto px-1 py-1.5">
+          <TooltipProvider delay={120}>
+            <SelectGroup className="min-w-0 p-0">
+              {filteredModels.map((model) => {
+                const modelValue = `${model.providerId}/${model.modelId}`;
+                const isSelected = selectedValue === modelValue;
+
+                return (
+                  <SelectItem
+                    key={modelValue}
+                    value={modelValue}
+                    className={cn(
+                      "mb-0.5 last:mb-0 w-full overflow-hidden rounded-lg border border-transparent px-3 py-2 text-foreground focus:bg-transparent focus:text-foreground",
+                      isSelected && "text-foreground",
+                    )}
+                  >
+                    <div className="flex min-w-0 flex-1 items-center gap-2.5 overflow-hidden pr-6">
+                      <span className="flex size-5 shrink-0 items-center justify-center rounded-lg bg-background/80 text-muted-foreground">
+                        <Cpu className="size-3" />
+                      </span>
+                      <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+                        <span className="block min-w-0 truncate text-[13px] font-medium leading-none text-current">
+                          {model.modelName}
+                        </span>
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <button
+                                type="button"
+                                className="flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground/75 transition-colors hover:text-foreground"
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                }}
+                              />
+                            }
+                          >
+                            <CircleHelp className="size-3.25" />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-[11px]">
+                            {model.providerName}
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </div>
+                  </SelectItem>
+                );
+              })}
+            </SelectGroup>
+          </TooltipProvider>
 
           {!isLoading && filteredModels.length === 0 ? (
             <div
               className={cn(
-                "px-3 py-3 text-sm text-muted-foreground",
+                "px-3 py-3 text-[12px] text-muted-foreground",
                 models.length === 0 && "text-center",
               )}
             >
-              {models.length === 0 ? "No models found." : "No models match your filter."}
+              {models.length === 0 ? "没有可用模型" : "没有匹配的模型"}
             </div>
           ) : null}
         </div>

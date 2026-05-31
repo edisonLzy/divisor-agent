@@ -6,10 +6,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@renderer/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@renderer/components/ui/tooltip";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
+import { cn } from "@renderer/lib/utils";
 import { sessionStore } from "@renderer/store";
 import type { PermissionMode } from "@shared/permissions-ipc";
-import { ShieldAlert, ShieldCheck } from "lucide-react";
+import { CircleHelp, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useStore } from "zustand";
@@ -22,14 +29,14 @@ const PERMISSION_OPTIONS: Array<{
 }> = [
   {
     value: "default",
-    label: "default",
-    description: "高风险操作执行前需要确认",
+    label: "默认权限",
+    description: "高风险操作前确认",
     icon: ShieldAlert,
   },
   {
     value: "bypasspermission",
-    label: "bypasspermission",
-    description: "高风险操作直接执行，不再请求确认",
+    label: "完全访问权限",
+    description: "直接执行高风险操作",
     icon: ShieldCheck,
   },
 ];
@@ -70,42 +77,59 @@ export function PermissionSelector({ disabled = false, onChange, value }: Permis
 
       <SelectContent
         align="end"
-        sideOffset={10}
-        className="w-80 min-w-80 max-h-none overflow-hidden rounded-2xl border border-border bg-popover p-0 text-popover-foreground shadow-[0_20px_48px_rgb(15_23_42/0.16)] dark:shadow-[0_20px_48px_rgb(0_0_0/0.4)]"
+        alignItemWithTrigger={false}
+        sideOffset={8}
+        className="w-max min-w-42 max-w-64 max-h-none overflow-hidden rounded-2xl border border-border/80 bg-popover/96 p-0 text-popover-foreground shadow-[0_18px_48px_rgb(15_23_42/0.16)] backdrop-blur-xl dark:shadow-[0_18px_48px_rgb(0_0_0/0.4)]"
       >
-        <div className="border-b border-border px-3 py-2.5">
-          <div className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            Session Permissions
-          </div>
-        </div>
-
-        <div className="px-2 py-2">
+        <TooltipProvider delay={120}>
           <SelectGroup className="min-w-0 p-0">
             {PERMISSION_OPTIONS.map((option) => {
               const OptionIcon = option.icon;
+              const isSelected = option.value === value;
 
               return (
                 <SelectItem
                   key={option.value}
                   value={option.value}
-                  className="w-full overflow-hidden rounded-xl px-3 py-2 text-foreground focus:bg-accent focus:text-accent-foreground"
+                  className={cn(
+                    "mb-0.5 last:mb-0 w-full overflow-hidden rounded-lg border border-transparent px-3 py-2 text-foreground focus:bg-transparent focus:text-foreground",
+                    isSelected && "text-foreground",
+                  )}
                 >
-                  <div className="flex min-w-0 flex-1 items-start gap-2 overflow-hidden pr-3">
-                    <OptionIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                    <div className="min-w-0 flex-1">
-                      <div className="block truncate text-sm font-medium text-current">
+                  <div className="flex min-w-0 flex-1 items-center gap-2.5 overflow-hidden pr-6">
+                    <span className="flex size-5 shrink-0 items-center justify-center rounded-lg bg-background/80 text-muted-foreground">
+                      <OptionIcon className="size-3" />
+                    </span>
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                      <span className="truncate text-[13px] font-medium leading-none text-current">
                         {option.label}
-                      </div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">
-                        {option.description}
-                      </div>
+                      </span>
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <button
+                              type="button"
+                              className="flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground/75 transition-colors hover:text-foreground"
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                              }}
+                            />
+                          }
+                        >
+                          <CircleHelp className="size-3.25" />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-52 text-[11px]">
+                          {option.description}
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                   </div>
                 </SelectItem>
               );
             })}
           </SelectGroup>
-        </div>
+        </TooltipProvider>
       </SelectContent>
     </Select>
   );

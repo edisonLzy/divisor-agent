@@ -31,14 +31,11 @@ export function PendingSessionContent() {
 
     try {
       const store = sessionStore.getState();
-      const pending = store.pendingSession;
-      if (!pending) {
-        return;
-      }
+      const workspaceId = store.pendingSession?.workspaceId ?? null;
 
       const newSession = await createSession({
         name: "新对话",
-        workspaceId: pending.workspaceId,
+        workspaceId,
         parentSessionId: null,
       });
 
@@ -48,8 +45,8 @@ export function PendingSessionContent() {
 
       await invoke("setSessionId", newSession.id);
 
-      if (pending.workspaceId) {
-        await invalidateWorkspaceSessions(pending.workspaceId);
+      if (workspaceId) {
+        await invalidateWorkspaceSessions(workspaceId);
       } else {
         await invalidateStandalone();
       }
