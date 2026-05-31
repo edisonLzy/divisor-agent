@@ -1,5 +1,4 @@
 import { Button } from "@renderer/components/ui/button";
-import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { cn } from "@renderer/lib/utils";
 import { ArrowUp, Square } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
@@ -7,7 +6,7 @@ import { useCallback, useRef, useState } from "react";
 import type { PromptSubmission } from "../prompt-types";
 import { ModalSelector, useModalSelector } from "./modal-selector";
 import { PermissionSelector, usePermissionSelector } from "./permission-selector";
-import { type FileItem, PromptEditor, type PromptEditorHandle } from "./prompt-editor";
+import { PromptEditor, type PromptEditorHandle } from "./prompt-editor";
 
 interface PromptInputProps {
   disabled?: boolean;
@@ -24,30 +23,12 @@ export function PromptInput({
   onStop,
   sessionId,
 }: PromptInputProps) {
-  const { invoke } = useElectronIPC();
   const modelSelectorProps = useModalSelector();
   const permissionSelectorProps = usePermissionSelector(sessionId);
   const editorRef = useRef<PromptEditorHandle>(null);
   const [hasContent, setHasContent] = useState(false);
   const canSubmit = !disabled && !isRunning && hasContent && modelSelectorProps.value !== null;
   const isStopEnabled = isRunning && typeof onStop === "function";
-
-  const handleSearchFiles = useCallback(
-    async (query: string): Promise<FileItem[]> => {
-      if (!sessionId) {
-        return [];
-      }
-
-      const files = await invoke("searchWorkspaceFiles", sessionId, query);
-      return files.map((file) => ({
-        id: file.path,
-        label: file.path,
-        name: file.name,
-        path: file.path,
-      }));
-    },
-    [invoke, sessionId],
-  );
 
   const handleSubmit = useCallback(async () => {
     if (!canSubmit || !modelSelectorProps.value || !editorRef.current) {
@@ -80,7 +61,6 @@ export function PromptInput({
         disabled={disabled || isRunning}
         onSubmit={handleSubmit}
         onContentChange={setHasContent}
-        onSearchFiles={handleSearchFiles}
         className="min-h-14"
       />
 
