@@ -34,8 +34,10 @@ export function useAgentRuntime() {
 
       window.electronAPI
         .invoke("prompt", sessionId, content, {
-          providerId,
-          modelId,
+          model: {
+            providerId,
+            modelId,
+          },
         })
         .catch(console.error);
     },

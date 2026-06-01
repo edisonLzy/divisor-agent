@@ -54,8 +54,11 @@ export function PendingSessionContent() {
       sessionStore.getState().setSessionStatus(newSession.id, "running");
 
       await invoke("prompt", newSession.id, submission.text, {
-        modelId: submission.model.modelId,
-        providerId: submission.model.providerId,
+        model: {
+          modelId: submission.model.modelId,
+          providerId: submission.model.providerId,
+        },
+        skillIds: submission.skillIds,
       });
     } catch (error) {
       console.error("Failed to submit prompt", error);

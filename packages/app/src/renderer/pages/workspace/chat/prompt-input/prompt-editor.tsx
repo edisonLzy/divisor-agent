@@ -2,11 +2,11 @@ import { cn } from "@renderer/lib/utils";
 import type { DiscoveredSkill } from "@shared/skills-ipc";
 import Mention from "@tiptap/extension-mention";
 import Placeholder from "@tiptap/extension-placeholder";
-import { PluginKey } from "@tiptap/pm/state";
 import { type Editor, EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import type { SuggestionKeyDownProps, SuggestionOptions } from "@tiptap/suggestion";
 import { BoxIcon } from "lucide-react";
+import { PluginKey } from "prosemirror-state";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
 

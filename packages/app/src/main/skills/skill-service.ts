@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 
 import type { DiscoveredSkill, SkillScope } from "../../shared/skills-ipc.js";
+import type { SystemPromptBuilder } from "../prompt/index.js";
 
 const CONFIG_FILE_PATH = join(homedir(), ".divisor-agent", "skills-settings.json");
 
@@ -25,7 +26,7 @@ interface SkillLocation {
   source: string;
 }
 
-export class SkillService {
+export class SkillService implements SystemPromptBuilder {
   private skillsCache: DiscoveredSkill[] | null = null;
   private disabledSkillIds = new Set<string>();
 
@@ -61,13 +62,13 @@ export class SkillService {
     return this.listSkills();
   }
 
-  formatEnabledSkillsForPrompt(): string {
+  buildSystemPrompt(raw: string): string {
     const skills = this.getSkills().filter(
       (skill) => skill.enabled && !skill.disableModelInvocation,
     );
 
     if (skills.length === 0) {
-      return "";
+      return raw;
     }
 
     const lines = [
@@ -88,7 +89,7 @@ export class SkillService {
 
     lines.push("</available_skills>");
 
-    return lines.join("\n");
+    return joinPromptSections(raw, lines.join("\n"));
   }
 
   expandSkillReferences(content: string, skillIds: string[]): string {
@@ -195,6 +196,8 @@ function collectProjectSkillLocations(cwd: string): SkillLocation[] {
     { dir: join(cwd, ".codex", "skills"), mode: "agents", scope: "project", source: "codex" },
   ];
 
+  // Limit parent traversal to the current repository so we do not accidentally
+  // inherit sibling or parent-project skills outside the active workspace.
   const gitRoot = findGitRepoRoot(cwd);
   let currentDir = cwd;
   while (true) {
@@ -306,7 +309,10 @@ function parseFrontmatter(content: string): SkillFrontmatter {
   }
 
   const frontmatter: SkillFrontmatter = {};
-  for (const line of match[1].split(/\r?\n/)) {
+  const lines = match[1].split(/\r?\n/);
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
     const separatorIndex = line.indexOf(":");
     if (separatorIndex === -1) {
       continue;
@@ -314,7 +320,29 @@ function parseFrontmatter(content: string): SkillFrontmatter {
 
     const key = line.slice(0, separatorIndex).trim();
     const rawValue = line.slice(separatorIndex + 1).trim();
-    const value = rawValue.replace(/^["']|["']$/g, "");
+    let value = rawValue.replace(/^["']|["']$/g, "");
+
+    if (rawValue === ">" || rawValue === "|") {
+      const blockLines: string[] = [];
+
+      while (index + 1 < lines.length) {
+        const nextLine = lines[index + 1];
+        if (nextLine.trim().length === 0) {
+          blockLines.push("");
+          index += 1;
+          continue;
+        }
+
+        if (!/^\s+/.test(nextLine)) {
+          break;
+        }
+
+        blockLines.push(nextLine);
+        index += 1;
+      }
+
+      value = parseBlockScalar(blockLines, rawValue);
+    }
 
     if (key === "name") frontmatter.name = value;
     if (key === "description") frontmatter.description = value;
@@ -347,6 +375,67 @@ function findGitRepoRoot(startDir: string): string | null {
   }
 }
 
+function parseBlockScalar(lines: string[], style: ">" | "|"): string {
+  const normalizedLines = dedentBlockLines(lines);
+  if (style === "|") {
+    return normalizedLines.join("\n").trim();
+  }
+
+  const paragraphs: string[] = [];
+  let currentParagraph: string[] = [];
+
+  for (const line of normalizedLines) {
+    if (line.trim().length === 0) {
+      if (currentParagraph.length > 0) {
+        paragraphs.push(currentParagraph.join(" "));
+        currentParagraph = [];
+      }
+      continue;
+    }
+
+    currentParagraph.push(line.trim());
+  }
+
+  if (currentParagraph.length > 0) {
+    paragraphs.push(currentParagraph.join(" "));
+  }
+
+  return paragraphs.join("\n\n").trim();
+}
+
+function dedentBlockLines(lines: string[]): string[] {
+  let minIndent = Number.POSITIVE_INFINITY;
+
+  for (const line of lines) {
+    if (line.trim().length === 0) {
+      continue;
+    }
+
+    const indent = line.match(/^\s*/)?.[0].length ?? 0;
+    minIndent = Math.min(minIndent, indent);
+  }
+
+  if (!Number.isFinite(minIndent)) {
+    return [];
+  }
+
+  return lines.map((line) => {
+    if (line.trim().length === 0) {
+      return "";
+    }
+
+    return line.slice(minIndent);
+  });
+}
+
+function joinPromptSections(...sections: string[]): string {
+  return sections
+    .filter((section) => section.trim().length > 0)
+    .join("\n\n")
+    .trim();
+}
+
+// Dirent does not follow symlinks, but skills are often symlinked during local development.
 function isFile(fullPath: string, entry: { isFile(): boolean; isSymbolicLink(): boolean }) {
   if (entry.isFile()) {
     return true;
@@ -363,6 +452,7 @@ function isFile(fullPath: string, entry: { isFile(): boolean; isSymbolicLink(): 
   }
 }
 
+// Mirror `isFile` behavior so recursive discovery works for symlinked skill directories too.
 function isDirectory(
   fullPath: string,
   entry: { isDirectory(): boolean; isSymbolicLink(): boolean },

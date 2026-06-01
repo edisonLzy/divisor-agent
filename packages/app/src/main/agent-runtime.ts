@@ -10,16 +10,10 @@ import type { AgentSessionIPC } from "../shared/session-ipc.js";
 import type { AgentSkillsIPC } from "../shared/skills-ipc.js";
 import { ModelRegistry } from "./models/index.js";
 import { PermissionService } from "./permissions/index.js";
+import { SystemPromptService } from "./prompt/index.js";
 import { SkillService } from "./skills/index.js";
 import type { AppTool } from "./tools/index.js";
 import { fsReadTextFileTool, fsWriteTextFileTool, terminalCreateTool } from "./tools/index.js";
-
-type AgentSkillService = Pick<
-  SkillService,
-  "expandSkillReferences" | "formatEnabledSkillsForPrompt" | "listSkills" | "setSkillEnabled"
->;
-
-const sharedSkillService = new SkillService();
 
 // ── Derived runtime delegate type ──────────────────────────────────────────
 
@@ -78,14 +72,17 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
   private agent: Agent;
   private permissionMode: PermissionMode;
   private permissionService: PermissionService;
+  private systemPromptService: SystemPromptService;
 
   constructor(
     private modelRegistry = new ModelRegistry(),
-    private skillService: AgentSkillService = sharedSkillService,
+    private skillService: SkillService,
   ) {
     super();
     this.permissionMode = "default";
     this.permissionService = new PermissionService();
+    this.systemPromptService = new SystemPromptService();
+    this.systemPromptService.addBuilder(this.skillService);
     this.agent = this.createInternalAgent();
   }
 
@@ -140,7 +137,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
         return this.modelRegistry.resolveApiKey(provider);
       },
       initialState: {
-        systemPrompt: this.skillService.formatEnabledSkillsForPrompt(),
+        systemPrompt: this.systemPromptService.buildSystemPrompt(""),
         tools: [fsReadTextFileTool, fsWriteTextFileTool, terminalCreateTool],
       },
     });
@@ -172,12 +169,13 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
     return true;
   };
 
-  public prompt: AgentRuntimeDelegate["prompt"] = async (content, model, skillIds = []) => {
-    if (model) {
-      await this.setModel(model);
+  public prompt: AgentRuntimeDelegate["prompt"] = async (content, metadata = {}) => {
+    if (metadata.model) {
+      await this.setModel(metadata.model);
     }
-    this.agent.state.systemPrompt = this.skillService.formatEnabledSkillsForPrompt();
-    this.agent.prompt(this.skillService.expandSkillReferences(content, skillIds));
+
+    this.agent.state.systemPrompt = this.systemPromptService.buildSystemPrompt("");
+    this.agent.prompt(this.skillService.expandSkillReferences(content, metadata.skillIds ?? []));
   };
 
   public abortPrompt: AgentRuntimeDelegate["abortPrompt"] = async () => {

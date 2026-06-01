@@ -66,10 +66,15 @@ vi.mock("@mariozechner/pi-agent-core", () => ({
 // ── Import after mock registration ───────────────────────────────────────────
 
 import { AgentRuntime } from "../../src/main/agent-runtime.js";
+import { SkillService } from "../../src/main/skills/index.js";
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 describe("AgentRuntime", () => {
+  function createRuntime() {
+    return new AgentRuntime(undefined, new SkillService());
+  }
+
   function emitAgentEvent(event: unknown) {
     const listener = mockSubscribeFn.mock.calls.at(-1)?.[0];
     expect(listener).toBeDefined();
@@ -88,7 +93,7 @@ describe("AgentRuntime", () => {
 
   describe("constructor", () => {
     it("creates Agent and subscribes to events", () => {
-      new AgentRuntime();
+      createRuntime();
 
       // Agent should be created with tools and subscribe should be called
       expect(mockSubscribeFn).toHaveBeenCalled();
@@ -97,7 +102,7 @@ describe("AgentRuntime", () => {
 
   describe("getAvailableModels", () => {
     it("returns mapped models from registry", async () => {
-      const runtime = new AgentRuntime();
+      const runtime = createRuntime();
       const models = await runtime.getAvailableModels();
 
       expect(models.length).toBeGreaterThan(0);
@@ -109,7 +114,7 @@ describe("AgentRuntime", () => {
     });
 
     it("maps model correctly with modelId and providerId", async () => {
-      const runtime = new AgentRuntime();
+      const runtime = createRuntime();
       const models = await runtime.getAvailableModels();
 
       const anthropicModels = models.filter((m) => m.providerId === "anthropic");
@@ -120,7 +125,7 @@ describe("AgentRuntime", () => {
 
   describe("setModel", () => {
     it("returns true when model is found and set", async () => {
-      const runtime = new AgentRuntime();
+      const runtime = createRuntime();
       const result = await runtime.setModel({
         modelId: "claude-sonnet-4-20250514",
         providerId: "anthropic",
@@ -130,7 +135,7 @@ describe("AgentRuntime", () => {
     });
 
     it("returns false when model is not found", async () => {
-      const runtime = new AgentRuntime();
+      const runtime = createRuntime();
       const result = await runtime.setModel({
         modelId: "nonexistent-model",
         providerId: "nonexistent-provider",
@@ -140,7 +145,7 @@ describe("AgentRuntime", () => {
     });
 
     it("updates agent state with model info", async () => {
-      const runtime = new AgentRuntime();
+      const runtime = createRuntime();
       await runtime.setModel({
         modelId: "claude-sonnet-4-20250514",
         providerId: "anthropic",
@@ -152,7 +157,7 @@ describe("AgentRuntime", () => {
 
   describe("prompt", () => {
     it("calls agent.prompt with content", async () => {
-      const runtime = new AgentRuntime();
+      const runtime = createRuntime();
 
       await runtime.prompt({
         sessionId: "session-123",
@@ -164,7 +169,7 @@ describe("AgentRuntime", () => {
     });
 
     it("sets model before prompting if model is provided", async () => {
-      const runtime = new AgentRuntime();
+      const runtime = createRuntime();
 
       await runtime.prompt({
         sessionId: "session-456",
@@ -176,7 +181,7 @@ describe("AgentRuntime", () => {
     });
 
     it("handles agent.prompt throwing without rethrowing", async () => {
-      const runtime = new AgentRuntime();
+      const runtime = createRuntime();
       mockPromptFn.mockRejectedValue(new Error("Network error"));
 
       // Should not throw
@@ -190,7 +195,7 @@ describe("AgentRuntime", () => {
     });
 
     it("emits renderer-ready thinking and response messages", async () => {
-      const runtime = new AgentRuntime();
+      const runtime = createRuntime();
       const chunkListener = vi.fn();
       runtime.on("agentMessageChunk", chunkListener);
 
@@ -248,7 +253,7 @@ describe("AgentRuntime", () => {
     });
 
     it("emits renderer-ready tool messages", async () => {
-      const runtime = new AgentRuntime();
+      const runtime = createRuntime();
       const chunkListener = vi.fn();
       runtime.on("agentMessageChunk", chunkListener);
 
@@ -291,7 +296,7 @@ describe("AgentRuntime", () => {
 
   describe("destroy", () => {
     it("clears all listeners without throwing", () => {
-      const runtime = new AgentRuntime();
+      const runtime = createRuntime();
 
       // Add listeners
       runtime.on("agentMessageChunk", vi.fn());
@@ -304,7 +309,7 @@ describe("AgentRuntime", () => {
 
   describe("setHistoryMessages", () => {
     it("is a no-op (TODO) implementation", async () => {
-      const runtime = new AgentRuntime();
+      const runtime = createRuntime();
 
       // Should not throw
       await expect(
