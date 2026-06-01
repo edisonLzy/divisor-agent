@@ -99,14 +99,6 @@ export class AgentPool
     runtime.setHistoryMessages(messages);
   };
 
-  public searchWorkspaceFiles: AgentSessionIPC["searchWorkspaceFiles"] = async (
-    sessionId,
-    query,
-  ) => {
-    const runtime = this.getOrCreateRuntime(sessionId);
-    return runtime.searchWorkspaceFiles(query);
-  };
-
   public setPermissionMode: AgentSessionIPC["setPermissionMode"] = async (sessionId, mode) => {
     const runtime = this.getOrCreateRuntime(sessionId);
     await runtime.setPermissionMode(mode);
