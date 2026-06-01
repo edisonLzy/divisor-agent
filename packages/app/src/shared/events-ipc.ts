@@ -37,11 +37,12 @@ export type AgentRuntimeIPC = AgentModelsIPC & AgentSessionIPC;
 export const ALLOWED_RENDER_INVOKE_EVENTS: (keyof AgentRuntimeIPC)[] = [
   "setModel",
   "getAvailableModels",
+  "getModelConfig",
+  "saveModelConfig",
   "prompt",
   "abortPrompt",
   "setHistoryMessages",
   "setSessionId",
-  "searchWorkspaceFiles",
   "setPermissionMode",
   "resolvePermissionRequest",
 ];
