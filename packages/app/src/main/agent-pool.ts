@@ -3,6 +3,7 @@ import Emittery from "emittery";
 import { AllowedMainExposeEvents } from "../shared/events-ipc.js";
 import { AgentModelsIPC } from "../shared/models-ipc.js";
 import { AgentSessionIPC } from "../shared/session-ipc.js";
+import { AgentSkillsIPC } from "../shared/skills-ipc.js";
 import { AgentRuntime } from "./agent-runtime.js";
 import { ModelRegistry } from "./models/index.js";
 
@@ -13,15 +14,17 @@ import { ModelRegistry } from "./models/index.js";
  */
 export class AgentPool
   extends Emittery<AllowedMainExposeEvents>
-  implements AgentSessionIPC, AgentModelsIPC
+  implements AgentSessionIPC, AgentModelsIPC, AgentSkillsIPC
 {
   private modelRegistry: ModelRegistry;
   private runtimes: Map<string, AgentRuntime>;
+  private skillsRuntime: AgentRuntime | null;
 
   constructor() {
     super();
     this.modelRegistry = new ModelRegistry();
     this.runtimes = new Map();
+    this.skillsRuntime = null;
   }
 
   // ── Runtime lifecycle ────────────────────────────────────────────────────
@@ -63,12 +66,22 @@ export class AgentPool
     for (const runtime of this.runtimes.values()) {
       runtime.destroy();
     }
+    this.skillsRuntime?.destroy();
+    this.skillsRuntime = null;
     this.runtimes.clear();
     this.clearListeners();
   }
 
   activeCount(): number {
     return this.runtimes.size;
+  }
+
+  private getSkillsRuntime(): AgentRuntime {
+    if (!this.skillsRuntime) {
+      this.skillsRuntime = new AgentRuntime(this.modelRegistry);
+    }
+
+    return this.skillsRuntime;
   }
 
   // ── Implements AgentSessionIPC ───────────────────────────────────────────
@@ -108,9 +121,9 @@ export class AgentPool
     await runtime.resolvePermissionRequest(requestId, resolution);
   };
 
-  public prompt: AgentSessionIPC["prompt"] = async (sessionId, content, model) => {
+  public prompt: AgentSessionIPC["prompt"] = async (sessionId, content, model, skillIds) => {
     const runtime = this.getOrCreateRuntime(sessionId);
-    runtime.prompt(content, model);
+    runtime.prompt(content, model, skillIds);
   };
 
   public abortPrompt: AgentSessionIPC["abortPrompt"] = async (sessionId) => {
@@ -139,5 +152,15 @@ export class AgentPool
         modelName: m.name ?? m.id,
       };
     });
+  };
+
+  // ── Implements AgentSkillsIPC ────────────────────────────────────────────
+
+  public listSkills: AgentSkillsIPC["listSkills"] = async () => {
+    return this.getSkillsRuntime().listSkills();
+  };
+
+  public setSkillEnabled: AgentSkillsIPC["setSkillEnabled"] = async (skillId, enabled) => {
+    return this.getSkillsRuntime().setSkillEnabled(skillId, enabled);
   };
 }

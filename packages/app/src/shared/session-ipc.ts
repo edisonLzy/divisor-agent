@@ -13,6 +13,7 @@ export interface AgentSessionIPC {
     sessionId: string,
     content: string,
     model?: Pick<AvailableModel, "modelId" | "providerId">,
+    skillIds?: string[],
   ) => Promise<void>;
   abortPrompt: (sessionId: string) => Promise<void>;
   setHistoryMessages: (sessionId: string, messages: AgentMessage[]) => Promise<void>;

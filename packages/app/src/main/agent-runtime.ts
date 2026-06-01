@@ -10,10 +10,19 @@ import type { AllowedMainExposeEvents } from "../shared/events-ipc.js";
 import type { AgentModelsIPC } from "../shared/models-ipc.js";
 import type { PermissionMode } from "../shared/permissions-ipc.js";
 import type { AgentSessionIPC, WorkspaceFileItem } from "../shared/session-ipc.js";
+import type { AgentSkillsIPC } from "../shared/skills-ipc.js";
 import { ModelRegistry } from "./models/index.js";
 import { PermissionService } from "./permissions/index.js";
+import { SkillService } from "./skills/index.js";
 import type { AppTool } from "./tools/index.js";
 import { fsReadTextFileTool, fsWriteTextFileTool, terminalCreateTool } from "./tools/index.js";
+
+type AgentSkillService = Pick<
+  SkillService,
+  "expandSkillReferences" | "formatEnabledSkillsForPrompt" | "listSkills" | "setSkillEnabled"
+>;
+
+const sharedSkillService = new SkillService();
 
 // ── Derived runtime delegate type ──────────────────────────────────────────
 
@@ -29,7 +38,7 @@ type StripSessionId<T> = T extends (sessionId: string, ...args: infer A) => infe
   ? (...args: A) => R
   : T;
 
-type CombinedIPC = AgentSessionIPC & AgentModelsIPC;
+type CombinedIPC = AgentSessionIPC & AgentModelsIPC & AgentSkillsIPC;
 
 /**
  * Contract that AgentRuntime must satisfy, auto-derived from IPC interfaces.
@@ -42,11 +51,17 @@ type CombinedIPC = AgentSessionIPC & AgentModelsIPC;
  * on AgentRuntime, the delegation call in AgentPool errors at compile time.
  */
 export type AgentRuntimeDelegate = {
-  [K in keyof CombinedIPC as K extends "getAvailableModels" | "setSessionId"
+  [K in keyof CombinedIPC as K extends
+    | "getAvailableModels"
+    | "listSkills"
+    | "setSessionId"
+    | "setSkillEnabled"
     ? never
     : K]: StripSessionId<CombinedIPC[K]>;
 } & {
+  listSkills: AgentSkillsIPC["listSkills"];
   setSessionId(sessionId: string): void;
+  setSkillEnabled: AgentSkillsIPC["setSkillEnabled"];
 };
 
 // ── Event type map ──────────────────────────────────────────────────────────
@@ -101,7 +116,10 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
   private workspaceRoot: string;
   private workspaceFilesCache: WorkspaceFileItem[] | null;
 
-  constructor(private modelRegistry: ModelRegistry) {
+  constructor(
+    private modelRegistry = new ModelRegistry(),
+    private skillService: AgentSkillService = sharedSkillService,
+  ) {
     super();
     this.permissionMode = "default";
     this.permissionService = new PermissionService();
@@ -161,6 +179,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
         return this.modelRegistry.resolveApiKey(provider);
       },
       initialState: {
+        systemPrompt: this.skillService.formatEnabledSkillsForPrompt(),
         tools: [fsReadTextFileTool, fsWriteTextFileTool, terminalCreateTool],
       },
     });
@@ -192,11 +211,12 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
     return true;
   };
 
-  public prompt: AgentRuntimeDelegate["prompt"] = async (content, model) => {
+  public prompt: AgentRuntimeDelegate["prompt"] = async (content, model, skillIds = []) => {
     if (model) {
       await this.setModel(model);
     }
-    this.agent.prompt(content);
+    this.agent.state.systemPrompt = this.skillService.formatEnabledSkillsForPrompt();
+    this.agent.prompt(this.skillService.expandSkillReferences(content, skillIds));
   };
 
   public abortPrompt: AgentRuntimeDelegate["abortPrompt"] = async () => {
@@ -205,6 +225,14 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
 
   public searchWorkspaceFiles: AgentRuntimeDelegate["searchWorkspaceFiles"] = (query) => {
     return this.searchFiles(query);
+  };
+
+  public listSkills: AgentRuntimeDelegate["listSkills"] = async () => {
+    return this.skillService.listSkills();
+  };
+
+  public setSkillEnabled: AgentRuntimeDelegate["setSkillEnabled"] = async (skillId, enabled) => {
+    return this.skillService.setSkillEnabled(skillId, enabled);
   };
 
   public setPermissionMode: AgentRuntimeDelegate["setPermissionMode"] = async (mode) => {

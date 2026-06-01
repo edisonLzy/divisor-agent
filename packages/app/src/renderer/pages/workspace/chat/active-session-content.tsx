@@ -68,10 +68,16 @@ function useActiveSessionChat() {
       sessionStore.getState().setSessionStatus(activeSessionId, "running");
 
       try {
-        await invoke("prompt", activeSessionId, submission.text, {
-          modelId: submission.model.modelId,
-          providerId: submission.model.providerId,
-        });
+        await invoke(
+          "prompt",
+          activeSessionId,
+          submission.text,
+          {
+            modelId: submission.model.modelId,
+            providerId: submission.model.providerId,
+          },
+          submission.skillIds,
+        );
       } catch (error) {
         console.error("Failed to submit prompt", error);
         sessionStore.getState().setSessionStatus(activeSessionId, "idle");

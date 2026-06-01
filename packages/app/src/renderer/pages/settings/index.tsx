@@ -1,13 +1,27 @@
 import { useTheme, type Theme } from "@renderer/components/theme-provider";
 import { Titlebar } from "@renderer/components/titlebar";
+import { Input } from "@renderer/components/ui/input";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@renderer/components/ui/resizable";
+import { Switch } from "@renderer/components/ui/switch";
+import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { cn } from "@renderer/lib/utils";
-import { ArrowLeft, Monitor, type LucideIcon, Moon, Paintbrush, Settings, Sun } from "lucide-react";
-import { useMemo, useState } from "react";
+import type { DiscoveredSkill, SkillScope } from "@shared/skills-ipc";
+import {
+  ArrowLeft,
+  BoxIcon,
+  Monitor,
+  type LucideIcon,
+  Moon,
+  Paintbrush,
+  SearchIcon,
+  Settings,
+  Sun,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 type SettingsSection =
@@ -27,7 +41,10 @@ const SECTIONS: Array<{
   id: SettingsSection;
   label: string;
   icon: typeof Settings;
-}> = [{ id: "appearance", label: "外观", icon: Paintbrush }];
+}> = [
+  { id: "appearance", label: "外观", icon: Paintbrush },
+  { id: "plugin", label: "Skills", icon: BoxIcon },
+];
 
 const THEME_OPTIONS: Array<{
   value: Theme;
@@ -43,6 +60,12 @@ const THEME_OPTIONS: Array<{
 const RESOLVED_THEME_LABEL: Record<Exclude<Theme, "system">, string> = {
   light: "浅色",
   dark: "深色",
+};
+
+const SKILL_SCOPE_LABEL: Record<SkillScope, string> = {
+  system: "系统",
+  project: "项目",
+  user: "个人",
 };
 
 type PreviewTone = "default" | "selected" | "resolved";
@@ -128,7 +151,10 @@ function CodePreviewPane({
 
 export function SettingsPage() {
   const navigate = useNavigate();
+  const { invoke } = useElectronIPC();
   const [activeSection, setActiveSection] = useState<SettingsSection>("appearance");
+  const [skills, setSkills] = useState<DiscoveredSkill[]>([]);
+  const [skillsQuery, setSkillsQuery] = useState("");
   const { resolvedTheme, setTheme, theme } = useTheme();
 
   const selectedTheme = useMemo(() => {
@@ -150,6 +176,60 @@ export function SettingsPage() {
     { line: 4, content: '  root: "html[data-theme]",' },
     { line: 5, content: "};" },
   ];
+
+  useEffect(() => {
+    if (activeSection !== "plugin") {
+      return;
+    }
+
+    let isMounted = true;
+    invoke("listSkills")
+      .then((nextSkills) => {
+        if (isMounted) {
+          setSkills(nextSkills);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load skills", error);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeSection, invoke]);
+
+  const filteredSkills = useMemo(() => {
+    const query = skillsQuery.trim().toLowerCase();
+    if (!query) {
+      return skills;
+    }
+
+    return skills.filter((skill) => {
+      return (
+        skill.name.toLowerCase().includes(query) ||
+        skill.description.toLowerCase().includes(query) ||
+        skill.filePath.toLowerCase().includes(query)
+      );
+    });
+  }, [skills, skillsQuery]);
+
+  const enabledSkillCount = skills.filter((skill) => skill.enabled).length;
+
+  const handleSkillEnabledChange = async (skillId: string, enabled: boolean) => {
+    setSkills((currentSkills) =>
+      currentSkills.map((skill) => (skill.id === skillId ? { ...skill, enabled } : skill)),
+    );
+
+    try {
+      const nextSkills = await invoke("setSkillEnabled", skillId, enabled);
+      setSkills(nextSkills);
+    } catch (error) {
+      console.error("Failed to update skill", error);
+      setSkills((currentSkills) =>
+        currentSkills.map((skill) => (skill.id === skillId ? { ...skill, enabled: !enabled } : skill)),
+      );
+    }
+  };
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-transparent text-foreground">
@@ -283,6 +363,73 @@ export function SettingsPage() {
                             />
                           </div>
                         </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {activeSection === "plugin" && (
+                  <div className="space-y-4">
+                    <div className="overflow-hidden rounded-lg border border-border bg-card">
+                      <div className="flex flex-col gap-4 border-b border-border px-4 py-4 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <div className="text-[13px] font-medium text-foreground">
+                            Skills Discovery
+                          </div>
+                          <div className="mt-0.5 text-[11px] text-muted-foreground">
+                            已发现 {skills.length} 个技能，当前启用 {enabledSkillCount} 个。禁用后不会出现在 prompt 和 `/` 建议中。
+                          </div>
+                        </div>
+                        <div className="relative w-full md:w-64">
+                          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            value={skillsQuery}
+                            onChange={(event) => setSkillsQuery(event.target.value)}
+                            placeholder="搜索技能"
+                            className="h-8 pl-8 text-[12px]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="divide-y divide-border">
+                        {filteredSkills.length === 0 ? (
+                          <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+                            没有匹配的技能
+                          </div>
+                        ) : (
+                          filteredSkills.map((skill) => (
+                            <div
+                              key={skill.id}
+                              className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/35"
+                            >
+                              <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground">
+                                <BoxIcon className="size-4" />
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <div className="truncate text-[13px] font-medium text-foreground">
+                                    {skill.name}
+                                  </div>
+                                  <span className="shrink-0 rounded-full border border-border bg-background px-2 py-0.5 text-[11px] text-muted-foreground">
+                                    {SKILL_SCOPE_LABEL[skill.scope]}
+                                  </span>
+                                </div>
+                                <div className="mt-1 line-clamp-2 text-[12px] leading-5 text-muted-foreground">
+                                  {skill.description}
+                                </div>
+                                <div className="mt-1 truncate text-[11px] text-muted-foreground/70">
+                                  {skill.filePath}
+                                </div>
+                              </div>
+                              <Switch
+                                checked={skill.enabled}
+                                onCheckedChange={(enabled) => {
+                                  void handleSkillEnabledChange(skill.id, enabled);
+                                }}
+                                aria-label={`Toggle ${skill.name}`}
+                              />
+                            </div>
+                          ))
+                        )}
                       </div>
                     </div>
                   </div>
