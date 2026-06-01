@@ -226,7 +226,9 @@ export function SettingsPage() {
     } catch (error) {
       console.error("Failed to update skill", error);
       setSkills((currentSkills) =>
-        currentSkills.map((skill) => (skill.id === skillId ? { ...skill, enabled: !enabled } : skill)),
+        currentSkills.map((skill) =>
+          skill.id === skillId ? { ...skill, enabled: !enabled } : skill,
+        ),
       );
     }
   };
@@ -376,7 +378,8 @@ export function SettingsPage() {
                             Skills Discovery
                           </div>
                           <div className="mt-0.5 text-[11px] text-muted-foreground">
-                            已发现 {skills.length} 个技能，当前启用 {enabledSkillCount} 个。禁用后不会出现在 prompt 和 `/` 建议中。
+                            已发现 {skills.length} 个技能，当前启用 {enabledSkillCount}{" "}
+                            个。禁用后不会出现在 prompt 和 `/` 建议中。
                           </div>
                         </div>
                         <div className="relative w-full md:w-64">

@@ -1,8 +1,8 @@
 import { Button } from "@renderer/components/ui/button";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { cn } from "@renderer/lib/utils";
-import { ArrowUp, Square } from "lucide-react";
 import type { DiscoveredSkill } from "@shared/skills-ipc";
+import { ArrowUp, Square } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 
 import type { PromptSubmission } from "../prompt-types";
@@ -170,7 +170,9 @@ function filterSkills(skills: DiscoveredSkill[], query: string) {
       return { skill, score };
     })
     .filter((entry) => Number.isFinite(entry.score))
-    .sort((left, right) => left.score - right.score || left.skill.name.localeCompare(right.skill.name))
+    .sort(
+      (left, right) => left.score - right.score || left.skill.name.localeCompare(right.skill.name),
+    )
     .slice(0, MAX_SKILL_SEARCH_RESULTS)
     .map((entry) => entry.skill);
 }

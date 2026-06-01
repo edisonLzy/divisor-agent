@@ -46,22 +46,25 @@ export class SkillService {
     }
 
     this.saveSettings();
-    this.skillsCache = this.skillsCache?.map((skill) => {
-      if (skill.id !== skillId) {
-        return skill;
-      }
+    this.skillsCache =
+      this.skillsCache?.map((skill) => {
+        if (skill.id !== skillId) {
+          return skill;
+        }
 
-      return {
-        ...skill,
-        enabled,
-      };
-    }) ?? null;
+        return {
+          ...skill,
+          enabled,
+        };
+      }) ?? null;
 
     return this.listSkills();
   }
 
   formatEnabledSkillsForPrompt(): string {
-    const skills = this.getSkills().filter((skill) => skill.enabled && !skill.disableModelInvocation);
+    const skills = this.getSkills().filter(
+      (skill) => skill.enabled && !skill.disableModelInvocation,
+    );
 
     if (skills.length === 0) {
       return "";
@@ -147,7 +150,9 @@ export class SkillService {
     }
 
     this.skillsCache = Array.from(skillsByName.values()).sort((left, right) => {
-      return scopeWeight(left.scope) - scopeWeight(right.scope) || left.name.localeCompare(right.name);
+      return (
+        scopeWeight(left.scope) - scopeWeight(right.scope) || left.name.localeCompare(right.name)
+      );
     });
 
     return this.skillsCache;
@@ -358,7 +363,10 @@ function isFile(fullPath: string, entry: { isFile(): boolean; isSymbolicLink(): 
   }
 }
 
-function isDirectory(fullPath: string, entry: { isDirectory(): boolean; isSymbolicLink(): boolean }) {
+function isDirectory(
+  fullPath: string,
+  entry: { isDirectory(): boolean; isSymbolicLink(): boolean },
+) {
   if (entry.isDirectory()) {
     return true;
   }

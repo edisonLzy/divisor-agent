@@ -742,7 +742,9 @@ function getSelectedSkillIds(editor: Editor | null): string[] {
   const ids = new Set<string>();
   const doc = editor?.getJSON();
 
-  function visit(node: { type?: string; attrs?: { id?: unknown }; content?: unknown[] } | undefined) {
+  function visit(
+    node: { type?: string; attrs?: { id?: unknown }; content?: unknown[] } | undefined,
+  ) {
     if (!node) {
       return;
     }
