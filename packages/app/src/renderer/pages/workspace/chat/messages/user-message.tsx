@@ -6,6 +6,8 @@ import {
 } from "@renderer/components/richtext";
 import { useMemo } from "react";
 
+import { MessageToolbar, MessageToolbarMenuButton } from "./message-toolbar";
+
 interface UserMessageProps {
   message: UserMessageType;
 }
@@ -20,6 +22,9 @@ export function UserMessage({ message }: UserMessageProps) {
           <RichTextDocumentView document={document} />
         </div>
       </div>
+      <MessageToolbar align="end">
+        <MessageToolbarMenuButton align="end" />
+      </MessageToolbar>
     </div>
   );
 }

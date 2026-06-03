@@ -19,6 +19,7 @@ import { useEffect, useState } from "react";
 import { AssistantResponseMessage } from "./assistant-response-message";
 import { AssistantThinkingMessage } from "./assistant-thinking-message";
 import { AssistantToolMessage } from "./assistant-tool-message";
+import { MessageToolbar, MessageToolbarMenuButton } from "./message-toolbar";
 
 interface AssistantMessageProps {
   completedAt?: number;
@@ -102,6 +103,10 @@ export function AssistantMessage({
       {textContent.map((block, i) => (
         <AssistantResponseMessage key={`text-${i}`} content={block.text} />
       ))}
+
+      <MessageToolbar align="start">
+        <MessageToolbarMenuButton align="start" />
+      </MessageToolbar>
     </Message>
   );
 }
