@@ -1,4 +1,3 @@
-import { computePosition, flip, shift, size } from "@floating-ui/dom";
 import {
   filterCommandItems,
   SuggestionsPanel,
@@ -21,11 +20,13 @@ export interface SlashCommandSelection {
 
 interface UseSlashCommandsExtensionOptions {
   commands: CommandItem[];
+  getFloatingReference?: () => Element | VirtualElement | null;
   onSelectCommand: (selection: SlashCommandSelection) => void;
 }
 
 export function useSlashCommandsExtension({
   commands,
+  getFloatingReference,
   onSelectCommand,
 }: UseSlashCommandsExtensionOptions) {
   return useMemo(() => {
@@ -59,7 +60,9 @@ export function useSlashCommandsExtension({
         },
         render: () => {
           let component: ReactRenderer<
-            React.ComponentProps<typeof SuggestionsPanel> & { items: CommandItem[] }
+            React.ComponentProps<typeof SuggestionsPanel> & {
+              items: CommandItem[];
+            }
           > | null = null;
           let selectedIndex = 0;
           let currentItemsKey = "";
@@ -78,40 +81,35 @@ export function useSlashCommandsExtension({
 
             const props = latestProps;
             const floatingElement = component.element as HTMLElement;
-            const rect = props.clientRect?.();
+            const floatingReference =
+              getFloatingReference?.() ??
+              ({
+                getBoundingClientRect: () =>
+                  posToDOMRect(
+                    props.editor.view,
+                    props.editor.state.selection.from,
+                    props.editor.state.selection.to,
+                  ),
+              } satisfies VirtualElement);
+            const referenceRect = floatingReference.getBoundingClientRect();
+            const viewportPadding = 16;
+            const verticalGap = 10;
+            const panelMaxHeight = 220;
 
-            if (!rect) {
-              return;
-            }
+            floatingElement.style.position = "fixed";
+            floatingElement.style.width = `${referenceRect.width}px`;
+            floatingElement.style.maxHeight = `${panelMaxHeight}px`;
 
-            const virtualElement = {
-              getBoundingClientRect: () =>
-                posToDOMRect(
-                  props.editor.view,
-                  props.editor.state.selection.from,
-                  props.editor.state.selection.to,
-                ),
-            };
+            const floatingRect = floatingElement.getBoundingClientRect();
+            const nextLeft = Math.min(
+              Math.max(referenceRect.left, viewportPadding),
+              window.innerWidth - floatingRect.width - viewportPadding,
+            );
+            const nextBottom = window.innerHeight - referenceRect.top + verticalGap;
 
-            void computePosition(virtualElement, floatingElement, {
-              placement: "bottom-start",
-              strategy: "absolute",
-              middleware: [
-                shift({ padding: 16 }),
-                flip({ padding: 16 }),
-                size({
-                  padding: 16,
-                  apply({ availableHeight, elements }) {
-                    elements.floating.style.width = `${Math.min(920, window.innerWidth - 32)}px`;
-                    elements.floating.style.maxHeight = `${Math.min(360, availableHeight)}px`;
-                  },
-                }),
-              ],
-            }).then(({ x, y, strategy }) => {
-              floatingElement.style.position = strategy;
-              floatingElement.style.left = `${x}px`;
-              floatingElement.style.top = `${y}px`;
-            });
+            floatingElement.style.left = `${nextLeft}px`;
+            floatingElement.style.top = "auto";
+            floatingElement.style.bottom = `${nextBottom}px`;
           };
 
           const renderPopup = () => {
@@ -130,7 +128,7 @@ export function useSlashCommandsExtension({
                 selectedIndex = index;
                 renderPopup();
               },
-              maxHeight: 360,
+              maxHeight: 220,
             });
           };
 
@@ -167,7 +165,7 @@ export function useSlashCommandsExtension({
                   selectedIndex,
                   onSelect: (item) => props.command(item),
                   onHighlight: () => {},
-                  maxHeight: 360,
+                  maxHeight: 220,
                 },
               });
 
@@ -218,7 +216,7 @@ export function useSlashCommandsExtension({
         },
       } satisfies Omit<SuggestionOptions<CommandItem>, "editor">,
     });
-  }, [commands, onSelectCommand]);
+  }, [commands, getFloatingReference, onSelectCommand]);
 }
 
 export function getSelectedCommandIds(editor: Editor | null) {
@@ -258,4 +256,8 @@ export function getSelectedCommandIds(editor: Editor | null) {
 
   visit(doc);
   return Array.from(ids);
+}
+
+interface VirtualElement {
+  getBoundingClientRect: () => DOMRect;
 }

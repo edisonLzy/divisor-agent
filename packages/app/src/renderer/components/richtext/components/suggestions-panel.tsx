@@ -66,7 +66,7 @@ export function SuggestionsPanel({
 
   if (filteredItems.length === 0) {
     return (
-      <div className="rounded-[20px] border border-border/80 bg-popover/95 px-4 py-3.5 text-sm text-muted-foreground shadow-[0_24px_64px_rgb(15_23_42/0.18)] backdrop-blur-xl dark:shadow-[0_24px_64px_rgb(0_0_0/0.45)]">
+      <div className="rounded-[18px] border border-border/80 bg-popover/95 px-3 py-2.5 text-[12px] text-muted-foreground shadow-[0_24px_64px_rgb(15_23_42/0.18)] backdrop-blur-xl dark:shadow-[0_24px_64px_rgb(0_0_0/0.45)]">
         No slash commands found
       </div>
     );
@@ -74,15 +74,15 @@ export function SuggestionsPanel({
 
   return (
     <div
-      className="overflow-y-auto rounded-[20px] border border-border/80 bg-popover/95 p-2 shadow-[0_24px_64px_rgb(15_23_42/0.18)] backdrop-blur-xl dark:shadow-[0_24px_64px_rgb(0_0_0/0.45)]"
+      className="overflow-y-auto rounded-[18px] border border-border/80 bg-popover/95 p-1.5 shadow-[0_24px_64px_rgb(15_23_42/0.18)] backdrop-blur-xl dark:shadow-[0_24px_64px_rgb(0_0_0/0.45)]"
       style={{ maxHeight }}
     >
       {groups.map((group, groupIndex) => (
         <div key={group.label}>
           <div
             className={cn(
-              "px-3 pb-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground",
-              groupIndex === 0 ? "pt-1" : "pt-2",
+              "px-2.5 pb-1 text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground",
+              groupIndex === 0 ? "pt-0.5" : "pt-1.5",
             )}
           >
             {group.label}
@@ -93,7 +93,7 @@ export function SuggestionsPanel({
               type="button"
               data-command-index={index}
               className={cn(
-                "flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors",
+                "flex w-full items-center gap-2.5 rounded-[14px] px-2.5 py-2 text-left transition-colors",
                 index === selectedIndex
                   ? "bg-accent text-accent-foreground"
                   : "text-popover-foreground hover:bg-muted",
@@ -102,15 +102,17 @@ export function SuggestionsPanel({
               onMouseDown={(event) => event.preventDefault()}
               onMouseEnter={() => onHighlight(index)}
             >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-background/70 text-muted-foreground">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-[10px] border border-border/70 bg-background/70 text-muted-foreground [&_svg]:size-3.5">
                 <BoxIcon />
               </span>
-              <span className="min-w-0 flex flex-1 items-baseline gap-2">
-                <span className="truncate text-sm font-medium text-current">{item.name}</span>
-                <span className="truncate text-xs text-muted-foreground">{item.description}</span>
+              <span className="min-w-0 flex flex-1 items-baseline gap-1.5">
+                <span className="truncate text-[13px] font-medium text-current">{item.name}</span>
+                <span className="truncate text-[11px] text-muted-foreground">
+                  {item.description}
+                </span>
               </span>
               {item.extra ? (
-                <span className="shrink-0 text-xs text-muted-foreground">{item.extra}</span>
+                <span className="shrink-0 text-[11px] text-muted-foreground">{item.extra}</span>
               ) : null}
             </button>
           ))}

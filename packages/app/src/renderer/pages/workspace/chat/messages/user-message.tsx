@@ -18,8 +18,8 @@ export function UserMessage({ message }: UserMessageProps) {
 
   return (
     <div className="ml-auto flex max-w-2xl flex-col items-end gap-3">
-      <div className="rounded-[22px] bg-secondary px-5 py-4 text-[15px] leading-7 text-secondary-foreground shadow-[0_18px_48px_rgb(15_23_42/0.08)] dark:shadow-[0_18px_48px_rgb(0_0_0/0.2)]">
-        <div className="pm-readonly text-[15px] leading-7 text-secondary-foreground">
+      <div className="rounded-[20px] bg-secondary px-4 py-2.5 text-[14px] leading-6 text-secondary-foreground shadow-[0_18px_48px_rgb(15_23_42/0.08)] dark:shadow-[0_18px_48px_rgb(0_0_0/0.2)]">
+        <div className="pm-readonly text-[14px] leading-6 text-secondary-foreground">
           <EditorContent editor={editor} className="prompt-editor max-w-none" />
         </div>
       </div>
@@ -59,7 +59,7 @@ function useUserMessageEditor(document: RichTextDocument) {
       editable: false,
       editorProps: {
         attributes: {
-          class: "ProseMirror min-h-0 text-[15px] leading-7 text-secondary-foreground outline-none",
+          class: "ProseMirror min-h-0 text-[14px] leading-6 text-secondary-foreground outline-none",
         },
       },
     },
@@ -70,6 +70,11 @@ function useUserMessageEditor(document: RichTextDocument) {
 type RichTextDocument = JSONContent;
 
 function createRichTextDocumentFromUserMessage(message: UserMessageType): RichTextDocument {
+  const metadataContent = getUserMessageJsonContent(message);
+  if (metadataContent) {
+    return metadataContent;
+  }
+
   const content = message.content;
 
   if (isRichTextDocument(content)) {
@@ -131,4 +136,17 @@ function isTextBlock(value: unknown): value is { type: "text"; text: string } {
     "text" in value &&
     typeof value.text === "string"
   );
+}
+
+function getUserMessageJsonContent(message: UserMessageType): RichTextDocument | null {
+  if (!("metadata" in message)) {
+    return null;
+  }
+
+  const metadata = message.metadata;
+  if (typeof metadata !== "object" || metadata === null || !("jsonContent" in metadata)) {
+    return null;
+  }
+
+  return isRichTextDocument(metadata.jsonContent) ? metadata.jsonContent : null;
 }

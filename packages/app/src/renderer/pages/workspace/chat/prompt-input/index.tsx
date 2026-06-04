@@ -9,6 +9,7 @@ import type { CommandItem } from "@renderer/components/richtext/types";
 import { Button } from "@renderer/components/ui/button";
 import { useAgentSkills } from "@renderer/hooks/use-agent-skills";
 import { cn } from "@renderer/lib/utils";
+import type { AnyExtension } from "@tiptap/core";
 import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -38,8 +39,29 @@ export function PromptInput({
   const permissionSelectorProps = usePermissionSelector(sessionId);
   const editorContainerRef = useRef<HTMLDivElement | null>(null);
   const [hasContent, setHasContent] = useState(false);
+  const slashCommands = useSkillsCommandItems();
+  const getFloatingReference = useCallback(() => editorContainerRef.current, []);
+  const handleSelectCommand = useCallback(({ command, editor, range }: SlashCommandSelection) => {
+    if (command.group === "Skills") {
+      insertSkillNode({
+        editor,
+        range,
+        skill: {
+          id: command.id,
+          label: command.name,
+        },
+      });
+    }
+  }, []);
+  const slashCommandsExtension = useSlashCommandsExtension({
+    commands: slashCommands,
+    getFloatingReference,
+    onSelectCommand: handleSelectCommand,
+  });
+  const promptExtensions = useMemo(() => [slashCommandsExtension], [slashCommandsExtension]);
   const editor = usePromptInputEditor({
     disabled: disabled || isRunning,
+    extensions: promptExtensions,
     onContentChange: setHasContent,
   });
   const canSubmit = !disabled && !isRunning && hasContent && modelSelectorProps.value !== null;
@@ -57,6 +79,7 @@ export function PromptInput({
 
     await onSubmit({
       text,
+      jsonContent: editor.getJSON(),
       model: modelSelectorProps.value,
       skillIds: getSelectedCommandIds(editor),
     });
@@ -157,30 +180,13 @@ export function PromptInput({
 
 function usePromptInputEditor({
   disabled,
+  extensions = [],
   onContentChange,
 }: {
   disabled: boolean;
+  extensions?: AnyExtension[];
   onContentChange: (hasContent: boolean) => void;
 }) {
-  const slashCommands = useSkillsCommandItems();
-  const handleSelectCommand = useCallback(({ command, editor, range }: SlashCommandSelection) => {
-    if (command.group === "Skills") {
-      insertSkillNode({
-        editor,
-        range,
-        skill: {
-          id: command.id,
-          label: command.name,
-        },
-      });
-    }
-  }, []);
-
-  const slashCommandsExtension = useSlashCommandsExtension({
-    commands: slashCommands,
-    onSelectCommand: handleSelectCommand,
-  });
-
   const editor = useEditor(
     {
       extensions: [
@@ -195,7 +201,7 @@ function usePromptInputEditor({
         Placeholder.configure({
           placeholder: "Ask anything...",
         }),
-        slashCommandsExtension,
+        ...extensions,
         skillNode,
       ],
       editorProps: {
@@ -209,7 +215,7 @@ function usePromptInputEditor({
         onContentChange(nextEditor.getText().trim().length > 0);
       },
     },
-    [slashCommandsExtension],
+    [extensions],
   );
 
   useEffect(() => {

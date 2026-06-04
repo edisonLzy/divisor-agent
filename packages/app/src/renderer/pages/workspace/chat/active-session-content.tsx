@@ -73,6 +73,7 @@ function useActiveSessionChat() {
             modelId: submission.model.modelId,
             providerId: submission.model.providerId,
           },
+          jsonContent: submission.jsonContent,
           skillIds: submission.skillIds,
         });
       } catch (error) {
