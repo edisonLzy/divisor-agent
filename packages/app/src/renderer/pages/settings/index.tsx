@@ -8,8 +8,10 @@ import {
 } from "@renderer/components/ui/resizable";
 import { Switch } from "@renderer/components/ui/switch";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
+import { useAgentSkills } from "@renderer/hooks/use-agent-skills";
 import { cn } from "@renderer/lib/utils";
-import type { DiscoveredSkill, SkillScope } from "@shared/skills-ipc";
+import type { SkillScope } from "@shared/skills-ipc";
+import Fuse from "fuse.js";
 import {
   ArrowLeft,
   BoxIcon,
@@ -153,8 +155,9 @@ export function SettingsPage() {
   const navigate = useNavigate();
   const { invoke } = useElectronIPC();
   const [activeSection, setActiveSection] = useState<SettingsSection>("appearance");
-  const [skills, setSkills] = useState<DiscoveredSkill[]>([]);
   const [skillsQuery, setSkillsQuery] = useState("");
+  const skills = useAgentSkills();
+  const [skillEnabledOverrides, setSkillEnabledOverrides] = useState<Record<string, boolean>>({});
   const { resolvedTheme, setTheme, theme } = useTheme();
 
   const selectedTheme = useMemo(() => {
@@ -177,61 +180,69 @@ export function SettingsPage() {
     { line: 5, content: "};" },
   ];
 
-  useEffect(() => {
-    if (activeSection !== "plugin") {
+  const resolvedSkills = useMemo(() => {
+    return skills.map((skill) => ({
+      ...skill,
+      enabled: skillEnabledOverrides[skill.id] ?? skill.enabled,
+    }));
+  }, [skillEnabledOverrides, skills]);
+
+  const filteredSkills = useMemo(() => {
+    const query = skillsQuery.trim();
+    if (!query) {
+      return resolvedSkills;
+    }
+
+    return new Fuse(resolvedSkills, {
+      threshold: 0.35,
+      ignoreLocation: true,
+      keys: ["name", "description", "filePath"],
+    })
+      .search(query)
+      .map((result) => result.item);
+  }, [resolvedSkills, skillsQuery]);
+
+  const enabledSkillCount = useMemo(() => {
+    return resolvedSkills.filter((skill) => skill.enabled).length;
+  }, [resolvedSkills]);
+
+  const handleSkillEnabledChange = async (skillId: string, enabled: boolean) => {
+    const currentSkill = resolvedSkills.find((skill) => skill.id === skillId);
+    if (!currentSkill) {
       return;
     }
 
-    let isMounted = true;
-    invoke("listSkills")
-      .then((nextSkills) => {
-        if (isMounted) {
-          setSkills(nextSkills);
-        }
-      })
-      .catch((error) => {
-        console.error("Failed to load skills", error);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [activeSection, invoke]);
-
-  const filteredSkills = useMemo(() => {
-    const query = skillsQuery.trim().toLowerCase();
-    if (!query) {
-      return skills;
-    }
-
-    return skills.filter((skill) => {
-      return (
-        skill.name.toLowerCase().includes(query) ||
-        skill.description.toLowerCase().includes(query) ||
-        skill.filePath.toLowerCase().includes(query)
-      );
-    });
-  }, [skills, skillsQuery]);
-
-  const enabledSkillCount = skills.filter((skill) => skill.enabled).length;
-
-  const handleSkillEnabledChange = async (skillId: string, enabled: boolean) => {
-    setSkills((currentSkills) =>
-      currentSkills.map((skill) => (skill.id === skillId ? { ...skill, enabled } : skill)),
-    );
+    setSkillEnabledOverrides((currentOverrides) => ({
+      ...currentOverrides,
+      [skillId]: enabled,
+    }));
 
     try {
-      const nextSkills = await invoke("setSkillEnabled", skillId, enabled);
-      setSkills(nextSkills);
+      await invoke("setSkillEnabled", skillId, enabled);
     } catch (error) {
       console.error("Failed to update skill", error);
-      setSkills((currentSkills) =>
-        currentSkills.map((skill) =>
-          skill.id === skillId ? { ...skill, enabled: !enabled } : skill,
-        ),
-      );
+      setSkillEnabledOverrides((currentOverrides) => ({
+        ...currentOverrides,
+        [skillId]: currentSkill.enabled,
+      }));
     }
   };
+
+  useEffect(() => {
+    setSkillEnabledOverrides((currentOverrides) => {
+      const nextOverrides = { ...currentOverrides };
+      let hasChanges = false;
+
+      for (const skill of skills) {
+        if (nextOverrides[skill.id] === skill.enabled) {
+          delete nextOverrides[skill.id];
+          hasChanges = true;
+        }
+      }
+
+      return hasChanges ? nextOverrides : currentOverrides;
+    });
+  }, [skills]);
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-transparent text-foreground">

@@ -12,7 +12,7 @@ export function useAgentSkills() {
     void invoke("listSkills")
       .then((nextSkills) => {
         if (!isCancelled) {
-          setSkills(nextSkills.filter((skill) => skill.enabled));
+          setSkills(nextSkills);
         }
       })
       .catch((error: unknown) => {

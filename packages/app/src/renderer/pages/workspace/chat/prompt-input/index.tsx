@@ -1,20 +1,23 @@
 import {
-  useSlashCommandsExtension,
   getSelectedCommandIds,
+  slashCommandSuggestionPluginKey,
+  type SlashCommandSelection,
+  useSlashCommandsExtension,
 } from "@renderer/components/richtext/extensions/slash-commands";
+import { insertSkillNode, skillNode } from "@renderer/components/richtext/inline/skill-node";
 import type { CommandItem } from "@renderer/components/richtext/types";
 import { Button } from "@renderer/components/ui/button";
+import { useAgentSkills } from "@renderer/hooks/use-agent-skills";
 import { cn } from "@renderer/lib/utils";
 import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { ArrowUp, Square } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { PromptSubmission } from "../prompt-types";
 import { ModalSelector, useModalSelector } from "./modal-selector";
 import { PermissionSelector, usePermissionSelector } from "./permission-selector";
-import { useAgentSkills } from "./use-agent-skills";
 
 interface PromptInputProps {
   disabled?: boolean;
@@ -33,65 +36,16 @@ export function PromptInput({
 }: PromptInputProps) {
   const modelSelectorProps = useModalSelector();
   const permissionSelectorProps = usePermissionSelector(sessionId);
-  const skills = useAgentSkills();
+  const editorContainerRef = useRef<HTMLDivElement | null>(null);
   const [hasContent, setHasContent] = useState(false);
-  const suggestionOpenRef = useRef(false);
-  const skipNextSubmitRef = useRef(false);
+  const editor = usePromptInputEditor({
+    disabled: disabled || isRunning,
+    onContentChange: setHasContent,
+  });
   const canSubmit = !disabled && !isRunning && hasContent && modelSelectorProps.value !== null;
   const isStopEnabled = isRunning && typeof onStop === "function";
 
-  const slashCommands = useMemo<CommandItem[]>(
-    () =>
-      skills.map((skill) => ({
-        id: skill.id,
-        group: "Skills",
-        name: skill.name,
-        description: skill.description,
-        extra: skill.scope === "user" ? "个人" : skill.scope === "project" ? "项目" : "系统",
-      })),
-    [skills],
-  );
-
-  const slashCommandsExtension = useSlashCommandsExtension({
-    commands: slashCommands,
-    onOpenChange: (isOpen) => {
-      suggestionOpenRef.current = isOpen;
-    },
-    onSelectCommand: () => {
-      skipNextSubmitRef.current = true;
-    },
-  });
-
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: false,
-        blockquote: false,
-        codeBlock: false,
-        horizontalRule: false,
-        orderedList: false,
-        bulletList: false,
-      }),
-      Placeholder.configure({
-        placeholder: "Ask anything...",
-      }),
-      slashCommandsExtension,
-    ],
-    editorProps: {
-      attributes: {
-        class:
-          "ProseMirror min-h-[48px] max-h-[160px] overflow-y-auto text-[14px] leading-6 text-foreground caret-foreground outline-none",
-      },
-    },
-    editable: !(disabled || isRunning),
-    onUpdate: ({ editor: nextEditor }) => {
-      setHasContent(nextEditor.getText().trim().length > 0);
-    },
-  });
-
-  const handleSubmitRef = useRef<() => Promise<void> | void>(async () => {});
-
-  handleSubmitRef.current = async () => {
+  const handleSubmit = useCallback(async () => {
     if (!canSubmit || !modelSelectorProps.value || !editor) {
       return;
     }
@@ -109,49 +63,46 @@ export function PromptInput({
 
     editor.commands.clearContent();
     setHasContent(false);
-  };
+  }, [canSubmit, editor, modelSelectorProps.value, onSubmit]);
 
   useEffect(() => {
-    editor?.setEditable(!(disabled || isRunning));
-  }, [disabled, editor, isRunning]);
-
-  useEffect(() => {
-    if (!editor) {
+    const container = editorContainerRef.current;
+    if (!editor || !container) {
       return;
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
-        event.key === "Enter" &&
-        !event.shiftKey &&
-        !event.altKey &&
-        !event.ctrlKey &&
-        !event.metaKey &&
-        !event.isComposing
+        event.defaultPrevented ||
+        event.key !== "Enter" ||
+        event.shiftKey ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.isComposing
       ) {
-        if (skipNextSubmitRef.current) {
-          skipNextSubmitRef.current = false;
-          event.preventDefault();
-          return;
-        }
-
-        if (suggestionOpenRef.current) {
-          event.preventDefault();
-          return;
-        }
-
-        event.preventDefault();
-        void handleSubmitRef.current();
+        return;
       }
+
+      const suggestionState = slashCommandSuggestionPluginKey.getState(editor.state) as
+        | { active?: boolean }
+        | undefined;
+
+      if (suggestionState?.active) {
+        event.preventDefault();
+        return;
+      }
+
+      event.preventDefault();
+      void handleSubmit();
     };
 
-    const dom = editor.view.dom;
-    dom.addEventListener("keydown", handleKeyDown);
+    container.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      dom.removeEventListener("keydown", handleKeyDown);
+      container.removeEventListener("keydown", handleKeyDown);
     };
-  }, [editor]);
+  }, [editor, handleSubmit]);
 
   return (
     <div
@@ -160,7 +111,7 @@ export function PromptInput({
         disabled && !isRunning && "opacity-80",
       )}
     >
-      <div className="relative min-h-14 px-3.5 py-2.5">
+      <div ref={editorContainerRef} className="relative min-h-14 px-3.5 py-2.5">
         <EditorContent editor={editor} className="prompt-editor max-w-none" />
       </div>
 
@@ -180,7 +131,7 @@ export function PromptInput({
                 return;
               }
 
-              void handleSubmitRef.current();
+              void handleSubmit();
             }}
             disabled={isRunning ? !isStopEnabled : !canSubmit}
             size="icon-sm"
@@ -201,5 +152,87 @@ export function PromptInput({
         </div>
       </div>
     </div>
+  );
+}
+
+function usePromptInputEditor({
+  disabled,
+  onContentChange,
+}: {
+  disabled: boolean;
+  onContentChange: (hasContent: boolean) => void;
+}) {
+  const slashCommands = useSkillsCommandItems();
+  const handleSelectCommand = useCallback(({ command, editor, range }: SlashCommandSelection) => {
+    if (command.group === "Skills") {
+      insertSkillNode({
+        editor,
+        range,
+        skill: {
+          id: command.id,
+          label: command.name,
+        },
+      });
+    }
+  }, []);
+
+  const slashCommandsExtension = useSlashCommandsExtension({
+    commands: slashCommands,
+    onSelectCommand: handleSelectCommand,
+  });
+
+  const editor = useEditor(
+    {
+      extensions: [
+        StarterKit.configure({
+          heading: false,
+          blockquote: false,
+          codeBlock: false,
+          horizontalRule: false,
+          orderedList: false,
+          bulletList: false,
+        }),
+        Placeholder.configure({
+          placeholder: "Ask anything...",
+        }),
+        slashCommandsExtension,
+        skillNode,
+      ],
+      editorProps: {
+        attributes: {
+          class:
+            "ProseMirror min-h-[48px] max-h-[160px] overflow-y-auto text-[14px] leading-6 text-foreground caret-foreground outline-none",
+        },
+      },
+      editable: !disabled,
+      onUpdate: ({ editor: nextEditor }) => {
+        onContentChange(nextEditor.getText().trim().length > 0);
+      },
+    },
+    [slashCommandsExtension],
+  );
+
+  useEffect(() => {
+    editor?.setEditable(!disabled);
+  }, [disabled, editor]);
+
+  return editor;
+}
+
+function useSkillsCommandItems() {
+  const skills = useAgentSkills();
+
+  return useMemo<CommandItem[]>(
+    () =>
+      skills
+        .filter((skill) => skill.enabled)
+        .map((skill) => ({
+          id: skill.id,
+          group: "Skills",
+          name: skill.name,
+          description: skill.description,
+          extra: skill.scope === "user" ? "个人" : skill.scope === "project" ? "项目" : "系统",
+        })),
+    [skills],
   );
 }
