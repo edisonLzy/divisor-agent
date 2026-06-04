@@ -1,12 +1,20 @@
+import {
+  useSlashCommandsExtension,
+  getSelectedCommandIds,
+} from "@renderer/components/richtext/extensions/slash-commands";
+import type { CommandItem } from "@renderer/components/richtext/types";
 import { Button } from "@renderer/components/ui/button";
 import { cn } from "@renderer/lib/utils";
+import Placeholder from "@tiptap/extension-placeholder";
+import { EditorContent, useEditor } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
 import { ArrowUp, Square } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { PromptSubmission } from "../prompt-types";
 import { ModalSelector, useModalSelector } from "./modal-selector";
 import { PermissionSelector, usePermissionSelector } from "./permission-selector";
-import { PromptEditor, type PromptEditorHandle } from "./prompt-editor";
+import { useAgentSkills } from "./use-agent-skills";
 
 interface PromptInputProps {
   disabled?: boolean;
@@ -25,17 +33,70 @@ export function PromptInput({
 }: PromptInputProps) {
   const modelSelectorProps = useModalSelector();
   const permissionSelectorProps = usePermissionSelector(sessionId);
-  const editorRef = useRef<PromptEditorHandle>(null);
+  const skills = useAgentSkills();
   const [hasContent, setHasContent] = useState(false);
+  const suggestionOpenRef = useRef(false);
+  const skipNextSubmitRef = useRef(false);
   const canSubmit = !disabled && !isRunning && hasContent && modelSelectorProps.value !== null;
   const isStopEnabled = isRunning && typeof onStop === "function";
 
-  const handleSubmit = useCallback(async () => {
-    if (!canSubmit || !modelSelectorProps.value || !editorRef.current) {
+  const slashCommands = useMemo<CommandItem[]>(
+    () =>
+      skills.map((skill) => ({
+        id: skill.id,
+        group: "Skills",
+        name: skill.name,
+        description: skill.description,
+        extra: skill.scope === "user" ? "个人" : skill.scope === "project" ? "项目" : "系统",
+      })),
+    [skills],
+  );
+
+  const slashCommandsExtension = useSlashCommandsExtension({
+    commands: slashCommands,
+    onOpenChange: (isOpen) => {
+      suggestionOpenRef.current = isOpen;
+    },
+    onSelectCommand: () => {
+      skipNextSubmitRef.current = true;
+    },
+  });
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: false,
+        blockquote: false,
+        codeBlock: false,
+        horizontalRule: false,
+        orderedList: false,
+        bulletList: false,
+      }),
+      Placeholder.configure({
+        placeholder: "Ask anything...",
+      }),
+      slashCommandsExtension,
+    ],
+    editorProps: {
+      attributes: {
+        class:
+          "ProseMirror min-h-[48px] max-h-[160px] overflow-y-auto text-[14px] leading-6 text-foreground caret-foreground outline-none",
+      },
+    },
+    editable: !(disabled || isRunning),
+    onUpdate: ({ editor: nextEditor }) => {
+      setHasContent(nextEditor.getText().trim().length > 0);
+    },
+  });
+
+  const handleSubmitRef = useRef<() => Promise<void> | void>(async () => {});
+
+  handleSubmitRef.current = async () => {
+    if (!canSubmit || !modelSelectorProps.value || !editor) {
       return;
     }
 
-    const text = editorRef.current.getText().trim();
+    const text = editor.getText().trim();
     if (!text) {
       return;
     }
@@ -43,12 +104,54 @@ export function PromptInput({
     await onSubmit({
       text,
       model: modelSelectorProps.value,
-      skillIds: editorRef.current.getSelectedSkillIds(),
+      skillIds: getSelectedCommandIds(editor),
     });
 
-    editorRef.current.clear();
+    editor.commands.clearContent();
     setHasContent(false);
-  }, [canSubmit, modelSelectorProps.value, onSubmit]);
+  };
+
+  useEffect(() => {
+    editor?.setEditable(!(disabled || isRunning));
+  }, [disabled, editor, isRunning]);
+
+  useEffect(() => {
+    if (!editor) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.key === "Enter" &&
+        !event.shiftKey &&
+        !event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.isComposing
+      ) {
+        if (skipNextSubmitRef.current) {
+          skipNextSubmitRef.current = false;
+          event.preventDefault();
+          return;
+        }
+
+        if (suggestionOpenRef.current) {
+          event.preventDefault();
+          return;
+        }
+
+        event.preventDefault();
+        void handleSubmitRef.current();
+      }
+    };
+
+    const dom = editor.view.dom;
+    dom.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      dom.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [editor]);
 
   return (
     <div
@@ -57,13 +160,9 @@ export function PromptInput({
         disabled && !isRunning && "opacity-80",
       )}
     >
-      <PromptEditor
-        ref={editorRef}
-        disabled={disabled || isRunning}
-        onSubmit={handleSubmit}
-        onContentChange={setHasContent}
-        className="min-h-14"
-      />
+      <div className="relative min-h-14 px-3.5 py-2.5">
+        <EditorContent editor={editor} className="prompt-editor max-w-none" />
+      </div>
 
       <div className="flex items-center justify-between gap-3 px-3 py-3">
         <div className="flex min-w-0 items-center gap-2">
@@ -81,7 +180,7 @@ export function PromptInput({
                 return;
               }
 
-              void handleSubmit();
+              void handleSubmitRef.current();
             }}
             disabled={isRunning ? !isStopEnabled : !canSubmit}
             size="icon-sm"
