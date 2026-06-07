@@ -1,5 +1,5 @@
 import { isAgentAssistantMessage, isAgentUserMessage } from "@renderer/lib/is";
-import type { MessageEntry, ToolExecutionState } from "@renderer/store";
+import type { MessageEntry, SessionEntry, ToolExecutionState } from "@renderer/store";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef } from "react";
 
@@ -7,12 +7,22 @@ import { AssistantMessage } from "./assistant-message";
 import { UserMessage } from "./user-message";
 
 interface ChatMessagesProps {
+  entries: SessionEntry[];
+  isRunning: boolean;
   messageEntries: MessageEntry[];
+  sessionId: string;
   streamingEntryId?: string;
   toolStates: Map<string, ToolExecutionState>;
 }
 
-export function ChatMessages({ messageEntries, streamingEntryId, toolStates }: ChatMessagesProps) {
+export function ChatMessages({
+  entries,
+  isRunning,
+  messageEntries,
+  sessionId,
+  streamingEntryId,
+  toolStates,
+}: ChatMessagesProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const virtualizer = useVirtualizer({
@@ -69,12 +79,21 @@ export function ChatMessages({ messageEntries, streamingEntryId, toolStates }: C
             >
               <div className="mx-auto w-full max-w-4xl">
                 {isAgentUserMessage(message) ? (
-                  <UserMessage message={message} />
+                  <UserMessage
+                    message={message}
+                    entryId={entry.id}
+                    sessionId={sessionId}
+                    isRunning={isRunning}
+                    entries={entries}
+                  />
                 ) : isAgentAssistantMessage(message) ? (
                   <AssistantMessage
                     completedAt={entry.completedAt}
+                    entries={entries}
+                    entryId={entry.id}
                     isStreaming={entry.id === streamingEntryId}
                     message={message}
+                    sessionId={sessionId}
                     startedAt={entry.timestamp}
                     toolStates={toolStates}
                   />
