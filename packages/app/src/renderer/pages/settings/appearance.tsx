@@ -3,8 +3,6 @@ import { cn } from "@renderer/lib/utils";
 import { Monitor, Moon, Sun, type LucideIcon } from "lucide-react";
 import { useMemo } from "react";
 
-import { SettingsSectionContainer, StatusCard } from "./layout";
-
 type PreviewTone = "default" | "selected" | "resolved";
 
 interface PreviewLine {
@@ -53,7 +51,8 @@ export function SettingsAppearancePage() {
   ];
 
   return (
-    <SettingsSectionContainer title="外观">
+    <div className="mx-auto flex min-h-full w-full max-w-160 flex-col px-10 py-12">
+      <h1 className="mb-8 text-center text-[20px] font-medium text-foreground">外观</h1>
       <div className="space-y-6">
         <div className="overflow-hidden rounded-lg border border-border bg-card">
           <div className="flex flex-col gap-4 border-b border-border px-4 py-4 md:flex-row md:items-center md:justify-between">
@@ -90,21 +89,37 @@ export function SettingsAppearancePage() {
           </div>
 
           <div className="grid gap-3 border-b border-border bg-background/30 px-4 py-4 md:grid-cols-3">
-            <StatusCard
-              label="当前选择"
-              value={selectedTheme.label}
-              description={selectedTheme.description}
-            />
-            <StatusCard
-              label="实际生效"
-              value={effectiveThemeLabel}
-              description={theme === "system" ? "由系统外观实时决定" : "已固定为当前外观模式"}
-            />
-            <StatusCard
-              label="偏好保存"
-              value="已持久化"
-              description="主题偏好会保存在当前设备的本地存储中"
-            />
+            <div className="rounded-lg border border-border bg-background/70 px-3 py-3">
+              <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                当前选择
+              </div>
+              <div className="mt-2 text-[15px] font-medium text-foreground">
+                {selectedTheme.label}
+              </div>
+              <div className="mt-1 text-[12px] leading-5 text-muted-foreground">
+                {selectedTheme.description}
+              </div>
+            </div>
+            <div className="rounded-lg border border-border bg-background/70 px-3 py-3">
+              <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                实际生效
+              </div>
+              <div className="mt-2 text-[15px] font-medium text-foreground">
+                {effectiveThemeLabel}
+              </div>
+              <div className="mt-1 text-[12px] leading-5 text-muted-foreground">
+                {theme === "system" ? "由系统外观实时决定" : "已固定为当前外观模式"}
+              </div>
+            </div>
+            <div className="rounded-lg border border-border bg-background/70 px-3 py-3">
+              <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                偏好保存
+              </div>
+              <div className="mt-2 text-[15px] font-medium text-foreground">已持久化</div>
+              <div className="mt-1 text-[12px] leading-5 text-muted-foreground">
+                主题偏好会保存在当前设备的本地存储中
+              </div>
+            </div>
           </div>
 
           <div className="border-b border-border bg-muted/25 p-4">
@@ -127,7 +142,7 @@ export function SettingsAppearancePage() {
           </div>
         </div>
       </div>
-    </SettingsSectionContainer>
+    </div>
   );
 }
 

@@ -1,5 +1,5 @@
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
-import type { AssistantMessage } from "@mariozechner/pi-ai";
+import type { AssistantMessage, UserMessage } from "@mariozechner/pi-ai";
 import type { Entry, Session } from "@renderer/apis/sessions";
 import type { AvailableModel } from "@shared/models-ipc";
 import type {
@@ -7,12 +7,20 @@ import type {
   PermissionRequest,
   PermissionResolution,
 } from "@shared/permissions-ipc";
+import type { JSONContent } from "@tiptap/core";
 
 export type SessionStatus = "idle" | "running" | "completed" | "failed";
 
 export type ToolExecutionStatus = "running" | "awaiting_approval" | "done" | "error";
 
 export type ToolApprovalStatus = "pending" | "approved" | "denied";
+
+export enum EntryStatus {
+  Local,
+  Syncing,
+  Synced,
+  Failed,
+}
 
 export interface ToolExecutionState {
   toolCallId: string;
@@ -24,11 +32,17 @@ export interface ToolExecutionState {
   approvalStatus?: ToolApprovalStatus;
 }
 
-export type AgentMessageData = AgentMessage;
+export interface AgentUserMessage extends Omit<UserMessage, "content"> {
+  content: JSONContent;
+  text: string;
+}
+
+export type AgentMessageData = Exclude<AgentMessage, UserMessage> | AgentUserMessage;
 
 interface AgentMessageEntry extends Omit<Entry, "type" | "data"> {
   type: "message";
   data: AgentMessageData;
+  status: EntryStatus;
   completedAt?: number;
 }
 
@@ -40,6 +54,7 @@ export interface ModelChangedData {
 interface AgentModalChangedEntry extends Omit<Entry, "type" | "data"> {
   type: "model_change";
   data: ModelChangedData;
+  status: EntryStatus;
 }
 
 export type SessionEntry = AgentMessageEntry | AgentModalChangedEntry;
@@ -79,8 +94,9 @@ export interface SessionsSlice {
 export interface EntriesSlice {
   streamingEntryIds: Map<string, string>;
   setStreamingEntryId: (sessionId: string, id: string | undefined) => void;
-  appendMessageEntry: (sessionId: string, message: AgentMessage) => string;
+  appendMessageEntry: (sessionId: string, message: AgentMessageData) => string;
   updateMessageEntry: (sessionId: string, entryId: string, message: AssistantMessage) => void;
+  setEntryStatus: (sessionId: string, entryIds: string[], status: EntryStatus) => void;
   setStreamingEntryCompletedAt: (sessionId: string, completedAt: number) => void;
   setToolState: (sessionId: string, toolCallId: string, state: ToolExecutionState) => void;
   setSessionEntries: (sessionId: string, entries: SessionEntry[]) => void;

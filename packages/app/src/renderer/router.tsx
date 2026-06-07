@@ -4,6 +4,7 @@ import { NotFoundRedirect } from "./Layout";
 import { SettingsPage } from "./pages/settings";
 import { SettingsAppearancePage } from "./pages/settings/appearance";
 import { SettingsModelsPage } from "./pages/settings/models";
+import { SettingsSkillsPage } from "./pages/settings/skills";
 import { WorkspacePage } from "./pages/workspace";
 
 export const router = createMemoryRouter([
@@ -26,6 +27,10 @@ export const router = createMemoryRouter([
       {
         path: "models",
         element: <SettingsModelsPage />,
+      },
+      {
+        path: "skills",
+        element: <SettingsSkillsPage />,
       },
     ],
   },

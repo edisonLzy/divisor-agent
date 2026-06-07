@@ -9,7 +9,8 @@ import {
 } from "@renderer/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@renderer/components/ui/popover";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
-import { sessionStore } from "@renderer/store";
+import { createAgentUserMessage } from "@renderer/lib/agent-message";
+import { EntryStatus, sessionStore } from "@renderer/store";
 import { Check, ChevronDown, Folder, X } from "lucide-react";
 import { useState } from "react";
 import { useStore } from "zustand";
@@ -52,11 +53,22 @@ export function PendingSessionContent() {
       }
 
       sessionStore.getState().setSessionStatus(newSession.id, "running");
+      const userMessage = createAgentUserMessage(submission.jsonContent, submission.text);
+      const entryId = sessionStore.getState().appendMessageEntry(newSession.id, userMessage);
+      const submissionText = submission.text;
 
-      await invoke("prompt", newSession.id, submission.text, {
-        modelId: submission.model.modelId,
-        providerId: submission.model.providerId,
-      });
+      try {
+        await invoke("prompt", newSession.id, submissionText, {
+          model: {
+            modelId: submission.model.modelId,
+            providerId: submission.model.providerId,
+          },
+          skillIds: submission.skillIds,
+        });
+      } catch (error) {
+        sessionStore.getState().setEntryStatus(newSession.id, [entryId], EntryStatus.Failed);
+        throw error;
+      }
     } catch (error) {
       console.error("Failed to submit prompt", error);
 

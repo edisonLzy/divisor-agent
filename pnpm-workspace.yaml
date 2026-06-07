@@ -1,6 +1,12 @@
 packages:
   - "packages/*"
 
+allowBuilds:
+  electron: true
+  electron-winstaller: true
+  esbuild: true
+  protobufjs: true
+
 catalog:
   typescript: ^6.0.3
   vitest: ^4.0.16

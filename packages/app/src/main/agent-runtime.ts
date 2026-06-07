@@ -7,8 +7,11 @@ import type { AllowedMainExposeEvents } from "../shared/events-ipc.js";
 import type { AgentModelsIPC } from "../shared/models-ipc.js";
 import type { PermissionMode } from "../shared/permissions-ipc.js";
 import type { AgentSessionIPC } from "../shared/session-ipc.js";
+import type { AgentSkillsIPC } from "../shared/skills-ipc.js";
 import { ModelRegistry } from "./models/index.js";
 import { PermissionService } from "./permissions/index.js";
+import { SystemPromptService } from "./prompt/index.js";
+import { SkillService } from "./skills/index.js";
 import type { AppTool } from "./tools/index.js";
 import { fsReadTextFileTool, fsWriteTextFileTool, terminalCreateTool } from "./tools/index.js";
 
@@ -26,7 +29,7 @@ type StripSessionId<T> = T extends (sessionId: string, ...args: infer A) => infe
   ? (...args: A) => R
   : T;
 
-type CombinedIPC = AgentSessionIPC & AgentModelsIPC;
+type CombinedIPC = AgentSessionIPC & AgentModelsIPC & AgentSkillsIPC;
 
 /**
  * Contract that AgentRuntime must satisfy, auto-derived from IPC interfaces.
@@ -43,10 +46,14 @@ export type AgentRuntimeDelegate = {
     | "getModelConfig"
     | "saveModelConfig"
     | "setSessionId"
+    | "listSkills"
+    | "setSkillEnabled"
     ? never
     : K]: StripSessionId<CombinedIPC[K]>;
 } & {
+  listSkills: AgentSkillsIPC["listSkills"];
   setSessionId(sessionId: string): void;
+  setSkillEnabled: AgentSkillsIPC["setSkillEnabled"];
 };
 
 // ── Event type map ──────────────────────────────────────────────────────────
@@ -66,11 +73,17 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
   private agent: Agent;
   private permissionMode: PermissionMode;
   private permissionService: PermissionService;
+  private systemPromptService: SystemPromptService;
 
-  constructor(private modelRegistry: ModelRegistry) {
+  constructor(
+    private modelRegistry = new ModelRegistry(),
+    private skillService: SkillService,
+  ) {
     super();
     this.permissionMode = "default";
     this.permissionService = new PermissionService();
+    this.systemPromptService = new SystemPromptService();
+    this.systemPromptService.addBuilder(this.skillService);
     this.agent = this.createInternalAgent();
   }
 
@@ -125,6 +138,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
         return this.modelRegistry.resolveApiKey(provider);
       },
       initialState: {
+        systemPrompt: this.systemPromptService.buildSystemPrompt(""),
         tools: [fsReadTextFileTool, fsWriteTextFileTool, terminalCreateTool],
       },
     });
@@ -156,15 +170,25 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
     return true;
   };
 
-  public prompt: AgentRuntimeDelegate["prompt"] = async (content, model) => {
-    if (model) {
-      await this.setModel(model);
+  public prompt: AgentRuntimeDelegate["prompt"] = async (content, metadata = {}) => {
+    if (metadata.model) {
+      await this.setModel(metadata.model);
     }
-    this.agent.prompt(content);
+
+    this.agent.state.systemPrompt = this.systemPromptService.buildSystemPrompt("");
+    this.agent.prompt(this.skillService.expandSkillReferences(content, metadata.skillIds ?? []));
   };
 
   public abortPrompt: AgentRuntimeDelegate["abortPrompt"] = async () => {
     this.agent.abort();
+  };
+
+  public listSkills: AgentRuntimeDelegate["listSkills"] = async () => {
+    return this.skillService.listSkills();
+  };
+
+  public setSkillEnabled: AgentRuntimeDelegate["setSkillEnabled"] = async (skillId, enabled) => {
+    return this.skillService.setSkillEnabled(skillId, enabled);
   };
 
   public setPermissionMode: AgentRuntimeDelegate["setPermissionMode"] = async (mode) => {

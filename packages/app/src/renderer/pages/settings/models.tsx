@@ -14,8 +14,6 @@ import { Pencil, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { SettingsSectionContainer, StatusCard } from "./layout";
-
 const EMPTY_MODELS_CONFIG: ModelsConfigFile = { providers: {} };
 
 const DEFAULT_PROVIDER: ProviderDefinitionConfig = {
@@ -308,7 +306,8 @@ export function SettingsModelsPage() {
   }
 
   return (
-    <SettingsSectionContainer title="Models" maxWidthClass="max-w-320">
+    <div className="mx-auto flex min-h-full w-full max-w-320 flex-col px-10 py-12">
+      <h1 className="mb-8 text-center text-[20px] font-medium text-foreground">Models</h1>
       <div className="space-y-6">
         <div className="rounded-lg border border-border bg-card">
           <div className="flex flex-col gap-4 border-b border-border px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
@@ -347,21 +346,39 @@ export function SettingsModelsPage() {
           </div>
 
           <div className="grid gap-3 border-b border-border bg-background/30 px-4 py-4 md:grid-cols-3">
-            <StatusCard
-              label="Provider"
-              value={String(providerCount)}
-              description="当前配置中的模型提供方数量"
-            />
-            <StatusCard
-              label="Model"
-              value={String(modelCount)}
-              description="保存后会立即刷新应用内可选模型"
-            />
-            <StatusCard
-              label="编辑方式"
-              value={modelEditorMode === "visual" ? "可视化" : "JSON"}
-              description="常用字段走可视化，高级字段可直接写 JSON"
-            />
+            <div className="rounded-lg border border-border bg-background/70 px-3 py-3">
+              <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                Provider
+              </div>
+              <div className="mt-2 text-[15px] font-medium text-foreground">
+                {String(providerCount)}
+              </div>
+              <div className="mt-1 text-[12px] leading-5 text-muted-foreground">
+                当前配置中的模型提供方数量
+              </div>
+            </div>
+            <div className="rounded-lg border border-border bg-background/70 px-3 py-3">
+              <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                Model
+              </div>
+              <div className="mt-2 text-[15px] font-medium text-foreground">
+                {String(modelCount)}
+              </div>
+              <div className="mt-1 text-[12px] leading-5 text-muted-foreground">
+                保存后会立即刷新应用内可选模型
+              </div>
+            </div>
+            <div className="rounded-lg border border-border bg-background/70 px-3 py-3">
+              <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                编辑方式
+              </div>
+              <div className="mt-2 text-[15px] font-medium text-foreground">
+                {modelEditorMode === "visual" ? "可视化" : "JSON"}
+              </div>
+              <div className="mt-1 text-[12px] leading-5 text-muted-foreground">
+                常用字段走可视化，高级字段可直接写 JSON
+              </div>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 border-b border-border px-4 py-4">
@@ -810,7 +827,7 @@ export function SettingsModelsPage() {
           )}
         </div>
       </div>
-    </SettingsSectionContainer>
+    </div>
   );
 }
 

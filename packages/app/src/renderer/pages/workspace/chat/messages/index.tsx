@@ -1,3 +1,4 @@
+import { isAgentAssistantMessage, isAgentUserMessage } from "@renderer/lib/is";
 import type { MessageEntry, ToolExecutionState } from "@renderer/store";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef } from "react";
@@ -67,9 +68,9 @@ export function ChatMessages({ messageEntries, streamingEntryId, toolStates }: C
               }}
             >
               <div className="mx-auto w-full max-w-4xl">
-                {message.role === "user" ? (
+                {isAgentUserMessage(message) ? (
                   <UserMessage message={message} />
-                ) : message.role === "assistant" ? (
+                ) : isAgentAssistantMessage(message) ? (
                   <AssistantMessage
                     completedAt={entry.completedAt}
                     isStreaming={entry.id === streamingEntryId}

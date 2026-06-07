@@ -2,7 +2,8 @@ import { BrowserWindow, ipcMain } from "electron";
 
 import type { AgentModelsIPC } from "../shared/models-ipc";
 import type { AgentSessionIPC } from "../shared/session-ipc";
-import { AgentPool } from "./agent-pool";
+import type { AgentSkillsIPC } from "../shared/skills-ipc";
+import type { AgentPool } from "./agent-pool";
 
 function registerAgentRuntimeHandlers(agentPool: AgentPool, browserWindow: BrowserWindow) {
   const offAny = agentPool.onAny(({ name, data }) => {
@@ -31,6 +32,8 @@ function registerIPCHandlers(agentPool: AgentPool) {
   typedIpcMain.handle("setSessionId", agentPool.setSessionId);
   typedIpcMain.handle("setPermissionMode", agentPool.setPermissionMode);
   typedIpcMain.handle("resolvePermissionRequest", agentPool.resolvePermissionRequest);
+  typedIpcMain.handle("listSkills", agentPool.listSkills);
+  typedIpcMain.handle("setSkillEnabled", agentPool.setSkillEnabled);
 
   return () => {
     typedIpcMain.removeAllListeners();
@@ -52,7 +55,7 @@ export function bindAgentRuntimeIPC(
 }
 
 function createTypedIpcMain() {
-  type AgentIPC = AgentModelsIPC & AgentSessionIPC;
+  type AgentIPC = AgentModelsIPC & AgentSessionIPC & AgentSkillsIPC;
   return {
     ...ipcMain,
     handle<C extends keyof AgentIPC = keyof AgentIPC>(channel: C, listener: AgentIPC[C]) {

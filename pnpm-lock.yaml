@@ -53,6 +53,9 @@ importers:
       '@electron-toolkit/utils':
         specifier: ^4.0.0
         version: 4.0.0(electron@39.8.9)
+      '@floating-ui/dom':
+        specifier: ^1.7.6
+        version: 1.7.6
       '@mariozechner/pi-agent-core':
         specifier: ^0.68.0
         version: 0.68.1(ws@8.20.0)(zod@4.3.6)
@@ -134,6 +137,9 @@ importers:
       emittery:
         specifier: ^2.0.0
         version: 2.0.0
+      fuse.js:
+        specifier: ^7.4.1
+        version: 7.4.1
       lucide-react:
         specifier: ^1.8.0
         version: 1.11.0(react@19.2.5)
@@ -1092,10 +1098,12 @@ packages:
   '@mariozechner/pi-agent-core@0.68.1':
     resolution: {integrity: sha512-7q0vHSc6IIlNNdfP5+4ktv/9Bidfo6dCFRRJVz96K9qjN+5rYJ+4V28quvcw/Vf0pfDgRMBRR0Yhjx51lb60tg==}
     engines: {node: '>=20.0.0'}
+    deprecated: please use @earendil-works/pi-agent-core instead going forward
 
   '@mariozechner/pi-ai@0.68.1':
     resolution: {integrity: sha512-z52kMOZK1/fxzKu7nTwdfOCHhOE/G5GwGsxzR98X6LX7yAz384iqwG4DoXn7nI05ETH7jXLET6wUrYIHMo91Qw==}
     engines: {node: '>=20.0.0'}
+    deprecated: please use @earendil-works/pi-ai instead going forward
     hasBin: true
 
   '@mermaid-js/parser@1.1.0':
@@ -3644,6 +3652,10 @@ packages:
 
   function-bind@1.1.2:
     resolution: {integrity: sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA==}
+
+  fuse.js@7.4.1:
+    resolution: {integrity: sha512-AY7lKAXK71hi3WgUvDy6oZL67UEHOOtvCAwVdOXHyJd6ZzftBy7QqxuXt4HxmmAhYjmp/YCuOELZtIvAdlZ+fw==}
+    engines: {node: '>=10'}
 
   gaxios@7.1.4:
     resolution: {integrity: sha512-bTIgTsM2bWn3XklZISBTQX7ZSddGW+IO3bMdGaemHZ3tbqExMENHLx6kKZ/KlejgrMtj8q7wBItt51yegqalrA==}
@@ -9307,6 +9319,8 @@ snapshots:
     optional: true
 
   function-bind@1.1.2: {}
+
+  fuse.js@7.4.1: {}
 
   gaxios@7.1.4:
     dependencies:
