@@ -1,14 +1,14 @@
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import type { UserMessage } from "@mariozechner/pi-ai";
 import { isAgentUserMessage } from "@renderer/lib/is";
-import { jsonContentToText } from "@renderer/lib/richtext";
 import type { AgentMessageData, AgentUserMessage } from "@renderer/store";
 import type { JSONContent } from "@tiptap/core";
 
-export function createAgentUserMessage(content: JSONContent): AgentUserMessage {
+export function createAgentUserMessage(content: JSONContent, text: string): AgentUserMessage {
   return {
     role: "user",
     content,
+    text,
     timestamp: Date.now(),
   };
 }
@@ -24,6 +24,6 @@ export function agentMessageToRuntimeMessage(message: AgentMessageData): AgentMe
 function agentUserMessageToUserMessage(message: AgentUserMessage): UserMessage {
   return {
     ...message,
-    content: jsonContentToText(message.content),
+    content: message.text,
   };
 }

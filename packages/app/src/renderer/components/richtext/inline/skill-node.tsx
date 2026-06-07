@@ -88,7 +88,7 @@ export const skillNode = Mention.extend({
     ];
   },
   renderText({ node }) {
-    return `@${node.attrs.label ?? node.attrs.id ?? ""}`;
+    return `<skill name="${escapeXmlAttribute(node.attrs.id ?? "")}"></skill>`;
   },
 });
 
@@ -105,4 +105,12 @@ function SkillNodeView({ node }: NodeViewProps) {
       </IconNode>
     </NodeViewWrapper>
   );
+}
+
+function escapeXmlAttribute(value: unknown) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }

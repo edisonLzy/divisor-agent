@@ -225,17 +225,16 @@ interface GroupSectionProps {
 function GroupSection({ title, defaultOpen = true, action, children }: GroupSectionProps) {
   return (
     <Collapsible defaultOpen={defaultOpen} className="space-y-1.5">
-      <CollapsibleTrigger className="group/section flex w-full cursor-pointer items-center gap-1 px-3 py-0.5 text-[11px] font-semibold tracking-[0.14em] text-sidebar-foreground/35 transition-colors hover:text-sidebar-foreground/55">
-        <span>{title}</span>
+      <div className="group/section flex items-center gap-1 px-3 py-0.5">
+        <CollapsibleTrigger className="flex cursor-pointer items-center gap-1 text-[11px] font-semibold tracking-[0.14em] text-sidebar-foreground/35 transition-colors hover:text-sidebar-foreground/55">
+          <span>{title}</span>
+        </CollapsibleTrigger>
         {action && (
-          <span
-            className="ml-auto flex shrink-0 opacity-0 transition-opacity group-hover/section:opacity-100"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <span className="ml-auto flex shrink-0 opacity-0 transition-opacity group-hover/section:opacity-100">
             {action}
           </span>
         )}
-      </CollapsibleTrigger>
+      </div>
       <CollapsibleContent>
         <div className="space-y-0.5">{children}</div>
       </CollapsibleContent>

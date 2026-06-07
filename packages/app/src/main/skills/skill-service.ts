@@ -93,15 +93,18 @@ export class SkillService implements SystemPromptBuilder {
   }
 
   expandSkillReferences(content: string, skillIds: string[]): string {
-    if (skillIds.length === 0) {
+    const requestedSkillIds = mergeUnique([...skillIds, ...extractSkillReferenceNames(content)]);
+    if (requestedSkillIds.length === 0) {
       return content;
     }
 
-    const skillsById = new Map(this.getSkills().map((skill) => [skill.id, skill]));
+    const skills = this.getSkills();
+    const skillsById = new Map(skills.map((skill) => [skill.id, skill]));
+    const skillsByName = new Map(skills.map((skill) => [skill.name, skill]));
     const blocks: string[] = [];
 
-    for (const skillId of skillIds) {
-      const skill = skillsById.get(skillId);
+    for (const skillId of requestedSkillIds) {
+      const skill = skillsById.get(skillId) ?? skillsByName.get(skillId);
       if (!skill?.enabled) {
         continue;
       }
@@ -489,4 +492,28 @@ function escapeXml(str: string): string {
 
 function escapeXmlAttribute(str: string): string {
   return str.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+function extractSkillReferenceNames(content: string): string[] {
+  const names: string[] = [];
+  const skillTagPattern = /<skill\s+name=(["'])(.*?)\1\s*>\s*<\/skill>/g;
+
+  for (const match of content.matchAll(skillTagPattern)) {
+    names.push(unescapeXmlAttribute(match[2]));
+  }
+
+  return names;
+}
+
+function unescapeXmlAttribute(str: string): string {
+  return str
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+function mergeUnique(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)));
 }

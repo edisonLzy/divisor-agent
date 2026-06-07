@@ -34,6 +34,7 @@ export interface ToolExecutionState {
 
 export interface AgentUserMessage extends Omit<UserMessage, "content"> {
   content: JSONContent;
+  text: string;
 }
 
 export type AgentMessageData = Exclude<AgentMessage, UserMessage> | AgentUserMessage;

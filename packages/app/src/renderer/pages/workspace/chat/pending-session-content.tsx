@@ -10,7 +10,6 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@renderer/components/ui/popover";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { createAgentUserMessage } from "@renderer/lib/agent-message";
-import { jsonContentToText } from "@renderer/lib/richtext";
 import { EntryStatus, sessionStore } from "@renderer/store";
 import { Check, ChevronDown, Folder, X } from "lucide-react";
 import { useState } from "react";
@@ -54,14 +53,9 @@ export function PendingSessionContent() {
       }
 
       sessionStore.getState().setSessionStatus(newSession.id, "running");
-      const userMessage = createAgentUserMessage(submission.jsonContent);
+      const userMessage = createAgentUserMessage(submission.jsonContent, submission.text);
       const entryId = sessionStore.getState().appendMessageEntry(newSession.id, userMessage);
-      const submissionText = jsonContentToText(submission.jsonContent);
-      if (!submissionText) {
-        sessionStore.getState().setEntryStatus(newSession.id, [entryId], EntryStatus.Failed);
-        sessionStore.getState().setSessionStatus(newSession.id, "idle");
-        return;
-      }
+      const submissionText = submission.text;
 
       try {
         await invoke("prompt", newSession.id, submissionText, {

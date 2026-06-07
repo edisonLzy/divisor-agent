@@ -8,7 +8,6 @@ import { insertSkillNode, skillNode } from "@renderer/components/richtext/inline
 import type { CommandItem } from "@renderer/components/richtext/types";
 import { Button } from "@renderer/components/ui/button";
 import { useAgentSkills } from "@renderer/hooks/use-agent-skills";
-import { jsonContentToText } from "@renderer/lib/richtext";
 import { cn } from "@renderer/lib/utils";
 import type { AnyExtension } from "@tiptap/core";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -74,12 +73,13 @@ export function PromptInput({
     }
 
     const jsonContent = editor.getJSON();
-    const submissionText = jsonContentToText(jsonContent);
+    const submissionText = editor.getText({ blockSeparator: "\n" }).trim();
     if (!submissionText) {
       return;
     }
 
     await onSubmit({
+      text: submissionText,
       jsonContent,
       model: modelSelectorProps.value,
       skillIds: getSelectedCommandIds(editor),

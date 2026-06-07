@@ -1,7 +1,6 @@
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { createAgentUserMessage } from "@renderer/lib/agent-message";
 import { isAgentMessageEntry } from "@renderer/lib/is";
-import { jsonContentToText } from "@renderer/lib/richtext";
 import { EntryStatus, sessionStore, type ToolExecutionState } from "@renderer/store";
 import { useCallback } from "react";
 import { useStore } from "zustand";
@@ -68,14 +67,9 @@ function useActiveSessionChat() {
       }
 
       sessionStore.getState().setSessionStatus(activeSessionId, "running");
-      const userMessage = createAgentUserMessage(submission.jsonContent);
+      const userMessage = createAgentUserMessage(submission.jsonContent, submission.text);
       const entryId = sessionStore.getState().appendMessageEntry(activeSessionId, userMessage);
-      const submissionText = jsonContentToText(submission.jsonContent);
-      if (!submissionText) {
-        sessionStore.getState().setEntryStatus(activeSessionId, [entryId], EntryStatus.Failed);
-        sessionStore.getState().setSessionStatus(activeSessionId, "idle");
-        return;
-      }
+      const submissionText = submission.text;
 
       try {
         await invoke("prompt", activeSessionId, submissionText, {
