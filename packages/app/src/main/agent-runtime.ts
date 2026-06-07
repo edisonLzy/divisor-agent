@@ -23,7 +23,7 @@ import { fsReadTextFileTool, fsWriteTextFileTool, terminalCreateTool } from "./t
  * IPC:    setHistoryMessages(sessionId, messages) => Promise<void>
  * Runtime: setHistoryMessages(messages) => void
  *
- * Methods without leading `sessionId` param (getAvailableModels) pass through.
+ * Methods without leading `sessionId` param (registry-level config methods) pass through.
  */
 type StripSessionId<T> = T extends (sessionId: string, ...args: infer A) => infer R
   ? (...args: A) => R
@@ -35,8 +35,7 @@ type CombinedIPC = AgentSessionIPC & AgentModelsIPC & AgentSkillsIPC;
  * Contract that AgentRuntime must satisfy, auto-derived from IPC interfaces.
  *
  * - Methods where sessionId is a routing parameter → sessionId is stripped.
- * - `setSessionId` / `getAvailableModels` are excluded (sessionId IS the data
- *   for setSessionId; getAvailableModels is registry-level).
+ * - `setSessionId` and registry-level model config methods are excluded.
  *
  * Enforcement: AgentPool calls these methods by name — if a method is missing
  * on AgentRuntime, the delegation call in AgentPool errors at compile time.
@@ -44,8 +43,10 @@ type CombinedIPC = AgentSessionIPC & AgentModelsIPC & AgentSkillsIPC;
 export type AgentRuntimeDelegate = {
   [K in keyof CombinedIPC as K extends
     | "getAvailableModels"
-    | "listSkills"
+    | "getModelConfig"
+    | "saveModelConfig"
     | "setSessionId"
+    | "listSkills"
     | "setSkillEnabled"
     ? never
     : K]: StripSessionId<CombinedIPC[K]>;

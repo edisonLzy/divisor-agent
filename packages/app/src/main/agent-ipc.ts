@@ -1,9 +1,9 @@
 import { BrowserWindow, ipcMain } from "electron";
 
-import { AgentModelsIPC } from "../shared/models-ipc";
-import { AgentSessionIPC } from "../shared/session-ipc";
-import { AgentSkillsIPC } from "../shared/skills-ipc";
-import { AgentPool } from "./agent-pool";
+import type { AgentModelsIPC } from "../shared/models-ipc";
+import type { AgentSessionIPC } from "../shared/session-ipc";
+import type { AgentSkillsIPC } from "../shared/skills-ipc";
+import type { AgentPool } from "./agent-pool";
 
 function registerAgentRuntimeHandlers(agentPool: AgentPool, browserWindow: BrowserWindow) {
   const offAny = agentPool.onAny(({ name, data }) => {
@@ -24,6 +24,8 @@ function registerIPCHandlers(agentPool: AgentPool) {
 
   typedIpcMain.handle("setModel", agentPool.setModel);
   typedIpcMain.handle("getAvailableModels", agentPool.getAvailableModels);
+  typedIpcMain.handle("getModelConfig", agentPool.getModelConfig);
+  typedIpcMain.handle("saveModelConfig", agentPool.saveModelConfig);
   typedIpcMain.handle("prompt", agentPool.prompt);
   typedIpcMain.handle("abortPrompt", agentPool.abortPrompt);
   typedIpcMain.handle("setHistoryMessages", agentPool.setHistoryMessages);
