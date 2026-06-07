@@ -2,7 +2,7 @@ import type { AssistantMessage, ToolCall, ToolResultMessage } from "@mariozechne
 import { appendEntries } from "@renderer/apis/sessions";
 import { useSubscribeAgentEvents } from "@renderer/hooks/use-subscribe-agent-events";
 import { isAgentMessageEntry } from "@renderer/lib/is";
-import { sessionStore } from "@renderer/store";
+import { EntryStatus, sessionStore } from "@renderer/store";
 import { useRef } from "react";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -43,15 +43,11 @@ function getToolState(sessionId: string, toolCallId: string) {
  */
 export function useAgentMessages() {
   const turnContentStartIndicesRef = useRef<Record<string, number>>({});
-  const entryCountAtStartRef = useRef<Record<string, number>>({});
   const hasPersistedRef = useRef<Record<string, boolean>>({});
 
   useSubscribeAgentEvents({
     agent_start: (event) => {
       const { sessionId } = event;
-      // Session is guaranteed to exist in store — set by session selector
-      entryCountAtStartRef.current[sessionId] =
-        sessionStore.getState().getSession(sessionId)?.entries.length ?? 0;
       hasPersistedRef.current[sessionId] = false;
     },
 
@@ -64,22 +60,27 @@ export function useAgentMessages() {
       if (!hasPersistedRef.current[sessionId]) {
         hasPersistedRef.current[sessionId] = true;
 
-        const startCount = entryCountAtStartRef.current[sessionId] ?? 0;
-        const newEntries = session.entries.slice(startCount);
+        const entriesToPersist = session.entries.filter(
+          (entry) => entry.status !== EntryStatus.Synced,
+        );
 
-        if (newEntries.length > 0) {
+        if (entriesToPersist.length > 0) {
+          const entryIds = entriesToPersist.map((entry) => entry.id);
+          sessionStore.getState().setEntryStatus(sessionId, entryIds, EntryStatus.Syncing);
           try {
             await appendEntries({
               sessionId,
-              entries: newEntries.map((e) => ({
+              entries: entriesToPersist.map((e) => ({
                 id: e.id,
                 parentId: e.parentId,
                 type: e.type,
                 data: e.data as unknown as Record<string, unknown>,
               })),
             });
+            sessionStore.getState().setEntryStatus(sessionId, entryIds, EntryStatus.Synced);
           } catch (error) {
             console.error("Failed to persist entries:", error);
+            sessionStore.getState().setEntryStatus(sessionId, entryIds, EntryStatus.Failed);
           }
         }
       }
@@ -98,7 +99,7 @@ export function useAgentMessages() {
       const streamingEntryId = sessionStore.getState().streamingEntryIds.get(sessionId);
       if (streamingEntryId) {
         const entry = entries.find((e) => e.id === streamingEntryId);
-        if (entry && isAgentMessageEntry(entry)) {
+        if (entry && isAgentMessageEntry(entry) && entry.data.role === "assistant") {
           turnContentStartIndicesRef.current[sessionId] = (entry.data.content ?? []).length;
         }
       }
@@ -109,7 +110,6 @@ export function useAgentMessages() {
       if (message.role === "toolResult") return;
 
       if (message.role === "user") {
-        sessionStore.getState().appendMessageEntry(sessionId, message);
         return;
       }
 
@@ -138,6 +138,7 @@ export function useAgentMessages() {
       const entry = entries.find((e) => e.id === streamingEntryId);
       if (!entry) return;
       if (!isAgentMessageEntry(entry)) return;
+      if (entry.data.role !== "assistant") return;
 
       const turnStartIdx = turnContentStartIndicesRef.current[sessionId] ?? 0;
 
@@ -185,6 +186,7 @@ export function useAgentMessages() {
       const entry = entries.find((e) => e.id === streamingEntryId);
       if (!entry) return;
       if (!isAgentMessageEntry(entry)) return;
+      if (entry.data.role !== "assistant") return;
 
       const turnStartIdx = turnContentStartIndicesRef.current[sessionId] ?? 0;
       const assistantMsg = message as AssistantMessage;

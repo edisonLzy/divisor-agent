@@ -1,10 +1,12 @@
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import type { Session } from "@renderer/apis/sessions";
 import { pinSession, deleteSession, getSessionEntries } from "@renderer/apis/sessions";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
+import { agentMessageToRuntimeMessage } from "@renderer/lib/agent-message";
 import { formatRelativeTime } from "@renderer/lib/date";
 import { cn } from "@renderer/lib/utils";
 import {
+  EntryStatus,
+  type AgentMessageData,
   type MessageEntry,
   type ModelChangedData,
   type SessionEntry,
@@ -44,13 +46,15 @@ export function SessionItem({ session }: SessionItemProps) {
                 return {
                   ...e,
                   type: "message" as const,
-                  data: e.data as unknown as AgentMessage,
+                  data: e.data as unknown as AgentMessageData,
+                  status: EntryStatus.Synced,
                 };
               }
               return {
                 ...e,
                 type: "model_change" as const,
                 data: e.data as unknown as ModelChangedData,
+                status: EntryStatus.Synced,
               };
             }),
           );
@@ -70,7 +74,7 @@ export function SessionItem({ session }: SessionItemProps) {
     if (updatedSession && updatedSession.entries.length > 0) {
       const messages = updatedSession.entries
         .filter((e): e is MessageEntry => e.type === "message")
-        .map((e) => e.data as AgentMessage);
+        .map((e) => agentMessageToRuntimeMessage(e.data));
       try {
         await invoke("setHistoryMessages", session.id, messages);
       } catch (error) {

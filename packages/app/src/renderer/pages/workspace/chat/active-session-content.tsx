@@ -1,6 +1,8 @@
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
+import { createAgentUserMessage } from "@renderer/lib/agent-message";
 import { isAgentMessageEntry } from "@renderer/lib/is";
-import { sessionStore, type ToolExecutionState } from "@renderer/store";
+import { jsonContentToText } from "@renderer/lib/richtext";
+import { EntryStatus, sessionStore, type ToolExecutionState } from "@renderer/store";
 import { useCallback } from "react";
 import { useStore } from "zustand";
 
@@ -66,18 +68,26 @@ function useActiveSessionChat() {
       }
 
       sessionStore.getState().setSessionStatus(activeSessionId, "running");
+      const userMessage = createAgentUserMessage(submission.jsonContent);
+      const entryId = sessionStore.getState().appendMessageEntry(activeSessionId, userMessage);
+      const submissionText = jsonContentToText(submission.jsonContent);
+      if (!submissionText) {
+        sessionStore.getState().setEntryStatus(activeSessionId, [entryId], EntryStatus.Failed);
+        sessionStore.getState().setSessionStatus(activeSessionId, "idle");
+        return;
+      }
 
       try {
-        await invoke("prompt", activeSessionId, submission.text, {
+        await invoke("prompt", activeSessionId, submissionText, {
           model: {
             modelId: submission.model.modelId,
             providerId: submission.model.providerId,
           },
-          jsonContent: submission.jsonContent,
           skillIds: submission.skillIds,
         });
       } catch (error) {
         console.error("Failed to submit prompt", error);
+        sessionStore.getState().setEntryStatus(activeSessionId, [entryId], EntryStatus.Failed);
         sessionStore.getState().setSessionStatus(activeSessionId, "idle");
       }
     },

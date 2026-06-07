@@ -1,4 +1,3 @@
-import type { JSONContent } from "@tiptap/core";
 import Emittery from "emittery";
 
 import { AllowedMainExposeEvents } from "../shared/events-ipc.js";
@@ -21,14 +20,12 @@ export class AgentPool
   private modelRegistry: ModelRegistry;
   private runtimes: Map<string, AgentRuntime>;
   private skillService: SkillService;
-  private pendingPromptMetadata: Map<string, Array<PromptPresentationMetadata>>;
 
   constructor() {
     super();
     this.modelRegistry = new ModelRegistry();
     this.runtimes = new Map();
     this.skillService = new SkillService();
-    this.pendingPromptMetadata = new Map();
   }
 
   // ── Runtime lifecycle ────────────────────────────────────────────────────
@@ -48,24 +45,6 @@ export class AgentPool
     // Re-emit all events tagged with sessionId
     runtime.onAny(({ name, data }) => {
       if (typeof name !== "string") return;
-
-      if (name === "message_start" && isUserMessageEvent(data)) {
-        const metadata = this.consumePendingPromptMetadata(sessionId);
-        if (metadata?.jsonContent) {
-          (this.emit as (...args: unknown[]) => Promise<void>)(name, {
-            sessionId,
-            ...data,
-            message: {
-              ...data.message,
-              metadata: {
-                ...(isRecord(data.message.metadata) ? data.message.metadata : {}),
-                jsonContent: metadata.jsonContent,
-              },
-            },
-          });
-          return;
-        }
-      }
 
       (this.emit as (...args: unknown[]) => Promise<void>)(name, {
         sessionId,
@@ -127,7 +106,6 @@ export class AgentPool
 
   public prompt: AgentSessionIPC["prompt"] = async (sessionId, content, metadata) => {
     const runtime = this.getOrCreateRuntime(sessionId);
-    this.enqueuePromptMetadata(sessionId, metadata);
     runtime.prompt(content, metadata);
   };
 
@@ -168,52 +146,4 @@ export class AgentPool
   public setSkillEnabled: AgentSkillsIPC["setSkillEnabled"] = async (skillId, enabled) => {
     return this.skillService.setSkillEnabled(skillId, enabled);
   };
-
-  private enqueuePromptMetadata(sessionId: string, metadata?: PromptPresentationMetadata) {
-    if (!metadata?.jsonContent) {
-      return;
-    }
-
-    const queue = this.pendingPromptMetadata.get(sessionId) ?? [];
-    queue.push({ jsonContent: metadata.jsonContent });
-    this.pendingPromptMetadata.set(sessionId, queue);
-  }
-
-  private consumePendingPromptMetadata(sessionId: string) {
-    const queue = this.pendingPromptMetadata.get(sessionId);
-    if (!queue?.length) {
-      return undefined;
-    }
-
-    const nextMetadata = queue.shift();
-    if (queue.length === 0) {
-      this.pendingPromptMetadata.delete(sessionId);
-    } else {
-      this.pendingPromptMetadata.set(sessionId, queue);
-    }
-
-    return nextMetadata;
-  }
-}
-
-interface PromptPresentationMetadata {
-  jsonContent?: JSONContent;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isUserMessageEvent(value: unknown): value is {
-  message: {
-    role: "user";
-    metadata?: unknown;
-  };
-} {
-  return (
-    isRecord(value) &&
-    "message" in value &&
-    isRecord(value.message) &&
-    value.message.role === "user"
-  );
 }

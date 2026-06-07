@@ -2,7 +2,7 @@ import { isAgentMessageEntry } from "@renderer/lib/is";
 import { v4 as uuidv4 } from "uuid";
 import type { StateCreator } from "zustand/vanilla";
 
-import type { EntriesSlice, SessionsStoreState } from "./types";
+import { EntryStatus, type EntriesSlice, type SessionsStoreState } from "./types";
 
 export const createEntriesSlice: StateCreator<SessionsStoreState, [], [], EntriesSlice> = (
   set,
@@ -25,6 +25,7 @@ export const createEntriesSlice: StateCreator<SessionsStoreState, [], [], Entrie
       type: "message" as const,
       timestamp: Date.now(),
       data: message,
+      status: EntryStatus.Local,
     };
 
     set((prev) => {
@@ -63,6 +64,33 @@ export const createEntriesSlice: StateCreator<SessionsStoreState, [], [], Entrie
 
     const entries = [...session.entries];
     entries[entryIndex] = { ...existingEntry, data: message };
+
+    set((prev) => {
+      const sessionIndex = prev.sessions.findIndex((candidate) => candidate.id === sessionId);
+      if (sessionIndex < 0) {
+        return prev;
+      }
+
+      const sessions = [...prev.sessions];
+      sessions[sessionIndex] = { ...session, entries };
+      return { sessions };
+    });
+  },
+
+  setEntryStatus: (sessionId, entryIds, status) => {
+    const session = get().getSession(sessionId);
+    if (!session || entryIds.length === 0) {
+      return;
+    }
+
+    const targetIds = new Set(entryIds);
+    const entries = session.entries.map((entry) => {
+      if (!targetIds.has(entry.id)) {
+        return entry;
+      }
+
+      return { ...entry, status };
+    });
 
     set((prev) => {
       const sessionIndex = prev.sessions.findIndex((candidate) => candidate.id === sessionId);
