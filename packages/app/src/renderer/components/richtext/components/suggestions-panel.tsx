@@ -106,13 +106,19 @@ export function SuggestionsPanel({
                 <BoxIcon />
               </span>
               <span className="min-w-0 flex flex-1 items-baseline gap-1.5">
-                <span className="truncate text-[13px] font-medium text-current">{item.name}</span>
-                <span className="truncate text-[11px] text-muted-foreground">
-                  {item.description}
+                <span className="shrink-0 text-[13px] font-medium leading-5 text-current">
+                  {item.name}
                 </span>
+                {item.description ? (
+                  <span className="truncate text-[11px] leading-5 text-muted-foreground">
+                    {item.description}
+                  </span>
+                ) : null}
               </span>
               {item.extra ? (
-                <span className="shrink-0 text-[11px] text-muted-foreground">{item.extra}</span>
+                <span className="mt-0.5 shrink-0 text-[11px] text-muted-foreground">
+                  {item.extra}
+                </span>
               ) : null}
             </button>
           ))}

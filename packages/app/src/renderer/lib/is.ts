@@ -22,3 +22,18 @@ export function isAgentUserMessage(message: AgentMessageData): message is AgentU
 export function isAgentAssistantMessage(message: AgentMessageData): message is AssistantMessage {
   return message.role === "assistant";
 }
+
+export function isFailedAssistantMessage(message: unknown): message is AssistantMessage {
+  if (typeof message !== "object" || message === null) {
+    return false;
+  }
+
+  const candidate = message as Partial<AssistantMessage>;
+
+  return (
+    candidate.role === "assistant" &&
+    (candidate.stopReason === "error" ||
+      candidate.stopReason === "aborted" ||
+      Boolean(candidate.errorMessage))
+  );
+}

@@ -381,9 +381,9 @@ export function SettingsPage() {
                   </div>
                 )}
                 {activeSection === "plugin" && (
-                  <div className="space-y-4">
-                    <div className="overflow-hidden rounded-lg border border-border bg-card">
-                      <div className="flex flex-col gap-4 border-b border-border px-4 py-4 md:flex-row md:items-center md:justify-between">
+                  <div className="min-h-0 space-y-4">
+                    <div className="flex max-h-[min(680px,calc(100vh-9rem))] flex-col overflow-hidden rounded-lg border border-border bg-card">
+                      <div className="shrink-0 flex flex-col gap-4 border-b border-border px-4 py-4 md:flex-row md:items-center md:justify-between">
                         <div>
                           <div className="text-[13px] font-medium text-foreground">
                             Skills Discovery
@@ -404,7 +404,7 @@ export function SettingsPage() {
                         </div>
                       </div>
 
-                      <div className="divide-y divide-border">
+                      <div className="min-h-0 flex-1 overflow-y-auto divide-y divide-border">
                         {filteredSkills.length === 0 ? (
                           <div className="px-4 py-10 text-center text-sm text-muted-foreground">
                             没有匹配的技能

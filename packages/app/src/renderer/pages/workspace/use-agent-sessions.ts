@@ -1,4 +1,5 @@
 import { useSubscribeAgentEvents } from "@renderer/hooks/use-subscribe-agent-events";
+import { isFailedAssistantMessage } from "@renderer/lib/is";
 import { sessionStore } from "@renderer/store";
 
 /**
@@ -16,8 +17,9 @@ export function useAgentSessions() {
     },
 
     agent_end: (event) => {
-      const { sessionId } = event;
-      sessionStore.getState().setSessionStatus(sessionId, "completed");
+      const { sessionId, messages } = event;
+      const status = messages.some(isFailedAssistantMessage) ? "failed" : "completed";
+      sessionStore.getState().setSessionStatus(sessionId, status);
     },
   });
 }

@@ -1,8 +1,12 @@
 import type { AssistantMessage, ToolCall, ToolResultMessage } from "@mariozechner/pi-ai";
 import { appendEntries } from "@renderer/apis/sessions";
 import { useSubscribeAgentEvents } from "@renderer/hooks/use-subscribe-agent-events";
-import { isAgentMessageEntry } from "@renderer/lib/is";
-import { EntryStatus, sessionStore } from "@renderer/store";
+import {
+  isAgentAssistantMessage,
+  isAgentMessageEntry,
+  isFailedAssistantMessage,
+} from "@renderer/lib/is";
+import { EntryStatus, type AgentSession, sessionStore } from "@renderer/store";
 import { useRef } from "react";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -31,6 +35,22 @@ function getToolState(sessionId: string, toolCallId: string) {
   return sessionStore.getState().getSession(sessionId)?.toolStates.get(toolCallId);
 }
 
+function findMissingFailureMessage(
+  session: AgentSession,
+  messages: unknown[],
+): AssistantMessage | undefined {
+  return messages.filter(isFailedAssistantMessage).find((message) => {
+    return !session.entries.some((entry) => {
+      return (
+        isAgentMessageEntry(entry) &&
+        isAgentAssistantMessage(entry.data) &&
+        entry.data.timestamp === message.timestamp &&
+        entry.data.stopReason === message.stopReason
+      );
+    });
+  });
+}
+
 // ── Hook ────────────────────────────────────────────────────────────────────
 
 /**
@@ -53,8 +73,19 @@ export function useAgentMessages() {
 
     agent_end: async (event) => {
       const { sessionId } = event;
-      const session = sessionStore.getState().getSession(sessionId);
+      let session = sessionStore.getState().getSession(sessionId);
       if (!session) return;
+
+      const missingFailureMessage = findMissingFailureMessage(session, event.messages);
+      if (missingFailureMessage) {
+        const entryId = sessionStore
+          .getState()
+          .appendMessageEntry(sessionId, missingFailureMessage);
+        sessionStore.getState().setStreamingEntryId(sessionId, entryId);
+        sessionStore.getState().setStreamingEntryCompletedAt(sessionId, Date.now());
+        session = sessionStore.getState().getSession(sessionId);
+        if (!session) return;
+      }
 
       // ── Persist new entries to server ──
       if (!hasPersistedRef.current[sessionId]) {
