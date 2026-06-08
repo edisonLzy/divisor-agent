@@ -3,6 +3,7 @@ import {
   SuggestionsPanel,
 } from "@renderer/components/richtext/components/suggestions-panel";
 import type { CommandItem } from "@renderer/components/richtext/types";
+import { useLatest } from "@renderer/hooks/use-latest";
 import type { Range } from "@tiptap/core";
 import Mention from "@tiptap/extension-mention";
 import { posToDOMRect, ReactRenderer, type Editor } from "@tiptap/react";
@@ -29,6 +30,9 @@ export function useSlashCommandsExtension({
   getFloatingReference,
   onSelectCommand,
 }: UseSlashCommandsExtensionOptions) {
+  const commandsRef = useLatest(commands);
+  const onSelectCommandRef = useLatest(onSelectCommand);
+
   return useMemo(() => {
     const SlashCommandMention = Mention.extend({
       name: "slashCommandMention",
@@ -50,9 +54,9 @@ export function useSlashCommandsExtension({
         decorationClass: "file-suggestion-query",
         decorationContent: "search slash commands",
         decorationEmptyClass: "is-empty",
-        items: ({ query }) => filterCommandItems(commands, query),
+        items: ({ query }) => filterCommandItems(commandsRef.current, query),
         command: ({ editor, range, props }) => {
-          onSelectCommand({
+          onSelectCommandRef.current({
             command: props,
             editor,
             range,
@@ -120,7 +124,7 @@ export function useSlashCommandsExtension({
             const props = latestProps;
 
             component.updateProps({
-              items: commands,
+              items: commandsRef.current,
               query: props.query,
               selectedIndex,
               onSelect: (item) => props.command(item),
@@ -160,7 +164,7 @@ export function useSlashCommandsExtension({
               component = new ReactRenderer(SuggestionsPanel, {
                 editor: props.editor,
                 props: {
-                  items: commands,
+                  items: commandsRef.current,
                   query: props.query,
                   selectedIndex,
                   onSelect: (item) => props.command(item),
@@ -216,7 +220,7 @@ export function useSlashCommandsExtension({
         },
       } satisfies Omit<SuggestionOptions<CommandItem>, "editor">,
     });
-  }, [commands, getFloatingReference, onSelectCommand]);
+  }, [getFloatingReference]);
 }
 
 export function getSelectedCommandIds(editor: Editor | null) {

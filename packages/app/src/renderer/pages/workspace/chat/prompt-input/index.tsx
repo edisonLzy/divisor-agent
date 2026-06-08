@@ -216,7 +216,7 @@ export function PromptInput({
 
 function usePromptInputEditor({
   disabled,
-  extensions = [],
+  extensions,
   onContentChange,
 }: {
   disabled: boolean;
@@ -237,7 +237,7 @@ function usePromptInputEditor({
         Placeholder.configure({
           placeholder: "Ask anything...",
         }),
-        ...extensions,
+        ...(extensions ?? []),
         skillNode,
       ],
       editorProps: {
@@ -251,7 +251,7 @@ function usePromptInputEditor({
         onContentChange(nextEditor.getText().trim().length > 0);
       },
     },
-    [extensions],
+    [],
   );
 
   useEffect(() => {
