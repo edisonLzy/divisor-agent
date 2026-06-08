@@ -63,6 +63,11 @@ type AgentRuntimeEvents = {
   [K in keyof AllowedMainExposeEvents]: Omit<AllowedMainExposeEvents[K], "sessionId">;
 };
 
+interface ExtensionRuntimeService {
+  getSystemPrompts(): string[];
+  getTools(): AppTool<any>[];
+}
+
 /**
  * Per-session runtime that manages a single Agent instance.
  *
@@ -78,6 +83,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
   constructor(
     private modelRegistry = new ModelRegistry(),
     private skillService: SkillService,
+    private extensionService: ExtensionRuntimeService = createEmptyExtensionService(),
   ) {
     super();
     this.permissionMode = "default";
@@ -138,8 +144,13 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
         return this.modelRegistry.resolveApiKey(provider);
       },
       initialState: {
-        systemPrompt: this.systemPromptService.buildSystemPrompt(""),
-        tools: [fsReadTextFileTool, fsWriteTextFileTool, terminalCreateTool],
+        systemPrompt: this.buildSystemPrompt(),
+        tools: [
+          fsReadTextFileTool,
+          fsWriteTextFileTool,
+          terminalCreateTool,
+          ...this.extensionService.getTools(),
+        ],
       },
     });
 
@@ -175,7 +186,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
       await this.setModel(metadata.model);
     }
 
-    this.agent.state.systemPrompt = this.systemPromptService.buildSystemPrompt("");
+    this.agent.state.systemPrompt = this.buildSystemPrompt();
     this.agent.prompt(this.skillService.expandSkillReferences(content, metadata.skillIds ?? []));
   };
 
@@ -214,8 +225,21 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
   public destroy() {
     this.clearListeners();
   }
+
+  private buildSystemPrompt() {
+    return this.systemPromptService.buildSystemPrompt(
+      this.extensionService.getSystemPrompts().join("\n\n"),
+    );
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function createEmptyExtensionService(): ExtensionRuntimeService {
+  return {
+    getSystemPrompts: () => [],
+    getTools: () => [],
+  };
 }

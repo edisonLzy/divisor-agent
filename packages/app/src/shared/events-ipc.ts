@@ -1,9 +1,9 @@
 import type { AgentEvent } from "@mariozechner/pi-agent-core";
 
-import { AgentModelsIPC } from "./models-ipc";
+import type { AgentModelsIPC } from "./models-ipc";
 import type { PermissionRequestedEvent } from "./permissions-ipc";
-import { AgentSessionIPC } from "./session-ipc";
-import { AgentSkillsIPC } from "./skills-ipc";
+import type { AgentSessionIPC } from "./session-ipc";
+import type { AgentSkillsIPC } from "./skills-ipc";
 
 type SessionTagged<T> = T & { sessionId: string };
 type AgentRuntimeEvent = AgentEvent | PermissionRequestedEvent;

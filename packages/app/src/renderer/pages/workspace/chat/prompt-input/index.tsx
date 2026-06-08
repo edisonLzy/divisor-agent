@@ -1,3 +1,4 @@
+import { usePluginSlashCommands } from "@divisor-agent/extension-core/renderer";
 import {
   getSelectedCommandIds,
   slashCommandSuggestionPluginKey,
@@ -39,20 +40,54 @@ export function PromptInput({
   const permissionSelectorProps = usePermissionSelector(sessionId);
   const editorContainerRef = useRef<HTMLDivElement | null>(null);
   const [hasContent, setHasContent] = useState(false);
-  const slashCommands = useSkillsCommandItems();
+  const skillCommands = useSkillsCommandItems();
+  const pluginCommands = usePluginSlashCommands();
+  const slashCommands = useMemo(
+    () => [...skillCommands, ...pluginCommands],
+    [pluginCommands, skillCommands],
+  );
   const getFloatingReference = useCallback(() => editorContainerRef.current, []);
-  const handleSelectCommand = useCallback(({ command, editor, range }: SlashCommandSelection) => {
-    if (command.group === "Skills") {
-      insertSkillNode({
+  const handleSelectCommand = useCallback(
+    ({ command, editor, range }: SlashCommandSelection) => {
+      if (command.group === "Skills") {
+        insertSkillNode({
+          editor,
+          range,
+          skill: {
+            id: command.id,
+            label: command.name,
+          },
+        });
+        return;
+      }
+
+      const pluginCommand = pluginCommands.find((item) => item.id === command.id);
+      if (!pluginCommand) {
+        return;
+      }
+
+      void pluginCommand.run({
         editor,
         range,
-        skill: {
-          id: command.id,
-          label: command.name,
+        submitPrompt(text) {
+          const submissionText = text.trim();
+          if (!modelSelectorProps.value || !submissionText) {
+            return;
+          }
+
+          void onSubmit({
+            text: submissionText,
+            jsonContent: createTextDoc(submissionText),
+            model: modelSelectorProps.value,
+            skillIds: getSelectedCommandIds(editor),
+          });
+          editor.commands.clearContent();
+          setHasContent(false);
         },
       });
-    }
-  }, []);
+    },
+    [modelSelectorProps.value, onSubmit, pluginCommands],
+  );
   const slashCommandsExtension = useSlashCommandsExtension({
     commands: slashCommands,
     getFloatingReference,
@@ -242,4 +277,16 @@ function useSkillsCommandItems() {
         })),
     [skills],
   );
+}
+
+function createTextDoc(text: string) {
+  return {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [{ type: "text", text }],
+      },
+    ],
+  };
 }
