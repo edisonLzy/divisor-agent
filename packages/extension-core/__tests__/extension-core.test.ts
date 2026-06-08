@@ -1,5 +1,7 @@
 import {
+  formatArtifactFence,
   formatAssistantBlockFence,
+  parseArtifactPayload,
   parseAssistantBlockPayload,
 } from "@divisor-agent/extension-core/common";
 import {
@@ -173,6 +175,47 @@ after`);
 
     expect(parseAssistantBlockPayload('{"type":"example.card","props":{', false)).toEqual({
       raw: '{"type":"example.card","props":{',
+      status: "invalid",
+    });
+  });
+
+  it("formats artifact fences", () => {
+    expect(
+      formatArtifactFence({
+        id: "artifact-1",
+        props: { title: "Hello" },
+        type: "example.artifact",
+      }),
+    ).toBe(
+      '```divisor-artifact\n{"id":"artifact-1","type":"example.artifact","props":{"title":"Hello"}}\n```',
+    );
+  });
+
+  it("parses artifact payloads", () => {
+    expect(
+      parseArtifactPayload(
+        '{"id":"artifact-1","type":"example.artifact","props":{"title":"Hello"}}',
+        false,
+      ),
+    ).toEqual({
+      payload: {
+        id: "artifact-1",
+        props: { title: "Hello" },
+        raw: '{"id":"artifact-1","type":"example.artifact","props":{"title":"Hello"}}',
+        type: "example.artifact",
+      },
+      status: "ready",
+    });
+  });
+
+  it("tracks incomplete artifact payloads while streaming", () => {
+    expect(parseArtifactPayload('{"type":"example.artifact","props":{', true)).toEqual({
+      raw: '{"type":"example.artifact","props":{',
+      status: "pending",
+    });
+
+    expect(parseArtifactPayload('{"type":"example.artifact","props":{', false)).toEqual({
+      raw: '{"type":"example.artifact","props":{',
       status: "invalid",
     });
   });

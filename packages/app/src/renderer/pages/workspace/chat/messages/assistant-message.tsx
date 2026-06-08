@@ -116,7 +116,13 @@ export function AssistantMessage({
       </Collapsible>
 
       {textContent.map((block, i) => (
-        <AssistantResponseMessage key={`text-${i}`} content={block.text} />
+        <AssistantResponseMessage
+          key={`text-${i}`}
+          content={block.text}
+          entryId={entryId}
+          isStreaming={isStreaming}
+          sessionId={sessionId}
+        />
       ))}
 
       {hasError && textContent.every((block) => block.text.trim().length === 0) ? (

@@ -75,6 +75,20 @@ export interface AgentPendingSession {
   createdAt: number;
 }
 
+export interface ArtifactRecord {
+  id: string;
+  props: Record<string, unknown>;
+  raw: string;
+  type: string;
+  updatedAt: number;
+}
+
+export interface SessionArtifactState {
+  activeArtifactId: string | null;
+  artifacts: ArtifactRecord[];
+  isOpen: boolean;
+}
+
 export interface SessionsSlice {
   activeSessionId: string | null;
   pendingSession: AgentPendingSession | null;
@@ -127,4 +141,12 @@ export interface PermissionSlice {
   clearPermissionState: (sessionId: string) => void;
 }
 
-export type SessionsStoreState = SessionsSlice & EntriesSlice & PermissionSlice;
+export interface ArtifactSlice {
+  artifactStates: Map<string, SessionArtifactState>;
+  getArtifactState: (sessionId: string) => SessionArtifactState;
+  setArtifactPanelOpen: (sessionId: string, isOpen: boolean) => void;
+  setActiveArtifactId: (sessionId: string, artifactId: string | null) => void;
+  upsertArtifact: (sessionId: string, artifact: Omit<ArtifactRecord, "updatedAt">) => void;
+}
+
+export type SessionsStoreState = SessionsSlice & EntriesSlice & PermissionSlice & ArtifactSlice;

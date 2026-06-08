@@ -1,4 +1,5 @@
 import { usePluginSlashCommands } from "@divisor-agent/extension-core/renderer";
+import { promptGhostSuggestionExtension } from "@renderer/components/richtext/extensions/prompt-ghost-suggestion";
 import {
   type SlashCommandSelection,
   useSlashCommandsExtension,
@@ -68,7 +69,10 @@ export function useChatEditor({ content, disabled, getFloatingReference }: UseCh
     getFloatingReference,
     onSelectCommand: handleSelectCommand,
   });
-  const extensions = useMemo(() => [slashCommandsExtension], [slashCommandsExtension]);
+  const extensions = useMemo(
+    () => [slashCommandsExtension, promptGhostSuggestionExtension],
+    [slashCommandsExtension],
+  );
 
   const editor = useEditor(
     {

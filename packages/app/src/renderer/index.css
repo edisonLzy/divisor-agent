@@ -286,3 +286,8 @@
   color: var(--muted-foreground);
   pointer-events: none;
 }
+
+.prompt-editor .ProseMirror .prompt-ghost-suggestion {
+  color: color-mix(in oklch, var(--muted-foreground) 58%, transparent);
+  pointer-events: none;
+}
