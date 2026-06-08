@@ -99,21 +99,42 @@ export function useSlashCommandsExtension({
             const viewportPadding = 16;
             const verticalGap = 10;
             const panelMaxHeight = 220;
+            const minPanelWidth = 260;
+            const panelWidth = Math.min(
+              Math.max(referenceRect.width, minPanelWidth),
+              window.innerWidth - viewportPadding * 2,
+            );
 
             floatingElement.style.position = "fixed";
-            floatingElement.style.width = `${referenceRect.width}px`;
+            floatingElement.style.width = `${panelWidth}px`;
             floatingElement.style.maxHeight = `${panelMaxHeight}px`;
 
             const floatingRect = floatingElement.getBoundingClientRect();
+            const availableAbove = referenceRect.top - viewportPadding - verticalGap;
+            const availableBelow =
+              window.innerHeight - referenceRect.bottom - viewportPadding - verticalGap;
+            const shouldPlaceBelow =
+              availableAbove < floatingRect.height && availableBelow > availableAbove;
             const nextLeft = Math.min(
               Math.max(referenceRect.left, viewportPadding),
               window.innerWidth - floatingRect.width - viewportPadding,
             );
-            const nextBottom = window.innerHeight - referenceRect.top + verticalGap;
+            const maxHeight = Math.max(
+              80,
+              Math.min(panelMaxHeight, shouldPlaceBelow ? availableBelow : availableAbove),
+            );
 
             floatingElement.style.left = `${nextLeft}px`;
+            floatingElement.style.maxHeight = `${maxHeight}px`;
+
+            if (shouldPlaceBelow) {
+              floatingElement.style.top = `${referenceRect.bottom + verticalGap}px`;
+              floatingElement.style.bottom = "auto";
+              return;
+            }
+
             floatingElement.style.top = "auto";
-            floatingElement.style.bottom = `${nextBottom}px`;
+            floatingElement.style.bottom = `${window.innerHeight - referenceRect.top + verticalGap}px`;
           };
 
           const renderPopup = () => {

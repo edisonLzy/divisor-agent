@@ -11,8 +11,15 @@ import { PromptInput } from "./prompt-input";
 import type { PromptSubmission } from "./prompt-types";
 
 export function ActiveSessionContent() {
-  const { isRunning, messageEntries, streamingEntryId, stopPrompt, toolStates, submitPrompt } =
-    useActiveSessionChat();
+  const {
+    entries,
+    isRunning,
+    messageEntries,
+    streamingEntryId,
+    stopPrompt,
+    toolStates,
+    submitPrompt,
+  } = useActiveSessionChat();
   const activeSessionId = useStore(sessionStore, (state) => state.activeSessionId);
   const pendingPermissionRequest = useStore(sessionStore, (state) => {
     if (!activeSessionId) {
@@ -26,7 +33,10 @@ export function ActiveSessionContent() {
     <>
       <section className="min-h-0 flex-1 px-6 pt-6">
         <ChatMessages
+          entries={entries}
+          isRunning={isRunning}
           messageEntries={messageEntries}
+          sessionId={activeSessionId ?? ""}
           streamingEntryId={streamingEntryId}
           toolStates={toolStates}
         />
@@ -57,7 +67,8 @@ function useActiveSessionChat() {
   const activeSession = activeSessionId
     ? sessions.find((session) => session.id === activeSessionId)
     : undefined;
-  const messageEntries = (activeSession?.entries ?? []).filter(isAgentMessageEntry);
+  const entries = activeSession?.entries ?? [];
+  const messageEntries = entries.filter(isAgentMessageEntry);
   const toolStates = activeSession?.toolStates ?? EMPTY_TOOL_STATES;
 
   const submitPrompt = useCallback(
@@ -101,6 +112,7 @@ function useActiveSessionChat() {
   }, [activeSessionId, invoke]);
 
   return {
+    entries,
     isRunning: (activeSession?.status ?? "idle") === "running",
     messageEntries,
     streamingEntryId: activeSessionId
