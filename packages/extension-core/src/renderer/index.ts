@@ -1,11 +1,11 @@
-export { RendererExtensionBridge } from "./bridge.js";
-export { defineRendererExtension } from "./define.js";
-export { useArtifact, useAssistantBlock, useExtensions, usePluginSlashCommands } from "./hooks.js";
-export { parseExtensionParts } from "./parser.js";
-export { ExtensionProvider, useExtensionRegistry } from "./provider.js";
-export { RendererExtensionRegistry } from "./registry.js";
+export { RendererExtensionBridge } from "./bridge";
+export { defineRendererExtension } from "./define";
+export { useArtifact, useAssistantBlock, useExtensions, usePluginSlashCommands } from "./hooks";
+export { parseExtensionParts } from "./parser";
+export { ExtensionProvider, useExtensionRegistry } from "./provider";
+export { RendererExtensionRegistry } from "./registry";
 
-export type { InstalledRendererExtension } from "./bridge.js";
+export type { InstalledRendererExtension } from "./bridge";
 export type {
   ArtifactRegistration,
   ArtifactRenderProps,
@@ -15,5 +15,5 @@ export type {
   RendererExtensionDefinition,
   RendererSlashCommand,
   RendererSlashCommandRunContext,
-} from "./define.js";
-export type { ParsedExtensionPart } from "./parser.js";
+} from "./define";
+export type { ParsedExtensionPart } from "./parser";

@@ -1,6 +1,6 @@
 import type { ExtensionManifest } from "../manifest.js";
-import type { RendererExtensionDefinition } from "./define.js";
-import { RendererExtensionRegistry } from "./registry.js";
+import type { RendererExtensionDefinition } from "./define";
+import { RendererExtensionRegistry } from "./registry";
 
 export interface InstalledRendererExtension {
   manifest: ExtensionManifest;

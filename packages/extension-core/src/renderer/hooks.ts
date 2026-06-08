@@ -1,4 +1,4 @@
-import { useExtensionRegistry } from "./provider.js";
+import { useExtensionRegistry } from "./provider";
 
 export function useExtensions() {
   const registry = useExtensionRegistry();

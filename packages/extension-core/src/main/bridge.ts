@@ -1,6 +1,6 @@
 import type { ExtensionManifest } from "../manifest.js";
-import type { MainExtensionDefinition } from "./define.js";
-import { MainExtensionRegistry } from "./registry.js";
+import type { MainExtensionDefinition } from "./define";
+import { MainExtensionRegistry } from "./registry";
 
 export interface InstalledMainExtension {
   manifest: ExtensionManifest;

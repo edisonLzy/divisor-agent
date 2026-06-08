@@ -3,7 +3,7 @@ import type {
   ArtifactRegistration,
   AssistantBlockRegistration,
   RendererSlashCommand,
-} from "./define.js";
+} from "./define";
 
 export class RendererExtensionRegistry {
   private extensions = new Map<string, ExtensionManifest>();

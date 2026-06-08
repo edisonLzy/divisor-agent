@@ -1,7 +1,7 @@
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 
 import type { ExtensionManifest } from "../manifest.js";
-import type { MainSystemPromptRegistration } from "./define.js";
+import type { MainSystemPromptRegistration } from "./define";
 
 export class MainExtensionRegistry {
   private extensions = new Map<string, ExtensionManifest>();

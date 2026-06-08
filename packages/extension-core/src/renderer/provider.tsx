@@ -1,9 +1,9 @@
 import { createContext, useContext, useMemo } from "react";
 import type { ReactNode } from "react";
 
-import { RendererExtensionBridge } from "./bridge.js";
-import type { InstalledRendererExtension } from "./bridge.js";
-import type { RendererExtensionRegistry } from "./registry.js";
+import { RendererExtensionBridge } from "./bridge";
+import type { InstalledRendererExtension } from "./bridge";
+import type { RendererExtensionRegistry } from "./registry";
 
 const ExtensionRegistryContext = createContext<RendererExtensionRegistry | null>(null);
 

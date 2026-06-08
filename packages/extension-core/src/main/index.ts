@@ -1,10 +1,10 @@
-export { MainExtensionBridge } from "./bridge.js";
-export { defineMainExtension } from "./define.js";
-export { MainExtensionRegistry } from "./registry.js";
+export { MainExtensionBridge } from "./bridge";
+export { defineMainExtension } from "./define";
+export { MainExtensionRegistry } from "./registry";
 
-export type { InstalledMainExtension } from "./bridge.js";
+export type { InstalledMainExtension } from "./bridge";
 export type {
   MainExtensionContext,
   MainExtensionDefinition,
   MainSystemPromptRegistration,
-} from "./define.js";
+} from "./define";
