@@ -29,13 +29,16 @@ export function PromptInput({
   sessionId,
 }: PromptInputProps) {
   const modelSelectorProps = useModalSelector();
+
   const permissionSelectorProps = usePermissionSelector(sessionId);
+
   const editorContainerRef = useRef<HTMLDivElement | null>(null);
-  const getFloatingReference = useCallback(() => editorContainerRef.current, []);
+
   const { editor, hasContent } = useChatEditor({
     disabled: disabled || isRunning,
-    getFloatingReference,
+    getFloatingReference: () => editorContainerRef.current,
   });
+
   const canSubmit = !disabled && !isRunning && hasContent && modelSelectorProps.value !== null;
   const isStopEnabled = isRunning && typeof onStop === "function";
 

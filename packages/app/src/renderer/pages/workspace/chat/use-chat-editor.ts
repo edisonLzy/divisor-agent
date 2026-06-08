@@ -1,3 +1,5 @@
+import { usePluginSlashCommands } from "@divisor-agent/extension-core/renderer";
+import { promptGhostSuggestionExtension } from "@renderer/components/richtext/extensions/prompt-ghost-suggestion";
 import {
   type SlashCommandSelection,
   useSlashCommandsExtension,
@@ -9,7 +11,7 @@ import type { AgentUserMessage } from "@renderer/store";
 import Placeholder from "@tiptap/extension-placeholder";
 import { useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface VirtualElement {
   getBoundingClientRect: () => DOMRect;
@@ -23,8 +25,25 @@ interface UseChatEditorOptions {
 
 export function useChatEditor({ content, disabled, getFloatingReference }: UseChatEditorOptions) {
   const [hasContent, setHasContent] = useState(false);
-  const slashCommands = useSkillsCommandItems();
-  const handleSelectCommand = useCallback(({ command, editor, range }: SlashCommandSelection) => {
+
+  const skillItems = useSkillsCommandItems();
+  const pluginCommands = usePluginSlashCommands();
+  const pluginItems = useMemo(
+    () =>
+      pluginCommands.map(
+        (cmd): CommandItem => ({
+          id: cmd.id,
+          group: cmd.group,
+          name: cmd.name,
+          description: cmd.description,
+          extra: cmd.extra,
+        }),
+      ),
+    [pluginCommands],
+  );
+  const slashCommands = [...skillItems, ...pluginItems];
+
+  const handleSelectCommand = ({ command, editor, range }: SlashCommandSelection) => {
     if (command.group === "Skills") {
       insertSkillNode({
         editor,
@@ -34,14 +53,26 @@ export function useChatEditor({ content, disabled, getFloatingReference }: UseCh
           label: command.name,
         },
       });
+      return;
     }
-  }, []);
+
+    const pluginCommand = pluginCommands.find((item) => item.id === command.id);
+    if (!pluginCommand) {
+      return;
+    }
+
+    void pluginCommand.run({ editor, range });
+  };
+
   const slashCommandsExtension = useSlashCommandsExtension({
     commands: slashCommands,
     getFloatingReference,
     onSelectCommand: handleSelectCommand,
   });
-  const extensions = useMemo(() => [slashCommandsExtension], [slashCommandsExtension]);
+  const extensions = useMemo(
+    () => [slashCommandsExtension, promptGhostSuggestionExtension],
+    [slashCommandsExtension],
+  );
 
   const editor = useEditor(
     {
@@ -57,7 +88,7 @@ export function useChatEditor({ content, disabled, getFloatingReference }: UseCh
         Placeholder.configure({
           placeholder: "Ask anything...",
         }),
-        ...extensions,
+        ...(extensions ?? []),
         skillNode,
       ],
       content,
@@ -75,7 +106,7 @@ export function useChatEditor({ content, disabled, getFloatingReference }: UseCh
         setHasContent(nextEditor.getText().trim().length > 0);
       },
     },
-    [content, extensions],
+    [content],
   );
 
   useEffect(() => {

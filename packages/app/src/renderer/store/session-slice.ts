@@ -61,15 +61,18 @@ export const createSessionsSlice: StateCreator<SessionsStoreState, [], [], Sessi
       const activeSessionId = prev.activeSessionId === sessionId ? null : prev.activeSessionId;
       const streamingEntryIds = new Map(prev.streamingEntryIds);
       const permissionStates = new Map(prev.permissionStates);
+      const artifactStates = new Map(prev.artifactStates);
 
       streamingEntryIds.delete(sessionId);
       permissionStates.delete(sessionId);
+      artifactStates.delete(sessionId);
 
       return {
         sessions,
         activeSessionId,
         streamingEntryIds,
         permissionStates,
+        artifactStates,
       };
     });
   },

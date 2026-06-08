@@ -5,6 +5,7 @@ import { AgentModelsIPC } from "../shared/models-ipc.js";
 import { AgentSessionIPC } from "../shared/session-ipc.js";
 import { AgentSkillsIPC } from "../shared/skills-ipc.js";
 import { AgentRuntime } from "./agent-runtime.js";
+import { ExtensionService } from "./extensions/index.js";
 import { ModelRegistry } from "./models/index.js";
 import { SkillService } from "./skills/index.js";
 
@@ -20,12 +21,14 @@ export class AgentPool
   private modelRegistry: ModelRegistry;
   private runtimes: Map<string, AgentRuntime>;
   private skillService: SkillService;
+  private extensionService: ExtensionService;
 
   constructor() {
     super();
     this.modelRegistry = new ModelRegistry();
     this.runtimes = new Map();
     this.skillService = new SkillService();
+    this.extensionService = new ExtensionService();
   }
 
   // ── Runtime lifecycle ────────────────────────────────────────────────────
@@ -40,7 +43,7 @@ export class AgentPool
   }
 
   private createRuntime(sessionId: string): AgentRuntime {
-    const runtime = new AgentRuntime(this.modelRegistry, this.skillService);
+    const runtime = new AgentRuntime(this.modelRegistry, this.skillService, this.extensionService);
 
     // Re-emit all events tagged with sessionId
     runtime.onAny(({ name, data }) => {

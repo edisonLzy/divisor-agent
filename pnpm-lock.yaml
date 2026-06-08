@@ -4,6 +4,18 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+catalogs:
+  default:
+    '@tiptap/core':
+      specifier: ^3.22.5
+      version: 3.22.5
+    '@types/react':
+      specifier: ^19.2.7
+      version: 19.2.14
+    react:
+      specifier: ^19.2.1
+      version: 19.2.5
+
 importers:
 
   .:
@@ -47,6 +59,12 @@ importers:
       '@base-ui/react':
         specifier: ^1.4.1
         version: 1.4.1(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@divisor-agent/extension-core':
+        specifier: workspace:*
+        version: link:../extension-core
+      '@divisor-agent/extension-example':
+        specifier: workspace:*
+        version: link:../extensions/example
       '@electron-toolkit/preload':
         specifier: ^3.0.2
         version: 3.0.2(electron@39.8.9)
@@ -220,7 +238,7 @@ importers:
         specifier: ^22.19.1
         version: 22.19.17
       '@types/react':
-        specifier: ^19.2.7
+        specifier: 'catalog:'
         version: 19.2.14
       '@types/react-dom':
         specifier: ^19.2.3
@@ -241,7 +259,7 @@ importers:
         specifier: ^5.0.0
         version: 5.0.0(vite@7.3.2(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.3))
       react:
-        specifier: ^19.2.1
+        specifier: 'catalog:'
         version: 19.2.5
       react-dom:
         specifier: ^19.2.1
@@ -255,6 +273,42 @@ importers:
       vite:
         specifier: ^7.2.6
         version: 7.3.2(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.3)
+
+  packages/extension-core:
+    dependencies:
+      '@mariozechner/pi-agent-core':
+        specifier: ^0.68.0
+        version: 0.68.1(ws@8.20.0)(zod@4.3.6)
+      '@sinclair/typebox':
+        specifier: ^0.34.0
+        version: 0.34.49
+      '@tiptap/core':
+        specifier: 'catalog:'
+        version: 3.22.5(@tiptap/pm@3.22.5)
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.14
+      react:
+        specifier: 'catalog:'
+        version: 19.2.5
+
+  packages/extensions/example:
+    dependencies:
+      '@divisor-agent/extension-core':
+        specifier: workspace:*
+        version: link:../../extension-core
+      '@sinclair/typebox':
+        specifier: ^0.34.49
+        version: 0.34.49
+      '@tiptap/core':
+        specifier: 'catalog:'
+        version: 3.22.5(@tiptap/pm@3.22.5)
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.14
+      react:
+        specifier: 'catalog:'
+        version: 19.2.5
 
 packages:
 

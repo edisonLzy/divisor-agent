@@ -66,6 +66,7 @@ shadcn/ui (base-nova style) with 25+ components in `packages/app/src/renderer/co
 ## Key Conventions
 
 - **Server imports**: Always include `.js` extension for local TypeScript imports (ESM requirement)
+- **Workspace (source-only) package imports**: Packages like `@divisor-agent/extension-core` have no `tsc` build step and are bundled directly by Vite. Use **no extension** in relative imports (`import "./bridge"`, not `import "./bridge.js"`). Writing `.js` will not match any on-disk file at runtime and breaks the source-direct `exports` resolution.
 - **Type imports**: Use `import type { ... }` for pure type imports
 - **React imports**: React 19 + new JSX Runtime — do NOT manually `import React from 'react'` in `.tsx`/`.jsx` files
 - **Package Manager**: Strictly use `pnpm`. Use `pnpx` instead of `npx`
@@ -75,6 +76,20 @@ shadcn/ui (base-nova style) with 25+ components in `packages/app/src/renderer/co
 - **Git Hooks**: Husky + lint-staged runs `oxlint --fix` and `oxfmt --write` on staged files. Commitlint enforces conventional commits (header/body length unrestricted)
 - **Testing**: Vitest 4.x workspace mode. Each package has `vitest.config.ts` with `__tests__/` directory. Tests use `vi.mock()` with hoisted mocks
 - **Production build**: Server uses `packages/server/tsconfig.build.json` (excludes tests)
+
+### Workspace packages and electron-vite externalization
+
+`@divisor-agent/extension-core` and any other workspace packages are **source-only** — their `package.json` `exports` point at `.ts` files, no `tsc` build step. electron-vite's `externalizeDeps` plugin externalizes every entry in `dependencies` by default, which leaves the main bundle with `import "@divisor-agent/extension-core/main"` statements that Node ESM then tries to resolve to `.ts` source at runtime — and fails with `ERR_MODULE_NOT_FOUND`, because no tsx loader is registered for the spawned Electron process in dev mode.
+
+To keep workspace packages bundled into the main output, list each one explicitly under `build.externalizeDeps.exclude` in `packages/app/electron.vite.config.ts`:
+
+```ts
+externalizeDeps: {
+  exclude: ["@divisor-agent/extension-core", "@divisor-agent/extension-example"],
+}
+```
+
+`exclude` accepts string package names only — electron-vite's filter uses `Array.includes()`, regex is not supported. **When adding a new workspace package that the main process imports, add its name to the list above.** The `externalizeDepsPlugin` also emits a `^(pkgA|pkgB|...)/.+` alternation regex covering sub-paths of those packages, but that is handled by the `exclude` strings — no extra config is needed for `package-name/subpath` imports.
 
 ## Tech Stack Quick Reference
 

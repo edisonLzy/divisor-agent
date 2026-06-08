@@ -8,6 +8,7 @@ import type { AgentModelsIPC } from "../shared/models-ipc.js";
 import type { PermissionMode } from "../shared/permissions-ipc.js";
 import type { AgentSessionIPC } from "../shared/session-ipc.js";
 import type { AgentSkillsIPC } from "../shared/skills-ipc.js";
+import { ExtensionService } from "./extensions/extension-service.js";
 import { ModelRegistry } from "./models/index.js";
 import { PermissionService } from "./permissions/index.js";
 import { SystemPromptService } from "./prompt/index.js";
@@ -78,12 +79,15 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
   constructor(
     private modelRegistry = new ModelRegistry(),
     private skillService: SkillService,
+    private extensionService: ExtensionService,
   ) {
     super();
     this.permissionMode = "default";
     this.permissionService = new PermissionService();
     this.systemPromptService = new SystemPromptService();
     this.systemPromptService.addBuilder(this.skillService);
+    this.systemPromptService.addBuilder(this.extensionService);
+
     this.agent = this.createInternalAgent();
   }
 
@@ -139,7 +143,12 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
       },
       initialState: {
         systemPrompt: this.systemPromptService.buildSystemPrompt(""),
-        tools: [fsReadTextFileTool, fsWriteTextFileTool, terminalCreateTool],
+        tools: [
+          fsReadTextFileTool,
+          fsWriteTextFileTool,
+          terminalCreateTool,
+          ...this.extensionService.getTools(),
+        ],
       },
     });
 

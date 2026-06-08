@@ -1,0 +1,18 @@
+{
+  "name": "@divisor-agent/extension-core",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./common": "./src/common/index.ts",
+    "./manifest": "./src/manifest.ts",
+    "./main": "./src/main/index.ts",
+    "./renderer": "./src/renderer/index.ts"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-agent-core": "^0.68.0",
+    "@sinclair/typebox": "^0.34.0",
+    "@tiptap/core": "catalog:",
+    "@types/react": "catalog:",
+    "react": "catalog:"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@divisor-agent/extension-example",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./manifest": "./src/manifest.ts",
+    "./main": "./src/main.ts",
+    "./renderer": "./src/renderer.tsx"
+  },
+  "dependencies": {
+    "@divisor-agent/extension-core": "workspace:*",
+    "@sinclair/typebox": "^0.34.49"
+  },
+  "peerDependencies": {
+    "@tiptap/core": "catalog:",
+    "@types/react": "catalog:",
+    "react": "catalog:"
+  }
+}
