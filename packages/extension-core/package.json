@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "exports": {
+    "./common": "./src/common/index.ts",
     "./manifest": "./src/manifest.ts",
     "./main": "./src/main/index.ts",
     "./renderer": "./src/renderer/index.ts"

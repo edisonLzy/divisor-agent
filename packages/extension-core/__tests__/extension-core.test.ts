@@ -1,4 +1,8 @@
 import {
+  formatAssistantBlockFence,
+  parseAssistantBlockPayload,
+} from "@divisor-agent/extension-core/common";
+import {
   defineMainExtension,
   MainExtensionBridge,
   type InstalledMainExtension,
@@ -137,5 +141,39 @@ after`);
     const content = '```divisor-block\n{"props":{}}\n```';
 
     expect(parseExtensionParts(content)).toEqual([{ kind: "text", text: content }]);
+  });
+
+  it("formats assistant block fences", () => {
+    expect(
+      formatAssistantBlockFence({
+        props: { title: "Hello" },
+        type: "example.card",
+      }),
+    ).toBe('```divisor-block\n{"type":"example.card","props":{"title":"Hello"}}\n```');
+  });
+
+  it("parses assistant block payloads", () => {
+    expect(
+      parseAssistantBlockPayload('{"type":"example.card","props":{"title":"Hello"}}', false),
+    ).toEqual({
+      payload: {
+        props: { title: "Hello" },
+        raw: '{"type":"example.card","props":{"title":"Hello"}}',
+        type: "example.card",
+      },
+      status: "ready",
+    });
+  });
+
+  it("tracks incomplete assistant block payloads while streaming", () => {
+    expect(parseAssistantBlockPayload('{"type":"example.card","props":{', true)).toEqual({
+      raw: '{"type":"example.card","props":{',
+      status: "pending",
+    });
+
+    expect(parseAssistantBlockPayload('{"type":"example.card","props":{', false)).toEqual({
+      raw: '{"type":"example.card","props":{',
+      status: "invalid",
+    });
   });
 });

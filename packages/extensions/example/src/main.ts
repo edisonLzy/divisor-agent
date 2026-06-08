@@ -1,10 +1,14 @@
+import { formatAssistantBlockFence } from "@divisor-agent/extension-core/common";
 import { defineMainExtension } from "@divisor-agent/extension-core/main";
 import { Type } from "@sinclair/typebox";
 
 export default defineMainExtension((ctx) => {
   ctx.systemPrompt.register({
     id: "example.prompt",
-    content: "When useful, emit divisor-block JSON blocks of type example.card.",
+    content: `When useful, emit assistant UI as a fenced divisor-block code block of type example.card. Do not emit bare JSON.
+
+Example:
+${formatAssistantBlockFence({ props: { title: "Hello" }, type: "example.card" })}`,
   });
 
   ctx.tools.register({
