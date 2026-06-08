@@ -8,6 +8,7 @@ import type { AgentModelsIPC } from "../shared/models-ipc.js";
 import type { PermissionMode } from "../shared/permissions-ipc.js";
 import type { AgentSessionIPC } from "../shared/session-ipc.js";
 import type { AgentSkillsIPC } from "../shared/skills-ipc.js";
+import { ExtensionService } from "./extensions/extension-service.js";
 import { ModelRegistry } from "./models/index.js";
 import { PermissionService } from "./permissions/index.js";
 import { SystemPromptService } from "./prompt/index.js";
@@ -63,11 +64,6 @@ type AgentRuntimeEvents = {
   [K in keyof AllowedMainExposeEvents]: Omit<AllowedMainExposeEvents[K], "sessionId">;
 };
 
-interface ExtensionRuntimeService {
-  getSystemPrompts(): string[];
-  getTools(): AppTool<any>[];
-}
-
 /**
  * Per-session runtime that manages a single Agent instance.
  *
@@ -83,13 +79,15 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
   constructor(
     private modelRegistry = new ModelRegistry(),
     private skillService: SkillService,
-    private extensionService: ExtensionRuntimeService = createEmptyExtensionService(),
+    private extensionService: ExtensionService,
   ) {
     super();
     this.permissionMode = "default";
     this.permissionService = new PermissionService();
     this.systemPromptService = new SystemPromptService();
     this.systemPromptService.addBuilder(this.skillService);
+    this.systemPromptService.addBuilder(this.extensionService);
+
     this.agent = this.createInternalAgent();
   }
 
@@ -144,7 +142,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
         return this.modelRegistry.resolveApiKey(provider);
       },
       initialState: {
-        systemPrompt: this.buildSystemPrompt(),
+        systemPrompt: this.systemPromptService.buildSystemPrompt(""),
         tools: [
           fsReadTextFileTool,
           fsWriteTextFileTool,
@@ -186,7 +184,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
       await this.setModel(metadata.model);
     }
 
-    this.agent.state.systemPrompt = this.buildSystemPrompt();
+    this.agent.state.systemPrompt = this.systemPromptService.buildSystemPrompt("");
     this.agent.prompt(this.skillService.expandSkillReferences(content, metadata.skillIds ?? []));
   };
 
@@ -225,21 +223,8 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
   public destroy() {
     this.clearListeners();
   }
-
-  private buildSystemPrompt() {
-    return this.systemPromptService.buildSystemPrompt(
-      this.extensionService.getSystemPrompts().join("\n\n"),
-    );
-  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function createEmptyExtensionService(): ExtensionRuntimeService {
-  return {
-    getSystemPrompts: () => [],
-    getTools: () => [],
-  };
 }
