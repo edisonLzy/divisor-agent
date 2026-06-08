@@ -13,27 +13,35 @@ import {
 } from "@renderer/components/ui/collapsible";
 import { Separator } from "@renderer/components/ui/separator";
 import { cn } from "@renderer/lib/utils";
-import type { ToolExecutionState } from "@renderer/store";
+import type { SessionEntry, ToolExecutionState } from "@renderer/store";
 import { ChevronRightIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AssistantResponseMessage } from "./assistant-response-message";
 import { AssistantThinkingMessage } from "./assistant-thinking-message";
 import { AssistantToolMessage } from "./assistant-tool-message";
-import { MessageToolbar, MessageToolbarMenuButton } from "./message-toolbar";
+import { CopyMessageButton } from "./toolbar/copy-message-button";
+import { ForkMessageButton } from "./toolbar/fork-message-button";
+import { MessageToolbar } from "./toolbar/message-toolbar";
 
 interface AssistantMessageProps {
   completedAt?: number;
+  entries: SessionEntry[];
+  entryId: string;
   isStreaming: boolean;
   message: AssistantMessageType;
+  sessionId: string;
   startedAt: number;
   toolStates: Map<string, ToolExecutionState>;
 }
 
 export function AssistantMessage({
   completedAt,
+  entries,
+  entryId,
   isStreaming,
   message,
+  sessionId,
   startedAt,
   toolStates,
 }: AssistantMessageProps) {
@@ -56,6 +64,8 @@ export function AssistantMessage({
     { processingContent: [], textContent: [] },
   );
 
+  const assistantText = textContent.map((block) => block.text).join("\n");
+
   const [isProcessingOpen, setIsProcessingOpen] = useState(true);
 
   useEffect(() => {
@@ -63,7 +73,7 @@ export function AssistantMessage({
   }, [textContent.length]);
 
   return (
-    <Message from="assistant">
+    <Message from="assistant" className="gap-1">
       <Collapsible open={isProcessingOpen} onOpenChange={(open) => setIsProcessingOpen(open)}>
         <div className="flex flex-col gap-2">
           <CollapsibleTrigger className="group/trigger flex cursor-pointer items-center gap-1.5">
@@ -118,7 +128,8 @@ export function AssistantMessage({
 
       {!hasError ? (
         <MessageToolbar align="start">
-          <MessageToolbarMenuButton align="start" />
+          <CopyMessageButton text={assistantText} />
+          <ForkMessageButton sessionId={sessionId} entries={entries} targetEntryId={entryId} />
         </MessageToolbar>
       ) : null}
     </Message>
