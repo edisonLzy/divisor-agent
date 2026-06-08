@@ -9,11 +9,13 @@ import type { CommandItem } from "@renderer/components/richtext/types";
 import { Button } from "@renderer/components/ui/button";
 import { useAgentSkills } from "@renderer/hooks/use-agent-skills";
 import { cn } from "@renderer/lib/utils";
-import type { AnyExtension } from "@tiptap/core";
+import { Extension, type AnyExtension } from "@tiptap/core";
 import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { ArrowUp, Square } from "lucide-react";
+import { Plugin, PluginKey, type EditorState } from "prosemirror-state";
+import { Decoration, DecorationSet } from "prosemirror-view";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { PromptSubmission } from "../prompt-types";
@@ -58,7 +60,10 @@ export function PromptInput({
     getFloatingReference,
     onSelectCommand: handleSelectCommand,
   });
-  const promptExtensions = useMemo(() => [slashCommandsExtension], [slashCommandsExtension]);
+  const promptExtensions = useMemo(
+    () => [slashCommandsExtension, ghostSuggestionExtension],
+    [slashCommandsExtension],
+  );
   const editor = usePromptInputEditor({
     disabled: disabled || isRunning,
     extensions: promptExtensions,
@@ -224,6 +229,98 @@ function usePromptInputEditor({
   }, [disabled, editor]);
 
   return editor;
+}
+
+const GHOST_SUGGESTIONS = [
+  "fix the failing tests",
+  "explain this code path",
+  "implement this feature and run type-check",
+  "review the recent changes",
+  "summarize this repository",
+  "create a small refactor plan",
+];
+
+const ghostSuggestionPluginKey = new PluginKey<{ suffix: string }>("promptGhostSuggestion");
+
+const ghostSuggestionExtension = Extension.create({
+  name: "promptGhostSuggestion",
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: ghostSuggestionPluginKey,
+        state: {
+          init: (_, state) => ({ suffix: getGhostSuggestionSuffix(state.doc.textContent) }),
+          apply: (_, _value, _oldState, newState) => ({
+            suffix: getGhostSuggestionSuffix(newState.doc.textContent),
+          }),
+        },
+        props: {
+          decorations(state) {
+            const pluginState = ghostSuggestionPluginKey.getState(state);
+
+            if (!pluginState?.suffix || !isCursorAtDocumentEnd(state)) {
+              return DecorationSet.empty;
+            }
+
+            const widget = Decoration.widget(
+              state.selection.from,
+              () => {
+                const element = document.createElement("span");
+                element.className = "prompt-ghost-suggestion";
+                element.textContent = pluginState.suffix;
+                return element;
+              },
+              { side: 1 },
+            );
+
+            return DecorationSet.create(state.doc, [widget]);
+          },
+          handleKeyDown(view, event) {
+            if (event.key !== "Tab" && event.key !== "ArrowRight") {
+              return false;
+            }
+
+            const pluginState = ghostSuggestionPluginKey.getState(view.state);
+
+            if (!pluginState?.suffix || !isCursorAtDocumentEnd(view.state)) {
+              return false;
+            }
+
+            event.preventDefault();
+            view.dispatch(view.state.tr.insertText(pluginState.suffix));
+            return true;
+          },
+        },
+      }),
+    ];
+  },
+});
+
+function getGhostSuggestionSuffix(text: string) {
+  const normalizedText = text.trimStart().toLowerCase();
+
+  if (normalizedText.length < 2) {
+    return "";
+  }
+
+  const suggestion = GHOST_SUGGESTIONS.find((item) => item.startsWith(normalizedText));
+
+  if (!suggestion || suggestion === normalizedText) {
+    return "";
+  }
+
+  return suggestion.slice(normalizedText.length);
+}
+
+function isCursorAtDocumentEnd(state: EditorState) {
+  const { selection } = state;
+
+  return (
+    selection.empty &&
+    selection.$from.parentOffset === selection.$from.parent.content.size &&
+    selection.$from.after() === state.doc.content.size
+  );
 }
 
 function useSkillsCommandItems() {
