@@ -6,7 +6,6 @@ import type { ExtensionManifest } from "../manifest.js";
 export interface RendererSlashCommandRunContext {
   editor: Editor;
   range: Range;
-  submitPrompt(text: string): void;
 }
 
 export interface RendererSlashCommand {
