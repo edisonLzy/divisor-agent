@@ -35,6 +35,12 @@ function getToolState(sessionId: string, toolCallId: string) {
   return sessionStore.getState().getSession(sessionId)?.toolStates.get(toolCallId);
 }
 
+function getSideChatToolState(mainSessionId: string, sideChatId: string, toolCallId: string) {
+  const state = sessionStore.getState().sideChatStates.get(mainSessionId);
+  if (!state) return undefined;
+  return state.sideChats.find((sc) => sc.id === sideChatId)?.toolStates.get(toolCallId);
+}
+
 function findMissingFailureMessage(
   session: AgentSession,
   messages: unknown[],
@@ -51,6 +57,25 @@ function findMissingFailureMessage(
   });
 }
 
+// ── Side chat helpers ────────────────────────────────────────────────────────
+
+type SessionScope =
+  | { type: "main"; sessionId: string }
+  | { type: "sidechat"; mainSessionId: string; sideChatId: string }
+  | null;
+
+function resolveScope(sessionId: string): SessionScope {
+  const store = sessionStore.getState();
+  if (store.isSideChatSession(sessionId)) {
+    const mainSessionId = store.getMainSessionId(sessionId);
+    if (!mainSessionId) return null;
+    return { type: "sidechat", mainSessionId, sideChatId: sessionId };
+  }
+  const session = store.getSession(sessionId);
+  if (!session) return null;
+  return { type: "main", sessionId };
+}
+
 // ── Hook ────────────────────────────────────────────────────────────────────
 
 /**
@@ -58,8 +83,7 @@ function findMissingFailureMessage(
  * Handles multi-turn conversation merging, tool execution state, streaming updates,
  * and entry persistence.
  *
- * Lives at WorkspacePage level so events from all sessions (not just the active one)
- * are captured.
+ * Now also routes events to side chat sessions.
  */
 export function useAgentMessages() {
   const turnContentStartIndicesRef = useRef<Record<string, number>>({});
@@ -68,11 +92,37 @@ export function useAgentMessages() {
   useSubscribeAgentEvents({
     agent_start: (event) => {
       const { sessionId } = event;
+      const scope = resolveScope(sessionId);
+      if (!scope) return;
+
+      if (scope.type === "sidechat") {
+        sessionStore.getState().setSideChatStatus(scope.mainSessionId, scope.sideChatId, "running");
+        return;
+      }
+
       hasPersistedRef.current[sessionId] = false;
     },
 
     agent_end: async (event) => {
       const { sessionId } = event;
+      const scope = resolveScope(sessionId);
+      if (!scope) return;
+
+      // ── Side chat: no persistence, just update status ──
+      if (scope.type === "sidechat") {
+        const status = event.messages.some(isFailedAssistantMessage) ? "failed" : "completed";
+        sessionStore.getState().setSideChatStatus(scope.mainSessionId, scope.sideChatId, status);
+        sessionStore
+          .getState()
+          .setSideChatStreamingCompletedAt(scope.mainSessionId, scope.sideChatId);
+        turnContentStartIndicesRef.current[sessionId] = 0;
+        sessionStore
+          .getState()
+          .setSideChatStreamingEntryId(scope.mainSessionId, scope.sideChatId, undefined);
+        return;
+      }
+
+      // ── Main session: existing logic ──
       let session = sessionStore.getState().getSession(sessionId);
       if (!session) return;
 
@@ -87,7 +137,6 @@ export function useAgentMessages() {
         if (!session) return;
       }
 
-      // ── Persist new entries to server ──
       if (!hasPersistedRef.current[sessionId]) {
         hasPersistedRef.current[sessionId] = true;
 
@@ -123,6 +172,26 @@ export function useAgentMessages() {
 
     turn_start: (event) => {
       const { sessionId } = event;
+      const scope = resolveScope(sessionId);
+      if (!scope) return;
+
+      if (scope.type === "sidechat") {
+        // Track turn start for multi-turn in side chat
+        const streamingEntryId = sessionStore.getState().streamingEntryIds.get(sessionId);
+        if (streamingEntryId) {
+          const state = sessionStore.getState().sideChatStates.get(scope.mainSessionId);
+          const sideChat = state?.sideChats.find((sc) => sc.id === scope.sideChatId);
+          if (sideChat) {
+            const entry = sideChat.entries.find((e) => e.id === streamingEntryId);
+            if (entry && isAgentMessageEntry(entry) && entry.data.role === "assistant") {
+              turnContentStartIndicesRef.current[sessionId] = (entry.data.content ?? []).length;
+            }
+          }
+        }
+        return;
+      }
+
+      // Main session
       const session = sessionStore.getState().getSession(sessionId);
       if (!session) return;
 
@@ -140,18 +209,26 @@ export function useAgentMessages() {
       const { sessionId, message } = event;
       if (message.role === "toolResult") return;
 
-      if (message.role === "user") {
-        return;
-      }
+      const scope = resolveScope(sessionId);
+      if (!scope) return;
+
+      if (message.role === "user") return;
 
       if (message.role === "assistant") {
         const turnStartIdx = turnContentStartIndicesRef.current[sessionId] ?? 0;
         if (turnStartIdx === 0) {
-          // First assistant turn — create a new entry
-          const entryId = sessionStore.getState().appendMessageEntry(sessionId, message);
-          sessionStore.getState().setStreamingEntryId(sessionId, entryId);
+          if (scope.type === "sidechat") {
+            const entryId = sessionStore
+              .getState()
+              .appendSideChatEntry(scope.mainSessionId, scope.sideChatId, message);
+            sessionStore
+              .getState()
+              .setSideChatStreamingEntryId(scope.mainSessionId, scope.sideChatId, entryId);
+          } else {
+            const entryId = sessionStore.getState().appendMessageEntry(sessionId, message);
+            sessionStore.getState().setStreamingEntryId(sessionId, entryId);
+          }
         }
-        // Subsequent turn — streamingEntryId already set, no-op here
       }
     },
 
@@ -159,6 +236,61 @@ export function useAgentMessages() {
       const { sessionId, message } = event;
       if (message.role !== "assistant") return;
 
+      const scope = resolveScope(sessionId);
+      if (!scope) return;
+
+      if (scope.type === "sidechat") {
+        const state = sessionStore.getState().sideChatStates.get(scope.mainSessionId);
+        if (!state) return;
+        const sideChat = state.sideChats.find((sc) => sc.id === scope.sideChatId);
+        if (!sideChat) return;
+
+        const streamingEntryId = sessionStore.getState().streamingEntryIds.get(sessionId);
+        if (!streamingEntryId) return;
+
+        const entry = sideChat.entries.find((e) => e.id === streamingEntryId);
+        if (!entry || !isAgentMessageEntry(entry) || entry.data.role !== "assistant") return;
+
+        const turnStartIdx = turnContentStartIndicesRef.current[sessionId] ?? 0;
+
+        if (turnStartIdx === 0) {
+          sessionStore
+            .getState()
+            .updateSideChatEntry(scope.mainSessionId, scope.sideChatId, streamingEntryId, message);
+        } else {
+          const existingContent = entry.data.content ?? [];
+          sessionStore
+            .getState()
+            .updateSideChatEntry(scope.mainSessionId, scope.sideChatId, streamingEntryId, {
+              ...message,
+              content: [
+                ...existingContent.slice(0, turnStartIdx),
+                ...message.content,
+              ] as AssistantMessage["content"],
+            });
+        }
+
+        for (const block of message.content) {
+          if (block.type === "toolCall") {
+            const tc = block as ToolCall;
+            const existing = getSideChatToolState(scope.mainSessionId, scope.sideChatId, tc.id);
+            if (!existing) {
+              sessionStore
+                .getState()
+                .setSideChatToolState(scope.mainSessionId, scope.sideChatId, tc.id, {
+                  toolCallId: tc.id,
+                  toolName: tc.name,
+                  status: "running",
+                  args: tc.arguments,
+                  output: "",
+                });
+            }
+          }
+        }
+        return;
+      }
+
+      // Main session
       const session = sessionStore.getState().getSession(sessionId);
       if (!session) return;
 
@@ -207,6 +339,49 @@ export function useAgentMessages() {
       const { sessionId, message } = event;
       if (message.role !== "assistant") return;
 
+      const scope = resolveScope(sessionId);
+      if (!scope) return;
+
+      if (scope.type === "sidechat") {
+        const state = sessionStore.getState().sideChatStates.get(scope.mainSessionId);
+        if (!state) return;
+        const sideChat = state.sideChats.find((sc) => sc.id === scope.sideChatId);
+        if (!sideChat) return;
+
+        const streamingEntryId = sessionStore.getState().streamingEntryIds.get(sessionId);
+        if (!streamingEntryId) return;
+
+        const entry = sideChat.entries.find((e) => e.id === streamingEntryId);
+        if (!entry || !isAgentMessageEntry(entry) || entry.data.role !== "assistant") return;
+
+        const turnStartIdx = turnContentStartIndicesRef.current[sessionId] ?? 0;
+        const assistantMsg = message as AssistantMessage;
+
+        if (turnStartIdx === 0) {
+          sessionStore
+            .getState()
+            .updateSideChatEntry(
+              scope.mainSessionId,
+              scope.sideChatId,
+              streamingEntryId,
+              assistantMsg,
+            );
+        } else {
+          const existingContent = entry.data.content ?? [];
+          sessionStore
+            .getState()
+            .updateSideChatEntry(scope.mainSessionId, scope.sideChatId, streamingEntryId, {
+              ...assistantMsg,
+              content: [
+                ...existingContent.slice(0, turnStartIdx),
+                ...assistantMsg.content,
+              ] as AssistantMessage["content"],
+            });
+        }
+        return;
+      }
+
+      // Main session
       const session = sessionStore.getState().getSession(sessionId);
       if (!session) return;
 
@@ -238,9 +413,26 @@ export function useAgentMessages() {
 
     tool_execution_start: (event) => {
       const { sessionId, toolCallId, toolName, args } = event;
+      const scope = resolveScope(sessionId);
+      if (!scope) return;
+
+      if (scope.type === "sidechat") {
+        const existing = getSideChatToolState(scope.mainSessionId, scope.sideChatId, toolCallId);
+        if (existing) return;
+        sessionStore
+          .getState()
+          .setSideChatToolState(scope.mainSessionId, scope.sideChatId, toolCallId, {
+            toolCallId,
+            toolName,
+            status: "running",
+            args,
+            output: "",
+          });
+        return;
+      }
+
       const existing = getToolState(sessionId, toolCallId);
       if (existing) return;
-
       sessionStore.getState().setToolState(sessionId, toolCallId, {
         toolCallId,
         toolName,
@@ -252,9 +444,28 @@ export function useAgentMessages() {
 
     tool_execution_update: (event) => {
       const { sessionId, toolCallId, toolName, args } = event;
+      const scope = resolveScope(sessionId);
+      if (!scope) return;
+
+      if (scope.type === "sidechat") {
+        const existing = getSideChatToolState(scope.mainSessionId, scope.sideChatId, toolCallId);
+        if (!existing) return;
+        sessionStore
+          .getState()
+          .setSideChatToolState(scope.mainSessionId, scope.sideChatId, toolCallId, {
+            toolCallId,
+            toolName,
+            status: "running",
+            args,
+            output: existing.output ?? "",
+            requestId: existing.requestId,
+            approvalStatus: existing.approvalStatus,
+          });
+        return;
+      }
+
       const existing = getToolState(sessionId, toolCallId);
       if (!existing) return;
-
       sessionStore.getState().setToolState(sessionId, toolCallId, {
         toolCallId,
         toolName,
@@ -273,6 +484,25 @@ export function useAgentMessages() {
         ? extractToolResultText(resultContent)
         : formatArgs(result);
 
+      const scope = resolveScope(sessionId);
+      if (!scope) return;
+
+      if (scope.type === "sidechat") {
+        const existing = getSideChatToolState(scope.mainSessionId, scope.sideChatId, toolCallId);
+        sessionStore
+          .getState()
+          .setSideChatToolState(scope.mainSessionId, scope.sideChatId, toolCallId, {
+            toolCallId,
+            toolName,
+            status: isError ? "error" : "done",
+            args: existing?.args ?? {},
+            output,
+            requestId: existing?.requestId,
+            approvalStatus: existing?.approvalStatus,
+          });
+        return;
+      }
+
       const existing = getToolState(sessionId, toolCallId);
       sessionStore.getState().setToolState(sessionId, toolCallId, {
         toolCallId,
@@ -287,8 +517,30 @@ export function useAgentMessages() {
 
     permission_requested: (event) => {
       const { sessionId, type: _type, ...request } = event;
-      const existing = getToolState(sessionId, request.toolCallId);
+      const scope = resolveScope(sessionId);
+      if (!scope) return;
 
+      if (scope.type === "sidechat") {
+        const existing = getSideChatToolState(
+          scope.mainSessionId,
+          scope.sideChatId,
+          request.toolCallId,
+        );
+        sessionStore
+          .getState()
+          .setSideChatToolState(scope.mainSessionId, scope.sideChatId, request.toolCallId, {
+            toolCallId: request.toolCallId,
+            toolName: request.toolName,
+            status: "awaiting_approval",
+            args: existing?.args ?? request.args,
+            output: existing?.output ?? "Waiting for permission approval…",
+            requestId: request.requestId,
+            approvalStatus: "pending",
+          });
+        return;
+      }
+
+      const existing = getToolState(sessionId, request.toolCallId);
       sessionStore.getState().enqueuePermissionRequest(sessionId, request);
       sessionStore.getState().setToolState(sessionId, request.toolCallId, {
         toolCallId: request.toolCallId,

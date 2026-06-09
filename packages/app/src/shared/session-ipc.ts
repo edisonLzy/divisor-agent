@@ -13,6 +13,7 @@ export interface AgentSessionIPC {
   abortPrompt: (sessionId: string) => Promise<void>;
   setHistoryMessages: (sessionId: string, messages: AgentMessage[]) => Promise<void>;
   setSessionId: (sessionId: string) => Promise<void>;
+  destroySession: (sessionId: string) => Promise<void>;
   setPermissionMode: (sessionId: string, mode: PermissionMode) => Promise<void>;
   resolvePermissionRequest: (
     sessionId: string,

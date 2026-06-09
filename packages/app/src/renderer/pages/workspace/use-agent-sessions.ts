@@ -13,11 +13,15 @@ export function useAgentSessions() {
   useSubscribeAgentEvents({
     agent_start: (event) => {
       const { sessionId } = event;
+      // Side chat sessions manage their own status
+      if (sessionStore.getState().isSideChatSession(sessionId)) return;
       sessionStore.getState().setSessionStatus(sessionId, "running");
     },
 
     agent_end: (event) => {
       const { sessionId, messages } = event;
+      // Side chat sessions manage their own status
+      if (sessionStore.getState().isSideChatSession(sessionId)) return;
       const status = messages.some(isFailedAssistantMessage) ? "failed" : "completed";
       sessionStore.getState().setSessionStatus(sessionId, status);
     },

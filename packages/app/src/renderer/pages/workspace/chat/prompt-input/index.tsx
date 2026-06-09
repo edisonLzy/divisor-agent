@@ -4,9 +4,11 @@ import {
 } from "@renderer/components/richtext/extensions/slash-commands";
 import { Button } from "@renderer/components/ui/button";
 import { cn } from "@renderer/lib/utils";
+import { sessionStore } from "@renderer/store";
 import { EditorContent } from "@tiptap/react";
 import { ArrowUp, Square } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
+import { useStore } from "zustand";
 
 import type { PromptSubmission } from "../prompt-types";
 import { useChatEditor } from "../use-chat-editor";
@@ -38,6 +40,21 @@ export function PromptInput({
     disabled: disabled || isRunning,
     getFloatingReference: () => editorContainerRef.current,
   });
+
+  // Handle pending insert text (from side chat "引用到主对话")
+  const pendingInsertText = useStore(sessionStore, (state) =>
+    sessionId ? (state.pendingInsertText.get(sessionId) ?? null) : null,
+  );
+
+  useEffect(() => {
+    if (!editor || !pendingInsertText || !sessionId) return;
+
+    // Insert at the end of the editor content
+    editor.chain().focus().insertContentAt(editor.state.doc.content.size, pendingInsertText).run();
+
+    // Clear after inserting
+    sessionStore.getState().setPendingInsertText(sessionId, null);
+  }, [editor, pendingInsertText, sessionId]);
 
   const canSubmit = !disabled && !isRunning && hasContent && modelSelectorProps.value !== null;
   const isStopEnabled = isRunning && typeof onStop === "function";

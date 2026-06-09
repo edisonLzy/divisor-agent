@@ -69,7 +69,7 @@ export function Artifacts({ activeArtifact, className, onClose }: ArtifactsProps
   );
 }
 
-function ArtifactPreview({ artifact }: { artifact: ArtifactRecord }) {
+export function ArtifactPreview({ artifact }: { artifact: ArtifactRecord }) {
   const registry = useExtensionRegistry();
   const registration = registry.getArtifact(artifact.type);
 

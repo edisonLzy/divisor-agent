@@ -47,6 +47,7 @@ export type AgentRuntimeDelegate = {
     | "getModelConfig"
     | "saveModelConfig"
     | "setSessionId"
+    | "destroySession"
     | "listSkills"
     | "setSkillEnabled"
     ? never
