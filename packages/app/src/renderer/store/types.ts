@@ -9,28 +9,13 @@ import type {
 } from "@shared/permissions-ipc";
 import type { JSONContent } from "@tiptap/core";
 
-// ── Side Chat Types ─────────────────────────────────────────────────────────
+// ── Artifact Types ──────────────────────────────────────────────────────────
+
+export type ArtifactType = "side-chat" | string;
 
 export interface SideChatContext {
   sourceEntryId: string;
   selectedText: string;
-}
-
-export interface SideChatSession {
-  id: string;
-  name: string;
-  model: AvailableModel;
-  entries: SessionEntry[];
-  status: SessionStatus;
-  toolStates: Map<string, ToolExecutionState>;
-  context: SideChatContext;
-  createdAt: number;
-}
-
-export interface SideChatState {
-  sideChats: SideChatSession[];
-  activeSideChatId: string | null;
-  isPanelOpen: boolean;
 }
 
 export type SessionStatus = "idle" | "running" | "completed" | "failed";
@@ -99,13 +84,29 @@ export interface AgentPendingSession {
   createdAt: number;
 }
 
-export interface ArtifactRecord {
+export interface SideChatArtifactContent {
+  pendingPrompt: string;
+  model?: AvailableModel;
+  entries: SessionEntry[];
+  status: SessionStatus;
+  toolStates: Map<string, ToolExecutionState>;
+  context: SideChatContext;
+  createdAt: number;
+}
+
+export interface ArtifactRecord<TContent = unknown> {
   id: string;
-  props: Record<string, unknown>;
-  raw: string;
-  type: string;
+  name: string;
+  type: ArtifactType;
+  content: TContent;
+  props?: Record<string, unknown>;
+  raw?: string;
   updatedAt: number;
 }
+
+export type SideChatArtifactRecord = ArtifactRecord<SideChatArtifactContent> & {
+  type: "side-chat";
+};
 
 export interface SessionArtifactState {
   activeArtifactId: string | null;
@@ -170,64 +171,49 @@ export interface ArtifactSlice {
   getArtifactState: (sessionId: string) => SessionArtifactState;
   setArtifactPanelOpen: (sessionId: string, isOpen: boolean) => void;
   setActiveArtifactId: (sessionId: string, artifactId: string | null) => void;
-  upsertArtifact: (sessionId: string, artifact: Omit<ArtifactRecord, "updatedAt">) => void;
-}
+  removeArtifact: (sessionId: string, artifactId: string) => void;
+  reorderArtifacts: (sessionId: string, sourceIndex: number, targetIndex: number) => void;
+  upsertArtifact: <TContent = unknown>(
+    sessionId: string,
+    artifact: Omit<ArtifactRecord<TContent>, "content" | "name" | "updatedAt"> &
+      Partial<Pick<ArtifactRecord<TContent>, "content" | "name">>,
+  ) => void;
 
-export interface SideChatSlice {
-  sideChatStates: Map<string, SideChatState>;
-  sideChatToMainMap: Map<string, string>;
-
-  getSideChatState: (mainSessionId: string) => SideChatState;
-  isSideChatSession: (sessionId: string) => boolean;
-  getMainSessionId: (sideChatId: string) => string | undefined;
-
-  createSideChat: (
+  getSideChatArtifact: (sideChatId: string) => {
+    artifact: SideChatArtifactRecord;
+    mainSessionId: string;
+  } | null;
+  isSideChatArtifactSession: (sessionId: string) => boolean;
+  createSideChatArtifact: (
     mainSessionId: string,
     context: SideChatContext,
-    model: AvailableModel,
+    model: AvailableModel | undefined,
+    pendingPrompt: string,
   ) => string;
-
-  closeSideChat: (mainSessionId: string, sideChatId: string) => void;
-  setActiveSideChat: (mainSessionId: string, sideChatId: string | null) => void;
-  setSideChatPanelOpen: (mainSessionId: string, isOpen: boolean) => void;
-
-  appendSideChatEntry: (
+  appendSideChatArtifactEntry: (
     mainSessionId: string,
-    sideChatId: string,
+    artifactId: string,
     message: AgentMessageData,
   ) => string;
-  updateSideChatEntry: (
+  updateSideChatArtifactEntry: (
     mainSessionId: string,
-    sideChatId: string,
+    artifactId: string,
     entryId: string,
     message: AssistantMessage,
   ) => void;
-  setSideChatToolState: (
+  setSideChatArtifactToolState: (
     mainSessionId: string,
-    sideChatId: string,
+    artifactId: string,
     toolCallId: string,
     state: ToolExecutionState,
   ) => void;
-  setSideChatStatus: (mainSessionId: string, sideChatId: string, status: SessionStatus) => void;
-  setSideChatStreamingEntryId: (
+  setSideChatArtifactStatus: (
     mainSessionId: string,
-    sideChatId: string,
-    entryId: string | undefined,
+    artifactId: string,
+    status: SessionStatus,
   ) => void;
-  setSideChatStreamingCompletedAt: (mainSessionId: string, sideChatId: string) => void;
-
-  /** Clean up all side chats for a main session (destroys runtimes via callback) */
-  destroySideChatsForSession: (mainSessionId: string, destroyRuntime: (id: string) => void) => void;
+  setSideChatArtifactStreamingEntryId: (artifactId: string, entryId: string | undefined) => void;
+  setSideChatArtifactStreamingCompletedAt: (mainSessionId: string, artifactId: string) => void;
 }
 
-export interface PendingInsertSlice {
-  pendingInsertText: Map<string, string>;
-  setPendingInsertText: (sessionId: string, text: string | null) => void;
-}
-
-export type SessionsStoreState = SessionsSlice &
-  EntriesSlice &
-  PermissionSlice &
-  ArtifactSlice &
-  SideChatSlice &
-  PendingInsertSlice;
+export type SessionsStoreState = SessionsSlice & EntriesSlice & PermissionSlice & ArtifactSlice;

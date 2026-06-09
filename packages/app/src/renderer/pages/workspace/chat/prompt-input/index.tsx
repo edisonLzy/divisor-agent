@@ -4,12 +4,11 @@ import {
 } from "@renderer/components/richtext/extensions/slash-commands";
 import { Button } from "@renderer/components/ui/button";
 import { cn } from "@renderer/lib/utils";
-import { sessionStore } from "@renderer/store";
 import { EditorContent } from "@tiptap/react";
 import { ArrowUp, Square } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
-import { useStore } from "zustand";
 
+import { INSERT_PROMPT_TEXT_EVENT } from "../prompt-insert-event";
 import type { PromptSubmission } from "../prompt-types";
 import { useChatEditor } from "../use-chat-editor";
 import { ModalSelector, useModalSelector } from "./modal-selector";
@@ -41,20 +40,19 @@ export function PromptInput({
     getFloatingReference: () => editorContainerRef.current,
   });
 
-  // Handle pending insert text (from side chat "引用到主对话")
-  const pendingInsertText = useStore(sessionStore, (state) =>
-    sessionId ? (state.pendingInsertText.get(sessionId) ?? null) : null,
-  );
-
   useEffect(() => {
-    if (!editor || !pendingInsertText || !sessionId) return;
+    if (!editor || !sessionId) return;
 
-    // Insert at the end of the editor content
-    editor.chain().focus().insertContentAt(editor.state.doc.content.size, pendingInsertText).run();
+    const handleInsertPromptText = (event: Event) => {
+      const detail = (event as CustomEvent<{ sessionId: string; text: string }>).detail;
+      if (!detail || detail.sessionId !== sessionId || !detail.text) return;
 
-    // Clear after inserting
-    sessionStore.getState().setPendingInsertText(sessionId, null);
-  }, [editor, pendingInsertText, sessionId]);
+      editor.chain().focus().insertContentAt(editor.state.doc.content.size, detail.text).run();
+    };
+
+    window.addEventListener(INSERT_PROMPT_TEXT_EVENT, handleInsertPromptText);
+    return () => window.removeEventListener(INSERT_PROMPT_TEXT_EVENT, handleInsertPromptText);
+  }, [editor, sessionId]);
 
   const canSubmit = !disabled && !isRunning && hasContent && modelSelectorProps.value !== null;
   const isStopEnabled = isRunning && typeof onStop === "function";

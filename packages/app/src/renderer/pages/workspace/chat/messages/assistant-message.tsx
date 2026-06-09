@@ -116,18 +116,22 @@ export function AssistantMessage({
 
   const handleOpenSideChat = useCallback(
     async (selectedText: string) => {
-      if (!model) return;
+      const text = selectedText.trim();
+      if (!text) return;
+
       setSelectionState(null);
       window.getSelection()?.removeAllRanges();
 
-      // Create side chat in store (client-side only)
+      const initialPrompt = `我正在研究主对话中的以下内容，请帮我深入分析：\n\n> ${text.split("\n").join("\n> ")}\n\n请针对以上内容进行分析和讨论。`;
       const sideChatId = sessionStore
         .getState()
-        .createSideChat(sessionId, { sourceEntryId: entryId, selectedText }, model);
+        .createSideChatArtifact(
+          sessionId,
+          { sourceEntryId: entryId, selectedText: text },
+          model,
+          initialPrompt,
+        );
 
-      const initialPrompt = `我正在研究主对话中的以下内容，请帮我深入分析：\n\n> ${selectedText.split("\n").join("\n> ")}\n\n请针对以上内容进行分析和讨论。`;
-
-      // Append user message to side chat entries
       const jsonContent = {
         type: "doc" as const,
         content: [
@@ -135,19 +139,20 @@ export function AssistantMessage({
         ],
       };
       const userMessage = createAgentUserMessage(jsonContent, initialPrompt);
-      sessionStore.getState().appendSideChatEntry(sessionId, sideChatId, userMessage);
+      sessionStore.getState().appendSideChatArtifactEntry(sessionId, sideChatId, userMessage);
 
-      // Initialize runtime and send prompt
+      if (!model) return;
+
       try {
         await invoke("setSessionId", sideChatId);
-        sessionStore.getState().setSideChatStatus(sessionId, sideChatId, "running");
+        sessionStore.getState().setSideChatArtifactStatus(sessionId, sideChatId, "running");
         void invoke("prompt", sideChatId, initialPrompt, {
           model: { modelId: model.modelId, providerId: model.providerId },
           skillIds: [],
         });
       } catch (error) {
         console.error("Failed to start side chat:", error);
-        sessionStore.getState().setSideChatStatus(sessionId, sideChatId, "idle");
+        sessionStore.getState().setSideChatArtifactStatus(sessionId, sideChatId, "idle");
       }
     },
     [sessionId, entryId, model, invoke],
@@ -232,6 +237,7 @@ export function AssistantMessage({
         {selectionState && (
           <SelectionPopup
             position={selectionState}
+            selectedText={selectionState.text}
             onOpen={handleOpenSideChat}
             onDismiss={handleDismissSelection}
           />

@@ -4,11 +4,12 @@ import { useEffect, useRef } from "react";
 
 interface SelectionPopupProps {
   position: { x: number; y: number };
+  selectedText: string;
   onOpen: (selectedText: string) => void;
   onDismiss: () => void;
 }
 
-export function SelectionPopup({ position, onOpen, onDismiss }: SelectionPopupProps) {
+export function SelectionPopup({ position, selectedText, onOpen, onDismiss }: SelectionPopupProps) {
   const popupRef = useRef<HTMLDivElement | null>(null);
 
   // Click outside to dismiss
@@ -35,10 +36,7 @@ export function SelectionPopup({ position, onOpen, onDismiss }: SelectionPopupPr
         size="sm"
         className="h-7 gap-1 rounded-lg border border-border/70 bg-background/95 px-2.5 text-xs shadow-md supports-backdrop-filter:backdrop-blur-xl"
         onClick={() => {
-          const selection = window.getSelection();
-          if (selection) {
-            onOpen(selection.toString().trim());
-          }
+          onOpen(selectedText);
         }}
       >
         <PanelRightOpen className="size-3" />
