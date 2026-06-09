@@ -37,6 +37,42 @@ Run a single test file:
 pnpm vitest run packages/server/__tests__/domain/sessions/service.test.ts
 ```
 
+## README Generation
+
+README is generated with [readme-ai](https://github.com/eli64s/readme-ai). When the project changes significantly, regenerate it:
+
+```bash
+# Ensure readme-ai is installed
+pip3 install --user --break-system-packages readmeai
+
+# Ensure .readmeaiignore exists with at minimum:
+#   node_modules/
+#   .pnpm-store/
+#   .git/
+#   .DS_Store
+#   pnpm-lock.yaml
+#   package-lock.json
+
+# Regenerate README (offline/template mode — no API key needed)
+export PATH="$HOME/Library/Python/3.14/bin:$PATH"
+readmeai \
+  --api offline \
+  --emojis default \
+  --header-style modern \
+  --align center \
+  --badge-style flat \
+  --badge-color "6366f1" \
+  --navigation-style bullet \
+  --tree-max-depth 3 \
+  -r /Users/evan/Desktop/coding/divisor-agent \
+  -o /Users/evan/Desktop/coding/divisor-agent/README.md
+```
+
+**Important notes:**
+- The `--api offline` mode generates a skeleton with badges, project tree, and template sections — but Overview, Features, and Roadmap sections are left empty/placeholder. After running readme-ai, **manually fill in** those sections with accurate project content (architecture, features, tech stack, commands, etc.).
+- The `.readmeaiignore` file prevents `node_modules` from being scanned, which would otherwise balloon the README to hundreds of megabytes.
+- The project uses **pnpm** — after generation, fix any references that readme-ai incorrectly defaults to `npm` in the Quickstart section.
+
 ## Architecture
 
 ### Communication Layers

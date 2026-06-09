@@ -1,330 +1,427 @@
-# divisor-agent
+<div id="top">
 
-桌面原生 AI Agent 应用，在 Electron 桌面环境中集成 AI 代理运行时，赋予 AI 直接操作本地文件系统和终端的能力。
+<!-- HEADER STYLE: MODERN -->
+<div align="center">
 
-## 项目架构
+<br>
 
-采用 **C/S 混合架构**，但目前客户端独立运行：
+# Divisor Agent
+
+> A desktop-native AI agent runtime for Electron — bridging AI models with your local filesystem and terminal.
+
+[![Electron][electron-badge]][electron-url]
+[![React][react-badge]][react-url]
+[![TypeScript][typescript-badge]][typescript-url]
+[![Vite][vite-badge]][vite-url]
+[![Tailwind CSS][tailwind-badge]][tailwind-url]
+[![Vitest][vitest-badge]][vitest-url]
+
+[electron-badge]: https://img.shields.io/badge/Electron-47848F.svg?style=flat&logo=Electron&logoColor=white
+[react-badge]: https://img.shields.io/badge/React-61DAFB.svg?style=flat&logo=React&logoColor=black
+[typescript-badge]: https://img.shields.io/badge/TypeScript-3178C6.svg?style=flat&logo=TypeScript&logoColor=white
+[vite-badge]: https://img.shields.io/badge/Vite-646CFF.svg?style=flat&logo=Vite&logoColor=white
+[tailwind-badge]: https://img.shields.io/badge/Tailwind%20CSS-06B6D4.svg?style=flat&logo=TailwindCSS&logoColor=white
+[vitest-badge]: https://img.shields.io/badge/Vitest-6E9F18.svg?style=flat&logo=Vitest&logoColor=white
+[electron-url]: https://www.electronjs.org/
+[react-url]: https://react.dev/
+[typescript-url]: https://www.typescriptlang.org/
+[vite-url]: https://vitejs.dev/
+[tailwind-url]: https://tailwindcss.com/
+[vitest-url]: https://vitest.dev/
+
+</div>
+
+---
+
+## 📋 Table of Contents
+
+- [Overview](#-overview)
+- [Features](#-features)
+- [Architecture](#-architecture)
+- [Tech Stack](#-tech-stack)
+- [Project Structure](#-project-structure)
+- [Getting Started](#-getting-started)
+- [Data Flow](#-data-flow)
+- [IPC Channels](#-ipc-channels)
+- [State Management](#-state-management)
+- [Status](#-status)
+- [Contributing](#-contributing)
+- [License](#-license)
+
+---
+
+## 📖 Overview
+
+Divisor Agent is a desktop AI assistant application built on **Electron 39** + **React 19**, featuring a fully integrated AI agent runtime powered by `@mariozechner/pi-agent-core`. It enables AI models to directly interact with the local filesystem and terminal through a permission-controlled tool system, all within a polished desktop UI.
+
+The application follows a **Client/Server hybrid architecture**:
+
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| **Renderer** | React 19 + Tailwind CSS 4 | Chat UI, session management, permission panels |
+| **Main Process** | Electron 39 + Agent Runtime | Agent execution, tool orchestration, IPC bridge |
+| **Server** | Express 5 + tRPC (in progress) | Session persistence, model configuration |
+
+Currently the client operates as a standalone desktop app; the server layer is under active development for session persistence and model configuration management.
+
+---
+
+## ✨ Features
+
+### 🤖 AI Agent Runtime
+- Powered by `@mariozechner/pi-agent-core`, supporting multi-turn conversations and tool calling
+- Seamless integration with multiple AI providers via a flexible model registry
+- Streaming responses with real-time thinking process display
+
+### 🛠️ Local Tool System
+- **Read File** (medium risk) — Read any file from the local filesystem
+- **Write File** (high risk) — Write content to local files
+- **Terminal** (high risk) — Execute shell commands with dangerous command detection (e.g., `rm -rf /`)
+
+### 🔒 Permission Control System
+- **Real-time permission requests** — Pop-up approval dialogs for sensitive operations
+- **"Remember this command"** — Auto-approve by command prefix
+- **Permission modes** — Default (per-request approval) / Full Access (auto-approve all)
+- **Session-scoped permissions** — Each session maintains its own approval state
+
+### 🧩 Extension System
+- Dynamic extension discovery from `~/.pi/extensions/`
+- Extension registry with lifecycle management
+- Plugin slash commands in the chat editor
+- Artifact panel for structured extension output
+
+### 💬 Rich Chat Interface
+- **Virtualized message list** — Smooth rendering of long conversations via `@tanstack/react-virtual`
+- **Streaming Markdown** — streamdown pipeline with CJK, code blocks, math, and Mermaid diagram support
+- **Code highlighting** — Shiki 4 with caching, language selection, and copy buttons
+- **Thinking process visualization** — Collapsible panels with timing animations
+- **Tool call cards** — Expandable cards showing tool name, status badge, input/output JSON
+
+### 📝 Rich Text Input
+- **TipTap editor** (ProseMirror-based) with `@` file search suggestions
+- Model selector grouped by provider
+- Permission mode selector (Default / Full Access)
+
+### 📂 Session & Workspace Management
+- Session sidebar with pinning, workspace/standalone grouping
+- Workspace management — create, switch, delete workspaces with custom system prompts
+- Multi-session agent pool for concurrent conversations
+
+---
+
+## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                Electron 39 应用                       │
-│                                                      │
-│  ┌──────────────────────────────────────────────┐   │
-│  │          Main Process (主进程)                 │   │
-│  │  ┌──────────┐ ┌────────┐ ┌───────────────┐   │   │
-│  │  │ Agent    │ │ Tools  │ │ Permission    │   │   │
-│  │  │ Runtime  │ │ fs/    │ │ Service       │   │   │
-│  │  │ (pi-     │ │ term   │ │ (请求/审批/   │   │   │
-│  │  │ agent-   │ │        │ │  记住/绕过)   │   │   │
-│  │  │ core)    │ │        │ │               │   │   │
-│  │  └──────────┘ └────────┘ └───────────────┘   │   │
-│  │  ┌──────────┐ ┌────────────────────────┐     │   │
-│  │  │ Model    │ │ Extension System       │     │   │
-│  │  │ Registry │ │ (discovery / loader)   │     │   │
-│  │  └──────────┘ └────────────────────────┘     │   │
-│  └──────────────────────────────────────────────┘   │
-│                     │ IPC (contextBridge)            │
-│  ┌──────────────────────────────────────────────┐   │
-│  │         Renderer (React 19 前端)              │   │
-│  │  ┌──────────┐ ┌──────────┐ ┌─────────────┐   │   │
-│  │  │ Chat UI  │ │ Session  │ │ Permission  │   │   │
-│  │  │ (虚拟化  │ │ Sidebar  │ │ Approval    │   │   │
-│  │  │  消息列  │ │ (works-  │ │ Panel       │   │   │
-│  │  │  表)     │ │ pace/    │ │             │   │   │
-│  │  │          │ │ session) │ │             │   │   │
-│  │  └──────────┘ └──────────┘ └─────────────┘   │   │
-│  │  ┌──────────┐ ┌──────────┐ ┌─────────────┐   │   │
-│  │  │ Markdown │ │ Code     │ │ Rich Text   │   │   │
-│  │  │ (stream- │ │ High-    │ │ Editor      │   │   │
-│  │  │  down)   │ │ light    │ │ (TipTap)    │   │   │
-│  │  │          │ │ (Shiki)  │ │             │   │   │
-│  │  └──────────┘ └──────────┘ └─────────────┘   │   │
-│  └──────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    Electron 39 Application                    │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │                 Main Process                          │   │
+│  │  ┌──────────────┐ ┌────────────┐ ┌───────────────┐   │   │
+│  │  │ Agent        │ │ Tools      │ │ Permission     │   │   │
+│  │  │ Runtime     │ │ fs/term    │ │ Service        │   │   │
+│  │  │ (pi-agent-  │ │            │ │ (request/      │   │   │
+│  │  │  core)      │ │            │ │  approve/      │   │   │
+│  │  │             │ │            │ │  remember/     │   │   │
+│  │  │             │ │            │ │  bypass)       │   │   │
+│  │  └──────────────┘ └────────────┘ └───────────────┘   │   │
+│  │  ┌──────────────┐ ┌────────────────────────────┐     │   │
+│  │  │ Model        │ │ Extension System            │     │   │
+│  │  │ Registry     │ │ (discovery / loader / exec) │     │   │
+│  │  └──────────────┘ └────────────────────────────┘     │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                         │ IPC (contextBridge)                │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │              Renderer (React 19)                      │   │
+│  │  ┌──────────────┐ ┌──────────────┐ ┌─────────────┐   │   │
+│  │  │ Chat UI      │ │ Session      │ │ Permission  │   │   │
+│  │  │ (virtualized │ │ Sidebar      │ │ Approval    │   │   │
+│  │  │  message     │ │ (workspace/  │ │ Panel       │   │   │
+│  │  │  list)       │ │  session)    │ │             │   │   │
+│  │  └──────────────┘ └──────────────┘ └─────────────┘   │   │
+│  │  ┌──────────────┐ ┌──────────────┐ ┌─────────────┐   │   │
+│  │  │ Markdown     │ │ Code         │ │ Rich Text   │   │   │
+│  │  │ (streamdown) │ │ Highlight    │ │ Editor      │   │   │
+│  │  │              │ │ (Shiki)      │ │ (TipTap)    │   │   │
+│  │  └──────────────┘ └──────────────┘ └─────────────┘   │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### 通信层
+### Communication Layers
 
-| 方向            | 协议                         | 用途                                             |
-| --------------- | ---------------------------- | ------------------------------------------------ |
-| Renderer ↔ Main | Electron IPC (contextBridge) | Agent prompt、权限审批、模型选择、工作区文件搜索 |
-| App → Server    | HTTP (Axios)                 | 会话元数据持久化（Server 尚未实现）              |
+| Direction | Protocol | Purpose |
+|-----------|----------|---------|
+| Renderer ↔ Main | Electron IPC (contextBridge) | Agent prompt, permissions, model selection |
+| App → Server | tRPC (HTTP) | Session metadata, model config |
 
-## 核心功能
+---
 
-- **AI Agent 运行时** — 基于 `@mariozechner/pi-agent-core`，支持多轮对话、工具调用
-- **文件系统工具** — 读取/写入本地文件（中等风险/高风险）
-- **终端工具** — 执行 Shell 命令，内置危险命令拦截（如 `rm -rf /`）
-- **权限控制系统** —
-  - 实时权限请求弹窗（支持审批/拒绝）
-  - "记住此命令"功能（按命令前缀自动批准）
-  - 权限模式切换：默认（逐条审批）/ 完全访问（自动放行）
-- **模型管理** — 从 `~/.pi/agent/models.json` 加载自定义模型配置，支持多种 AI 提供商
-- **Extension 系统** — 扫描 `~/.pi/extensions/` 目录动态加载扩展（基础设施已就绪，尚未接入运行时）
-- **多会话管理** — 侧边栏展示会话列表，支持置顶、分组（workspace / standalone）、创建/删除/重命名
-- **工作区管理** — 新建/切换/删除工作区，可附加自定义 system prompt
-- **富文本输入** — TipTap 编辑器，支持 `@` 触发文件搜索与插入（ProseMirror 驱动）
-- **流式 Markdown 渲染** — streamdown 管线（CJK、代码块、数学公式、Mermaid 图表）
-- **代码高亮** — Shiki 4 异步高亮，含缓存、语言选择、复制按钮
-- **工具调用可视化** — 可折叠卡片展示工具名称、状态徽章、输入/输出 JSON
-- **处理中状态** — 思考过程展示、工具执行状态、耗时动画
+## 🛠️ Tech Stack
 
-## 技术栈
+### Core
 
-### 核心
+| Category | Technology |
+|----------|-----------|
+| Framework | Electron 39 + React 19 + Vite 7 |
+| Build | electron-vite 5 |
+| Styling | Tailwind CSS 4 + shadcn/ui (base-nova) |
+| State | Zustand 5 (vanilla stores) |
+| Agent | @mariozechner/pi-agent-core 0.68 |
+| Validation | Zod 4 + @sinclair/typebox |
 
-| 类别     | 技术                             |
-| -------- | -------------------------------- |
-| 框架     | Electron 39 + React 19 + Vite 7  |
-| 构建     | electron-vite 5                  |
-| 样式     | Tailwind CSS v4 + shadcn/ui      |
-| 状态     | Zustand 5 (vanilla stores)       |
-| Agent    | @mariozechner/pi-agent-core 0.68 |
-| 类型验证 | Zod 4 + @sinclair/typebox        |
+### Renderer
 
-### 渲染器
+| Category | Technology |
+|----------|-----------|
+| Markdown | streamdown 2 (CJK / code / math / mermaid plugins) |
+| Code Highlight | Shiki 4 |
+| Rich Text | TipTap 3 + ProseMirror |
+| Virtualization | @tanstack/react-virtual 3 |
+| Data Fetching | @tanstack/react-query 5 |
+| Routing | react-router-dom 7 (memory router) |
+| Animation | Framer Motion (motion) |
+| Icons | Lucide React |
+| Toast | Sonner |
 
-| 类别       | 技术                                            |
-| ---------- | ----------------------------------------------- |
-| Markdown   | streamdown 2 (CJK / code / math / mermaid 插件) |
-| 代码高亮   | Shiki 4                                         |
-| 富文本编辑 | TipTap 3 + ProseMirror                          |
-| 消息虚拟化 | @tanstack/react-virtual 3                       |
-| 数据获取   | @tanstack/react-query 5 + Axios                 |
-| 路由       | react-router-dom 7 (memory router)              |
-| 动画       | Framer Motion (motion)                          |
-| 图标       | Lucide React                                    |
-| Toast 通知 | Sonner                                          |
+### Server
 
-## 目录结构
+| Category | Technology |
+|----------|-----------|
+| Framework | Express 5 |
+| API | tRPC 11 + Zod 4 |
+| Logging | Pino 9 |
+
+---
+
+## 📂 Project Structure
 
 ```text
-packages/app/                # 桌面应用（唯一实现包）
-├── src/
-│   ├── main/                # Electron 主进程
-│   │   ├── index.ts         # 窗口创建 & 应用入口
-│   │   ├── agent-runtime.ts # Agent 运行时 (pi-agent-core 封装)
-│   │   ├── agent-pool.ts    # 多会话 Agent 管理器
-│   │   ├── agent-ipc.ts     # IPC 绑定 (main ↔ renderer)
-│   │   ├── tools/
-│   │   │   ├── types.ts     # AppTool 类型定义 (含 riskLevel)
-│   │   │   ├── fs-tool.ts   # 文件读写工具
-│   │   │   └── terminal-tool.ts  # 终端执行工具
-│   │   ├── permissions/
-│   │   │   └── permission-service.ts  # 权限审批服务
-│   │   ├── models/
-│   │   │   └── registry.ts  # 模型配置注册表
-│   │   └── extensions/
-│   │       ├── registry.ts  # Extension 注册表
-│   │       ├── discovery.ts # 扩展发现
-│   │       └── loader.ts    # 扩展加载器
-│   ├── preload/
-│   │   ├── index.ts         # contextBridge API 暴露
-│   │   └── index.d.ts       # Window.electronAPI 类型声明
-│   ├── renderer/
-│   │   ├── main.tsx         # React 入口
-│   │   ├── App.tsx          # 应用根组件 (providers)
-│   │   ├── router.tsx       # 路由配置
-│   │   ├── index.html       # HTML 入口
-│   │   ├── index.css        # Tailwind CSS 入口
-│   │   ├── context/
-│   │   │   └── ElectronIPCProvider.tsx  # IPC React Context
-│   │   ├── store/
-│   │   │   ├── index.ts           # 主 store (组合 slices)
-│   │   │   ├── types.ts           # 状态类型定义
-│   │   │   ├── session-slice.ts   # 会话/工作区管理
-│   │   │   ├── entries-slice.ts   # 消息条目/工具状态
-│   │   │   └── permission-slice.ts # 权限请求状态
-│   │   ├── hooks/
-│   │   │   ├── useAgentStore.ts          # 处理中状态
-│   │   │   ├── useAgentRuntime.ts        # IPC prompt 封装
-│   │   │   └── use-subscribe-agent-events.ts  # 通用事件订阅
-│   │   ├── apis/
-│   │   │   ├── sessions.ts    # REST API 客户端
-│   │   │   └── lib/
-│   │   │       └── request.ts # Axios 封装
-│   │   ├── pages/
-│   │   │   └── workspace/
-│   │   │       ├── index.tsx        # 主布局 (resizable panels)
-│   │   │       ├── toggle-sidebar-button.tsx
-│   │   │       ├── use-agent-messages.ts  # 事件→Store 桥接
-│   │   │       ├── use-agent-sessions.ts  # 会话状态同步
-│   │   │       ├── use-create-session.ts
-│   │   │       ├── chat/
-│   │   │       │   ├── index.tsx          # 聊天容器
-│   │   │       │   ├── pending-session-content.tsx  # 起始页
-│   │   │       │   ├── active-session-content.tsx   # 活跃会话
-│   │   │       │   ├── messages/
-│   │   │       │   │   ├── index.tsx             # 虚拟化列表
-│   │   │       │   │   ├── user-message.tsx     # 用户消息
-│   │   │       │   │   ├── assistant-message.tsx # 助手消息（组合）
-│   │   │       │   │   ├── assistant-response-message.tsx  # 文本回复
-│   │   │       │   │   ├── assistant-thinking-message.tsx   # 思考过程
-│   │   │       │   │   └── assistant-tool-message.tsx       # 工具调用
-│   │   │       │   ├── prompt-input/
-│   │   │       │   │   ├── index.tsx             # 输入容器
-│   │   │       │   │   ├── prompt-editor.tsx     # TipTap 编辑器
-│   │   │       │   │   ├── modal-selector.tsx    # 模型选择器
-│   │   │       │   │   └── permission-selector.tsx  # 权限模式
-│   │   │       │   └── permission/
-│   │   │       │       ├── index.tsx             # 审批面板
-│   │   │       │       └── useCurrentPermissionRequest.ts
-│   │   │       └── sessions/
-│   │   │           ├── index.tsx          # 会话侧边栏
-│   │   │           ├── session-item.tsx
-│   │   │           ├── workspace-item.tsx
-│   │   │           ├── create-workspace-button.tsx
-│   │   │           ├── usePinnedSessions.ts
-│   │   │           ├── useStandaloneSessions.ts
-│   │   │           ├── useWorkspaceList.ts
-│   │   │           └── useWorkspaces.ts
-│   │   └── components/
-│   │       ├── ai-elements/
-│   │       │   ├── message.tsx     # 消息容器 & Branch 导航
-│   │       │   ├── code-block.tsx  # Shiki 代码块
-│   │       │   ├── tool.tsx        # 工具调用卡片
-│   │       │   └── shimmer.tsx     # 加载动画
-│   │       ├── richtext/
-│   │       │   ├── schema.ts                # ProseMirror Schema
-│   │       │   ├── richtext-editor.tsx      # 可编辑视图
-│   │       │   └── richtext-document-view.tsx  # 只读视图
-│   │       └── ui/
-│   │           ├── button.tsx
-│   │           ├── dialog.tsx
-│   │           ├── popover.tsx
-│   │           ├── resizable.tsx
-│   │           ├── select.tsx
-│   │           ├── scroll-area.tsx
-│   │           └── ... (25+ shadcn/ui 组件)
-│   └── shared/                   # IPC 类型定义
-│       ├── events-ipc.ts         # 事件白名单 & 类型
-│       ├── session-ipc.ts        # 会话 IPC 接口
-│       ├── models-ipc.ts         # 模型 IPC 接口
-│       └── permissions-ipc.ts    # 权限类型定义
+divisor-agent/
+├── commitlint.config.mjs          # Conventional commit linting
+├── oxfmt.config.ts                # oxfmt formatter config
+├── oxlint.config.ts               # oxlint linter config
+├── lint-staged.config.mjs         # Git hooks linting
+├── pnpm-workspace.yaml            # pnpm workspace definition
+├── vitest.config.ts               # Vitest workspace config
+├── CLAUDE.md                      # AI assistant instructions
+├── AGENTS.md                      # Agent definitions
+├── docs/
+│   ├── 需求/                       # Requirements docs (Chinese)
+│   ├── 原型/                       # Prototype docs
+│   ├── 技术文档/                    # Technical docs
+│   └── 调研文档/                    # Research docs
+└── packages/
+    ├── app/                        # Desktop application
+    │   └── src/
+    │       ├── main/               # Electron main process
+    │       │   ├── index.ts        # Window creation & app entry
+    │       │   ├── agent-runtime.ts # Agent runtime (pi-agent-core wrapper)
+    │       │   ├── agent-pool.ts   # Multi-session agent manager
+    │       │   ├── agent-ipc.ts    # IPC bindings (main ↔ renderer)
+    │       │   ├── tools/          # Local tools (fs, terminal)
+    │       │   ├── permissions/    # Permission approval service
+    │       │   ├── models/         # Model configuration registry
+    │       │   └── extensions/     # Extension discovery & loader
+    │       ├── preload/            # contextBridge API exposure
+    │       ├── renderer/           # React UI
+    │       │   ├── App.tsx         # Root component
+    │       │   ├── router.tsx      # Route config
+    │       │   ├── store/          # Zustand state (3 slices)
+    │       │   ├── hooks/          # React hooks
+    │       │   ├── pages/          # Page components
+    │       │   │   └── workspace/  # Main workspace layout
+    │       │   │       ├── chat/           # Chat container, messages, input
+    │       │   │       ├── sessions/       # Session sidebar
+    │       │   │       └── ...             # Supporting components
+    │       │   └── components/     # Shared components
+    │       │       ├── ai-elements/ # Message, code block, tool cards
+    │       │       ├── richtext/    # ProseMirror rich text components
+    │       │       └── ui/         # 25+ shadcn/ui components
+    │       └── shared/             # IPC type definitions
+    ├── extension-core/             # Extension system core library
+    └── extensions/
+        └── example/                # Example extension
 ```
 
-## 环境要求
+---
 
-- Node.js 22+
-- pnpm
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Node.js** 22+
+- **pnpm** (strictly required — see below)
+
+### Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/yourusername/divisor-agent.git
+cd divisor-agent
+
+# Install dependencies (pnpm only)
 pnpm install
 ```
 
-## 常用命令
+### Development
 
 ```bash
-# 启动应用
+# Start all packages in parallel
 pnpm dev
 
-# 仅启动 server（预留 — 尚未实现）
+# Start only the Electron app
+pnpm dev:app
+
+# Start only the server (Express + tRPC)
 pnpm dev:server
-
-# 类型检查
-pnpm type-check
-
-# 运行所有测试
-pnpm test
-
-# 运行单个测试文件
-pnpm vitest run packages/app/__tests__/xxx.test.ts
-
-# Lint 检查 (oxlint)
-pnpm lint
-
-# 格式化 (oxfmt)
-pnpm format
 ```
 
-除此以外，也可以单独启动 app：
+### Testing
 
 ```bash
-pnpm --filter @divisor-agent/app dev
+# Run all tests
+pnpm test
+
+# Run a single test file
+pnpm vitest run packages/app/__tests__/xxx.test.ts
 ```
 
-## 数据流
+### Other Commands
+
+```bash
+pnpm build              # Build all packages
+pnpm type-check         # Type-check all packages
+pnpm lint               # Lint (oxlint)
+pnpm format             # Auto-format (oxfmt)
+pnpm format:check       # Check formatting
+pnpm clean              # Clean all node_modules
+```
+
+---
+
+## 🔄 Data Flow
 
 ```
-用户输入 → PromptEditor (TipTap)
+User Input → PromptEditor (TipTap)
   → handleSubmit()
   → IPC invoke("prompt", sessionId, text, model)
   → AgentPool.prompt() → AgentRuntime.prompt()
-  → Agent.prompt() 开始执行
+  → Agent.prompt() execution begins
 
-Agent 产生事件：
+Agent emits events:
   agent_start                 → IPC → useAgentMessages → store.setSessionStatus("running")
   message_start/update/end    → IPC → store.appendMessageEntry / updateMessageEntry
   tool_execution_start/update → IPC → store.setToolState
-  permission_requested        → IPC → store.enqueuePermissionRequest → UI 弹窗
+  permission_requested        → IPC → store.enqueuePermissionRequest → UI dialog
   agent_end                   → IPC → store.setSessionStatus("completed")
 ```
 
-### IPC 通道一览
+---
 
-**Main → Renderer（事件）**：`agent_start`, `turn_start`, `message_start`, `message_update`, `message_end`, `tool_execution_start`, `tool_execution_update`, `tool_execution_end`, `agent_end`, `permission_requested`
+## 📡 IPC Channels
 
-**Renderer → Main（调用）**：`setModel`, `getAvailableModels`, `prompt`, `abortPrompt`, `setHistoryMessages`, `setSessionId`, `searchWorkspaceFiles`, `setPermissionMode`, `resolvePermissionRequest`
+### Main → Renderer (Events)
 
-## 状态管理
+| Channel | Description |
+|---------|-------------|
+| `agent_start` | Agent begins processing |
+| `turn_start` | New turn started |
+| `message_start` | Message stream started |
+| `message_update` | Message delta received |
+| `message_end` | Message complete |
+| `tool_execution_start` | Tool execution began |
+| `tool_execution_update` | Tool execution progress |
+| `tool_execution_end` | Tool execution complete |
+| `agent_end` | Agent finished processing |
+| `permission_requested` | Permission dialog needed |
 
-使用 **Zustand 5** 单一 Store（三切片组合）：
+### Renderer → Main (Invoke)
 
-- **sessionsSlice** — 会话列表、活跃会话、模型分配、工作区管理
-- **entriesSlice** — 消息条目（流式追加/更新）、工具执行状态
-- **permissionSlice** — 每个会话的权限模式、当前权限请求队列、已审批请求
+| Channel | Description |
+|---------|-------------|
+| `setModel` | Select AI model |
+| `getAvailableModels` | List available models |
+| `prompt` | Send user prompt |
+| `abortPrompt` | Cancel current generation |
+| `setHistoryMessages` | Restore session history |
+| `setSessionId` | Switch active session |
+| `searchWorkspaceFiles` | Search files via @ mention |
+| `setPermissionMode` | Change permission mode |
+| `resolvePermissionRequest` | Approve/deny permission |
 
-## 项目约定
+---
 
-- **Server 导入**：如果使用 Server 包，本地 TypeScript 导入必须显式带 `.js` 扩展名（ESM 要求）
-- **类型导入**：纯类型导入使用 `import type { ... }`
-- **React 导入**：React 19 使用新的 JSX Runtime，无需手动 `import React from 'react'`
-- **包管理**：严格使用 `pnpm`，`npx` 替换为 `pnpx`
-- **依赖管理**：严格按需引入，禁止安装未使用的依赖
-- **Lint/Format**：使用 `oxlint`（非 ESLint）+ `oxfmt`
-- **Git Hooks**：Husky + commitlint（Conventional Commits）+ lint-staged（oxlint --fix + oxfmt --write）
+## 🗄️ State Management
 
-## 实现状态
+Uses **Zustand 5** with a single store composed of three slices:
 
-### ✅ 已完成
+- **sessionsSlice** — Session list, active session, model assignment, workspace management
+- **entriesSlice** — Message entries (streaming append/update), tool execution states
+- **permissionSlice** — Permission mode per session, permission request queue, approved requests
 
-- Electron 39 桌面应用框架（无边框窗口、vibrancy、毛玻璃效果）
-- pi-agent-core Agent 运行时集成
-- 三款本地工具：读文件、写文件、终端执行
-- 权限控制系统（请求/审批/拒绝/记住/绕过模式）
-- 模型注册表（读取 `~/.pi/agent/models.json` 自定义模型）
-- Extension 发现与加载基础设施（尚未接入运行时）
-- 类型安全的 IPC 桥接（contextBridge + 通道白名单）
-- 聊天 UI：
-  - 虚拟化消息列表（@tanstack/react-virtual）
-  - 用户消息（ProseMirror 只读渲染）
-  - 助手消息流式渲染（streamdown + CJK/代码/数学/Mermaid）
-  - 思考过程展示（可折叠 + 计时动画）
-  - 工具调用卡片（状态徽章、输入输出 JSON）
-- TipTap 富文本输入（支持 `@` 文件搜索建议）
-- 模型选择器（按提供商分组搜索）
-- 权限模式选择器（默认/完全访问）
-- 会话侧边栏（置顶/工作区/独立会话分组）
-- 工作区创建与管理
-- Zustand 状态管理（sessions/entries/permission 三切片）
-- 事件订阅系统（IPC 事件 → Store 自动同步）
-- Shiki 代码高亮（缓存 + 语言选择 + 复制）
-- 设置页路由（占位）
+---
 
-### 🏗️ 待实现
+## 📊 Status
 
-- **Server 包**（Express + tRPC + 会话持久化）— 尚未开始实现
-- Extension 接入 Agent 运行时
-- 会话树 / Fork 功能
-- 设置页完整功能
+### ✅ Completed
 
-## 设计文档
+- Electron 39 desktop app (frameless window, vibrancy, frosted glass)
+- pi-agent-core runtime integration
+- Local tools: read file, write file, terminal execution
+- Permission control system (request / approve / reject / remember / bypass)
+- Model registry (reads `~/.pi/agent/models.json`)
+- Extension discovery & loading infrastructure
+- Type-safe IPC bridge (contextBridge + channel whitelist)
+- Chat UI:
+  - Virtualized message list (@tanstack/react-virtual)
+  - Streaming assistant responses (streamdown + CJK / code / math / Mermaid)
+  - Thinking process display (collapsible + timing animation)
+  - Tool call cards (status badge, input/output JSON)
+- TipTap rich text editor with @ file search
+- Model selector grouped by provider
+- Permission mode selector
+- Session sidebar (pinned / workspace / standalone groups)
+- Workspace CRUD with custom system prompts
+- Zustand state management (3 slices)
+- Event subscription system (IPC events → Store auto-sync)
+- Shiki code highlighting (cache + language select + copy)
+- Plugin system (slash commands, artifact panel, prompt ghost)
 
-- [MVP 需求文档](docs/需求/mvp.md)
-- [MVP 原型文档](docs/原型/mvp.md)
-- [前端技术文档](docs/技术文档/mvp/前端.md)
-- [后端技术文档](docs/技术文档/mvp/后端.md)
-- [tRPC 适用性分析](docs/调研文档/tRPC适用性分析.md)
-- [pi-agent-core 适用性分析](docs/调研文档/pi-agent-core适用性分析.md)
-- [pi-agent-extension 机制分析](docs/调研文档/pi-agent-extension机制.md)
+### 🏗️ In Progress
+
+- Server package (Express 5 + tRPC + session persistence)
+- Extension runtime integration with agent pipeline
+- Session branching / Fork functionality
+- Settings page
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please follow our commit conventions:
+
+```bash
+# Commit using conventional commits format
+git commit -m "feat: add new feature"
+git commit -m "fix: resolve issue with..."
+git commit -m "refactor: improve structure of..."
+```
+
+The project uses:
+- **oxlint** for linting (not ESLint)
+- **oxfmt** for auto-formatting
+- **commitlint** for conventional commit enforcement
+- **Husky** + **lint-staged** for pre-commit checks
+
+---
+
+## 📄 License
+
+Distributed under the ISC License. See `LICENSE` for more information.
+
+---
+
+<p align="center">
+  <sub>Generated with <a href="https://github.com/eli64s/readme-ai">readme-ai</a> · Built with ❤️</sub>
+</p>
