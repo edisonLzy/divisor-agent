@@ -56,11 +56,11 @@ Divisor Agent is a desktop AI assistant application built on **Electron 39** + *
 
 The application follows a **Client/Server hybrid architecture**:
 
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| **Renderer** | React 19 + Tailwind CSS 4 | Chat UI, session management, permission panels |
-| **Main Process** | Electron 39 + Agent Runtime | Agent execution, tool orchestration, IPC bridge |
-| **Server** | Express 5 + tRPC (in progress) | Session persistence, model configuration |
+| Layer            | Technology                     | Purpose                                         |
+| ---------------- | ------------------------------ | ----------------------------------------------- |
+| **Renderer**     | React 19 + Tailwind CSS 4      | Chat UI, session management, permission panels  |
+| **Main Process** | Electron 39 + Agent Runtime    | Agent execution, tool orchestration, IPC bridge |
+| **Server**       | Express 5 + tRPC (in progress) | Session persistence, model configuration        |
 
 Currently the client operates as a standalone desktop app; the server layer is under active development for session persistence and model configuration management.
 
@@ -69,28 +69,33 @@ Currently the client operates as a standalone desktop app; the server layer is u
 ## ✨ Features
 
 ### 🤖 AI Agent Runtime
+
 - Powered by `@mariozechner/pi-agent-core`, supporting multi-turn conversations and tool calling
 - Seamless integration with multiple AI providers via a flexible model registry
 - Streaming responses with real-time thinking process display
 
 ### 🛠️ Local Tool System
+
 - **Read File** (medium risk) — Read any file from the local filesystem
 - **Write File** (high risk) — Write content to local files
 - **Terminal** (high risk) — Execute shell commands with dangerous command detection (e.g., `rm -rf /`)
 
 ### 🔒 Permission Control System
+
 - **Real-time permission requests** — Pop-up approval dialogs for sensitive operations
 - **"Remember this command"** — Auto-approve by command prefix
 - **Permission modes** — Default (per-request approval) / Full Access (auto-approve all)
 - **Session-scoped permissions** — Each session maintains its own approval state
 
 ### 🧩 Extension System
+
 - Dynamic extension discovery from `~/.pi/extensions/`
 - Extension registry with lifecycle management
 - Plugin slash commands in the chat editor
 - Artifact panel for structured extension output
 
 ### 💬 Rich Chat Interface
+
 - **Virtualized message list** — Smooth rendering of long conversations via `@tanstack/react-virtual`
 - **Streaming Markdown** — streamdown pipeline with CJK, code blocks, math, and Mermaid diagram support
 - **Code highlighting** — Shiki 4 with caching, language selection, and copy buttons
@@ -98,11 +103,13 @@ Currently the client operates as a standalone desktop app; the server layer is u
 - **Tool call cards** — Expandable cards showing tool name, status badge, input/output JSON
 
 ### 📝 Rich Text Input
+
 - **TipTap editor** (ProseMirror-based) with `@` file search suggestions
 - Model selector grouped by provider
 - Permission mode selector (Default / Full Access)
 
 ### 📂 Session & Workspace Management
+
 - Session sidebar with pinning, workspace/standalone grouping
 - Workspace management — create, switch, delete workspaces with custom system prompts
 - Multi-session agent pool for concurrent conversations
@@ -150,10 +157,10 @@ Currently the client operates as a standalone desktop app; the server layer is u
 
 ### Communication Layers
 
-| Direction | Protocol | Purpose |
-|-----------|----------|---------|
+| Direction       | Protocol                     | Purpose                                    |
+| --------------- | ---------------------------- | ------------------------------------------ |
 | Renderer ↔ Main | Electron IPC (contextBridge) | Agent prompt, permissions, model selection |
-| App → Server | tRPC (HTTP) | Session metadata, model config |
+| App → Server    | tRPC (HTTP)                  | Session metadata, model config             |
 
 ---
 
@@ -161,36 +168,36 @@ Currently the client operates as a standalone desktop app; the server layer is u
 
 ### Core
 
-| Category | Technology |
-|----------|-----------|
-| Framework | Electron 39 + React 19 + Vite 7 |
-| Build | electron-vite 5 |
-| Styling | Tailwind CSS 4 + shadcn/ui (base-nova) |
-| State | Zustand 5 (vanilla stores) |
-| Agent | @mariozechner/pi-agent-core 0.68 |
-| Validation | Zod 4 + @sinclair/typebox |
+| Category   | Technology                             |
+| ---------- | -------------------------------------- |
+| Framework  | Electron 39 + React 19 + Vite 7        |
+| Build      | electron-vite 5                        |
+| Styling    | Tailwind CSS 4 + shadcn/ui (base-nova) |
+| State      | Zustand 5 (vanilla stores)             |
+| Agent      | @mariozechner/pi-agent-core 0.68       |
+| Validation | Zod 4 + @sinclair/typebox              |
 
 ### Renderer
 
-| Category | Technology |
-|----------|-----------|
-| Markdown | streamdown 2 (CJK / code / math / mermaid plugins) |
-| Code Highlight | Shiki 4 |
-| Rich Text | TipTap 3 + ProseMirror |
-| Virtualization | @tanstack/react-virtual 3 |
-| Data Fetching | @tanstack/react-query 5 |
-| Routing | react-router-dom 7 (memory router) |
-| Animation | Framer Motion (motion) |
-| Icons | Lucide React |
-| Toast | Sonner |
+| Category       | Technology                                         |
+| -------------- | -------------------------------------------------- |
+| Markdown       | streamdown 2 (CJK / code / math / mermaid plugins) |
+| Code Highlight | Shiki 4                                            |
+| Rich Text      | TipTap 3 + ProseMirror                             |
+| Virtualization | @tanstack/react-virtual 3                          |
+| Data Fetching  | @tanstack/react-query 5                            |
+| Routing        | react-router-dom 7 (memory router)                 |
+| Animation      | Framer Motion (motion)                             |
+| Icons          | Lucide React                                       |
+| Toast          | Sonner                                             |
 
 ### Server
 
-| Category | Technology |
-|----------|-----------|
-| Framework | Express 5 |
-| API | tRPC 11 + Zod 4 |
-| Logging | Pino 9 |
+| Category  | Technology      |
+| --------- | --------------- |
+| Framework | Express 5       |
+| API       | tRPC 11 + Zod 4 |
+| Logging   | Pino 9          |
 
 ---
 
@@ -323,32 +330,32 @@ Agent emits events:
 
 ### Main → Renderer (Events)
 
-| Channel | Description |
-|---------|-------------|
-| `agent_start` | Agent begins processing |
-| `turn_start` | New turn started |
-| `message_start` | Message stream started |
-| `message_update` | Message delta received |
-| `message_end` | Message complete |
-| `tool_execution_start` | Tool execution began |
-| `tool_execution_update` | Tool execution progress |
-| `tool_execution_end` | Tool execution complete |
-| `agent_end` | Agent finished processing |
-| `permission_requested` | Permission dialog needed |
+| Channel                 | Description               |
+| ----------------------- | ------------------------- |
+| `agent_start`           | Agent begins processing   |
+| `turn_start`            | New turn started          |
+| `message_start`         | Message stream started    |
+| `message_update`        | Message delta received    |
+| `message_end`           | Message complete          |
+| `tool_execution_start`  | Tool execution began      |
+| `tool_execution_update` | Tool execution progress   |
+| `tool_execution_end`    | Tool execution complete   |
+| `agent_end`             | Agent finished processing |
+| `permission_requested`  | Permission dialog needed  |
 
 ### Renderer → Main (Invoke)
 
-| Channel | Description |
-|---------|-------------|
-| `setModel` | Select AI model |
-| `getAvailableModels` | List available models |
-| `prompt` | Send user prompt |
-| `abortPrompt` | Cancel current generation |
-| `setHistoryMessages` | Restore session history |
-| `setSessionId` | Switch active session |
-| `searchWorkspaceFiles` | Search files via @ mention |
-| `setPermissionMode` | Change permission mode |
-| `resolvePermissionRequest` | Approve/deny permission |
+| Channel                    | Description                |
+| -------------------------- | -------------------------- |
+| `setModel`                 | Select AI model            |
+| `getAvailableModels`       | List available models      |
+| `prompt`                   | Send user prompt           |
+| `abortPrompt`              | Cancel current generation  |
+| `setHistoryMessages`       | Restore session history    |
+| `setSessionId`             | Switch active session      |
+| `searchWorkspaceFiles`     | Search files via @ mention |
+| `setPermissionMode`        | Change permission mode     |
+| `resolvePermissionRequest` | Approve/deny permission    |
 
 ---
 
@@ -409,6 +416,7 @@ git commit -m "refactor: improve structure of..."
 ```
 
 The project uses:
+
 - **oxlint** for linting (not ESLint)
 - **oxfmt** for auto-formatting
 - **commitlint** for conventional commit enforcement
