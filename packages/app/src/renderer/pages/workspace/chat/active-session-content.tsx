@@ -1,4 +1,3 @@
-import { Button } from "@renderer/components/ui/button";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -9,11 +8,12 @@ import { createAgentUserMessage } from "@renderer/lib/agent-message";
 import { isAgentMessageEntry } from "@renderer/lib/is";
 import { EntryStatus, type ToolExecutionState } from "@renderer/store";
 import { mainStore } from "@renderer/store/main";
-import { PanelRightOpen } from "lucide-react";
 import { useCallback } from "react";
 import { useStore } from "zustand";
 
 import { ArtifactsPanel } from "./artifacts";
+import { ToggleArtifactPanelButton } from "./artifacts/toggle-artifact-panel-button";
+import { FixedActions } from "./fixed-actions";
 import { ChatMessages } from "./messages";
 import { PermissionApprovalPanel } from "./permission";
 import { PromptInput } from "./prompt-input";
@@ -33,7 +33,6 @@ export function ActiveSessionContent() {
   const artifactState = useStore(mainStore, (state) =>
     activeSessionId ? state.getArtifactState(activeSessionId) : null,
   );
-  const setArtifactPanelOpen = useStore(mainStore, (state) => state.setArtifactPanelOpen);
   const pendingPermissionRequest = useStore(mainStore, (state) => {
     if (!activeSessionId) {
       return null;
@@ -48,19 +47,10 @@ export function ActiveSessionContent() {
     <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
       <ResizablePanel defaultSize={isArtifactPanelOpen ? "68%" : "100%"} minSize="42%">
         <div className="relative flex h-full min-w-0 flex-col">
-          {activeSessionId && hasArtifacts && !isArtifactPanelOpen ? (
-            <div className="absolute right-3 top-3 z-10">
-              <Button
-                type="button"
-                variant="secondary"
-                size="icon-sm"
-                className="rounded-lg border border-border/70 bg-background/90 shadow-sm supports-backdrop-filter:backdrop-blur-xl"
-                onClick={() => setArtifactPanelOpen(activeSessionId, true)}
-                aria-label="Open artifacts panel"
-              >
-                <PanelRightOpen />
-              </Button>
-            </div>
+          {activeSessionId ? (
+            <FixedActions>
+              <ToggleArtifactPanelButton sessionId={activeSessionId} />
+            </FixedActions>
           ) : null}
 
           <section className="min-h-0 flex-1 px-6 pt-6">
