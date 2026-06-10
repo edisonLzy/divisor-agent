@@ -5,7 +5,7 @@ import { Button } from "@renderer/components/ui/button";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { agentMessageToRuntimeMessage, createAgentUserMessage } from "@renderer/lib/agent-message";
 import type { AgentUserMessage, MessageEntry, SessionEntry } from "@renderer/store";
-import { sessionStore } from "@renderer/store";
+import { mainStore } from "@renderer/store/main";
 import Mention from "@tiptap/extension-mention";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -115,7 +115,7 @@ function EditableUserMessage({
         await setLeaf({ sessionId, entryId: parentEntryId });
       }
 
-      sessionStore.getState().setSessionEntries(sessionId, rewindEntries);
+      mainStore.getState().setSessionEntries(sessionId, rewindEntries);
 
       const runtimeMessages = rewindEntries
         .filter((entry): entry is MessageEntry => entry.type === "message")
@@ -123,9 +123,9 @@ function EditableUserMessage({
       await invoke("setHistoryMessages", sessionId, runtimeMessages);
 
       onCancel();
-      sessionStore.getState().setSessionStatus(sessionId, "running");
+      mainStore.getState().setStatus(sessionId, "running");
       const userMessage = createAgentUserMessage(jsonContent, text);
-      sessionStore.getState().appendMessageEntry(sessionId, userMessage);
+      mainStore.getState().appendMessageEntry(sessionId, userMessage);
 
       await invoke("prompt", sessionId, text, {
         skillIds: getSelectedCommandIds(editor),
@@ -133,10 +133,10 @@ function EditableUserMessage({
     } catch (error) {
       console.error("Failed to resubmit edited message:", error);
       toast.error("发送失败");
-      const store = sessionStore.getState();
+      const store = mainStore.getState();
       const session = store.getSession(sessionId);
       if (session) {
-        store.setSessionStatus(sessionId, "idle");
+        store.setStatus(sessionId, "idle");
       }
     }
   }, [editor, entries, entryId, sessionId, invoke, onCancel]);

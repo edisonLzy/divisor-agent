@@ -6,7 +6,9 @@ import {
   isAgentMessageEntry,
   isFailedAssistantMessage,
 } from "@renderer/lib/is";
-import { EntryStatus, type AgentSession, sessionStore } from "@renderer/store";
+import { EntryStatus, type SessionEntry } from "@renderer/store";
+import { mainStore } from "@renderer/store/main";
+import { sideChatStore } from "@renderer/store/side-chat";
 import { useRef } from "react";
 
 function extractToolResultText(content: ToolResultMessage["content"]): string {
@@ -30,15 +32,15 @@ function formatArgs(value: unknown): string {
 }
 
 function getToolState(sessionId: string, toolCallId: string) {
-  return sessionStore.getState().getSession(sessionId)?.toolStates.get(toolCallId);
+  return mainStore.getState().getEntryState(sessionId).toolStates.get(toolCallId);
 }
 
 function findMissingFailureMessage(
-  session: AgentSession,
+  entries: SessionEntry[],
   messages: unknown[],
 ): AssistantMessage | undefined {
   return messages.filter(isFailedAssistantMessage).find((message) => {
-    return !session.entries.some((entry) => {
+    return !entries.some((entry) => {
       return (
         isAgentMessageEntry(entry) &&
         isAgentAssistantMessage(entry.data) &&
@@ -56,41 +58,44 @@ export function useAgentMessages() {
   useSubscribeAgentEvents({
     agent_start: (event) => {
       const { sessionId } = event;
-      if (sessionStore.getState().isSideChatArtifactSession(sessionId)) return;
+      if (sideChatStore.getState().isSideChatSession(sessionId)) return;
 
-      const session = sessionStore.getState().getSession(sessionId);
+      const session = mainStore.getState().getSession(sessionId);
       if (!session) return;
       hasPersistedRef.current[sessionId] = false;
+      mainStore.getState().setStatus(sessionId, "running");
     },
 
     agent_end: async (event) => {
       const { sessionId } = event;
-      if (sessionStore.getState().isSideChatArtifactSession(sessionId)) return;
+      if (sideChatStore.getState().isSideChatSession(sessionId)) return;
 
-      let session = sessionStore.getState().getSession(sessionId);
+      const session = mainStore.getState().getSession(sessionId);
       if (!session) return;
 
-      const missingFailureMessage = findMissingFailureMessage(session, event.messages);
+      const entries = mainStore.getState().getEntryState(sessionId).entries;
+      const missingFailureMessage = findMissingFailureMessage(entries, event.messages);
       if (missingFailureMessage) {
-        const entryId = sessionStore
-          .getState()
-          .appendMessageEntry(sessionId, missingFailureMessage);
-        sessionStore.getState().setStreamingEntryId(sessionId, entryId);
-        sessionStore.getState().setStreamingEntryCompletedAt(sessionId, Date.now());
-        session = sessionStore.getState().getSession(sessionId);
-        if (!session) return;
+        const entryId = mainStore.getState().appendMessageEntry(sessionId, missingFailureMessage);
+        mainStore.getState().setStreamingEntryId(sessionId, entryId);
+        mainStore.getState().setStreamingEntryCompletedAt(sessionId, Date.now());
+        if (!mainStore.getState().getSession(sessionId)) return;
       }
+
+      const status = event.messages.some(isFailedAssistantMessage) ? "failed" : "completed";
+      mainStore.getState().setStatus(sessionId, status);
 
       if (!hasPersistedRef.current[sessionId]) {
         hasPersistedRef.current[sessionId] = true;
 
-        const entriesToPersist = session.entries.filter(
+        const currentEntries = mainStore.getState().getEntryState(sessionId).entries;
+        const entriesToPersist = currentEntries.filter(
           (entry) => entry.status !== EntryStatus.Synced,
         );
 
         if (entriesToPersist.length > 0) {
           const entryIds = entriesToPersist.map((entry) => entry.id);
-          sessionStore.getState().setEntryStatus(sessionId, entryIds, EntryStatus.Syncing);
+          mainStore.getState().setEntryStatus(sessionId, entryIds, EntryStatus.Syncing);
           try {
             await appendEntries({
               sessionId,
@@ -101,30 +106,31 @@ export function useAgentMessages() {
                 data: entry.data as unknown as Record<string, unknown>,
               })),
             });
-            sessionStore.getState().setEntryStatus(sessionId, entryIds, EntryStatus.Synced);
+            mainStore.getState().setEntryStatus(sessionId, entryIds, EntryStatus.Synced);
           } catch (error) {
             console.error("Failed to persist entries:", error);
-            sessionStore.getState().setEntryStatus(sessionId, entryIds, EntryStatus.Failed);
+            mainStore.getState().setEntryStatus(sessionId, entryIds, EntryStatus.Failed);
           }
         }
       }
 
       turnContentStartIndicesRef.current[sessionId] = 0;
-      sessionStore.getState().setStreamingEntryCompletedAt(sessionId, Date.now());
-      sessionStore.getState().setStreamingEntryId(sessionId, undefined);
+      mainStore.getState().setStreamingEntryCompletedAt(sessionId, Date.now());
+      mainStore.getState().setStreamingEntryId(sessionId, undefined);
     },
 
     turn_start: (event) => {
       const { sessionId } = event;
-      if (sessionStore.getState().isSideChatArtifactSession(sessionId)) return;
+      if (sideChatStore.getState().isSideChatSession(sessionId)) return;
 
-      const session = sessionStore.getState().getSession(sessionId);
+      const session = mainStore.getState().getSession(sessionId);
       if (!session) return;
 
-      const streamingEntryId = sessionStore.getState().streamingEntryIds.get(sessionId);
+      const streamingEntryId = mainStore.getState().streamingEntryIds.get(sessionId);
       if (!streamingEntryId) return;
 
-      const entry = session.entries.find((item) => item.id === streamingEntryId);
+      const entries = mainStore.getState().getEntryState(sessionId).entries;
+      const entry = entries.find((item) => item.id === streamingEntryId);
       if (entry && isAgentMessageEntry(entry) && entry.data.role === "assistant") {
         turnContentStartIndicesRef.current[sessionId] = (entry.data.content ?? []).length;
       }
@@ -132,39 +138,40 @@ export function useAgentMessages() {
 
     message_start: (event) => {
       const { sessionId, message } = event;
-      if (sessionStore.getState().isSideChatArtifactSession(sessionId)) return;
+      if (sideChatStore.getState().isSideChatSession(sessionId)) return;
       if (message.role !== "assistant") return;
 
-      const session = sessionStore.getState().getSession(sessionId);
+      const session = mainStore.getState().getSession(sessionId);
       if (!session) return;
 
       const turnStartIdx = turnContentStartIndicesRef.current[sessionId] ?? 0;
       if (turnStartIdx !== 0) return;
 
-      const entryId = sessionStore.getState().appendMessageEntry(sessionId, message);
-      sessionStore.getState().setStreamingEntryId(sessionId, entryId);
+      const entryId = mainStore.getState().appendMessageEntry(sessionId, message);
+      mainStore.getState().setStreamingEntryId(sessionId, entryId);
     },
 
     message_update: (event) => {
       const { sessionId, message } = event;
-      if (sessionStore.getState().isSideChatArtifactSession(sessionId)) return;
+      if (sideChatStore.getState().isSideChatSession(sessionId)) return;
       if (message.role !== "assistant") return;
 
-      const session = sessionStore.getState().getSession(sessionId);
+      const session = mainStore.getState().getSession(sessionId);
       if (!session) return;
 
-      const streamingEntryId = sessionStore.getState().streamingEntryIds.get(sessionId);
+      const streamingEntryId = mainStore.getState().streamingEntryIds.get(sessionId);
       if (!streamingEntryId) return;
 
-      const entry = session.entries.find((item) => item.id === streamingEntryId);
+      const entries = mainStore.getState().getEntryState(sessionId).entries;
+      const entry = entries.find((item) => item.id === streamingEntryId);
       if (!entry || !isAgentMessageEntry(entry) || entry.data.role !== "assistant") return;
 
       const turnStartIdx = turnContentStartIndicesRef.current[sessionId] ?? 0;
       if (turnStartIdx === 0) {
-        sessionStore.getState().updateMessageEntry(sessionId, streamingEntryId, message);
+        mainStore.getState().updateMessageEntry(sessionId, streamingEntryId, message);
       } else {
         const existingContent = entry.data.content ?? [];
-        sessionStore.getState().updateMessageEntry(sessionId, streamingEntryId, {
+        mainStore.getState().updateMessageEntry(sessionId, streamingEntryId, {
           ...message,
           content: [
             ...existingContent.slice(0, turnStartIdx),
@@ -178,7 +185,7 @@ export function useAgentMessages() {
           const toolCall = block as ToolCall;
           const existing = getToolState(sessionId, toolCall.id);
           if (!existing) {
-            sessionStore.getState().setToolState(sessionId, toolCall.id, {
+            mainStore.getState().setToolState(sessionId, toolCall.id, {
               toolCallId: toolCall.id,
               toolName: toolCall.name,
               status: "running",
@@ -192,25 +199,26 @@ export function useAgentMessages() {
 
     message_end: (event) => {
       const { sessionId, message } = event;
-      if (sessionStore.getState().isSideChatArtifactSession(sessionId)) return;
+      if (sideChatStore.getState().isSideChatSession(sessionId)) return;
       if (message.role !== "assistant") return;
 
-      const session = sessionStore.getState().getSession(sessionId);
+      const session = mainStore.getState().getSession(sessionId);
       if (!session) return;
 
-      const streamingEntryId = sessionStore.getState().streamingEntryIds.get(sessionId);
+      const streamingEntryId = mainStore.getState().streamingEntryIds.get(sessionId);
       if (!streamingEntryId) return;
 
-      const entry = session.entries.find((item) => item.id === streamingEntryId);
+      const entries = mainStore.getState().getEntryState(sessionId).entries;
+      const entry = entries.find((item) => item.id === streamingEntryId);
       if (!entry || !isAgentMessageEntry(entry) || entry.data.role !== "assistant") return;
 
       const turnStartIdx = turnContentStartIndicesRef.current[sessionId] ?? 0;
       const assistantMsg = message as AssistantMessage;
       if (turnStartIdx === 0) {
-        sessionStore.getState().updateMessageEntry(sessionId, streamingEntryId, assistantMsg);
+        mainStore.getState().updateMessageEntry(sessionId, streamingEntryId, assistantMsg);
       } else {
         const existingContent = entry.data.content ?? [];
-        sessionStore.getState().updateMessageEntry(sessionId, streamingEntryId, {
+        mainStore.getState().updateMessageEntry(sessionId, streamingEntryId, {
           ...assistantMsg,
           content: [
             ...existingContent.slice(0, turnStartIdx),
@@ -222,11 +230,11 @@ export function useAgentMessages() {
 
     tool_execution_start: (event) => {
       const { sessionId, toolCallId, toolName, args } = event;
-      if (sessionStore.getState().isSideChatArtifactSession(sessionId)) return;
+      if (sideChatStore.getState().isSideChatSession(sessionId)) return;
 
       const existing = getToolState(sessionId, toolCallId);
       if (existing) return;
-      sessionStore.getState().setToolState(sessionId, toolCallId, {
+      mainStore.getState().setToolState(sessionId, toolCallId, {
         toolCallId,
         toolName,
         status: "running",
@@ -237,11 +245,11 @@ export function useAgentMessages() {
 
     tool_execution_update: (event) => {
       const { sessionId, toolCallId, toolName, args } = event;
-      if (sessionStore.getState().isSideChatArtifactSession(sessionId)) return;
+      if (sideChatStore.getState().isSideChatSession(sessionId)) return;
 
       const existing = getToolState(sessionId, toolCallId);
       if (!existing) return;
-      sessionStore.getState().setToolState(sessionId, toolCallId, {
+      mainStore.getState().setToolState(sessionId, toolCallId, {
         toolCallId,
         toolName,
         status: "running",
@@ -254,14 +262,14 @@ export function useAgentMessages() {
 
     tool_execution_end: (event) => {
       const { sessionId, toolCallId, toolName, result, isError } = event;
-      if (sessionStore.getState().isSideChatArtifactSession(sessionId)) return;
+      if (sideChatStore.getState().isSideChatSession(sessionId)) return;
 
       const resultContent = result?.content;
       const output = Array.isArray(resultContent)
         ? extractToolResultText(resultContent)
         : formatArgs(result);
       const existing = getToolState(sessionId, toolCallId);
-      sessionStore.getState().setToolState(sessionId, toolCallId, {
+      mainStore.getState().setToolState(sessionId, toolCallId, {
         toolCallId,
         toolName,
         status: isError ? "error" : "done",
@@ -274,11 +282,11 @@ export function useAgentMessages() {
 
     permission_requested: (event) => {
       const { sessionId, type: _type, ...request } = event;
-      if (sessionStore.getState().isSideChatArtifactSession(sessionId)) return;
+      if (sideChatStore.getState().isSideChatSession(sessionId)) return;
 
       const existing = getToolState(sessionId, request.toolCallId);
-      sessionStore.getState().enqueuePermissionRequest(sessionId, request);
-      sessionStore.getState().setToolState(sessionId, request.toolCallId, {
+      mainStore.getState().enqueuePermissionRequest(sessionId, request);
+      mainStore.getState().setToolState(sessionId, request.toolCallId, {
         toolCallId: request.toolCallId,
         toolName: request.toolName,
         status: "awaiting_approval",

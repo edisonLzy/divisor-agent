@@ -8,7 +8,7 @@ import { useExtensionRegistry } from "@divisor-agent/extension-core/renderer";
 import { MessageResponse } from "@renderer/components/ai-elements/message";
 import { Button } from "@renderer/components/ui/button";
 import { UnknownAssistantBlock } from "@renderer/extensions/fallback-renderers";
-import { sessionStore } from "@renderer/store";
+import { mainStore } from "@renderer/store/main";
 import { PanelRightOpen } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import type { CustomRenderer, CustomRendererProps, PluginConfig } from "streamdown";
@@ -94,8 +94,8 @@ function PluginArtifactRenderer({
   sessionId: string;
 }) {
   const result = useMemo(() => parseArtifactPayload(code, isIncomplete), [code, isIncomplete]);
-  const setActiveArtifactId = useStore(sessionStore, (state) => state.setActiveArtifactId);
-  const upsertArtifact = useStore(sessionStore, (state) => state.upsertArtifact);
+  const setActiveArtifactId = useStore(mainStore, (state) => state.setActiveArtifactId);
+  const upsertArtifact = useStore(mainStore, (state) => state.upsertArtifact);
   const artifact = useMemo(
     () =>
       result.status === "ready"

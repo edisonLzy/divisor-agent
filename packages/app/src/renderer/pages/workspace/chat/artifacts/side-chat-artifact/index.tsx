@@ -2,7 +2,8 @@ import type { AssistantMessage } from "@mariozechner/pi-ai";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { createAgentUserMessage } from "@renderer/lib/agent-message";
 import { isAgentAssistantMessage, isAgentMessageEntry } from "@renderer/lib/is";
-import { sessionStore, type SideChatArtifactRecord } from "@renderer/store";
+import type { SideChatArtifactRecord } from "@renderer/store";
+import { sideChatStore } from "@renderer/store/side-chat";
 import { useCallback, useMemo } from "react";
 import { useStore } from "zustand";
 
@@ -18,21 +19,21 @@ interface SideChatArtifactProps {
 
 export function SideChatArtifact({ artifact, mainSessionId }: SideChatArtifactProps) {
   const { invoke } = useElectronIPC();
-  const content = artifact.content;
-  const streamingEntryId = useStore(sessionStore, (state) =>
+  const streamingEntryId = useStore(sideChatStore, (state) =>
     state.streamingEntryIds.get(artifact.id),
   );
+  const entryState = useStore(sideChatStore, (state) => state.getEntryState(artifact.id));
   const messageEntries = useMemo(
-    () => content.entries.filter(isAgentMessageEntry),
-    [content.entries],
+    () => entryState.entries.filter(isAgentMessageEntry),
+    [entryState.entries],
   );
-  const isRunning = content.status === "running";
+  const isRunning = entryState.status === "running";
 
   const submitPrompt = useCallback(
     async (submission: PromptSubmission) => {
-      sessionStore.getState().setSideChatArtifactStatus(mainSessionId, artifact.id, "running");
+      sideChatStore.getState().setStatus(artifact.id, "running");
       const userMessage = createAgentUserMessage(submission.jsonContent, submission.text);
-      sessionStore.getState().appendSideChatArtifactEntry(mainSessionId, artifact.id, userMessage);
+      sideChatStore.getState().appendMessageEntry(artifact.id, userMessage);
 
       try {
         await invoke("setSessionId", artifact.id);
@@ -45,10 +46,10 @@ export function SideChatArtifact({ artifact, mainSessionId }: SideChatArtifactPr
         });
       } catch (error) {
         console.error("Failed to submit side chat prompt", error);
-        sessionStore.getState().setSideChatArtifactStatus(mainSessionId, artifact.id, "idle");
+        sideChatStore.getState().setStatus(artifact.id, "idle");
       }
     },
-    [artifact.id, mainSessionId, invoke],
+    [artifact.id, invoke],
   );
 
   const stopPrompt = useCallback(async () => {
@@ -60,7 +61,7 @@ export function SideChatArtifact({ artifact, mainSessionId }: SideChatArtifactPr
   }, [artifact.id, invoke]);
 
   const handleQuoteToMain = useCallback(() => {
-    const lastAssistant = [...content.entries].reverse().find((entry) => {
+    const lastAssistant = [...entryState.entries].reverse().find((entry) => {
       if (!isAgentMessageEntry(entry)) return false;
       return isAgentAssistantMessage(entry.data);
     });
@@ -86,18 +87,18 @@ export function SideChatArtifact({ artifact, mainSessionId }: SideChatArtifactPr
         },
       }),
     );
-  }, [content.entries, mainSessionId]);
+  }, [entryState.entries, mainSessionId]);
 
   return (
     <div className="flex h-full flex-col">
       <div className="min-h-0 flex-1 px-2 pt-2">
         <ChatMessages
-          entries={content.entries}
+          entries={entryState.entries}
           isRunning={isRunning}
           messageEntries={messageEntries}
           sessionId={artifact.id}
           streamingEntryId={streamingEntryId}
-          toolStates={content.toolStates}
+          toolStates={entryState.toolStates}
         />
       </div>
 

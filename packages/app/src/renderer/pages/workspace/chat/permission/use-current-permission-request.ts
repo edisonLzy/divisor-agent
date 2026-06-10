@@ -1,5 +1,5 @@
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
-import { sessionStore } from "@renderer/store";
+import { mainStore } from "@renderer/store/main";
 import type { PermissionRequest, PermissionResolution } from "@shared/permissions-ipc";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
@@ -10,8 +10,8 @@ function updateResolvedToolState(
   request: PermissionRequest,
   resolution: PermissionResolution,
 ) {
-  const store = sessionStore.getState();
-  const existing = store.getSession(sessionId)?.toolStates.get(request.toolCallId);
+  const store = mainStore.getState();
+  const existing = store.getEntryState(sessionId).toolStates.get(request.toolCallId);
 
   if (!existing || existing.status === "done" || existing.status === "error") {
     return;
@@ -31,7 +31,7 @@ function updateResolvedToolState(
 export function useCurrentPermissionRequest(sessionId: string | null) {
   const { invoke } = useElectronIPC();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const request = useStore(sessionStore, (state) => {
+  const request = useStore(mainStore, (state) => {
     if (!sessionId) {
       return null;
     }
@@ -49,7 +49,7 @@ export function useCurrentPermissionRequest(sessionId: string | null) {
 
       try {
         await invoke("resolvePermissionRequest", sessionId, request.requestId, resolution);
-        sessionStore.getState().resolvePermissionRequest(sessionId, request.requestId, resolution);
+        mainStore.getState().resolvePermissionRequest(sessionId, request.requestId, resolution);
         updateResolvedToolState(sessionId, request, resolution);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "提交审批结果失败");

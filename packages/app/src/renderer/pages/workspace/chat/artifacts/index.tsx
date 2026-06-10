@@ -3,7 +3,8 @@ import { Button } from "@renderer/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@renderer/components/ui/tabs";
 import { UnknownArtifact } from "@renderer/extensions/fallback-renderers";
 import { cn } from "@renderer/lib/utils";
-import { sessionStore, type ArtifactRecord, type SideChatArtifactRecord } from "@renderer/store";
+import { type ArtifactRecord, type SideChatArtifactRecord } from "@renderer/store";
+import { mainStore } from "@renderer/store/main";
 import { GripVertical, PanelRightClose, PuzzleIcon, X } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useStore } from "zustand";
@@ -16,11 +17,11 @@ interface ArtifactsPanelProps {
 }
 
 export function ArtifactsPanel({ className, sessionId }: ArtifactsPanelProps) {
-  const artifactState = useStore(sessionStore, (state) => state.getArtifactState(sessionId));
-  const setActiveArtifactId = useStore(sessionStore, (state) => state.setActiveArtifactId);
-  const setArtifactPanelOpen = useStore(sessionStore, (state) => state.setArtifactPanelOpen);
-  const removeArtifact = useStore(sessionStore, (state) => state.removeArtifact);
-  const reorderArtifacts = useStore(sessionStore, (state) => state.reorderArtifacts);
+  const artifactState = useStore(mainStore, (state) => state.getArtifactState(sessionId));
+  const setActiveArtifactId = useStore(mainStore, (state) => state.setActiveArtifactId);
+  const setArtifactPanelOpen = useStore(mainStore, (state) => state.setArtifactPanelOpen);
+  const removeArtifact = useStore(mainStore, (state) => state.removeArtifact);
+  const reorderArtifacts = useStore(mainStore, (state) => state.reorderArtifacts);
   const [draggedArtifactId, setDraggedArtifactId] = useState<string | null>(null);
 
   const artifacts = artifactState.artifacts;

@@ -71,11 +71,18 @@ export type SessionEntry = AgentMessageEntry | AgentModalChangedEntry;
 export interface MessageEntry extends AgentMessageEntry {}
 export interface ModelChangedEntry extends AgentModalChangedEntry {}
 
-export interface AgentSession extends Session {
+// ── EntryState (extracted from AgentSession + SideChatArtifactContent) ─────
+
+export interface EntryState {
   entries: SessionEntry[];
-  model: AvailableModel | undefined;
   toolStates: Map<string, ToolExecutionState>;
   status: SessionStatus;
+}
+
+// ── AgentSession (slimmed — no entries/toolStates/status) ──────────────────
+
+export interface AgentSession extends Session {
+  model: AvailableModel | undefined;
 }
 
 export interface AgentPendingSession {
@@ -84,15 +91,25 @@ export interface AgentPendingSession {
   createdAt: number;
 }
 
-export interface SideChatArtifactContent {
-  pendingPrompt: string;
-  model?: AvailableModel;
-  entries: SessionEntry[];
-  status: SessionStatus;
-  toolStates: Map<string, ToolExecutionState>;
+// ── SideChatMeta (side-chat-specific metadata) ─────────────────────────────
+
+export interface SideChatMeta {
+  mainSessionId: string;
   context: SideChatContext;
+  model?: AvailableModel;
+  pendingPrompt: string;
   createdAt: number;
 }
+
+// ── SideChatArtifactContent (minimal — runtime data in EntryState) ────────
+
+export interface SideChatArtifactContent {
+  // Kept for ArtifactRecord<TContent> type compatibility.
+  // All runtime state (entries, toolStates, status) is now in EntryState.
+  // Metadata (model, context, pendingPrompt) is now in SideChatMeta.
+}
+
+// ── ArtifactRecord ─────────────────────────────────────────────────────────
 
 export interface ArtifactRecord<TContent = unknown> {
   id: string;
@@ -114,10 +131,33 @@ export interface SessionArtifactState {
   isOpen: boolean;
 }
 
+// ── EntriesSlice (shared factory — used by both mainStore and sideChatStore)
+
+export interface EntriesSlice {
+  entryStates: Map<string, EntryState>;
+  streamingEntryIds: Map<string, string>;
+
+  getEntryState: (ownerId: string) => EntryState;
+
+  appendMessageEntry: (ownerId: string, message: AgentMessageData) => string;
+  updateMessageEntry: (ownerId: string, entryId: string, message: AssistantMessage) => void;
+  setEntryStatus: (ownerId: string, entryIds: string[], status: EntryStatus) => void;
+  setStreamingEntryId: (ownerId: string, id: string | undefined) => void;
+  setStreamingEntryCompletedAt: (ownerId: string, completedAt: number) => void;
+  setToolState: (ownerId: string, toolCallId: string, state: ToolExecutionState) => void;
+  setSessionEntries: (ownerId: string, entries: SessionEntry[]) => void;
+  setStatus: (ownerId: string, status: SessionStatus) => void;
+
+  removeEntryState: (ownerId: string) => void;
+}
+
+// ── SessionsSlice (main agent, slimmed) ────────────────────────────────────
+
 export interface SessionsSlice {
   activeSessionId: string | null;
   pendingSession: AgentPendingSession | null;
   sessions: AgentSession[];
+
   getSession: (sessionId: string) => AgentSession | undefined;
   appendSession: (session: Session) => void;
   setActiveSessionId: (sessionId: string | null) => void;
@@ -125,21 +165,11 @@ export interface SessionsSlice {
   clearPendingSession: () => void;
   removeSession: (sessionId: string) => void;
   addSessions: (sessions: Session[]) => void;
-  setSessionStatus: (sessionId: string, status: SessionStatus) => void;
   setModel: (sessionId: string, model: AvailableModel) => void;
   setCwd: (sessionId: string, cwd: string) => void;
 }
 
-export interface EntriesSlice {
-  streamingEntryIds: Map<string, string>;
-  setStreamingEntryId: (sessionId: string, id: string | undefined) => void;
-  appendMessageEntry: (sessionId: string, message: AgentMessageData) => string;
-  updateMessageEntry: (sessionId: string, entryId: string, message: AssistantMessage) => void;
-  setEntryStatus: (sessionId: string, entryIds: string[], status: EntryStatus) => void;
-  setStreamingEntryCompletedAt: (sessionId: string, completedAt: number) => void;
-  setToolState: (sessionId: string, toolCallId: string, state: ToolExecutionState) => void;
-  setSessionEntries: (sessionId: string, entries: SessionEntry[]) => void;
-}
+// ── PermissionSlice ────────────────────────────────────────────────────────
 
 export interface PermissionResolutionSnapshot {
   requestId: string;
@@ -166,6 +196,8 @@ export interface PermissionSlice {
   clearPermissionState: (sessionId: string) => void;
 }
 
+// ── ArtifactSlice (main agent, simplified — no side-chat specifics) ───────
+
 export interface ArtifactSlice {
   artifactStates: Map<string, SessionArtifactState>;
   getArtifactState: (sessionId: string) => SessionArtifactState;
@@ -178,42 +210,27 @@ export interface ArtifactSlice {
     artifact: Omit<ArtifactRecord<TContent>, "content" | "name" | "updatedAt"> &
       Partial<Pick<ArtifactRecord<TContent>, "content" | "name">>,
   ) => void;
+}
 
-  getSideChatArtifact: (sideChatId: string) => {
-    artifact: SideChatArtifactRecord;
-    mainSessionId: string;
-  } | null;
-  isSideChatArtifactSession: (sessionId: string) => boolean;
-  createSideChatArtifact: (
+// ── SideChatSlice ──────────────────────────────────────────────────────────
+
+export interface SideChatSlice {
+  sideChatMeta: Map<string, SideChatMeta>;
+
+  getSideChatMeta: (sideChatId: string) => SideChatMeta | undefined;
+  isSideChatSession: (sessionId: string) => boolean;
+  initSideChat: (
+    sideChatId: string,
     mainSessionId: string,
     context: SideChatContext,
     model: AvailableModel | undefined,
     pendingPrompt: string,
-  ) => string;
-  appendSideChatArtifactEntry: (
-    mainSessionId: string,
-    artifactId: string,
-    message: AgentMessageData,
-  ) => string;
-  updateSideChatArtifactEntry: (
-    mainSessionId: string,
-    artifactId: string,
-    entryId: string,
-    message: AssistantMessage,
   ) => void;
-  setSideChatArtifactToolState: (
-    mainSessionId: string,
-    artifactId: string,
-    toolCallId: string,
-    state: ToolExecutionState,
-  ) => void;
-  setSideChatArtifactStatus: (
-    mainSessionId: string,
-    artifactId: string,
-    status: SessionStatus,
-  ) => void;
-  setSideChatArtifactStreamingEntryId: (artifactId: string, entryId: string | undefined) => void;
-  setSideChatArtifactStreamingCompletedAt: (mainSessionId: string, artifactId: string) => void;
+  setSideChatModel: (sideChatId: string, model: AvailableModel) => void;
+  removeSideChatMeta: (sideChatId: string) => void;
 }
 
-export type SessionsStoreState = SessionsSlice & EntriesSlice & PermissionSlice & ArtifactSlice;
+// ── Combined Store States ──────────────────────────────────────────────────
+
+export type MainStoreState = EntriesSlice & SessionsSlice & PermissionSlice & ArtifactSlice;
+export type SideChatStoreState = EntriesSlice & SideChatSlice;

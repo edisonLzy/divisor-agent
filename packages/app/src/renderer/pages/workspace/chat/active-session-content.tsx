@@ -7,7 +7,8 @@ import {
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { createAgentUserMessage } from "@renderer/lib/agent-message";
 import { isAgentMessageEntry } from "@renderer/lib/is";
-import { EntryStatus, sessionStore, type ToolExecutionState } from "@renderer/store";
+import { EntryStatus, type ToolExecutionState } from "@renderer/store";
+import { mainStore } from "@renderer/store/main";
 import { PanelRightOpen } from "lucide-react";
 import { useCallback } from "react";
 import { useStore } from "zustand";
@@ -28,12 +29,12 @@ export function ActiveSessionContent() {
     toolStates,
     submitPrompt,
   } = useActiveSessionChat();
-  const activeSessionId = useStore(sessionStore, (state) => state.activeSessionId);
-  const artifactState = useStore(sessionStore, (state) =>
+  const activeSessionId = useStore(mainStore, (state) => state.activeSessionId);
+  const artifactState = useStore(mainStore, (state) =>
     activeSessionId ? state.getArtifactState(activeSessionId) : null,
   );
-  const setArtifactPanelOpen = useStore(sessionStore, (state) => state.setArtifactPanelOpen);
-  const pendingPermissionRequest = useStore(sessionStore, (state) => {
+  const setArtifactPanelOpen = useStore(mainStore, (state) => state.setArtifactPanelOpen);
+  const pendingPermissionRequest = useStore(mainStore, (state) => {
     if (!activeSessionId) {
       return null;
     }
@@ -105,13 +106,14 @@ const EMPTY_TOOL_STATES = new Map<string, ToolExecutionState>();
 
 function useActiveSessionChat() {
   const { invoke } = useElectronIPC();
-  const { activeSessionId, sessions } = useStore(sessionStore);
-  const activeSession = activeSessionId
-    ? sessions.find((session) => session.id === activeSessionId)
-    : undefined;
-  const entries = activeSession?.entries ?? [];
+  const { activeSessionId } = useStore(mainStore);
+  const entryState = activeSessionId
+    ? mainStore.getState().getEntryState(activeSessionId)
+    : { entries: [], toolStates: EMPTY_TOOL_STATES, status: "idle" as const };
+  const entries = entryState.entries;
   const messageEntries = entries.filter(isAgentMessageEntry);
-  const toolStates = activeSession?.toolStates ?? EMPTY_TOOL_STATES;
+  const toolStates = entryState.toolStates;
+  const isRunning = entryState.status === "running";
 
   const submitPrompt = useCallback(
     async (submission: PromptSubmission) => {
@@ -119,10 +121,10 @@ function useActiveSessionChat() {
         return;
       }
 
-      sessionStore.getState().setSessionStatus(activeSessionId, "running");
-      sessionStore.getState().setModel(activeSessionId, submission.model);
+      mainStore.getState().setStatus(activeSessionId, "running");
+      mainStore.getState().setModel(activeSessionId, submission.model);
       const userMessage = createAgentUserMessage(submission.jsonContent, submission.text);
-      const entryId = sessionStore.getState().appendMessageEntry(activeSessionId, userMessage);
+      const entryId = mainStore.getState().appendMessageEntry(activeSessionId, userMessage);
       const submissionText = submission.text;
 
       try {
@@ -135,8 +137,8 @@ function useActiveSessionChat() {
         });
       } catch (error) {
         console.error("Failed to submit prompt", error);
-        sessionStore.getState().setEntryStatus(activeSessionId, [entryId], EntryStatus.Failed);
-        sessionStore.getState().setSessionStatus(activeSessionId, "idle");
+        mainStore.getState().setEntryStatus(activeSessionId, [entryId], EntryStatus.Failed);
+        mainStore.getState().setStatus(activeSessionId, "idle");
       }
     },
     [activeSessionId, invoke],
@@ -156,10 +158,10 @@ function useActiveSessionChat() {
 
   return {
     entries,
-    isRunning: (activeSession?.status ?? "idle") === "running",
+    isRunning,
     messageEntries,
     streamingEntryId: activeSessionId
-      ? sessionStore.getState().streamingEntryIds.get(activeSessionId)
+      ? mainStore.getState().streamingEntryIds.get(activeSessionId)
       : undefined,
     stopPrompt,
     toolStates,

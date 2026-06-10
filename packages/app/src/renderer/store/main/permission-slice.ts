@@ -1,7 +1,7 @@
 import type { PermissionMode, PermissionResolution } from "@shared/permissions-ipc";
 import type { StateCreator } from "zustand/vanilla";
 
-import type { PermissionSlice, SessionPermissionState, SessionsStoreState } from "./types";
+import type { MainStoreState, PermissionSlice, SessionPermissionState } from "../types";
 
 const DEFAULT_PERMISSION_MODE: PermissionMode = "default";
 
@@ -19,7 +19,7 @@ function getStoredPermissionState(
   return permissionStates.get(sessionId) ?? createDefaultPermissionState();
 }
 
-export const createPermissionSlice: StateCreator<SessionsStoreState, [], [], PermissionSlice> = (
+export const createPermissionSlice: StateCreator<MainStoreState, [], [], PermissionSlice> = (
   set,
   get,
 ) => ({

@@ -1,21 +1,18 @@
 import type { Session } from "@renderer/apis/sessions";
 import type { StateCreator } from "zustand/vanilla";
 
-import type { AgentPendingSession, AgentSession, SessionsSlice, SessionsStoreState } from "./types";
+import type { AgentPendingSession, AgentSession, MainStoreState, SessionsSlice } from "../types";
 
 const PENDING_SESSION_SYMBOL = Symbol("pending-session");
 
 function createSessionState(session: Session): AgentSession {
   return {
     ...session,
-    entries: [],
     model: undefined,
-    toolStates: new Map(),
-    status: "idle",
   };
 }
 
-export const createSessionsSlice: StateCreator<SessionsStoreState, [], [], SessionsSlice> = (
+export const createSessionsSlice: StateCreator<MainStoreState, [], [], SessionsSlice> = (
   set,
   get,
 ) => ({
@@ -29,9 +26,7 @@ export const createSessionsSlice: StateCreator<SessionsStoreState, [], [], Sessi
 
   appendSession: (session) => {
     const existing = get().sessions.find((candidate) => candidate.id === session.id);
-    if (existing) {
-      return;
-    }
+    if (existing) return;
 
     set((prev) => ({ sessions: [...prev.sessions, createSessionState(session)] }));
   },
@@ -62,10 +57,12 @@ export const createSessionsSlice: StateCreator<SessionsStoreState, [], [], Sessi
       const streamingEntryIds = new Map(prev.streamingEntryIds);
       const permissionStates = new Map(prev.permissionStates);
       const artifactStates = new Map(prev.artifactStates);
+      const entryStates = new Map(prev.entryStates);
 
       streamingEntryIds.delete(sessionId);
       permissionStates.delete(sessionId);
       artifactStates.delete(sessionId);
+      entryStates.delete(sessionId);
 
       return {
         sessions,
@@ -73,6 +70,7 @@ export const createSessionsSlice: StateCreator<SessionsStoreState, [], [], Sessi
         streamingEntryIds,
         permissionStates,
         artifactStates,
+        entryStates,
       };
     });
   },
@@ -84,43 +82,19 @@ export const createSessionsSlice: StateCreator<SessionsStoreState, [], [], Sessi
         .filter((session) => !existingIds.has(session.id))
         .map((session) => createSessionState(session));
 
-      if (nextSessions.length === 0) {
-        return prev;
-      }
+      if (nextSessions.length === 0) return prev;
 
       return { sessions: [...prev.sessions, ...nextSessions] };
     });
   },
 
-  setSessionStatus: (sessionId, status) => {
-    const session = get().getSession(sessionId);
-    if (!session) {
-      return;
-    }
-
-    set((prev) => {
-      const sessionIndex = prev.sessions.findIndex((candidate) => candidate.id === sessionId);
-      if (sessionIndex < 0) {
-        return prev;
-      }
-
-      const sessions = [...prev.sessions];
-      sessions[sessionIndex] = { ...session, status };
-      return { sessions };
-    });
-  },
-
   setModel: (sessionId, model) => {
     const session = get().getSession(sessionId);
-    if (!session) {
-      return;
-    }
+    if (!session) return;
 
     set((prev) => {
       const sessionIndex = prev.sessions.findIndex((candidate) => candidate.id === sessionId);
-      if (sessionIndex < 0) {
-        return prev;
-      }
+      if (sessionIndex < 0) return prev;
 
       const sessions = [...prev.sessions];
       sessions[sessionIndex] = { ...session, model };
@@ -130,15 +104,11 @@ export const createSessionsSlice: StateCreator<SessionsStoreState, [], [], Sessi
 
   setCwd: (sessionId, cwd) => {
     const session = get().getSession(sessionId);
-    if (!session) {
-      return;
-    }
+    if (!session) return;
 
     set((prev) => {
       const sessionIndex = prev.sessions.findIndex((candidate) => candidate.id === sessionId);
-      if (sessionIndex < 0) {
-        return prev;
-      }
+      if (sessionIndex < 0) return prev;
 
       const sessions = [...prev.sessions];
       sessions[sessionIndex] = { ...session, cwd };

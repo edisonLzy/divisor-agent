@@ -1,5 +1,5 @@
 import { listSessions, listWorkspaces } from "@renderer/apis/sessions";
-import { sessionStore } from "@renderer/store";
+import { mainStore } from "@renderer/store/main";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 
@@ -10,7 +10,7 @@ export function usePinnedSessions() {
     queryKey: ["sessions", "pinned"],
     queryFn: async () => {
       const result = await listSessions({ isTop: true, limit: 100 });
-      sessionStore.getState().addSessions(result.sessions);
+      mainStore.getState().addSessions(result.sessions);
       return result;
     },
   });

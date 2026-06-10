@@ -1,6 +1,6 @@
 import { createSession } from "@renderer/apis/sessions";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
-import { sessionStore } from "@renderer/store";
+import { mainStore } from "@renderer/store/main";
 import { useCallback } from "react";
 
 import { useInvalidateStandaloneSessions } from "./sessions/use-standalone-sessions";
@@ -19,7 +19,7 @@ export function useCreateSession() {
   const invalidateWorkspaceSessions = useInvalidateWorkspaceSessions();
 
   const handleCreateSession = useCallback((workspaceId?: string | null) => {
-    const store = sessionStore.getState();
+    const store = mainStore.getState();
     store.setActiveSessionId(null);
 
     if (store.pendingSession) {
@@ -37,7 +37,7 @@ export function useCreateSession() {
    * the creation failed (pendingSession is preserved for retry).
    */
   const handleSubmitPrompt = useCallback(async (): Promise<boolean> => {
-    const store = sessionStore.getState();
+    const store = mainStore.getState();
     const pending = store.pendingSession;
     if (!pending) return false;
 

@@ -11,8 +11,8 @@ import {
   type ModelChangedData,
   type SessionEntry,
   type SessionStatus,
-  sessionStore,
 } from "@renderer/store";
+import { mainStore } from "@renderer/store/main";
 import { useQueryClient } from "@tanstack/react-query";
 import { Pin, PinOff, Trash2, Loader2 } from "lucide-react";
 import { useCallback } from "react";
@@ -27,19 +27,18 @@ interface SessionItemProps {
 // ── Component ───────────────────────────────────────────────────────────────
 
 export function SessionItem({ session }: SessionItemProps) {
-  const { activeSessionId } = useStore(sessionStore);
+  const { activeSessionId } = useStore(mainStore);
   const { invoke } = useElectronIPC();
   const queryClient = useQueryClient();
   const isActive = session.id === activeSessionId;
 
   const handleSelectSession = useCallback(async () => {
-    const storeSession = sessionStore.getState().getSession(session.id);
-    if (storeSession && storeSession.entries.length === 0) {
+    const entryState = mainStore.getState().getEntryState(session.id);
+    if (entryState.entries.length === 0) {
       try {
         const entries = await getSessionEntries(session.id);
-        const current = sessionStore.getState().getSession(session.id);
-        if (current) {
-          sessionStore.getState().setSessionEntries(
+        if (mainStore.getState().getSession(session.id)) {
+          mainStore.getState().setSessionEntries(
             session.id,
             entries.map((e): SessionEntry => {
               if (e.type === "message") {
@@ -70,9 +69,9 @@ export function SessionItem({ session }: SessionItemProps) {
       console.error("Failed to set session ID:", error);
     }
 
-    const updatedSession = sessionStore.getState().getSession(session.id);
-    if (updatedSession && updatedSession.entries.length > 0) {
-      const messages = updatedSession.entries
+    const updatedEntries = mainStore.getState().getEntryState(session.id).entries;
+    if (updatedEntries.length > 0) {
+      const messages = updatedEntries
         .filter((e): e is MessageEntry => e.type === "message")
         .map((e) => agentMessageToRuntimeMessage(e.data));
       try {
@@ -82,7 +81,7 @@ export function SessionItem({ session }: SessionItemProps) {
       }
     }
 
-    sessionStore.getState().setActiveSessionId(session.id);
+    mainStore.getState().setActiveSessionId(session.id);
   }, [session.id, invoke]);
 
   const handleTogglePin = useCallback(
@@ -104,7 +103,7 @@ export function SessionItem({ session }: SessionItemProps) {
       e.stopPropagation();
       try {
         await deleteSession({ id: session.id });
-        sessionStore.getState().removeSession(session.id);
+        mainStore.getState().removeSession(session.id);
         await queryClient.invalidateQueries({ queryKey: ["sessions"] });
         await queryClient.invalidateQueries({ queryKey: ["workspaces"] });
       } catch (error) {
@@ -133,9 +132,7 @@ export function SessionItem({ session }: SessionItemProps) {
         )}
       >
         <span className="truncate pr-2">{session.name.trim() || "untitled"}</span>
-        <SessionStatusDot
-          status={sessionStore.getState().getSession(session.id)?.status ?? "idle"}
-        />
+        <SessionStatusDot status={mainStore.getState().getEntryState(session.id).status} />
       </button>
 
       <div className="relative shrink-0 flex justify-end min-w-[3.25rem]">

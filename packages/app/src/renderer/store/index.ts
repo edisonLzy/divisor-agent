@@ -1,16 +1,5 @@
-import { createStore } from "zustand/vanilla";
-
-import { createArtifactSlice } from "./artifact-slice";
-import { createEntriesSlice } from "./entries-slice";
-import { createPermissionSlice } from "./permission-slice";
-import { createSessionsSlice } from "./session-slice";
-import type { SessionsStoreState } from "./types";
-
+// Type barrel — types are still importable from "@renderer/store".
+// Store instances are imported separately:
+//   import { mainStore } from "@renderer/store/main";
+//   import { sideChatStore } from "@renderer/store/side-chat";
 export * from "./types";
-
-export const sessionStore = createStore<SessionsStoreState>()((...args) => ({
-  ...createArtifactSlice(...args),
-  ...createSessionsSlice(...args),
-  ...createEntriesSlice(...args),
-  ...createPermissionSlice(...args),
-}));

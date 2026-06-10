@@ -15,9 +15,12 @@ import { Separator } from "@renderer/components/ui/separator";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { createAgentUserMessage } from "@renderer/lib/agent-message";
 import { cn } from "@renderer/lib/utils";
-import { sessionStore, type SessionEntry, type ToolExecutionState } from "@renderer/store";
+import type { SessionEntry, ToolExecutionState } from "@renderer/store";
+import { mainStore } from "@renderer/store/main";
+import { sideChatStore } from "@renderer/store/side-chat";
 import { ChevronRightIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { v4 as uuidv4 } from "uuid";
 import { useStore } from "zustand";
 
 import { AssistantResponseMessage } from "./assistant-response-message";
@@ -81,7 +84,7 @@ export function AssistantMessage({
     y: number;
   } | null>(null);
 
-  const model = useStore(sessionStore, (state) => {
+  const model = useStore(mainStore, (state) => {
     const s = state.getSession(sessionId);
     return s?.model ?? undefined;
   });
@@ -123,9 +126,19 @@ export function AssistantMessage({
       window.getSelection()?.removeAllRanges();
 
       const initialPrompt = `我正在研究主对话中的以下内容，请帮我深入分析：\n\n> ${text.split("\n").join("\n> ")}\n\n请针对以上内容进行分析和讨论。`;
-      const sideChatId = sessionStore
+      const sideChatId = uuidv4();
+
+      mainStore.getState().upsertArtifact(sessionId, {
+        id: sideChatId,
+        type: "side-chat",
+        content: {},
+        name: text.slice(0, 30) + (text.length > 30 ? "..." : ""),
+      });
+
+      sideChatStore
         .getState()
-        .createSideChatArtifact(
+        .initSideChat(
+          sideChatId,
           sessionId,
           { sourceEntryId: entryId, selectedText: text },
           model,
@@ -139,20 +152,20 @@ export function AssistantMessage({
         ],
       };
       const userMessage = createAgentUserMessage(jsonContent, initialPrompt);
-      sessionStore.getState().appendSideChatArtifactEntry(sessionId, sideChatId, userMessage);
+      sideChatStore.getState().appendMessageEntry(sideChatId, userMessage);
 
       if (!model) return;
 
       try {
         await invoke("setSessionId", sideChatId);
-        sessionStore.getState().setSideChatArtifactStatus(sessionId, sideChatId, "running");
+        sideChatStore.getState().setStatus(sideChatId, "running");
         void invoke("prompt", sideChatId, initialPrompt, {
           model: { modelId: model.modelId, providerId: model.providerId },
           skillIds: [],
         });
       } catch (error) {
         console.error("Failed to start side chat:", error);
-        sessionStore.getState().setSideChatArtifactStatus(sessionId, sideChatId, "idle");
+        sideChatStore.getState().setStatus(sideChatId, "idle");
       }
     },
     [sessionId, entryId, model, invoke],

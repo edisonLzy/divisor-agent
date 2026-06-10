@@ -2,25 +2,42 @@ import { isAgentMessageEntry } from "@renderer/lib/is";
 import { v4 as uuidv4 } from "uuid";
 import type { StateCreator } from "zustand/vanilla";
 
-import { EntryStatus, type EntriesSlice, type SessionsStoreState } from "./types";
+import { EntryStatus, type EntriesSlice } from "./types";
 
-export const createEntriesSlice: StateCreator<SessionsStoreState, [], [], EntriesSlice> = (
-  set,
-  get,
-) => ({
-  appendMessageEntry: (sessionId, message) => {
+const EMPTY_ENTRY_STATE = {
+  entries: [],
+  toolStates: new Map(),
+  status: "idle" as const,
+};
+
+function getOrCreateEntryState(
+  entryStates: Map<string, EntriesSlice["entryStates"] extends Map<string, infer V> ? V : never>,
+  ownerId: string,
+) {
+  const existing = entryStates.get(ownerId);
+  if (existing) return existing;
+  return { entries: [], toolStates: new Map(), status: "idle" as const };
+}
+
+export const createEntriesSlice: StateCreator<EntriesSlice, [], [], EntriesSlice> = (set, get) => ({
+  entryStates: new Map(),
+  streamingEntryIds: new Map(),
+
+  getEntryState: (ownerId) => {
+    const existing = get().entryStates.get(ownerId);
+    if (existing) return existing;
+    return { ...EMPTY_ENTRY_STATE, toolStates: new Map() };
+  },
+
+  appendMessageEntry: (ownerId, message) => {
     const entryId = uuidv4();
-    const session = get().getSession(sessionId);
-    if (!session) {
-      return entryId;
-    }
+    const state = get().getEntryState(ownerId);
 
-    const parentId =
-      session.entries.length > 0 ? session.entries[session.entries.length - 1].id : null;
+    const parentId = state.entries.length > 0 ? state.entries[state.entries.length - 1].id : null;
 
     const messageEntry = {
       id: entryId,
-      sessionId,
+      sessionId: ownerId,
       parentId,
       type: "message" as const,
       timestamp: Date.now(),
@@ -29,168 +46,121 @@ export const createEntriesSlice: StateCreator<SessionsStoreState, [], [], Entrie
     };
 
     set((prev) => {
-      const sessionIndex = prev.sessions.findIndex((candidate) => candidate.id === sessionId);
-      if (sessionIndex < 0) {
-        return prev;
-      }
-
-      const sessions = [...prev.sessions];
-      sessions[sessionIndex] = {
-        ...session,
-        entries: [...session.entries, messageEntry],
-        updatedAt: Date.now(),
-      };
-      return { sessions };
+      const entryStates = new Map(prev.entryStates);
+      const current = getOrCreateEntryState(entryStates, ownerId);
+      entryStates.set(ownerId, {
+        ...current,
+        entries: [...current.entries, messageEntry],
+      });
+      return { entryStates };
     });
 
     return entryId;
   },
 
-  updateMessageEntry: (sessionId, entryId, message) => {
-    const session = get().getSession(sessionId);
-    if (!session) {
-      return;
-    }
+  updateMessageEntry: (ownerId, entryId, message) => {
+    const state = get().getEntryState(ownerId);
+    const entryIndex = state.entries.findIndex((entry) => entry.id === entryId);
+    if (entryIndex < 0) return;
 
-    const entryIndex = session.entries.findIndex((entry) => entry.id === entryId);
-    if (entryIndex < 0) {
-      return;
-    }
-
-    const existingEntry = session.entries[entryIndex];
-    if (!isAgentMessageEntry(existingEntry)) {
-      return;
-    }
-
-    const entries = [...session.entries];
-    entries[entryIndex] = { ...existingEntry, data: message };
+    const existingEntry = state.entries[entryIndex];
+    if (!isAgentMessageEntry(existingEntry)) return;
 
     set((prev) => {
-      const sessionIndex = prev.sessions.findIndex((candidate) => candidate.id === sessionId);
-      if (sessionIndex < 0) {
-        return prev;
-      }
-
-      const sessions = [...prev.sessions];
-      sessions[sessionIndex] = { ...session, entries };
-      return { sessions };
+      const entryStates = new Map(prev.entryStates);
+      const current = getOrCreateEntryState(entryStates, ownerId);
+      const entries = [...current.entries];
+      entries[entryIndex] = { ...existingEntry, data: message };
+      entryStates.set(ownerId, { ...current, entries });
+      return { entryStates };
     });
   },
 
-  setEntryStatus: (sessionId, entryIds, status) => {
-    const session = get().getSession(sessionId);
-    if (!session || entryIds.length === 0) {
-      return;
-    }
+  setEntryStatus: (ownerId, entryIds, status) => {
+    const state = get().getEntryState(ownerId);
+    if (entryIds.length === 0) return;
 
     const targetIds = new Set(entryIds);
-    const entries = session.entries.map((entry) => {
-      if (!targetIds.has(entry.id)) {
-        return entry;
-      }
-
+    const entries = state.entries.map((entry) => {
+      if (!targetIds.has(entry.id)) return entry;
       return { ...entry, status };
     });
 
     set((prev) => {
-      const sessionIndex = prev.sessions.findIndex((candidate) => candidate.id === sessionId);
-      if (sessionIndex < 0) {
-        return prev;
-      }
-
-      const sessions = [...prev.sessions];
-      sessions[sessionIndex] = { ...session, entries };
-      return { sessions };
+      const entryStates = new Map(prev.entryStates);
+      const current = getOrCreateEntryState(entryStates, ownerId);
+      entryStates.set(ownerId, { ...current, entries });
+      return { entryStates };
     });
   },
 
-  setStreamingEntryCompletedAt: (sessionId, completedAt) => {
-    const entryId = get().streamingEntryIds.get(sessionId);
-    if (!entryId) {
-      return;
-    }
+  setStreamingEntryCompletedAt: (ownerId, completedAt) => {
+    const entryId = get().streamingEntryIds.get(ownerId);
+    if (!entryId) return;
 
-    const session = get().getSession(sessionId);
-    if (!session) {
-      return;
-    }
+    const state = get().getEntryState(ownerId);
+    const entryIndex = state.entries.findIndex((entry) => entry.id === entryId);
+    if (entryIndex < 0) return;
 
-    const entryIndex = session.entries.findIndex((entry) => entry.id === entryId);
-    if (entryIndex < 0) {
-      return;
-    }
-
-    const existingEntry = session.entries[entryIndex];
-    if (!isAgentMessageEntry(existingEntry)) {
-      return;
-    }
-
-    const entries = [...session.entries];
-    entries[entryIndex] = { ...existingEntry, completedAt };
+    const existingEntry = state.entries[entryIndex];
+    if (!isAgentMessageEntry(existingEntry)) return;
 
     set((prev) => {
-      const sessionIndex = prev.sessions.findIndex((candidate) => candidate.id === sessionId);
-      if (sessionIndex < 0) {
-        return prev;
-      }
-
-      const sessions = [...prev.sessions];
-      sessions[sessionIndex] = { ...session, entries };
-      return { sessions };
+      const entryStates = new Map(prev.entryStates);
+      const current = getOrCreateEntryState(entryStates, ownerId);
+      const entries = [...current.entries];
+      entries[entryIndex] = { ...existingEntry, completedAt };
+      entryStates.set(ownerId, { ...current, entries });
+      return { entryStates };
     });
   },
 
-  setToolState: (sessionId, toolCallId, state) => {
-    const session = get().getSession(sessionId);
-    if (!session) {
-      return;
-    }
-
-    const toolStates = new Map(session.toolStates);
-    toolStates.set(toolCallId, state);
-
+  setToolState: (ownerId, toolCallId, state) => {
     set((prev) => {
-      const sessionIndex = prev.sessions.findIndex((candidate) => candidate.id === sessionId);
-      if (sessionIndex < 0) {
-        return prev;
-      }
-
-      const sessions = [...prev.sessions];
-      sessions[sessionIndex] = { ...session, toolStates };
-      return { sessions };
+      const entryStates = new Map(prev.entryStates);
+      const current = getOrCreateEntryState(entryStates, ownerId);
+      const toolStates = new Map(current.toolStates);
+      toolStates.set(toolCallId, state);
+      entryStates.set(ownerId, { ...current, toolStates });
+      return { entryStates };
     });
   },
 
-  setSessionEntries: (sessionId, entries) => {
-    const session = get().getSession(sessionId);
-    if (!session) {
-      return;
-    }
-
+  setSessionEntries: (ownerId, entries) => {
     set((prev) => {
-      const sessionIndex = prev.sessions.findIndex((candidate) => candidate.id === sessionId);
-      if (sessionIndex < 0) {
-        return prev;
-      }
-
-      const sessions = [...prev.sessions];
-      sessions[sessionIndex] = { ...session, entries, updatedAt: Date.now() };
-      return { sessions };
+      const entryStates = new Map(prev.entryStates);
+      const current = getOrCreateEntryState(entryStates, ownerId);
+      entryStates.set(ownerId, { ...current, entries });
+      return { entryStates };
     });
   },
 
-  streamingEntryIds: new Map(),
+  setStatus: (ownerId, status) => {
+    set((prev) => {
+      const entryStates = new Map(prev.entryStates);
+      const current = getOrCreateEntryState(entryStates, ownerId);
+      entryStates.set(ownerId, { ...current, status });
+      return { entryStates };
+    });
+  },
 
-  setStreamingEntryId: (sessionId, entryId) => {
+  setStreamingEntryId: (ownerId, entryId) => {
     set((prev) => {
       const streamingEntryIds = new Map(prev.streamingEntryIds);
       if (entryId === undefined) {
-        streamingEntryIds.delete(sessionId);
+        streamingEntryIds.delete(ownerId);
       } else {
-        streamingEntryIds.set(sessionId, entryId);
+        streamingEntryIds.set(ownerId, entryId);
       }
-
       return { streamingEntryIds };
+    });
+  },
+
+  removeEntryState: (ownerId) => {
+    set((prev) => {
+      const entryStates = new Map(prev.entryStates);
+      entryStates.delete(ownerId);
+      return { entryStates };
     });
   },
 });

@@ -10,7 +10,8 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@renderer/components/ui/popover";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { createAgentUserMessage } from "@renderer/lib/agent-message";
-import { EntryStatus, sessionStore } from "@renderer/store";
+import { EntryStatus } from "@renderer/store";
+import { mainStore } from "@renderer/store/main";
 import { Check, ChevronDown, Folder, X } from "lucide-react";
 import { useState } from "react";
 import { useStore } from "zustand";
@@ -31,7 +32,7 @@ export function PendingSessionContent() {
     setIsLoading(true);
 
     try {
-      const store = sessionStore.getState();
+      const store = mainStore.getState();
       const workspaceId = store.pendingSession?.workspaceId ?? null;
 
       const newSession = await createSession({
@@ -52,9 +53,9 @@ export function PendingSessionContent() {
         await invalidateStandalone();
       }
 
-      sessionStore.getState().setSessionStatus(newSession.id, "running");
+      mainStore.getState().setStatus(newSession.id, "running");
       const userMessage = createAgentUserMessage(submission.jsonContent, submission.text);
-      const entryId = sessionStore.getState().appendMessageEntry(newSession.id, userMessage);
+      const entryId = mainStore.getState().appendMessageEntry(newSession.id, userMessage);
       const submissionText = submission.text;
 
       try {
@@ -66,15 +67,15 @@ export function PendingSessionContent() {
           skillIds: submission.skillIds,
         });
       } catch (error) {
-        sessionStore.getState().setEntryStatus(newSession.id, [entryId], EntryStatus.Failed);
+        mainStore.getState().setEntryStatus(newSession.id, [entryId], EntryStatus.Failed);
         throw error;
       }
     } catch (error) {
       console.error("Failed to submit prompt", error);
 
-      const sessionId = sessionStore.getState().activeSessionId;
+      const sessionId = mainStore.getState().activeSessionId;
       if (sessionId) {
-        sessionStore.getState().setSessionStatus(sessionId, "idle");
+        mainStore.getState().setStatus(sessionId, "idle");
       }
     } finally {
       setIsLoading(false);
@@ -98,10 +99,10 @@ export function PendingSessionContent() {
 }
 
 export function useWorkspaceSelector() {
-  const value = useStore(sessionStore, (state) => state.pendingSession?.workspaceId ?? null);
+  const value = useStore(mainStore, (state) => state.pendingSession?.workspaceId ?? null);
 
   const onChange = (nextWorkspaceId: string | null) => {
-    sessionStore.getState().createPendingSession(nextWorkspaceId);
+    mainStore.getState().createPendingSession(nextWorkspaceId);
   };
 
   return {

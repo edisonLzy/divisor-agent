@@ -1,6 +1,7 @@
 import { useSubscribeAgentEvents } from "@renderer/hooks/use-subscribe-agent-events";
 import { isFailedAssistantMessage } from "@renderer/lib/is";
-import { sessionStore } from "@renderer/store";
+import { mainStore } from "@renderer/store/main";
+import { sideChatStore } from "@renderer/store/side-chat";
 
 /**
  * Subscribes to agent lifecycle events to manage session UI state
@@ -13,15 +14,15 @@ export function useAgentSessions() {
   useSubscribeAgentEvents({
     agent_start: (event) => {
       const { sessionId } = event;
-      if (sessionStore.getState().isSideChatArtifactSession(sessionId)) return;
-      sessionStore.getState().setSessionStatus(sessionId, "running");
+      if (sideChatStore.getState().isSideChatSession(sessionId)) return;
+      mainStore.getState().setStatus(sessionId, "running");
     },
 
     agent_end: (event) => {
       const { sessionId, messages } = event;
-      if (sessionStore.getState().isSideChatArtifactSession(sessionId)) return;
+      if (sideChatStore.getState().isSideChatSession(sessionId)) return;
       const status = messages.some(isFailedAssistantMessage) ? "failed" : "completed";
-      sessionStore.getState().setSessionStatus(sessionId, status);
+      mainStore.getState().setStatus(sessionId, status);
     },
   });
 }
