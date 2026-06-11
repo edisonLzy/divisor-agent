@@ -1,7 +1,34 @@
 import type { Session } from "@renderer/apis/sessions";
+import type { AvailableModel } from "@shared/models-ipc";
 import type { StateCreator } from "zustand/vanilla";
 
-import type { AgentPendingSession, AgentSession, MainStoreState, SessionsSlice } from "../types";
+import type { MainStoreState } from "./store-state";
+
+export interface AgentSession extends Session {
+  model: AvailableModel | undefined;
+}
+
+export interface AgentPendingSession {
+  id: symbol;
+  workspaceId: string | null;
+  createdAt: number;
+}
+
+export interface SessionsSlice {
+  activeSessionId: string | null;
+  pendingSession: AgentPendingSession | null;
+  sessions: AgentSession[];
+
+  getSession: (sessionId: string) => AgentSession | undefined;
+  appendSession: (session: Session) => void;
+  setActiveSessionId: (sessionId: string | null) => void;
+  createPendingSession: (workspaceId?: string | null) => AgentPendingSession;
+  clearPendingSession: () => void;
+  removeSession: (sessionId: string) => void;
+  addSessions: (sessions: Session[]) => void;
+  setModel: (sessionId: string, model: AvailableModel) => void;
+  setCwd: (sessionId: string, cwd: string) => void;
+}
 
 const PENDING_SESSION_SYMBOL = Symbol("pending-session");
 

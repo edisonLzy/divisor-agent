@@ -1,6 +1,38 @@
 import type { StateCreator } from "zustand/vanilla";
 
-import type { ArtifactRecord, ArtifactSlice, MainStoreState, SessionArtifactState } from "../types";
+import type { MainStoreState } from "./store-state";
+
+export type ArtifactType = "side-chat" | string;
+
+export interface ArtifactRecord<TContent = unknown> {
+  id: string;
+  name: string;
+  type: ArtifactType;
+  content: TContent;
+  props?: Record<string, unknown>;
+  raw?: string;
+  updatedAt: number;
+}
+
+export interface SessionArtifactState {
+  activeArtifactId: string | null;
+  artifacts: ArtifactRecord[];
+  isOpen: boolean;
+}
+
+export interface ArtifactSlice {
+  artifactStates: Map<string, SessionArtifactState>;
+  getArtifactState: (sessionId: string) => SessionArtifactState;
+  setArtifactPanelOpen: (sessionId: string, isOpen: boolean) => void;
+  setActiveArtifactId: (sessionId: string, artifactId: string | null) => void;
+  removeArtifact: (sessionId: string, artifactId: string) => void;
+  reorderArtifacts: (sessionId: string, sourceIndex: number, targetIndex: number) => void;
+  upsertArtifact: <TContent = unknown>(
+    sessionId: string,
+    artifact: Omit<ArtifactRecord<TContent>, "content" | "name" | "updatedAt"> &
+      Partial<Pick<ArtifactRecord<TContent>, "content" | "name">>,
+  ) => void;
+}
 
 const EMPTY_ARTIFACT_STATE: SessionArtifactState = {
   activeArtifactId: null,
@@ -98,7 +130,7 @@ export const createArtifactSlice: StateCreator<MainStoreState, [], [], ArtifactS
         ...state,
         activeArtifactId,
         artifacts,
-        isOpen: artifacts.length > 0 ? state.isOpen : false,
+        isOpen: state.isOpen,
       });
 
       const streamingEntryIds = new Map(prev.streamingEntryIds);

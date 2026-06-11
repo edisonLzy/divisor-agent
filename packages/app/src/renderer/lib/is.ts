@@ -5,7 +5,7 @@ import type {
   MessageEntry,
   ModelChangedEntry,
   SessionEntry,
-} from "@renderer/store";
+} from "@renderer/store/entries-slice";
 
 export function isAgentMessageEntry(entry: SessionEntry): entry is MessageEntry {
   return entry.type === "message";

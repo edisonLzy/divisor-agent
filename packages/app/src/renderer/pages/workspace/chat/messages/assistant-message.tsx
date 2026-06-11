@@ -15,7 +15,7 @@ import { Separator } from "@renderer/components/ui/separator";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { createAgentUserMessage } from "@renderer/lib/agent-message";
 import { cn } from "@renderer/lib/utils";
-import type { SessionEntry, ToolExecutionState } from "@renderer/store";
+import type { SessionEntry, ToolExecutionState } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
 import { sideChatStore } from "@renderer/store/side-chat";
 import { ChevronRightIcon } from "lucide-react";

@@ -4,7 +4,7 @@ import { skillNode } from "@renderer/components/richtext/inline/skill-node";
 import { Button } from "@renderer/components/ui/button";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { agentMessageToRuntimeMessage, createAgentUserMessage } from "@renderer/lib/agent-message";
-import type { AgentUserMessage, MessageEntry, SessionEntry } from "@renderer/store";
+import type { AgentUserMessage, MessageEntry, SessionEntry } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
 import Mention from "@tiptap/extension-mention";
 import { EditorContent, useEditor } from "@tiptap/react";

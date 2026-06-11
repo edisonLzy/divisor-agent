@@ -2,8 +2,8 @@ import type { AssistantMessage } from "@mariozechner/pi-ai";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { createAgentUserMessage } from "@renderer/lib/agent-message";
 import { isAgentAssistantMessage, isAgentMessageEntry } from "@renderer/lib/is";
-import type { SideChatArtifactRecord } from "@renderer/store";
 import { sideChatStore } from "@renderer/store/side-chat";
+import type { SideChatArtifactRecord } from "@renderer/store/side-chat/side-chat-slice";
 import { useCallback, useMemo } from "react";
 import { useStore } from "zustand";
 

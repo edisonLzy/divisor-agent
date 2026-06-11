@@ -1,3 +1,4 @@
+import { Button } from "@renderer/components/ui/button";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -6,15 +7,15 @@ import {
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { createAgentUserMessage } from "@renderer/lib/agent-message";
 import { isAgentMessageEntry } from "@renderer/lib/is";
-import { EntryStatus, type ToolExecutionState } from "@renderer/store";
+import { EntryStatus, type ToolExecutionState } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
+import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useCallback } from "react";
 import { useStore } from "zustand";
 
 import { ArtifactsPanel } from "./artifacts";
-import { ToggleArtifactPanelButton } from "./artifacts/toggle-artifact-panel-button";
-import { FixedActions } from "./fixed-actions";
 import { ChatMessages } from "./messages";
+import { FixedActions, PanelHeader } from "./panel-header";
 import { PermissionApprovalPanel } from "./permission";
 import { PromptInput } from "./prompt-input";
 import type { PromptSubmission } from "./prompt-types";
@@ -29,7 +30,12 @@ export function ActiveSessionContent() {
     toolStates,
     submitPrompt,
   } = useActiveSessionChat();
-  const activeSessionId = useStore(mainStore, (state) => state.activeSessionId);
+
+  const activeSessionId = useStore(mainStore, (state) => state.activeSessionId!);
+
+  const activeSession = useStore(mainStore, (state) =>
+    activeSessionId ? state.getSession(activeSessionId) : undefined,
+  );
   const artifactState = useStore(mainStore, (state) =>
     activeSessionId ? state.getArtifactState(activeSessionId) : null,
   );
@@ -40,59 +46,95 @@ export function ActiveSessionContent() {
 
     return state.getPermissionState(activeSessionId).requests[0] ?? null;
   });
-  const hasArtifacts = (artifactState?.artifacts.length ?? 0) > 0;
-  const isArtifactPanelOpen = Boolean(activeSessionId && artifactState?.isOpen && hasArtifacts);
+  const isArtifactPanelOpen = Boolean(activeSessionId && artifactState?.isOpen);
+  const sessionName = activeSession?.name.trim() || "untitled";
 
   return (
-    <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
-      <ResizablePanel defaultSize={isArtifactPanelOpen ? "68%" : "100%"} minSize="42%">
-        <div className="relative flex h-full min-w-0 flex-col">
-          {activeSessionId ? (
-            <FixedActions>
-              <ToggleArtifactPanelButton sessionId={activeSessionId} />
-            </FixedActions>
-          ) : null}
+    <div className="relative flex min-h-0 flex-1">
+      <FixedActions>
+        <ToggleArtifactPanelButton sessionId={activeSessionId} />
+      </FixedActions>
 
-          <section className="min-h-0 flex-1 px-6 pt-6">
-            <ChatMessages
-              entries={entries}
-              isRunning={isRunning}
-              messageEntries={messageEntries}
-              sessionId={activeSessionId ?? ""}
-              streamingEntryId={streamingEntryId}
-              toolStates={toolStates}
-            />
-          </section>
-
-          <section className="shrink-0 px-6 pb-6 pt-4">
-            {activeSessionId && pendingPermissionRequest ? (
-              <PermissionApprovalPanel sessionId={activeSessionId} />
-            ) : (
-              <PromptInput
-                disabled={false}
+      <ResizablePanelGroup
+        key={isArtifactPanelOpen ? "artifacts-open" : "artifacts-closed"}
+        orientation="horizontal"
+        className="min-h-0 flex-1"
+      >
+        <ResizablePanel defaultSize={isArtifactPanelOpen ? "68%" : "100%"} minSize="42%">
+          <div className="flex h-full min-w-0 flex-col">
+            <PanelHeader>
+              <h1 className="truncate text-sm font-medium text-foreground">{sessionName}</h1>
+              <Button>asdasd</Button>
+            </PanelHeader>
+            <section className="min-h-0 flex-1 px-6 pt-6">
+              <ChatMessages
+                entries={entries}
                 isRunning={isRunning}
-                onStop={stopPrompt}
-                onSubmit={submitPrompt}
-                sessionId={activeSessionId}
+                messageEntries={messageEntries}
+                sessionId={activeSessionId ?? ""}
+                streamingEntryId={streamingEntryId}
+                toolStates={toolStates}
               />
-            )}
-          </section>
-        </div>
-      </ResizablePanel>
+            </section>
 
-      {activeSessionId && isArtifactPanelOpen ? (
-        <>
-          <ResizableHandle />
-          <ResizablePanel defaultSize="32%" minSize="22%" maxSize="48%">
-            <ArtifactsPanel sessionId={activeSessionId} />
-          </ResizablePanel>
-        </>
-      ) : null}
-    </ResizablePanelGroup>
+            <section className="shrink-0 px-6 pb-6 pt-4">
+              {activeSessionId && pendingPermissionRequest ? (
+                <PermissionApprovalPanel sessionId={activeSessionId} />
+              ) : (
+                <PromptInput
+                  disabled={false}
+                  isRunning={isRunning}
+                  onStop={stopPrompt}
+                  onSubmit={submitPrompt}
+                  sessionId={activeSessionId}
+                />
+              )}
+            </section>
+          </div>
+        </ResizablePanel>
+
+        {isArtifactPanelOpen ? (
+          <>
+            <ResizableHandle />
+            <ResizablePanel defaultSize="32%" minSize="22%" maxSize="48%">
+              <ArtifactsPanel sessionId={activeSessionId} />
+            </ResizablePanel>
+          </>
+        ) : null}
+      </ResizablePanelGroup>
+    </div>
   );
 }
 
 const EMPTY_TOOL_STATES = new Map<string, ToolExecutionState>();
+
+interface ToggleArtifactPanelButtonProps {
+  sessionId: string;
+}
+
+function ToggleArtifactPanelButton({ sessionId }: ToggleArtifactPanelButtonProps) {
+  const artifactState = useStore(mainStore, (state) => state.getArtifactState(sessionId));
+  const setArtifactPanelOpen = useStore(mainStore, (state) => state.setArtifactPanelOpen);
+
+  const isOpen = artifactState.isOpen;
+  const Icon = isOpen ? PanelRightClose : PanelRightOpen;
+
+  return (
+    <Button
+      type="button"
+      variant="secondary"
+      size="icon-sm"
+      className="rounded-lg border border-border/70 bg-background/90 shadow-sm supports-backdrop-filter:backdrop-blur-xl"
+      onClick={() => {
+        const nextIsOpen = !mainStore.getState().getArtifactState(sessionId).isOpen;
+        setArtifactPanelOpen(sessionId, nextIsOpen);
+      }}
+      aria-label={isOpen ? "Close artifacts panel" : "Open artifacts panel"}
+    >
+      <Icon />
+    </Button>
+  );
+}
 
 function useActiveSessionChat() {
   const { invoke } = useElectronIPC();

@@ -11,7 +11,7 @@ import {
   type ModelChangedData,
   type SessionEntry,
   type SessionStatus,
-} from "@renderer/store";
+} from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
 import { useQueryClient } from "@tanstack/react-query";
 import { Pin, PinOff, Trash2, Loader2 } from "lucide-react";

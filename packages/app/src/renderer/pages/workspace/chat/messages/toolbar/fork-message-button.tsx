@@ -2,7 +2,7 @@ import { createSession } from "@renderer/apis/sessions";
 import { MessageAction } from "@renderer/components/ai-elements/message";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { agentMessageToRuntimeMessage } from "@renderer/lib/agent-message";
-import { type MessageEntry, type SessionEntry } from "@renderer/store";
+import { type MessageEntry, type SessionEntry } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
 import { GitBranch } from "lucide-react";
 import { useCallback, useState } from "react";

@@ -4,7 +4,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@renderer/components/ui/collapsible";
-import type { ToolExecutionState } from "@renderer/store";
+import type { ToolExecutionState } from "@renderer/store/entries-slice";
 import { ChevronRightIcon } from "lucide-react";
 
 interface AssistantToolMessageProps {

@@ -10,7 +10,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@renderer/components/ui/popover";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { createAgentUserMessage } from "@renderer/lib/agent-message";
-import { EntryStatus } from "@renderer/store";
+import { EntryStatus } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
 import { Check, ChevronDown, Folder, X } from "lucide-react";
 import { useState } from "react";

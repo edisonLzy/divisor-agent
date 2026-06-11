@@ -1,7 +1,36 @@
-import type { PermissionMode, PermissionResolution } from "@shared/permissions-ipc";
+import type {
+  PermissionMode,
+  PermissionRequest,
+  PermissionResolution,
+} from "@shared/permissions-ipc";
 import type { StateCreator } from "zustand/vanilla";
 
-import type { MainStoreState, PermissionSlice, SessionPermissionState } from "../types";
+import type { MainStoreState } from "./store-state";
+
+export interface PermissionResolutionSnapshot {
+  requestId: string;
+  resolution: PermissionResolution;
+  resolvedAt: number;
+}
+
+export interface SessionPermissionState {
+  mode: PermissionMode;
+  requests: PermissionRequest[];
+  lastResolvedRequest?: PermissionResolutionSnapshot;
+}
+
+export interface PermissionSlice {
+  permissionStates: Map<string, SessionPermissionState>;
+  getPermissionState: (sessionId: string) => SessionPermissionState;
+  setPermissionMode: (sessionId: string, mode: PermissionMode) => void;
+  enqueuePermissionRequest: (sessionId: string, request: PermissionRequest) => void;
+  resolvePermissionRequest: (
+    sessionId: string,
+    requestId: string,
+    resolution: PermissionResolution,
+  ) => void;
+  clearPermissionState: (sessionId: string) => void;
+}
 
 const DEFAULT_PERMISSION_MODE: PermissionMode = "default";
 

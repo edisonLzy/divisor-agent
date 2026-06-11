@@ -1,8 +1,87 @@
+import type { AgentMessage } from "@mariozechner/pi-agent-core";
+import type { AssistantMessage, UserMessage } from "@mariozechner/pi-ai";
+import type { Entry } from "@renderer/apis/sessions";
 import { isAgentMessageEntry } from "@renderer/lib/is";
+import type { JSONContent } from "@tiptap/core";
 import { v4 as uuidv4 } from "uuid";
 import type { StateCreator } from "zustand/vanilla";
 
-import { EntryStatus, type EntriesSlice } from "./types";
+export type SessionStatus = "idle" | "running" | "completed" | "failed";
+
+export type ToolExecutionStatus = "running" | "awaiting_approval" | "done" | "error";
+
+export type ToolApprovalStatus = "pending" | "approved" | "denied";
+
+export enum EntryStatus {
+  Local,
+  Syncing,
+  Synced,
+  Failed,
+}
+
+export interface ToolExecutionState {
+  toolCallId: string;
+  toolName: string;
+  status: ToolExecutionStatus;
+  args: unknown;
+  output: string;
+  requestId?: string;
+  approvalStatus?: ToolApprovalStatus;
+}
+
+export interface AgentUserMessage extends Omit<UserMessage, "content"> {
+  content: JSONContent;
+  text: string;
+}
+
+export type AgentMessageData = Exclude<AgentMessage, UserMessage> | AgentUserMessage;
+
+interface AgentMessageEntry extends Omit<Entry, "type" | "data"> {
+  type: "message";
+  data: AgentMessageData;
+  status: EntryStatus;
+  completedAt?: number;
+}
+
+export interface ModelChangedData {
+  provider: string;
+  modelId: string;
+}
+
+interface AgentModalChangedEntry extends Omit<Entry, "type" | "data"> {
+  type: "model_change";
+  data: ModelChangedData;
+  status: EntryStatus;
+}
+
+export type SessionEntry = AgentMessageEntry | AgentModalChangedEntry;
+
+export interface MessageEntry extends AgentMessageEntry {}
+export interface ModelChangedEntry extends AgentModalChangedEntry {}
+
+export interface EntryState {
+  entries: SessionEntry[];
+  toolStates: Map<string, ToolExecutionState>;
+  status: SessionStatus;
+}
+
+export interface EntriesSlice {
+  entryStates: Map<string, EntryState>;
+  streamingEntryIds: Map<string, string>;
+
+  getEntryState: (sessionId: string) => EntryState;
+
+  appendMessageEntry: (sessionId: string, message: AgentMessageData) => string;
+  updateMessageEntry: (sessionId: string, entryId: string, message: AssistantMessage) => void;
+  setEntryStatus: (sessionId: string, entryIds: string[], status: EntryStatus) => void;
+  setStreamingEntryId: (sessionId: string, id: string | undefined) => void;
+  setStreamingEntryCompletedAt: (sessionId: string, completedAt: number) => void;
+  setToolState: (sessionId: string, toolCallId: string, state: ToolExecutionState) => void;
+  setSessionEntries: (sessionId: string, entries: SessionEntry[]) => void;
+  setStatus: (sessionId: string, status: SessionStatus) => void;
+
+  removeEntryState: (sessionId: string) => void;
+}
 
 const EMPTY_ENTRY_STATE = {
   entries: [],
@@ -12,9 +91,9 @@ const EMPTY_ENTRY_STATE = {
 
 function getOrCreateEntryState(
   entryStates: Map<string, EntriesSlice["entryStates"] extends Map<string, infer V> ? V : never>,
-  ownerId: string,
+  sessionId: string,
 ) {
-  const existing = entryStates.get(ownerId);
+  const existing = entryStates.get(sessionId);
   if (existing) return existing;
   return { entries: [], toolStates: new Map(), status: "idle" as const };
 }
@@ -23,21 +102,21 @@ export const createEntriesSlice: StateCreator<EntriesSlice, [], [], EntriesSlice
   entryStates: new Map(),
   streamingEntryIds: new Map(),
 
-  getEntryState: (ownerId) => {
-    const existing = get().entryStates.get(ownerId);
+  getEntryState: (sessionId) => {
+    const existing = get().entryStates.get(sessionId);
     if (existing) return existing;
     return { ...EMPTY_ENTRY_STATE, toolStates: new Map() };
   },
 
-  appendMessageEntry: (ownerId, message) => {
+  appendMessageEntry: (sessionId, message) => {
     const entryId = uuidv4();
-    const state = get().getEntryState(ownerId);
+    const state = get().getEntryState(sessionId);
 
     const parentId = state.entries.length > 0 ? state.entries[state.entries.length - 1].id : null;
 
     const messageEntry = {
       id: entryId,
-      sessionId: ownerId,
+      sessionId,
       parentId,
       type: "message" as const,
       timestamp: Date.now(),
@@ -47,8 +126,8 @@ export const createEntriesSlice: StateCreator<EntriesSlice, [], [], EntriesSlice
 
     set((prev) => {
       const entryStates = new Map(prev.entryStates);
-      const current = getOrCreateEntryState(entryStates, ownerId);
-      entryStates.set(ownerId, {
+      const current = getOrCreateEntryState(entryStates, sessionId);
+      entryStates.set(sessionId, {
         ...current,
         entries: [...current.entries, messageEntry],
       });
@@ -58,8 +137,8 @@ export const createEntriesSlice: StateCreator<EntriesSlice, [], [], EntriesSlice
     return entryId;
   },
 
-  updateMessageEntry: (ownerId, entryId, message) => {
-    const state = get().getEntryState(ownerId);
+  updateMessageEntry: (sessionId, entryId, message) => {
+    const state = get().getEntryState(sessionId);
     const entryIndex = state.entries.findIndex((entry) => entry.id === entryId);
     if (entryIndex < 0) return;
 
@@ -68,16 +147,16 @@ export const createEntriesSlice: StateCreator<EntriesSlice, [], [], EntriesSlice
 
     set((prev) => {
       const entryStates = new Map(prev.entryStates);
-      const current = getOrCreateEntryState(entryStates, ownerId);
+      const current = getOrCreateEntryState(entryStates, sessionId);
       const entries = [...current.entries];
       entries[entryIndex] = { ...existingEntry, data: message };
-      entryStates.set(ownerId, { ...current, entries });
+      entryStates.set(sessionId, { ...current, entries });
       return { entryStates };
     });
   },
 
-  setEntryStatus: (ownerId, entryIds, status) => {
-    const state = get().getEntryState(ownerId);
+  setEntryStatus: (sessionId, entryIds, status) => {
+    const state = get().getEntryState(sessionId);
     if (entryIds.length === 0) return;
 
     const targetIds = new Set(entryIds);
@@ -88,17 +167,17 @@ export const createEntriesSlice: StateCreator<EntriesSlice, [], [], EntriesSlice
 
     set((prev) => {
       const entryStates = new Map(prev.entryStates);
-      const current = getOrCreateEntryState(entryStates, ownerId);
-      entryStates.set(ownerId, { ...current, entries });
+      const current = getOrCreateEntryState(entryStates, sessionId);
+      entryStates.set(sessionId, { ...current, entries });
       return { entryStates };
     });
   },
 
-  setStreamingEntryCompletedAt: (ownerId, completedAt) => {
-    const entryId = get().streamingEntryIds.get(ownerId);
+  setStreamingEntryCompletedAt: (sessionId, completedAt) => {
+    const entryId = get().streamingEntryIds.get(sessionId);
     if (!entryId) return;
 
-    const state = get().getEntryState(ownerId);
+    const state = get().getEntryState(sessionId);
     const entryIndex = state.entries.findIndex((entry) => entry.id === entryId);
     if (entryIndex < 0) return;
 
@@ -107,59 +186,59 @@ export const createEntriesSlice: StateCreator<EntriesSlice, [], [], EntriesSlice
 
     set((prev) => {
       const entryStates = new Map(prev.entryStates);
-      const current = getOrCreateEntryState(entryStates, ownerId);
+      const current = getOrCreateEntryState(entryStates, sessionId);
       const entries = [...current.entries];
       entries[entryIndex] = { ...existingEntry, completedAt };
-      entryStates.set(ownerId, { ...current, entries });
+      entryStates.set(sessionId, { ...current, entries });
       return { entryStates };
     });
   },
 
-  setToolState: (ownerId, toolCallId, state) => {
+  setToolState: (sessionId, toolCallId, state) => {
     set((prev) => {
       const entryStates = new Map(prev.entryStates);
-      const current = getOrCreateEntryState(entryStates, ownerId);
+      const current = getOrCreateEntryState(entryStates, sessionId);
       const toolStates = new Map(current.toolStates);
       toolStates.set(toolCallId, state);
-      entryStates.set(ownerId, { ...current, toolStates });
+      entryStates.set(sessionId, { ...current, toolStates });
       return { entryStates };
     });
   },
 
-  setSessionEntries: (ownerId, entries) => {
+  setSessionEntries: (sessionId, entries) => {
     set((prev) => {
       const entryStates = new Map(prev.entryStates);
-      const current = getOrCreateEntryState(entryStates, ownerId);
-      entryStates.set(ownerId, { ...current, entries });
+      const current = getOrCreateEntryState(entryStates, sessionId);
+      entryStates.set(sessionId, { ...current, entries });
       return { entryStates };
     });
   },
 
-  setStatus: (ownerId, status) => {
+  setStatus: (sessionId, status) => {
     set((prev) => {
       const entryStates = new Map(prev.entryStates);
-      const current = getOrCreateEntryState(entryStates, ownerId);
-      entryStates.set(ownerId, { ...current, status });
+      const current = getOrCreateEntryState(entryStates, sessionId);
+      entryStates.set(sessionId, { ...current, status });
       return { entryStates };
     });
   },
 
-  setStreamingEntryId: (ownerId, entryId) => {
+  setStreamingEntryId: (sessionId, entryId) => {
     set((prev) => {
       const streamingEntryIds = new Map(prev.streamingEntryIds);
       if (entryId === undefined) {
-        streamingEntryIds.delete(ownerId);
+        streamingEntryIds.delete(sessionId);
       } else {
-        streamingEntryIds.set(ownerId, entryId);
+        streamingEntryIds.set(sessionId, entryId);
       }
       return { streamingEntryIds };
     });
   },
 
-  removeEntryState: (ownerId) => {
+  removeEntryState: (sessionId) => {
     set((prev) => {
       const entryStates = new Map(prev.entryStates);
-      entryStates.delete(ownerId);
+      entryStates.delete(sessionId);
       return { entryStates };
     });
   },
