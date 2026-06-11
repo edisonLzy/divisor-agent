@@ -4,6 +4,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@renderer/components/ui/resizable";
+import { useState } from "react";
 
 import { Chat } from "./chat";
 import { useSideChatMessages } from "./chat/artifacts/side-chat-artifact/use-side-chat-messages";
@@ -14,6 +15,8 @@ import { useAgentSessions } from "./use-agent-sessions";
 
 export function WorkspacePage() {
   const { isCollapsed, panelRef, setIsCollapsed, toggle } = useToggleSidebarButton();
+  const [sidebarSize, setSidebarSize] = useState(26);
+  const titlebarWidth = isCollapsed ? "8rem" : `max(8rem, ${sidebarSize}%)`;
 
   void useAgentMessages();
   void useSideChatMessages();
@@ -21,7 +24,7 @@ export function WorkspacePage() {
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-transparent font-sans text-foreground">
-      <Titlebar>
+      <Titlebar style={{ width: titlebarWidth }}>
         <ToggleSidebarButton isCollapsed={isCollapsed} onToggle={toggle} />
       </Titlebar>
       <ResizablePanelGroup orientation="horizontal" className="flex-1">
@@ -32,7 +35,10 @@ export function WorkspacePage() {
           defaultSize="26%"
           minSize="18%"
           maxSize="32%"
-          onResize={(size) => setIsCollapsed(size.asPercentage === 0)}
+          onResize={(size) => {
+            setIsCollapsed(size.asPercentage === 0);
+            setSidebarSize(size.asPercentage);
+          }}
         >
           <Sessions />
         </ResizablePanel>

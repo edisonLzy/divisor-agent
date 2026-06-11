@@ -64,7 +64,7 @@ export function ArtifactsPanel({ className, sessionId }: ArtifactsPanelProps) {
   return (
     <aside
       className={cn(
-        "flex h-full min-w-90 flex-col border-l border-border/70 bg-background/80 supports-backdrop-filter:backdrop-blur-xl",
+        "app-no-drag flex h-full min-w-90 flex-col border-l border-border/70 bg-background/80 supports-backdrop-filter:backdrop-blur-xl",
         className,
       )}
     >
@@ -73,18 +73,26 @@ export function ArtifactsPanel({ className, sessionId }: ArtifactsPanelProps) {
         onValueChange={(value) => setActiveArtifactId(sessionId, value)}
         className="min-h-0 flex-1 gap-0"
       >
-        <PanelHeader className="pl-2">
-          <div className="relative min-w-0 flex-1">
+        <PanelHeader className="app-no-drag pl-2">
+          <div className="app-no-drag relative min-w-0 flex-1">
             <TabsList
               variant="line"
-              className="h-9 w-full min-w-0 justify-start gap-1 overflow-x-auto rounded-none p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className="app-no-drag h-9 w-full min-w-0 justify-start gap-1 overflow-x-auto rounded-none p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
               {artifacts.map((artifact) => (
                 <ArtifactTab
                   key={artifact.id}
                   artifact={artifact}
                   onClose={handleCloseArtifact}
-                  onDragStart={() => setDraggedArtifactId(artifact.id)}
+                  onDragStart={(event) => {
+                    const target = event.target;
+                    if (target instanceof Element && target.closest("[data-slot='button']")) {
+                      event.preventDefault();
+                      return;
+                    }
+
+                    setDraggedArtifactId(artifact.id);
+                  }}
                   onDragEnd={() => setDraggedArtifactId(null)}
                   onDragOver={(event) => event.preventDefault()}
                   onDrop={() => handleDrop(artifact.id)}
@@ -115,7 +123,7 @@ interface ArtifactTabProps {
   onClose: (artifactId: string) => void;
   onDragEnd: () => void;
   onDragOver: (event: DragEvent<HTMLDivElement>) => void;
-  onDragStart: () => void;
+  onDragStart: (event: DragEvent<HTMLDivElement>) => void;
   onDrop: () => void;
 }
 
@@ -132,7 +140,7 @@ function ArtifactTab({
   return (
     <div
       draggable
-      className="group/tab relative flex h-9 max-w-48 shrink-0 items-center"
+      className="app-no-drag group/tab relative flex h-9 max-w-48 shrink-0 items-center"
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onDragOver={onDragOver}
@@ -140,7 +148,7 @@ function ArtifactTab({
     >
       <TabsTrigger
         value={artifact.id}
-        className="h-8 min-w-0 max-w-48 justify-start gap-2 rounded-lg px-3 text-sm data-active:bg-muted data-active:after:opacity-0"
+        className="app-no-drag h-8 min-w-0 max-w-48 justify-start gap-2 rounded-lg px-3 text-sm data-active:bg-muted data-active:after:opacity-0"
       >
         <span className="grid size-4 shrink-0 place-items-center text-muted-foreground transition-opacity group-hover/tab:opacity-0">
           <Icon />
@@ -151,7 +159,7 @@ function ArtifactTab({
         type="button"
         variant="ghost"
         size="icon-xs"
-        className="absolute left-2 opacity-0 group-hover/tab:opacity-100 focus-visible:opacity-100"
+        className="app-no-drag absolute left-2 opacity-0 group-hover/tab:opacity-100 focus-visible:opacity-100"
         aria-label={`Close ${artifact.name}`}
         onClick={(event) => {
           event.stopPropagation();

@@ -50,11 +50,7 @@ export function ActiveSessionContent() {
   const sessionName = activeSession?.name.trim() || "untitled";
 
   return (
-    <div className="relative flex min-h-0 flex-1">
-      <FixedActions>
-        <ToggleArtifactPanelButton sessionId={activeSessionId} />
-      </FixedActions>
-
+    <div className="relative isolate flex min-h-0 flex-1">
       <ResizablePanelGroup
         key={isArtifactPanelOpen ? "artifacts-open" : "artifacts-closed"}
         orientation="horizontal"
@@ -62,9 +58,8 @@ export function ActiveSessionContent() {
       >
         <ResizablePanel defaultSize={isArtifactPanelOpen ? "68%" : "100%"} minSize="42%">
           <div className="flex h-full min-w-0 flex-col">
-            <PanelHeader>
+            <PanelHeader dragRegion>
               <h1 className="truncate text-sm font-medium text-foreground">{sessionName}</h1>
-              <Button>asdasd</Button>
             </PanelHeader>
             <section className="min-h-0 flex-1 px-6 pt-6">
               <ChatMessages
@@ -102,6 +97,10 @@ export function ActiveSessionContent() {
           </>
         ) : null}
       </ResizablePanelGroup>
+
+      <FixedActions>
+        <ToggleArtifactPanelButton sessionId={activeSessionId} />
+      </FixedActions>
     </div>
   );
 }
