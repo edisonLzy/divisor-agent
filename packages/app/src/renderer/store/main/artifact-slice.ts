@@ -4,14 +4,13 @@ import type { MainStoreState } from "./store-state";
 
 export type ArtifactType = "side-chat" | string;
 
-export interface ArtifactRecord<TContent = unknown> {
+export interface ArtifactRecord<
+  TContent extends Record<string, unknown> = Record<string, unknown>,
+> {
   id: string;
   name: string;
   type: ArtifactType;
   content: TContent;
-  props?: Record<string, unknown>;
-  raw?: string;
-  updatedAt: number;
 }
 
 export interface SessionArtifactState {
@@ -27,9 +26,9 @@ export interface ArtifactSlice {
   setActiveArtifactId: (sessionId: string, artifactId: string | null) => void;
   removeArtifact: (sessionId: string, artifactId: string) => void;
   reorderArtifacts: (sessionId: string, sourceIndex: number, targetIndex: number) => void;
-  upsertArtifact: <TContent = unknown>(
+  upsertArtifact: <TContent extends Record<string, unknown> = Record<string, unknown>>(
     sessionId: string,
-    artifact: Omit<ArtifactRecord<TContent>, "content" | "name" | "updatedAt"> &
+    artifact: Omit<ArtifactRecord<TContent>, "content" | "name"> &
       Partial<Pick<ArtifactRecord<TContent>, "content" | "name">>,
   ) => void;
 }
@@ -90,9 +89,8 @@ export const createArtifactSlice: StateCreator<MainStoreState, [], [], ArtifactS
       const existingIndex = state.artifacts.findIndex((item) => item.id === artifact.id);
       const nextArtifact: ArtifactRecord = {
         ...artifact,
-        content: artifact.content,
+        content: artifact.content ?? {},
         name: artifact.name ?? artifact.type,
-        updatedAt: Date.now(),
       };
       const artifacts =
         existingIndex >= 0

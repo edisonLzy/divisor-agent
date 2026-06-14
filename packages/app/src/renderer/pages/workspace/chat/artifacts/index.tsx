@@ -106,7 +106,7 @@ export function ArtifactsPanel({ className, sessionId }: ArtifactsPanelProps) {
 
         {activeArtifact ? (
           <TabsContent value={activeArtifact.id} className="min-h-0 overflow-hidden">
-            <ArtifactContent artifact={activeArtifact} mainSessionId={sessionId} />
+            <ArtifactContent artifact={activeArtifact} />
           </TabsContent>
         ) : (
           <TabsContent value="" className="min-h-0">
@@ -178,20 +178,9 @@ function ArtifactTab({
   );
 }
 
-function ArtifactContent({
-  artifact,
-  mainSessionId,
-}: {
-  artifact: ArtifactRecord;
-  mainSessionId: string;
-}) {
+function ArtifactContent({ artifact }: { artifact: ArtifactRecord }) {
   if (artifact.type === "side-chat") {
-    return (
-      <SideChatArtifact
-        artifact={artifact as SideChatArtifactRecord}
-        mainSessionId={mainSessionId}
-      />
-    );
+    return <SideChatArtifact artifact={artifact as SideChatArtifactRecord} />;
   }
 
   return (
@@ -221,7 +210,7 @@ export function ArtifactPreview({ artifact }: { artifact: ArtifactRecord }) {
   if (!registration) {
     return (
       <div className="p-3">
-        <UnknownArtifact raw={artifact.raw ?? ""} type={artifact.type} />
+        <UnknownArtifact raw={JSON.stringify(artifact.content, null, 2)} type={artifact.type} />
       </div>
     );
   }
@@ -229,7 +218,7 @@ export function ArtifactPreview({ artifact }: { artifact: ArtifactRecord }) {
   const Renderer = registration.render;
   return (
     <div className="h-full min-h-full">
-      <Renderer artifactId={artifact.id} props={artifact.props ?? {}} raw={artifact.raw ?? ""} />
+      <Renderer artifactId={artifact.id} content={artifact.content} />
     </div>
   );
 }

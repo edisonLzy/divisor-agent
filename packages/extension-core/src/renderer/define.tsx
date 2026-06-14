@@ -27,15 +27,14 @@ export interface AssistantBlockRegistration<TProps = Record<string, unknown>> {
   render: ComponentType<AssistantBlockRenderProps<TProps>>;
 }
 
-export interface ArtifactRenderProps<TProps = Record<string, unknown>> {
+export interface ArtifactRenderProps<TContent = Record<string, unknown>> {
   artifactId: string;
-  props: TProps;
-  raw: string;
+  content: TContent;
 }
 
-export interface ArtifactRegistration<TProps = Record<string, unknown>> {
+export interface ArtifactRegistration<TContent = Record<string, unknown>> {
   type: string;
-  render: ComponentType<ArtifactRenderProps<TProps>>;
+  render: ComponentType<ArtifactRenderProps<TContent>>;
 }
 
 export interface RendererExtensionContext {

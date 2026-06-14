@@ -1,8 +1,8 @@
 import type { AvailableModel } from "@shared/models-ipc";
 import type { StateCreator } from "zustand/vanilla";
 
+import type { SideChatStoreState } from ".";
 import type { ArtifactRecord } from "../main/artifact-slice";
-import type { SideChatStoreState } from "./store-state";
 
 export interface SideChatContext {
   sourceEntryId: string;
@@ -17,7 +17,7 @@ export interface SideChatMeta {
   createdAt: number;
 }
 
-export interface SideChatArtifactContent {
+export interface SideChatArtifactContent extends Record<string, unknown> {
   // Kept for ArtifactRecord<TContent> compatibility.
 }
 

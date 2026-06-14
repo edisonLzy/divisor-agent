@@ -10,14 +10,14 @@ function ExampleCard({ props }: { props: Record<string, unknown> }) {
 
 function ExampleArtifact({
   artifactId,
-  props,
+  content,
 }: {
   artifactId: string;
-  props: Record<string, unknown>;
+  content: Record<string, unknown>;
 }) {
   return (
     <div className="rounded-md border bg-card p-3 text-sm text-card-foreground">
-      <div className="font-medium">{String(props.title ?? "Example artifact")}</div>
+      <div className="font-medium">{String(content.title ?? "Example artifact")}</div>
       <div className="mt-1 text-muted-foreground">{artifactId}</div>
     </div>
   );

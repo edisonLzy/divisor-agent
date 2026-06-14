@@ -1,7 +1,6 @@
-import type { AssistantMessage } from "@mariozechner/pi-ai";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { createAgentUserMessage } from "@renderer/lib/agent-message";
-import { isAgentAssistantMessage, isAgentMessageEntry } from "@renderer/lib/is";
+import { isAgentMessageEntry } from "@renderer/lib/is";
 import { sideChatStore } from "@renderer/store/side-chat";
 import type { SideChatArtifactRecord } from "@renderer/store/side-chat/side-chat-slice";
 import { useCallback, useMemo } from "react";
@@ -9,15 +8,13 @@ import { useStore } from "zustand";
 
 import { ChatMessages } from "../../messages";
 import { PromptInput } from "../../prompt-input";
-import { INSERT_PROMPT_TEXT_EVENT } from "../../prompt-insert-event";
 import type { PromptSubmission } from "../../prompt-types";
 
 interface SideChatArtifactProps {
   artifact: SideChatArtifactRecord;
-  mainSessionId: string;
 }
 
-export function SideChatArtifact({ artifact, mainSessionId }: SideChatArtifactProps) {
+export function SideChatArtifact({ artifact }: SideChatArtifactProps) {
   const { invoke } = useElectronIPC();
   const streamingEntryId = useStore(sideChatStore, (state) =>
     state.streamingEntryIds.get(artifact.id),
@@ -60,35 +57,6 @@ export function SideChatArtifact({ artifact, mainSessionId }: SideChatArtifactPr
     }
   }, [artifact.id, invoke]);
 
-  const handleQuoteToMain = useCallback(() => {
-    const lastAssistant = [...entryState.entries].reverse().find((entry) => {
-      if (!isAgentMessageEntry(entry)) return false;
-      return isAgentAssistantMessage(entry.data);
-    });
-
-    if (!lastAssistant || !isAgentMessageEntry(lastAssistant)) return;
-    if (!isAgentAssistantMessage(lastAssistant.data)) return;
-
-    const assistantData = lastAssistant.data as AssistantMessage;
-    const text = (assistantData.content ?? [])
-      .filter((block) => block.type === "text")
-      .map((block) => block.text)
-      .join("\n")
-      .trim();
-
-    if (!text) return;
-
-    const quotedText = `> 来自侧边聊天的结论：\n> ${text.split("\n").join("\n> ")}\n\n`;
-    window.dispatchEvent(
-      new CustomEvent(INSERT_PROMPT_TEXT_EVENT, {
-        detail: {
-          sessionId: mainSessionId,
-          text: quotedText,
-        },
-      }),
-    );
-  }, [entryState.entries, mainSessionId]);
-
   return (
     <div className="flex h-full flex-col">
       <div className="min-h-0 flex-1 px-2 pt-2">
@@ -103,17 +71,6 @@ export function SideChatArtifact({ artifact, mainSessionId }: SideChatArtifactPr
       </div>
 
       <div className="shrink-0 px-2 pb-2 pt-2">
-        {messageEntries.length > 0 ? (
-          <div className="mb-2 flex justify-end">
-            <button
-              type="button"
-              className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-              onClick={handleQuoteToMain}
-            >
-              引用到主对话
-            </button>
-          </div>
-        ) : null}
         <PromptInput
           disabled={false}
           isRunning={isRunning}

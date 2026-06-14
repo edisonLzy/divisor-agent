@@ -1,28 +1,9 @@
-import type { AssistantMessage, ToolCall, ToolResultMessage } from "@mariozechner/pi-ai";
+import type { AssistantMessage, ToolCall } from "@mariozechner/pi-ai";
 import { useSubscribeAgentEvents } from "@renderer/hooks/use-subscribe-agent-events";
+import { extractToolResultText, formatToolArgs } from "@renderer/lib/agent-tool";
 import { isAgentMessageEntry, isFailedAssistantMessage } from "@renderer/lib/is";
 import { sideChatStore } from "@renderer/store/side-chat";
 import { useRef } from "react";
-
-function extractToolResultText(content: ToolResultMessage["content"]): string {
-  return content
-    .filter(
-      (block): block is Extract<ToolResultMessage["content"][number], { type: "text" }> =>
-        block.type === "text",
-    )
-    .map((block) => block.text)
-    .join("\n")
-    .trim();
-}
-
-function formatArgs(value: unknown): string {
-  if (typeof value === "string") return value;
-  try {
-    return JSON.stringify(value ?? {}, null, 2);
-  } catch {
-    return String(value);
-  }
-}
 
 function resolveSideChat(sessionId: string) {
   return sideChatStore.getState().getSideChatMeta(sessionId);
@@ -176,7 +157,7 @@ export function useSideChatMessages() {
         const resultContent = result?.content;
         const output = Array.isArray(resultContent)
           ? extractToolResultText(resultContent)
-          : formatArgs(result);
+          : formatToolArgs(result);
         const existing = getSideChatToolState(sessionId, toolCallId);
         sideChatStore.getState().setToolState(sessionId, toolCallId, {
           toolCallId,

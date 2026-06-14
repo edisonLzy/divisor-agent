@@ -1,6 +1,7 @@
-import type { AssistantMessage, ToolCall, ToolResultMessage } from "@mariozechner/pi-ai";
+import type { AssistantMessage, ToolCall } from "@mariozechner/pi-ai";
 import { appendEntries } from "@renderer/apis/sessions";
 import { useSubscribeAgentEvents } from "@renderer/hooks/use-subscribe-agent-events";
+import { extractToolResultText, formatToolArgs } from "@renderer/lib/agent-tool";
 import {
   isAgentAssistantMessage,
   isAgentMessageEntry,
@@ -9,26 +10,6 @@ import {
 import { EntryStatus, type SessionEntry } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
 import { useRef } from "react";
-
-function extractToolResultText(content: ToolResultMessage["content"]): string {
-  return content
-    .filter(
-      (block): block is Extract<ToolResultMessage["content"][number], { type: "text" }> =>
-        block.type === "text",
-    )
-    .map((block) => block.text)
-    .join("\n")
-    .trim();
-}
-
-function formatArgs(value: unknown): string {
-  if (typeof value === "string") return value;
-  try {
-    return JSON.stringify(value ?? {}, null, 2);
-  } catch {
-    return String(value);
-  }
-}
 
 function getToolState(sessionId: string, toolCallId: string) {
   return mainStore.getState().getEntryState(sessionId).toolStates.get(toolCallId);
@@ -241,7 +222,7 @@ export function useAgentMessages() {
         const resultContent = result?.content;
         const output = Array.isArray(resultContent)
           ? extractToolResultText(resultContent)
-          : formatArgs(result);
+          : formatToolArgs(result);
         const existing = getToolState(sessionId, toolCallId);
         mainStore.getState().setToolState(sessionId, toolCallId, {
           toolCallId,

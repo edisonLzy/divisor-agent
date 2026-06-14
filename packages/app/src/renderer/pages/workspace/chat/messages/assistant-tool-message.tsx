@@ -4,6 +4,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@renderer/components/ui/collapsible";
+import { formatToolArgs } from "@renderer/lib/agent-tool";
 import type { ToolExecutionState } from "@renderer/store/entries-slice";
 import { ChevronRightIcon } from "lucide-react";
 
@@ -11,15 +12,6 @@ interface AssistantToolMessageProps {
   toolName: string;
   args: Record<string, unknown>;
   toolState?: ToolExecutionState;
-}
-
-function formatArgs(value: unknown): string {
-  if (typeof value === "string") return value;
-  try {
-    return JSON.stringify(value ?? {}, null, 2);
-  } catch {
-    return String(value);
-  }
 }
 
 function statusLabel(status?: ToolExecutionState["status"]): string {
@@ -59,7 +51,7 @@ export function AssistantToolMessage({ toolName, args, toolState }: AssistantToo
               Input
             </div>
             <pre className="overflow-x-auto whitespace-pre-wrap wrap-break-word text-xs leading-6 text-muted-foreground">
-              {formatArgs(args) || "{}"}
+              {formatToolArgs(args) || "{}"}
             </pre>
           </section>
 
