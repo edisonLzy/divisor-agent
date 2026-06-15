@@ -6,6 +6,7 @@ import { AgentSessionIPC } from "../shared/session-ipc.js";
 import { AgentSkillsIPC } from "../shared/skills-ipc.js";
 import { AgentRuntime } from "./agent-runtime.js";
 import { ExtensionService } from "./extensions/index.js";
+import { ExtensionRuntimeService } from "./extensions/runtime-service.js";
 import { ModelRegistry } from "./models/index.js";
 import { SkillService } from "./skills/index.js";
 
@@ -22,13 +23,19 @@ export class AgentPool
   private runtimes: Map<string, AgentRuntime>;
   private skillService: SkillService;
   private extensionService: ExtensionService;
+  private extensionRuntimeService: ExtensionRuntimeService;
 
   constructor() {
     super();
     this.modelRegistry = new ModelRegistry();
     this.runtimes = new Map();
     this.skillService = new SkillService();
-    this.extensionService = new ExtensionService();
+    this.extensionRuntimeService = new ExtensionRuntimeService(
+      this.modelRegistry,
+      this.skillService,
+    );
+    this.extensionService = new ExtensionService(this.extensionRuntimeService);
+    this.extensionRuntimeService.setExtensionService(this.extensionService);
   }
 
   // ── Runtime lifecycle ────────────────────────────────────────────────────
@@ -71,6 +78,7 @@ export class AgentPool
       runtime.destroy();
     }
     this.runtimes.clear();
+    this.extensionRuntimeService.destroyAll();
     this.clearListeners();
   }
 

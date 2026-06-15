@@ -1,0 +1,20 @@
+{
+  "name": "@divisor-agent/extension-subagents",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./manifest": "./src/manifest.ts",
+    "./main": "./src/main.ts",
+    "./renderer": "./src/renderer.tsx",
+    "./types": "./src/types.ts"
+  },
+  "dependencies": {
+    "@divisor-agent/extension-core": "workspace:*",
+    "@sinclair/typebox": "^0.34.49"
+  },
+  "peerDependencies": {
+    "@types/react": "catalog:",
+    "lucide-react": "^1.8.0",
+    "react": "catalog:"
+  }
+}

@@ -1,5 +1,5 @@
 import type { ExtensionManifest } from "../manifest.js";
-import type { MainExtensionDefinition } from "./define";
+import type { MainExtensionDefinition, MainExtensionRuntimeAPI } from "./define";
 import { MainExtensionRegistry } from "./registry";
 
 export interface InstalledMainExtension {
@@ -7,11 +7,18 @@ export interface InstalledMainExtension {
   extension: MainExtensionDefinition;
 }
 
+export interface MainExtensionBridgeServices {
+  runtime?: MainExtensionRuntimeAPI;
+}
+
 export class MainExtensionBridge {
   private registry = new MainExtensionRegistry();
   private initialized = false;
 
-  constructor(private extensions: InstalledMainExtension[]) {}
+  constructor(
+    private extensions: InstalledMainExtension[],
+    private services: MainExtensionBridgeServices = {},
+  ) {}
 
   initialize() {
     if (this.initialized) {
@@ -22,6 +29,7 @@ export class MainExtensionBridge {
       this.registry.registerExtension(item.manifest);
       item.extension.setup({
         manifest: item.manifest,
+        runtime: this.services.runtime ?? createUnavailableRuntimeAPI(),
         systemPrompt: {
           register: (prompt) => this.registry.registerSystemPrompt(item.manifest, prompt),
         },
@@ -45,4 +53,19 @@ export class MainExtensionBridge {
   getTools() {
     return this.registry.getTools();
   }
+}
+
+function createUnavailableRuntimeAPI(): MainExtensionRuntimeAPI {
+  const reject = () => {
+    throw new Error("Main extension runtime API is not available");
+  };
+
+  return {
+    abortAgent: reject,
+    createAgent: reject,
+    destroyAgent: reject,
+    getCurrentAgentContext: reject,
+    promptAgent: reject,
+    subscribeAgentEvents: reject,
+  };
 }

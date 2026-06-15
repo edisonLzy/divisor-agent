@@ -24,6 +24,7 @@
     "@base-ui/react": "^1.4.1",
     "@divisor-agent/extension-core": "workspace:*",
     "@divisor-agent/extension-example": "workspace:*",
+    "@divisor-agent/extension-subagents": "workspace:*",
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "@floating-ui/dom": "^1.7.6",

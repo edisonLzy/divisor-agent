@@ -1,3 +1,4 @@
+import { useExtensionsContextAPI } from "@divisor-agent/extension-core/renderer";
 import type { AssistantMessage, ToolCall } from "@mariozechner/pi-ai";
 import { appendEntries } from "@renderer/apis/sessions";
 import { useSubscribeAgentEvents } from "@renderer/hooks/use-subscribe-agent-events";
@@ -32,6 +33,7 @@ function findMissingFailureMessage(
 }
 
 export function useAgentMessages() {
+  const extensionsApi = useExtensionsContextAPI();
   const turnContentStartIndicesRef = useRef<Record<string, number>>({});
   const hasPersistedRef = useRef<Record<string, boolean>>({});
 
@@ -205,11 +207,14 @@ export function useAgentMessages() {
 
         const existing = getToolState(sessionId, toolCallId);
         if (!existing) return;
+        const details = event.partialResult?.details ?? existing.details;
+        upsertArtifactsFromToolDetails(extensionsApi, sessionId, details);
         mainStore.getState().setToolState(sessionId, toolCallId, {
           toolCallId,
           toolName,
           status: "running",
           args,
+          details,
           output: existing.output ?? "",
           requestId: existing.requestId,
           approvalStatus: existing.approvalStatus,
@@ -223,12 +228,14 @@ export function useAgentMessages() {
         const output = Array.isArray(resultContent)
           ? extractToolResultText(resultContent)
           : formatToolArgs(result);
+        upsertArtifactsFromToolDetails(extensionsApi, sessionId, result?.details);
         const existing = getToolState(sessionId, toolCallId);
         mainStore.getState().setToolState(sessionId, toolCallId, {
           toolCallId,
           toolName,
           status: isError ? "error" : "done",
           args: existing?.args ?? {},
+          details: result?.details ?? existing?.details,
           output,
           requestId: existing?.requestId,
           approvalStatus: existing?.approvalStatus,
@@ -245,6 +252,7 @@ export function useAgentMessages() {
           toolName: request.toolName,
           status: "awaiting_approval",
           args: existing?.args ?? request.args,
+          details: existing?.details,
           output: existing?.output ?? "Waiting for permission approval...",
           requestId: request.requestId,
           approvalStatus: "pending",
@@ -257,4 +265,32 @@ export function useAgentMessages() {
       },
     },
   );
+}
+
+function upsertArtifactsFromToolDetails(
+  extensionsApi: ReturnType<typeof useExtensionsContextAPI>,
+  sessionId: string,
+  details: unknown,
+) {
+  if (!isRecord(details)) return;
+  const artifacts = Array.isArray(details.artifacts) ? details.artifacts : [];
+
+  for (const artifact of artifacts) {
+    if (!isRecord(artifact)) continue;
+    if (typeof artifact.id !== "string" || typeof artifact.type !== "string") continue;
+    extensionsApi.upsertArtifact(
+      sessionId,
+      {
+        id: artifact.id,
+        type: artifact.type,
+        name: typeof artifact.name === "string" ? artifact.name : artifact.type,
+        content: isRecord(artifact.content) ? artifact.content : {},
+      },
+      { activate: false, open: false },
+    );
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

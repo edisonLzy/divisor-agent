@@ -19,6 +19,12 @@ export interface SessionArtifactState {
   isOpen: boolean;
 }
 
+export interface UpsertArtifactOptions {
+  activateOnCreate?: boolean;
+  activateOnUpdate?: boolean;
+  openOnCreate?: boolean;
+}
+
 export interface ArtifactSlice {
   artifactStates: Map<string, SessionArtifactState>;
   getArtifactState: (sessionId: string) => SessionArtifactState;
@@ -30,6 +36,7 @@ export interface ArtifactSlice {
     sessionId: string,
     artifact: Omit<ArtifactRecord<TContent>, "content" | "name"> &
       Partial<Pick<ArtifactRecord<TContent>, "content" | "name">>,
+    options?: UpsertArtifactOptions,
   ) => void;
 }
 
@@ -82,8 +89,9 @@ export const createArtifactSlice: StateCreator<MainStoreState, [], [], ArtifactS
     });
   },
 
-  upsertArtifact: (sessionId, artifact) => {
+  upsertArtifact: (sessionId, artifact, options = {}) => {
     set((prev) => {
+      const { activateOnCreate = true, activateOnUpdate = false, openOnCreate = true } = options;
       const artifactStates = new Map(prev.artifactStates);
       const state = getSessionArtifactState(artifactStates, sessionId);
       const existingIndex = state.artifacts.findIndex((item) => item.id === artifact.id);
@@ -98,16 +106,17 @@ export const createArtifactSlice: StateCreator<MainStoreState, [], [], ArtifactS
           : [...state.artifacts, nextArtifact];
       const isNewArtifact = existingIndex < 0;
       const activeArtifactId =
-        isNewArtifact ||
-        state.activeArtifactId === null ||
-        state.activeArtifactId === nextArtifact.id
+        (isNewArtifact && activateOnCreate) ||
+        (!isNewArtifact && activateOnUpdate) ||
+        state.activeArtifactId === nextArtifact.id ||
+        (state.activeArtifactId === null && activateOnCreate)
           ? nextArtifact.id
           : state.activeArtifactId;
 
       artifactStates.set(sessionId, {
         activeArtifactId,
         artifacts,
-        isOpen: isNewArtifact ? true : state.isOpen,
+        isOpen: isNewArtifact && openOnCreate ? true : state.isOpen,
       });
 
       return { artifactStates };
