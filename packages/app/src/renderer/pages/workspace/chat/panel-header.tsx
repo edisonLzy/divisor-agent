@@ -16,11 +16,15 @@ export function PanelHeader({ children, className, dragRegion = false }: PanelHe
   return (
     <header
       className={cn(
-        "flex h-12 shrink-0 items-center border-b border-border/70 px-4 pr-14",
+        "relative flex h-12 shrink-0 items-center border-b border-border/70 px-4 pr-14",
         dragRegion && "app-drag-region",
         className,
       )}
     >
+      {dragRegion ? (
+        // Carve out the global sidebar toggle area from Electron's native drag region.
+        <span aria-hidden className="app-no-drag absolute top-0 bottom-0 left-0 z-10 w-32" />
+      ) : null}
       {children}
     </header>
   );
