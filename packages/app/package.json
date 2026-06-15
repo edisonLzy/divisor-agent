@@ -27,6 +27,7 @@
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "@floating-ui/dom": "^1.7.6",
+    "@floating-ui/react": "^0.27.19",
     "@mariozechner/pi-agent-core": "^0.68.0",
     "@mariozechner/pi-ai": "^0.68.0",
     "@radix-ui/react-use-controllable-state": "^1.2.2",

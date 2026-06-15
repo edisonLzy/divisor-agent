@@ -12,21 +12,15 @@ import {
   CollapsibleTrigger,
 } from "@renderer/components/ui/collapsible";
 import { Separator } from "@renderer/components/ui/separator";
-import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
-import { createAgentUserMessage } from "@renderer/lib/agent-message";
 import { cn } from "@renderer/lib/utils";
 import type { SessionEntry, ToolExecutionState } from "@renderer/store/entries-slice";
-import { mainStore } from "@renderer/store/main";
-import { sideChatStore } from "@renderer/store/side-chat";
 import { ChevronRightIcon } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { v4 as uuidv4 } from "uuid";
-import { useStore } from "zustand";
+import { useEffect, useState } from "react";
 
 import { AssistantResponseMessage } from "./assistant-response-message";
 import { AssistantThinkingMessage } from "./assistant-thinking-message";
 import { AssistantToolMessage } from "./assistant-tool-message";
-import { SelectionPopup } from "./selection-popup";
+import { FloatingToolbar } from "./floating-toolbar";
 import { CopyMessageButton } from "./toolbar/copy-message-button";
 import { ForkMessageButton } from "./toolbar/fork-message-button";
 import { MessageToolbar } from "./toolbar/message-toolbar";
@@ -75,113 +69,13 @@ export function AssistantMessage({
 
   const [isProcessingOpen, setIsProcessingOpen] = useState(true);
 
-  // ── Side chat: text selection ────────────────────────────────────────────
-  const { invoke } = useElectronIPC();
-  const messageRef = useRef<HTMLDivElement | null>(null);
-  const [selectionState, setSelectionState] = useState<{
-    text: string;
-    x: number;
-    y: number;
-  } | null>(null);
-
-  const model = useStore(mainStore, (state) => {
-    const s = state.getSession(sessionId);
-    return s?.model ?? undefined;
-  });
-
-  const handleMouseUp = useCallback(() => {
-    setTimeout(() => {
-      const selection = window.getSelection();
-      if (!selection || selection.isCollapsed || !selection.toString().trim()) {
-        setSelectionState(null);
-        return;
-      }
-
-      const text = selection.toString().trim();
-      if (!text || !selection.rangeCount) {
-        setSelectionState(null);
-        return;
-      }
-
-      const range = selection.getRangeAt(0);
-      if (!messageRef.current?.contains(range.commonAncestorContainer)) {
-        return;
-      }
-
-      const rect = range.getBoundingClientRect();
-      setSelectionState({
-        text,
-        x: rect.left + rect.width / 2,
-        y: rect.top - 8,
-      });
-    }, 10);
-  }, []);
-
-  const handleOpenSideChat = useCallback(
-    async (selectedText: string) => {
-      const text = selectedText.trim();
-      if (!text) return;
-
-      setSelectionState(null);
-      window.getSelection()?.removeAllRanges();
-
-      const initialPrompt = `我正在研究主对话中的以下内容，请帮我深入分析：\n\n> ${text.split("\n").join("\n> ")}\n\n请针对以上内容进行分析和讨论。`;
-      const sideChatId = uuidv4();
-
-      mainStore.getState().upsertArtifact(sessionId, {
-        id: sideChatId,
-        type: "side-chat",
-        content: {},
-        name: text.slice(0, 30) + (text.length > 30 ? "..." : ""),
-      });
-
-      sideChatStore
-        .getState()
-        .initSideChat(
-          sideChatId,
-          sessionId,
-          { sourceEntryId: entryId, selectedText: text },
-          model,
-          initialPrompt,
-        );
-
-      const jsonContent = {
-        type: "doc" as const,
-        content: [
-          { type: "paragraph" as const, content: [{ type: "text" as const, text: initialPrompt }] },
-        ],
-      };
-      const userMessage = createAgentUserMessage(jsonContent, initialPrompt);
-      sideChatStore.getState().appendMessageEntry(sideChatId, userMessage);
-
-      if (!model) return;
-
-      try {
-        await invoke("setSessionId", sideChatId);
-        sideChatStore.getState().setStatus(sideChatId, "running");
-        void invoke("prompt", sideChatId, initialPrompt, {
-          model: { modelId: model.modelId, providerId: model.providerId },
-          skillIds: [],
-        });
-      } catch (error) {
-        console.error("Failed to start side chat:", error);
-        sideChatStore.getState().setStatus(sideChatId, "idle");
-      }
-    },
-    [sessionId, entryId, model, invoke],
-  );
-
-  const handleDismissSelection = useCallback(() => {
-    setSelectionState(null);
-  }, []);
-
   useEffect(() => {
     setIsProcessingOpen(textContent.length === 0);
   }, [textContent.length]);
 
   return (
     <Message from="assistant" className="gap-1">
-      <div ref={messageRef} onMouseUp={handleMouseUp}>
+      <FloatingToolbar entryId={entryId} sessionId={sessionId}>
         <Collapsible open={isProcessingOpen} onOpenChange={(open) => setIsProcessingOpen(open)}>
           <div className="flex flex-col gap-2">
             <CollapsibleTrigger className="group/trigger flex cursor-pointer items-center gap-1.5">
@@ -246,16 +140,7 @@ export function AssistantMessage({
             <ForkMessageButton sessionId={sessionId} entries={entries} targetEntryId={entryId} />
           </MessageToolbar>
         ) : null}
-
-        {selectionState && (
-          <SelectionPopup
-            position={selectionState}
-            selectedText={selectionState.text}
-            onOpen={handleOpenSideChat}
-            onDismiss={handleDismissSelection}
-          />
-        )}
-      </div>
+      </FloatingToolbar>
     </Message>
   );
 }
