@@ -4,17 +4,16 @@ import type { StateCreator } from "zustand/vanilla";
 import type { SideChatStoreState } from ".";
 import type { ArtifactRecord } from "../main/artifact-slice";
 
-export interface SideChatContext {
-  sourceEntryId: string;
-  selectedText: string;
-}
+export type SideChatContext = Record<string, unknown>;
 
 export interface SideChatMeta {
   mainSessionId: string;
   context: SideChatContext;
-  model?: AvailableModel;
+  model?: Pick<AvailableModel, "modelId" | "providerId">;
   pendingPrompt: string;
   createdAt: number;
+  inputDisabled?: boolean;
+  kind?: "side-chat" | "subagent";
 }
 
 export interface SideChatArtifactContent extends Record<string, unknown> {
@@ -34,10 +33,14 @@ export interface SideChatSlice {
     sideChatId: string,
     mainSessionId: string,
     context: SideChatContext,
-    model: AvailableModel | undefined,
+    model: Pick<AvailableModel, "modelId" | "providerId"> | undefined,
     pendingPrompt: string,
+    options?: { inputDisabled?: boolean; kind?: "side-chat" | "subagent" },
   ) => void;
-  setSideChatModel: (sideChatId: string, model: AvailableModel) => void;
+  setSideChatModel: (
+    sideChatId: string,
+    model: Pick<AvailableModel, "modelId" | "providerId">,
+  ) => void;
   removeSideChatMeta: (sideChatId: string) => void;
 }
 
@@ -55,7 +58,7 @@ export const createSideChatSlice: StateCreator<SideChatStoreState, [], [], SideC
     return get().sideChatMeta.has(sessionId);
   },
 
-  initSideChat: (sideChatId, mainSessionId, context, model, pendingPrompt) => {
+  initSideChat: (sideChatId, mainSessionId, context, model, pendingPrompt, options = {}) => {
     set((prev) => {
       const sideChatMeta = new Map(prev.sideChatMeta);
       sideChatMeta.set(sideChatId, {
@@ -64,6 +67,8 @@ export const createSideChatSlice: StateCreator<SideChatStoreState, [], [], SideC
         model,
         pendingPrompt,
         createdAt: Date.now(),
+        inputDisabled: options.inputDisabled,
+        kind: options.kind ?? "side-chat",
       });
       return { sideChatMeta };
     });

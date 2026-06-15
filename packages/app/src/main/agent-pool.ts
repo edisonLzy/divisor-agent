@@ -34,6 +34,11 @@ export class AgentPool
       this.modelRegistry,
       this.skillService,
     );
+    this.extensionRuntimeService.onAny(({ name, data }) => {
+      if (typeof name !== "string") return;
+
+      (this.emit as (...args: unknown[]) => Promise<void>)(name, data);
+    });
     this.extensionService = new ExtensionService(this.extensionRuntimeService);
     this.extensionRuntimeService.setExtensionService(this.extensionService);
   }
@@ -127,6 +132,7 @@ export class AgentPool
   public abortPrompt: AgentSessionIPC["abortPrompt"] = async (sessionId) => {
     const runtime = this.runtimes.get(sessionId);
     if (!runtime) {
+      await this.extensionRuntimeService.abortAgent(sessionId);
       return;
     }
 

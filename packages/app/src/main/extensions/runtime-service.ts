@@ -9,13 +9,18 @@ import type {
   ExtensionAgentModel,
   MainExtensionRuntimeAPI,
 } from "@divisor-agent/extension-core/main";
+import Emittery from "emittery";
 
+import type { AllowedMainExposeEvents } from "../../shared/events-ipc.js";
 import { AgentRuntime } from "../agent-runtime.js";
 import { ModelRegistry } from "../models/index.js";
 import { SkillService } from "../skills/index.js";
 import type { ExtensionService, ExtensionToolRuntimeContext } from "./extension-service.js";
 
-export class ExtensionRuntimeService implements MainExtensionRuntimeAPI {
+export class ExtensionRuntimeService
+  extends Emittery<AllowedMainExposeEvents>
+  implements MainExtensionRuntimeAPI
+{
   private extensionService: ExtensionService | undefined;
   private runtimeContextStorage = new AsyncLocalStorage<ExtensionToolRuntimeContext>();
   private runtimes = new Map<string, AgentRuntime>();
@@ -23,7 +28,9 @@ export class ExtensionRuntimeService implements MainExtensionRuntimeAPI {
   constructor(
     private modelRegistry: ModelRegistry,
     private skillService: SkillService,
-  ) {}
+  ) {
+    super();
+  }
 
   setExtensionService(extensionService: ExtensionService) {
     this.extensionService = extensionService;
@@ -60,6 +67,15 @@ export class ExtensionRuntimeService implements MainExtensionRuntimeAPI {
     if (model) {
       await runtime.setModel(model);
     }
+
+    runtime.onAny(({ name, data }) => {
+      if (typeof name !== "string") return;
+
+      (this.emit as (...args: unknown[]) => Promise<void>)(name, {
+        sessionId: agentId,
+        ...(data as object),
+      });
+    });
 
     this.runtimes.set(agentId, runtime);
 
@@ -101,6 +117,7 @@ export class ExtensionRuntimeService implements MainExtensionRuntimeAPI {
       runtime.destroy();
     }
     this.runtimes.clear();
+    this.clearListeners();
   }
 
   private getRuntime(agentId: string) {

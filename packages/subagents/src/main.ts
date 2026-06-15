@@ -4,7 +4,6 @@ import { Type } from "@sinclair/typebox";
 
 import {
   SUBAGENTS_LIST_BLOCK_TYPE,
-  SUBAGENTS_RUNTIME_ARTIFACT_TYPE,
   SUBAGENTS_TOOL_NAME,
   type SubagentRuntimeSnapshot,
   type SubagentSnapshot,
@@ -42,6 +41,9 @@ export default defineMainExtension((ctx) => {
       const parentSessionId = currentContext?.sessionId ?? "unknown-session";
       const runId = `subagents-${toolCallId}`;
       const snapshots = tasks.map((task, index) => createQueuedSnapshot(runId, index, task));
+      for (const subagent of snapshots) {
+        subagent.model = currentContext?.model;
+      }
       let snapshot = createRuntimeSnapshot(parentSessionId, runId, snapshots);
 
       const publish = () => {
@@ -68,7 +70,6 @@ export default defineMainExtension((ctx) => {
             },
           });
 
-          subagent.model = currentContext?.model;
           const unsubscribe = ctx.runtime.subscribeAgentEvents(agent.id, (event) => {
             applyRuntimeEvent(subagent, event);
             publish();
@@ -128,7 +129,7 @@ function createQueuedSnapshot(
 ): SubagentSnapshot {
   const id = `${runId}-${index}`;
   return {
-    artifactId: `subagent-${id}`,
+    artifactId: id,
     id,
     name: task.name,
     phase: "Queued",
@@ -143,56 +144,42 @@ function createRuntimeSnapshot(
   runId: string,
   subagents: SubagentSnapshot[],
 ): SubagentRuntimeSnapshot {
+  const listSubagents = subagents.map(({ artifactId, id, name, phase, status, task }) => ({
+    artifactId,
+    id,
+    name,
+    phase,
+    status,
+    task,
+  }));
+
   return {
     assistantBlock: {
       props: {
         parentSessionId,
         runId,
-        subagents: subagents.map(({ artifactId, id, name, phase, status, task }) => ({
-          artifactId,
-          id,
-          name,
-          phase,
-          status,
-          task,
-        })),
+        subagents: listSubagents,
       },
       type: SUBAGENTS_LIST_BLOCK_TYPE,
     },
-    artifacts: subagents.map((subagent) => ({
-      content: {
-        activeSubagentId: subagent.id,
-        assistantBlock: {
-          props: {
-            parentSessionId,
-            runId,
-            subagents: [
-              {
-                artifactId: subagent.artifactId,
-                id: subagent.id,
-                name: subagent.name,
-                phase: subagent.phase,
-                status: subagent.status,
-                task: subagent.task,
-              },
-            ],
-          },
-          type: SUBAGENTS_LIST_BLOCK_TYPE,
-        },
-        artifacts: [],
-        parentSessionId,
+    sideChatArtifacts: subagents.map((subagent) => ({
+      context: {
         runId,
-        subagents,
-        type: SUBAGENTS_RUNTIME_ARTIFACT_TYPE,
+        subagentId: subagent.id,
+        task: subagent.task,
       },
       id: subagent.artifactId,
-      name: subagent.name,
-      type: SUBAGENTS_RUNTIME_ARTIFACT_TYPE,
+      inputDisabled: true,
+      kind: "subagent",
+      model: subagent.model,
+      parentSessionId,
+      pendingPrompt: subagent.task,
+      title: subagent.name,
     })),
     parentSessionId,
     runId,
-    subagents,
-    type: SUBAGENTS_RUNTIME_ARTIFACT_TYPE,
+    subagents: listSubagents,
+    type: "subagents.runtime",
   };
 }
 
@@ -240,11 +227,18 @@ function applyRuntimeEvent(subagent: SubagentSnapshot, event: ExtensionAgentEven
       break;
     }
     case "agent_end": {
-      const failed = event.messages.some((message) => {
-        return isRecord(message) && message.role === "assistant" && message.stopReason === "error";
-      });
-      subagent.status = failed ? "failed" : "completed";
-      subagent.phase = failed ? "Failed" : "Completed";
+      const stopReason = event.messages.reduce<string | undefined>((reason, message) => {
+        if (!isRecord(message) || message.role !== "assistant") return reason;
+        return typeof message.stopReason === "string" ? message.stopReason : reason;
+      }, undefined);
+      subagent.status =
+        stopReason === "aborted" ? "aborted" : stopReason === "error" ? "failed" : "completed";
+      subagent.phase =
+        subagent.status === "aborted"
+          ? "Aborted"
+          : subagent.status === "failed"
+            ? "Failed"
+            : "Completed";
       subagent.completedAt = Date.now();
       subagent.finalOutput = extractFinalOutput(event.messages);
       break;

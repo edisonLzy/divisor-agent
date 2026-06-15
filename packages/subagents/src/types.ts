@@ -1,8 +1,7 @@
 export const SUBAGENTS_TOOL_NAME = "subagents/run";
 export const SUBAGENTS_LIST_BLOCK_TYPE = "subagents.list";
-export const SUBAGENTS_RUNTIME_ARTIFACT_TYPE = "subagents.runtime";
 
-export type SubagentStatus = "completed" | "failed" | "queued" | "running";
+export type SubagentStatus = "aborted" | "completed" | "failed" | "queued" | "running";
 export type SubagentToolStatus = "done" | "error" | "running";
 
 export interface SubagentTaskInput {
@@ -39,25 +38,34 @@ export interface SubagentSnapshot {
   toolEvents: SubagentToolEvent[];
 }
 
-export interface SubagentRuntimeArtifactContent extends SubagentRuntimeSnapshot {
-  activeSubagentId: string;
-}
-
 export interface SubagentRuntimeSnapshot {
   assistantBlock: {
     props: SubagentsListBlockProps;
     type: typeof SUBAGENTS_LIST_BLOCK_TYPE;
   };
-  artifacts: Array<{
-    content: SubagentRuntimeArtifactContent;
-    id: string;
-    name: string;
-    type: typeof SUBAGENTS_RUNTIME_ARTIFACT_TYPE;
-  }>;
   parentSessionId: string;
   runId: string;
-  subagents: SubagentSnapshot[];
-  type: typeof SUBAGENTS_RUNTIME_ARTIFACT_TYPE;
+  sideChatArtifacts: SubagentSideChatArtifact[];
+  subagents: SubagentsListBlockProps["subagents"];
+  type: "subagents.runtime";
+}
+
+export interface SubagentSideChatArtifact {
+  context: {
+    runId: string;
+    subagentId: string;
+    task: string;
+  };
+  id: string;
+  inputDisabled: true;
+  kind: "subagent";
+  model?: {
+    modelId: string;
+    providerId: string;
+  };
+  parentSessionId: string;
+  pendingPrompt: string;
+  title: string;
 }
 
 export interface SubagentsListBlockProps {

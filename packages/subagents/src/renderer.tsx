@@ -1,14 +1,19 @@
 import { useExtensionsContextAPI } from "@divisor-agent/extension-core/renderer";
 import { defineRendererExtension } from "@divisor-agent/extension-core/renderer";
 import { Badge } from "@renderer/components/ui/badge";
-import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { cn } from "@renderer/lib/utils";
-import { CheckCircleIcon, CircleIcon, LoaderCircleIcon, XCircleIcon } from "lucide-react";
+import { sideChatStore } from "@renderer/store/side-chat";
+import {
+  CheckCircleIcon,
+  CircleIcon,
+  LoaderCircleIcon,
+  OctagonXIcon,
+  XCircleIcon,
+} from "lucide-react";
+import { useSyncExternalStore } from "react";
 
 import {
   SUBAGENTS_LIST_BLOCK_TYPE,
-  SUBAGENTS_RUNTIME_ARTIFACT_TYPE,
-  type SubagentRuntimeArtifactContent,
   type SubagentsListBlockProps,
   type SubagentStatus,
 } from "./types";
@@ -16,6 +21,7 @@ import {
 function SubagentsListBlock({ props }: { props: Record<string, unknown> }) {
   const api = useExtensionsContextAPI();
   const block = parseListBlockProps(props);
+  const entryStates = useSideChatEntryStates();
 
   if (!block) {
     return null;
@@ -29,7 +35,11 @@ function SubagentsListBlock({ props }: { props: Record<string, unknown> }) {
       </div>
       <div className="flex flex-col gap-1">
         {block.subagents.map((subagent) => {
-          const StatusIcon = getStatusIcon(subagent.status);
+          const status = getLiveSubagentStatus(
+            entryStates.get(subagent.id)?.status,
+            subagent.status,
+          );
+          const StatusIcon = getStatusIcon(status);
           return (
             <button
               key={subagent.id}
@@ -40,18 +50,20 @@ function SubagentsListBlock({ props }: { props: Record<string, unknown> }) {
               <StatusIcon
                 className={cn(
                   "size-4 shrink-0 text-muted-foreground",
-                  subagent.status === "running" && "animate-spin",
+                  status === "running" && "animate-spin",
                 )}
               />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="truncate font-medium">{subagent.name}</span>
                   <span className="shrink-0 text-xs text-muted-foreground">
-                    {getStatusLabel(subagent.status)}
+                    {getStatusLabel(status)}
                   </span>
                 </div>
                 <div className="truncate text-xs text-muted-foreground">
-                  {subagent.phase || subagent.task}
+                  {status !== subagent.status
+                    ? getStatusLabel(status)
+                    : subagent.phase || subagent.task}
                 </div>
               </div>
             </button>
@@ -62,101 +74,35 @@ function SubagentsListBlock({ props }: { props: Record<string, unknown> }) {
   );
 }
 
-function SubagentRuntimeArtifact({
-  content,
-}: {
-  artifactId: string;
-  content: Record<string, unknown>;
-}) {
-  const snapshot = parseArtifactContent(content);
-  const subagent = snapshot?.subagents.find((item) => item.id === snapshot.activeSubagentId);
-
-  if (!snapshot || !subagent) {
-    return (
-      <div className="rounded-md border border-border/70 bg-card/70 p-3 text-sm text-muted-foreground">
-        No subagent runtime data.
-      </div>
-    );
-  }
-
-  const elapsed =
-    subagent.startedAt && (subagent.completedAt || subagent.status === "running")
-      ? Math.max(0, Math.floor(((subagent.completedAt ?? Date.now()) - subagent.startedAt) / 1000))
-      : null;
-
-  return (
-    <ScrollArea className="h-full">
-      <div className="flex flex-col gap-3 p-1">
-        <section className="rounded-md border border-border/70 bg-card/70 p-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="truncate font-semibold text-base">{subagent.name}</h2>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">{subagent.task}</p>
-            </div>
-            <Badge variant="secondary">{getStatusLabel(subagent.status)}</Badge>
-          </div>
-          <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-            <div>
-              <dt className="font-medium text-foreground">Phase</dt>
-              <dd>{subagent.phase ?? "-"}</dd>
-            </div>
-            <div>
-              <dt className="font-medium text-foreground">Elapsed</dt>
-              <dd>{elapsed === null ? "-" : `${elapsed}s`}</dd>
-            </div>
-            <div>
-              <dt className="font-medium text-foreground">Provider</dt>
-              <dd>{subagent.model?.providerId ?? "-"}</dd>
-            </div>
-            <div>
-              <dt className="font-medium text-foreground">Model</dt>
-              <dd className="truncate">{subagent.model?.modelId ?? "-"}</dd>
-            </div>
-          </dl>
-        </section>
-
-        <section className="rounded-md border border-border/70 bg-card/70 p-3">
-          <h3 className="mb-2 font-medium text-sm">Latest Output</h3>
-          <pre className="whitespace-pre-wrap wrap-break-word text-sm leading-6 text-muted-foreground">
-            {subagent.finalOutput || subagent.latestText || "Waiting for output..."}
-          </pre>
-        </section>
-
-        {subagent.error ? (
-          <section className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-            {subagent.error}
-          </section>
-        ) : null}
-
-        <section className="rounded-md border border-border/70 bg-card/70 p-3">
-          <h3 className="mb-2 font-medium text-sm">Tool Activity</h3>
-          {subagent.toolEvents.length > 0 ? (
-            <div className="flex flex-col gap-2">
-              {subagent.toolEvents.map((tool) => (
-                <div key={tool.id} className="rounded-md bg-muted/50 p-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-sm font-medium">{tool.name}</span>
-                    <Badge variant="secondary">{tool.status}</Badge>
-                  </div>
-                  <pre className="mt-2 whitespace-pre-wrap wrap-break-word text-xs leading-5 text-muted-foreground">
-                    {tool.outputPreview || tool.argsPreview}
-                  </pre>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">No tool activity yet.</p>
-          )}
-        </section>
-      </div>
-    </ScrollArea>
+function useSideChatEntryStates() {
+  return useSyncExternalStore(
+    sideChatStore.subscribe,
+    () => sideChatStore.getState().entryStates,
+    () => sideChatStore.getState().entryStates,
   );
+}
+
+function getLiveSubagentStatus(
+  status: "completed" | "failed" | "idle" | "running" | undefined,
+  fallback: SubagentStatus,
+): SubagentStatus {
+  switch (status) {
+    case "completed":
+      return "completed";
+    case "failed":
+      return "failed";
+    case "running":
+      return "running";
+    case "idle":
+    case undefined:
+      return fallback;
+  }
 }
 
 export default defineRendererExtension((ctx) => {
   ctx.slashCommands.register({
     id: "subagents.run",
-    group: "Subagents",
+    group: "Skills",
     name: "subagent",
     description: "Use subagents to run focused tasks in parallel",
     extra: "Parallel agents",
@@ -175,11 +121,6 @@ export default defineRendererExtension((ctx) => {
   ctx.assistantBlocks.register({
     type: SUBAGENTS_LIST_BLOCK_TYPE,
     render: SubagentsListBlock,
-  });
-
-  ctx.artifacts.register({
-    type: SUBAGENTS_RUNTIME_ARTIFACT_TYPE,
-    render: SubagentRuntimeArtifact,
   });
 });
 
@@ -216,24 +157,10 @@ function parseListBlockProps(value: Record<string, unknown>): SubagentsListBlock
   };
 }
 
-function parseArtifactContent(
-  value: Record<string, unknown>,
-): SubagentRuntimeArtifactContent | null {
-  if (
-    typeof value.activeSubagentId !== "string" ||
-    typeof value.parentSessionId !== "string" ||
-    typeof value.runId !== "string" ||
-    value.type !== SUBAGENTS_RUNTIME_ARTIFACT_TYPE ||
-    !Array.isArray(value.subagents)
-  ) {
-    return null;
-  }
-
-  return value as unknown as SubagentRuntimeArtifactContent;
-}
-
 function getStatusIcon(status: SubagentStatus) {
   switch (status) {
+    case "aborted":
+      return OctagonXIcon;
     case "completed":
       return CheckCircleIcon;
     case "failed":
@@ -247,6 +174,8 @@ function getStatusIcon(status: SubagentStatus) {
 
 function getStatusLabel(status: SubagentStatus) {
   switch (status) {
+    case "aborted":
+      return "Aborted";
     case "completed":
       return "Completed";
     case "failed":
@@ -259,7 +188,13 @@ function getStatusLabel(status: SubagentStatus) {
 }
 
 function isSubagentStatus(value: unknown): value is SubagentStatus {
-  return value === "completed" || value === "failed" || value === "queued" || value === "running";
+  return (
+    value === "aborted" ||
+    value === "completed" ||
+    value === "failed" ||
+    value === "queued" ||
+    value === "running"
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
