@@ -69,6 +69,7 @@ readmeai \
 ```
 
 **Important notes:**
+
 - The `--api offline` mode generates a skeleton with badges, project tree, and template sections — but Overview, Features, and Roadmap sections are left empty/placeholder. After running readme-ai, **manually fill in** those sections with accurate project content (architecture, features, tech stack, commands, etc.).
 - The `.readmeaiignore` file prevents `node_modules` from being scanned, which would otherwise balloon the README to hundreds of megabytes.
 - The project uses **pnpm** — after generation, fix any references that readme-ai incorrectly defaults to `npm` in the Quickstart section.

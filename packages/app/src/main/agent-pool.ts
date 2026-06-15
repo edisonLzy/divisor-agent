@@ -85,6 +85,10 @@ export class AgentPool
     runtime.setSessionId(sessionId);
   };
 
+  public destroySession: AgentSessionIPC["destroySession"] = async (sessionId) => {
+    this.destroyAgent(sessionId);
+  };
+
   public setHistoryMessages: AgentSessionIPC["setHistoryMessages"] = async (
     sessionId,
     messages,

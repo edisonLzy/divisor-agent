@@ -235,6 +235,21 @@
   }
 }
 
+@layer utilities {
+  .app-drag-region {
+    -webkit-app-region: drag;
+    app-region: drag;
+    user-select: none;
+  }
+
+  .app-no-drag,
+  .app-no-drag *,
+  .app-drag-region :is(button, input, textarea, select, a, [role="button"], [role="tab"]) {
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+  }
+}
+
 .ProseMirror {
   outline: none;
   white-space: pre-wrap;

@@ -1,12 +1,12 @@
 import { ErrorBoundary } from "@renderer/components/ui/error-boundary";
-import { sessionStore } from "@renderer/store";
+import { mainStore } from "@renderer/store/main";
 import { useStore } from "zustand";
 
 import { ActiveSessionContent } from "./active-session-content";
 import { PendingSessionContent } from "./pending-session-content";
 
 export function Chat() {
-  const activeSessionId = useStore(sessionStore, (state) => state.activeSessionId);
+  const activeSessionId = useStore(mainStore, (state) => state.activeSessionId);
   const shouldRenderPendingState = !activeSessionId;
 
   return (

@@ -1,5 +1,6 @@
 import { Button } from "@renderer/components/ui/button";
 import { Input } from "@renderer/components/ui/input";
+import { formatToolArgs } from "@renderer/lib/agent-tool";
 import { cn } from "@renderer/lib/utils";
 import { getPermissionCommandPrefix, getPermissionCommandText } from "@shared/permissions-ipc";
 import { ChevronDown, ChevronUp, CornerDownLeft } from "lucide-react";
@@ -15,17 +16,6 @@ const DEFAULT_DENY_REASON =
   "User declined the operation. Please ask for further instructions or adjust your approach.";
 
 type PermissionChoice = "approve" | "approve-prefix" | "deny";
-
-function formatArgs(value: unknown): string {
-  if (typeof value === "string") {
-    return value;
-  }
-  try {
-    return JSON.stringify(value ?? {}, null, 2);
-  } catch {
-    return String(value);
-  }
-}
 
 export function PermissionApprovalPanel({ sessionId }: PermissionApprovalPanelProps) {
   const { approve, approveWithRememberedPrefix, deny, isSubmitting, request } =
@@ -44,7 +34,7 @@ export function PermissionApprovalPanel({ sessionId }: PermissionApprovalPanelPr
     return null;
   }
 
-  const formattedArgs = formatArgs(request.args);
+  const formattedArgs = formatToolArgs(request.args);
 
   const commandSnippet = getPermissionCommandText(request);
   const rememberCommandPrefix = getPermissionCommandPrefix(commandSnippet);

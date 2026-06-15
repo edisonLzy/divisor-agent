@@ -2,7 +2,8 @@ import { createSession } from "@renderer/apis/sessions";
 import { MessageAction } from "@renderer/components/ai-elements/message";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { agentMessageToRuntimeMessage } from "@renderer/lib/agent-message";
-import { sessionStore, type MessageEntry, type SessionEntry } from "@renderer/store";
+import { type MessageEntry, type SessionEntry } from "@renderer/store/entries-slice";
+import { mainStore } from "@renderer/store/main";
 import { GitBranch } from "lucide-react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
@@ -29,7 +30,7 @@ export function ForkMessageButton({ sessionId, entries, targetEntryId }: ForkMes
   const [isForking, setIsForking] = useState(false);
 
   const handleFork = useCallback(async () => {
-    const store = sessionStore.getState();
+    const store = mainStore.getState();
     const session = store.getSession(sessionId);
     if (!session) return;
 

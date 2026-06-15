@@ -1,6 +1,6 @@
 import { useSubscribeAgentEvents } from "@renderer/hooks/use-subscribe-agent-events";
 import { isFailedAssistantMessage } from "@renderer/lib/is";
-import { sessionStore } from "@renderer/store";
+import { mainStore } from "@renderer/store/main";
 
 /**
  * Subscribes to agent lifecycle events to manage session UI state
@@ -10,16 +10,23 @@ import { sessionStore } from "@renderer/store";
  * session-level visual state.
  */
 export function useAgentSessions() {
-  useSubscribeAgentEvents({
-    agent_start: (event) => {
-      const { sessionId } = event;
-      sessionStore.getState().setSessionStatus(sessionId, "running");
-    },
+  useSubscribeAgentEvents(
+    {
+      agent_start: (event) => {
+        const { sessionId } = event;
+        mainStore.getState().setStatus(sessionId, "running");
+      },
 
-    agent_end: (event) => {
-      const { sessionId, messages } = event;
-      const status = messages.some(isFailedAssistantMessage) ? "failed" : "completed";
-      sessionStore.getState().setSessionStatus(sessionId, status);
+      agent_end: (event) => {
+        const { sessionId, messages } = event;
+        const status = messages.some(isFailedAssistantMessage) ? "failed" : "completed";
+        mainStore.getState().setStatus(sessionId, status);
+      },
     },
-  });
+    {
+      shouldHandleEvent: (event) => {
+        return Boolean(mainStore.getState().getSession(event.sessionId));
+      },
+    },
+  );
 }

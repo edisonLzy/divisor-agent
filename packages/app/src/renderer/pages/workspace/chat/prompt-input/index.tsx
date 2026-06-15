@@ -8,6 +8,7 @@ import { EditorContent } from "@tiptap/react";
 import { ArrowUp, Square } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 
+import { INSERT_PROMPT_TEXT_EVENT } from "../prompt-insert-event";
 import type { PromptSubmission } from "../prompt-types";
 import { useChatEditor } from "../use-chat-editor";
 import { ModalSelector, useModalSelector } from "./modal-selector";
@@ -38,6 +39,20 @@ export function PromptInput({
     disabled: disabled || isRunning,
     getFloatingReference: () => editorContainerRef.current,
   });
+
+  useEffect(() => {
+    if (!editor || !sessionId) return;
+
+    const handleInsertPromptText = (event: Event) => {
+      const detail = (event as CustomEvent<{ sessionId: string; text: string }>).detail;
+      if (!detail || detail.sessionId !== sessionId || !detail.text) return;
+
+      editor.chain().focus().insertContentAt(editor.state.doc.content.size, detail.text).run();
+    };
+
+    window.addEventListener(INSERT_PROMPT_TEXT_EVENT, handleInsertPromptText);
+    return () => window.removeEventListener(INSERT_PROMPT_TEXT_EVENT, handleInsertPromptText);
+  }, [editor, sessionId]);
 
   const canSubmit = !disabled && !isRunning && hasContent && modelSelectorProps.value !== null;
   const isStopEnabled = isRunning && typeof onStop === "function";

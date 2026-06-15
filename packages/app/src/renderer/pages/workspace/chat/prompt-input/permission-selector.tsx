@@ -14,7 +14,7 @@ import {
 } from "@renderer/components/ui/tooltip";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { cn } from "@renderer/lib/utils";
-import { sessionStore } from "@renderer/store";
+import { mainStore } from "@renderer/store/main";
 import type { PermissionMode } from "@shared/permissions-ipc";
 import { CircleHelp, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
@@ -137,7 +137,7 @@ export function PermissionSelector({ disabled = false, onChange, value }: Permis
 
 export function usePermissionSelector(sessionId: string | null): PermissionSelectorProps {
   const { invoke } = useElectronIPC();
-  const value = useStore(sessionStore, (state) => {
+  const value = useStore(mainStore, (state) => {
     if (!sessionId) {
       return "default";
     }
@@ -151,7 +151,7 @@ export function usePermissionSelector(sessionId: string | null): PermissionSelec
         return;
       }
 
-      const store = sessionStore.getState();
+      const store = mainStore.getState();
       const previousMode = store.getPermissionState(sessionId).mode;
       if (previousMode === mode) {
         return;

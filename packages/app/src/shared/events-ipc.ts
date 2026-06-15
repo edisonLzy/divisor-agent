@@ -44,6 +44,7 @@ export const ALLOWED_RENDER_INVOKE_EVENTS: (keyof AgentRuntimeIPC)[] = [
   "abortPrompt",
   "setHistoryMessages",
   "setSessionId",
+  "destroySession",
   "setPermissionMode",
   "resolvePermissionRequest",
   "listSkills",

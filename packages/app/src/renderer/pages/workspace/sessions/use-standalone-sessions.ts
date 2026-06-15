@@ -1,5 +1,5 @@
 import { listSessions } from "@renderer/apis/sessions";
-import { sessionStore } from "@renderer/store";
+import { mainStore } from "@renderer/store/main";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 
@@ -15,7 +15,7 @@ export function useStandaloneSessions() {
         limit: 50,
         offset: pageParam,
       });
-      sessionStore.getState().addSessions(result.sessions);
+      mainStore.getState().addSessions(result.sessions);
       return result;
     },
     initialPageParam: 0,

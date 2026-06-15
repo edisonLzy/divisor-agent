@@ -16,7 +16,7 @@ import {
   DialogClose,
 } from "@renderer/components/ui/dialog";
 import { cn } from "@renderer/lib/utils";
-import { sessionStore } from "@renderer/store";
+import { mainStore } from "@renderer/store/main";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { Folder, FolderOpen, Pin, PinOff, Plus, Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";
@@ -46,7 +46,7 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
         offset: pageParam,
       });
       // Sync fetched sessions to store
-      sessionStore.getState().addSessions(result.sessions);
+      mainStore.getState().addSessions(result.sessions);
       return result;
     },
     initialPageParam: 0,
@@ -75,7 +75,7 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
     try {
       await deleteWorkspace(workspace.id);
       // Clean up sessions belonging to this workspace from local store
-      const store = sessionStore.getState();
+      const store = mainStore.getState();
       store.sessions
         .filter((s) => s.workspaceId === workspace.id)
         .forEach((s) => store.removeSession(s.id));
@@ -90,7 +90,7 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
     (e: React.MouseEvent) => {
       e.stopPropagation();
       // Always update the pending session with this workspace, even if one already exists
-      const store = sessionStore.getState();
+      const store = mainStore.getState();
       store.setActiveSessionId(null);
       store.createPendingSession(workspace.id);
       setOpen(true);

@@ -1,5 +1,5 @@
 import { isAgentAssistantMessage, isAgentUserMessage } from "@renderer/lib/is";
-import type { MessageEntry, SessionEntry, ToolExecutionState } from "@renderer/store";
+import type { MessageEntry, SessionEntry, ToolExecutionState } from "@renderer/store/entries-slice";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef } from "react";
 

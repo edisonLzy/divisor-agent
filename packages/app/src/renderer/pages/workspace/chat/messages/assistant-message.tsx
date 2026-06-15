@@ -13,13 +13,14 @@ import {
 } from "@renderer/components/ui/collapsible";
 import { Separator } from "@renderer/components/ui/separator";
 import { cn } from "@renderer/lib/utils";
-import type { SessionEntry, ToolExecutionState } from "@renderer/store";
+import type { SessionEntry, ToolExecutionState } from "@renderer/store/entries-slice";
 import { ChevronRightIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AssistantResponseMessage } from "./assistant-response-message";
 import { AssistantThinkingMessage } from "./assistant-thinking-message";
 import { AssistantToolMessage } from "./assistant-tool-message";
+import { FloatingToolbar } from "./floating-toolbar";
 import { CopyMessageButton } from "./toolbar/copy-message-button";
 import { ForkMessageButton } from "./toolbar/fork-message-button";
 import { MessageToolbar } from "./toolbar/message-toolbar";
@@ -74,70 +75,72 @@ export function AssistantMessage({
 
   return (
     <Message from="assistant" className="gap-1">
-      <Collapsible open={isProcessingOpen} onOpenChange={(open) => setIsProcessingOpen(open)}>
-        <div className="flex flex-col gap-2">
-          <CollapsibleTrigger className="group/trigger flex cursor-pointer items-center gap-1.5">
-            <ProcessingTip
-              completedAt={completedAt}
-              hasError={hasError}
-              isStreaming={isStreaming}
-              startedAt={startedAt}
-            />
-            <ChevronRightIcon className="size-3.5 text-muted-foreground transition-transform group-data-panel-open/trigger:rotate-90 hover:text-foreground" />
-          </CollapsibleTrigger>
-          <Separator />
-        </div>
+      <FloatingToolbar entryId={entryId} sessionId={sessionId}>
+        <Collapsible open={isProcessingOpen} onOpenChange={(open) => setIsProcessingOpen(open)}>
+          <div className="flex flex-col gap-2">
+            <CollapsibleTrigger className="group/trigger flex cursor-pointer items-center gap-1.5">
+              <ProcessingTip
+                completedAt={completedAt}
+                hasError={hasError}
+                isStreaming={isStreaming}
+                startedAt={startedAt}
+              />
+              <ChevronRightIcon className="size-3.5 text-muted-foreground transition-transform group-data-panel-open/trigger:rotate-90 hover:text-foreground" />
+            </CollapsibleTrigger>
+            <Separator />
+          </div>
 
-        <CollapsibleContent className="mt-2 flex flex-col gap-2">
-          {processingContent.map((block) => {
-            if (block.type === "thinking") {
-              return (
-                <AssistantThinkingMessage
-                  key={`thinking-${block.thinking.slice(0, 20)}`}
-                  content={block.thinking}
-                />
-              );
-            }
+          <CollapsibleContent className="mt-2 flex flex-col gap-2">
+            {processingContent.map((block) => {
+              if (block.type === "thinking") {
+                return (
+                  <AssistantThinkingMessage
+                    key={`thinking-${block.thinking.slice(0, 20)}`}
+                    content={block.thinking}
+                  />
+                );
+              }
 
-            if (block.type === "toolCall") {
-              return (
-                <AssistantToolMessage
-                  key={block.id}
-                  toolName={block.name}
-                  args={block.arguments}
-                  toolState={toolStates.get(block.id)}
-                />
-              );
-            }
+              if (block.type === "toolCall") {
+                return (
+                  <AssistantToolMessage
+                    key={block.id}
+                    toolName={block.name}
+                    args={block.arguments}
+                    toolState={toolStates.get(block.id)}
+                  />
+                );
+              }
 
-            return null;
-          })}
-        </CollapsibleContent>
-      </Collapsible>
+              return null;
+            })}
+          </CollapsibleContent>
+        </Collapsible>
 
-      {textContent.map((block, i) => (
-        <AssistantResponseMessage
-          key={`text-${i}`}
-          content={block.text}
-          entryId={entryId}
-          isStreaming={isStreaming}
-          sessionId={sessionId}
-        />
-      ))}
+        {textContent.map((block, i) => (
+          <AssistantResponseMessage
+            key={`text-${i}`}
+            content={block.text}
+            entryId={entryId}
+            isStreaming={isStreaming}
+            sessionId={sessionId}
+          />
+        ))}
 
-      {hasError && textContent.every((block) => block.text.trim().length === 0) ? (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm leading-6 text-destructive">
-          {errorMessage ||
-            "Agent request failed. Please check the model/API configuration and try again."}
-        </div>
-      ) : null}
+        {hasError && textContent.every((block) => block.text.trim().length === 0) ? (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm leading-6 text-destructive">
+            {errorMessage ||
+              "Agent request failed. Please check the model/API configuration and try again."}
+          </div>
+        ) : null}
 
-      {!hasError ? (
-        <MessageToolbar align="start">
-          <CopyMessageButton text={assistantText} />
-          <ForkMessageButton sessionId={sessionId} entries={entries} targetEntryId={entryId} />
-        </MessageToolbar>
-      ) : null}
+        {!hasError ? (
+          <MessageToolbar align="start">
+            <CopyMessageButton text={assistantText} />
+            <ForkMessageButton sessionId={sessionId} entries={entries} targetEntryId={entryId} />
+          </MessageToolbar>
+        ) : null}
+      </FloatingToolbar>
     </Message>
   );
 }
