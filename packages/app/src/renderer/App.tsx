@@ -3,8 +3,11 @@ import {
   ExtensionsContextAPIProvider,
   type ExtensionsContextAPI,
 } from "@divisor-agent/extension-core/renderer";
+import { createAgentUserMessage } from "@renderer/lib/agent-message";
 import { mainStore } from "@renderer/store/main";
+import { sideChatStore } from "@renderer/store/side-chat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { JSONContent } from "@tiptap/core";
 import { useMemo } from "react";
 import { RouterProvider } from "react-router-dom";
 import { Toaster } from "sonner";
@@ -26,6 +29,34 @@ const queryClient = new QueryClient({
 export function App() {
   const extensionsContextAPI = useMemo<ExtensionsContextAPI>(
     () => ({
+      appendSideChatArtifact(input) {
+        mainStore.getState().upsertArtifact(input.parentSessionId, {
+          id: input.id,
+          type: "side-chat",
+          content: {},
+          name: input.title,
+        });
+
+        const sideChat = sideChatStore.getState();
+        if (!sideChat.getSideChatMeta(input.id)) {
+          sideChat.initSideChat(
+            input.id,
+            input.parentSessionId,
+            input.context ?? {},
+            input.model,
+            input.pendingPrompt,
+            {
+              inputDisabled: input.inputDisabled,
+              kind: input.kind,
+            },
+          );
+
+          sideChat.appendMessageEntry(
+            input.id,
+            createAgentUserMessage(createTextDocument(input.pendingPrompt), input.pendingPrompt),
+          );
+        }
+      },
       openArtifact(sessionId, artifactId) {
         mainStore.getState().setArtifactPanelOpen(sessionId, true);
         mainStore.getState().setActiveArtifactId(sessionId, artifactId);
@@ -61,4 +92,16 @@ export function App() {
       </ElectronIPCProvider>
     </QueryClientProvider>
   );
+}
+
+function createTextDocument(text: string): JSONContent {
+  return {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [{ type: "text", text }],
+      },
+    ],
+  };
 }

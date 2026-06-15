@@ -20,11 +20,13 @@ export function SideChatArtifact({ artifact }: SideChatArtifactProps) {
     state.streamingEntryIds.get(artifact.id),
   );
   const entryState = useStore(sideChatStore, (state) => state.getEntryState(artifact.id));
+  const meta = useStore(sideChatStore, (state) => state.getSideChatMeta(artifact.id));
   const messageEntries = useMemo(
     () => entryState.entries.filter(isAgentMessageEntry),
     [entryState.entries],
   );
   const isRunning = entryState.status === "running";
+  const inputDisabled = meta?.inputDisabled ?? false;
 
   const submitPrompt = useCallback(
     async (submission: PromptSubmission) => {
@@ -72,7 +74,7 @@ export function SideChatArtifact({ artifact }: SideChatArtifactProps) {
 
       <div className="shrink-0 px-2 pb-2 pt-2">
         <PromptInput
-          disabled={false}
+          disabled={inputDisabled}
           isRunning={isRunning}
           onStop={stopPrompt}
           onSubmit={submitPrompt}
