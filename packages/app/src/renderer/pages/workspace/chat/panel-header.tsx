@@ -28,7 +28,7 @@ export function PanelHeader({
         className,
       )}
     >
-      {dragRegion ? (
+      {dragRegion && insetForWindowControls ? (
         // Carve out the global sidebar toggle area from Electron's native drag region.
         <span aria-hidden className="app-no-drag absolute top-0 bottom-0 left-0 z-10 w-32" />
       ) : null}

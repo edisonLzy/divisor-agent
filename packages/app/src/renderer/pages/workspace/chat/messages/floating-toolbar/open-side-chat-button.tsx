@@ -35,7 +35,7 @@ export function OpenSideChatButton({
       id: sideChatId,
       type: "side-chat",
       content: {},
-      name: '侧边聊天',
+      name: "侧边聊天",
     });
 
     sideChatStore

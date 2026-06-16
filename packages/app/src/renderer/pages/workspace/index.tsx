@@ -16,7 +16,7 @@ import { useAgentSessions } from "./use-agent-sessions";
 export function WorkspacePage() {
   const { isCollapsed, panelRef, setIsCollapsed, toggle } = useToggleSidebarButton();
   const [sidebarSize, setSidebarSize] = useState(26);
-  const titlebarWidth = isCollapsed ? "100%" : `max(8rem, ${sidebarSize}%)`;
+  const titlebarWidth = isCollapsed ? "8rem" : `max(8rem, ${sidebarSize}%)`;
 
   void useAgentMessages();
   void useSideChatMessages();

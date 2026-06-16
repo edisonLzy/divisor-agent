@@ -6,7 +6,6 @@ import { Button } from "@renderer/components/ui/button";
 import { cn } from "@renderer/lib/utils";
 import { EditorContent } from "@tiptap/react";
 import { ArrowUp, Square } from "lucide-react";
-import { motion } from "motion/react";
 import { useCallback, useEffect, useRef } from "react";
 
 import { INSERT_PROMPT_TEXT_EVENT } from "../prompt-insert-event";
@@ -118,14 +117,11 @@ export function PromptInput({
   }, [editor, handleSubmit]);
 
   return (
-    <motion.div
+    <div
       className={cn(
         "mx-auto flex w-full max-w-3xl flex-col rounded-[24px] border border-border bg-card shadow-[0_20px_48px_rgb(15_23_42/0.08)] transition-all duration-300 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20 dark:shadow-[0_20px_48px_rgb(0_0_0/0.28)]",
         disabled && !isRunning && "opacity-80",
       )}
-      initial={{ opacity: 0, y: 10, scale: 0.99 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.22, ease: "easeOut" }}
     >
       <div ref={editorContainerRef} className="relative min-h-14 px-3.5 py-2.5">
         <EditorContent editor={editor} className="prompt-editor max-w-none" />
@@ -167,6 +163,6 @@ export function PromptInput({
           </Button>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }

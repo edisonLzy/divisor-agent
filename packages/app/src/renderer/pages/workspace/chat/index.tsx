@@ -23,7 +23,7 @@ export function Chat({ isSidebarCollapsed }: ChatProps) {
     >
       <ErrorBoundary>
         {shouldRenderPendingState ? (
-          <PendingSessionContent />
+          <PendingSessionContent isSidebarCollapsed={isSidebarCollapsed} />
         ) : (
           <ActiveSessionContent isSidebarCollapsed={isSidebarCollapsed} />
         )}

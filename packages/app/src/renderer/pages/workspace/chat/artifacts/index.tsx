@@ -87,7 +87,7 @@ export function ArtifactsPanel({ className, sessionId }: ArtifactsPanelProps) {
   return (
     <aside
       className={cn(
-        "app-no-drag flex h-full min-w-90 flex-col border-l border-border/70 bg-background/80 supports-backdrop-filter:backdrop-blur-xl",
+        "flex h-full min-w-90 flex-col border-l border-border/70 bg-background/80 supports-backdrop-filter:backdrop-blur-xl",
         className,
       )}
     >
@@ -96,8 +96,8 @@ export function ArtifactsPanel({ className, sessionId }: ArtifactsPanelProps) {
         onValueChange={(value) => setActiveArtifactId(sessionId, value)}
         className="min-h-0 flex-1 gap-0"
       >
-        <PanelHeader className="app-no-drag pl-2">
-          <div className="app-no-drag relative min-w-0 flex-1">
+        <PanelHeader dragRegion className="pl-2">
+          <div className="relative min-w-0 flex-1">
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -106,7 +106,7 @@ export function ArtifactsPanel({ className, sessionId }: ArtifactsPanelProps) {
               <SortableContext items={artifactIds} strategy={horizontalListSortingStrategy}>
                 <TabsList
                   variant="line"
-                  className="app-no-drag h-9 w-full min-w-0 justify-start gap-1 overflow-x-auto rounded-none p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  className="h-9 w-full min-w-0 justify-start gap-1 overflow-x-auto rounded-none p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                 >
                   {artifacts.map((artifact) => (
                     <ArtifactTab
@@ -162,7 +162,7 @@ function ArtifactTab({ artifact, onClose }: ArtifactTabProps) {
     >
       <TabsTrigger
         value={artifact.id}
-        className="app-no-drag h-8 min-w-0 max-w-48 cursor-grab justify-start gap-1.5 rounded-lg px-3 text-sm hover:!bg-[#F4F4F4] data-active:!bg-[#F4F4F4] data-active:after:opacity-0 active:cursor-grabbing dark:hover:!bg-muted dark:data-active:!bg-muted"
+        className="app-no-drag h-8 min-w-0 max-w-48 cursor-grab justify-start gap-1.5 rounded-lg px-3 text-sm data-active:!border-transparent hover:!bg-[#F4F4F4] data-active:!bg-[#F4F4F4] data-active:after:opacity-0 active:cursor-grabbing dark:hover:!bg-muted dark:data-active:!border-transparent dark:data-active:!bg-muted"
         {...attributes}
         {...listeners}
       >

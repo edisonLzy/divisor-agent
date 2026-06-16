@@ -19,10 +19,15 @@ import { useStore } from "zustand";
 import { useInvalidateStandaloneSessions } from "../sessions/use-standalone-sessions";
 import { useWorkspaceList } from "../sessions/use-workspace-list";
 import { useInvalidateWorkspaceSessions } from "../sessions/use-workspaces";
+import { PanelHeader } from "./panel-header";
 import { PromptInput } from "./prompt-input";
 import type { PromptSubmission } from "./prompt-types";
 
-export function PendingSessionContent() {
+interface PendingSessionContentProps {
+  isSidebarCollapsed: boolean;
+}
+
+export function PendingSessionContent({ isSidebarCollapsed }: PendingSessionContentProps) {
   const { invoke } = useElectronIPC();
   const invalidateStandalone = useInvalidateStandaloneSessions();
   const invalidateWorkspaceSessions = useInvalidateWorkspaceSessions();
@@ -83,18 +88,23 @@ export function PendingSessionContent() {
   };
 
   return (
-    <section className="min-h-0 flex-1 px-6 pt-6">
-      <div className="mx-auto flex h-full w-full max-w-4xl flex-col items-center justify-center gap-8 pb-16">
-        <h1 className="text-center text-4xl font-medium tracking-tight text-foreground sm:text-5xl">
-          我们应该在 divisor-agent 中构建什么？
-        </h1>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <PanelHeader dragRegion insetForWindowControls={isSidebarCollapsed} className="border-b-0">
+        <span className="sr-only">New session</span>
+      </PanelHeader>
+      <section className="min-h-0 flex-1 px-6 pt-6">
+        <div className="mx-auto flex h-full w-full max-w-4xl flex-col items-center justify-center gap-8 pb-16">
+          <h1 className="text-center text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
+            我们应该在 divisor-agent 中构建什么？
+          </h1>
 
-        <div className="w-full max-w-3xl">
-          <PromptInput disabled={isLoading} onSubmit={submitPrompt} sessionId={null} />
-          <SessionProfile />
+          <div className="w-full max-w-3xl">
+            <PromptInput disabled={isLoading} onSubmit={submitPrompt} sessionId={null} />
+            <SessionProfile />
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
   );
 }
 
