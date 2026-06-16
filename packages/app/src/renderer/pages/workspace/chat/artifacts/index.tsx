@@ -14,7 +14,6 @@ import {
   sortableKeyboardCoordinates,
   useSortable,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@renderer/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@renderer/components/ui/tabs";
 import { UnknownArtifact } from "@renderer/extensions/fallback-renderers";
@@ -35,7 +34,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
 
 import { PanelHeader } from "../panel-header";
@@ -51,6 +50,8 @@ export function ArtifactsPanel({ className, sessionId }: ArtifactsPanelProps) {
   const setActiveArtifactId = useStore(mainStore, (state) => state.setActiveArtifactId);
   const removeArtifact = useStore(mainStore, (state) => state.removeArtifact);
   const reorderArtifacts = useStore(mainStore, (state) => state.reorderArtifacts);
+  const tabsListRef = useRef<HTMLDivElement | null>(null);
+  const [scrollEdges, setScrollEdges] = useState({ left: false, right: false });
 
   const artifacts = artifactState.artifacts;
   const artifactIds = useMemo(() => artifacts.map((artifact) => artifact.id), [artifacts]);
@@ -63,6 +64,32 @@ export function ArtifactsPanel({ className, sessionId }: ArtifactsPanelProps) {
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+  const updateScrollEdges = useCallback(() => {
+    const list = tabsListRef.current;
+    if (!list) return;
+
+    const maxScrollLeft = list.scrollWidth - list.clientWidth;
+    setScrollEdges({
+      left: list.scrollLeft > 1,
+      right: list.scrollLeft < maxScrollLeft - 1,
+    });
+  }, []);
+
+  useEffect(() => {
+    updateScrollEdges();
+
+    const list = tabsListRef.current;
+    if (!list) return;
+
+    list.addEventListener("scroll", updateScrollEdges, { passive: true });
+    const resizeObserver = new ResizeObserver(updateScrollEdges);
+    resizeObserver.observe(list);
+
+    return () => {
+      list.removeEventListener("scroll", updateScrollEdges);
+      resizeObserver.disconnect();
+    };
+  }, [artifactIds, updateScrollEdges]);
 
   const handleCloseArtifact = useCallback(
     (artifactId: string) => {
@@ -105,8 +132,9 @@ export function ArtifactsPanel({ className, sessionId }: ArtifactsPanelProps) {
             >
               <SortableContext items={artifactIds} strategy={horizontalListSortingStrategy}>
                 <TabsList
+                  ref={tabsListRef}
                   variant="line"
-                  className="h-9 w-full min-w-0 justify-start gap-1 overflow-x-auto rounded-none p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  className="h-9 w-full min-w-0 justify-start gap-1 overflow-x-auto overflow-y-hidden rounded-none p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                 >
                   {artifacts.map((artifact) => (
                     <ArtifactTab
@@ -118,8 +146,12 @@ export function ArtifactsPanel({ className, sessionId }: ArtifactsPanelProps) {
                 </TabsList>
               </SortableContext>
             </DndContext>
-            <div className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-background to-transparent" />
-            <div className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent" />
+            {scrollEdges.left ? (
+              <div className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-background to-transparent" />
+            ) : null}
+            {scrollEdges.right ? (
+              <div className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent" />
+            ) : null}
           </div>
         </PanelHeader>
 
@@ -147,22 +179,23 @@ function ArtifactTab({ artifact, onClose }: ArtifactTabProps) {
   const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({
     id: artifact.id,
   });
+  const horizontalTransform = transform ? `translate3d(${transform.x}px, 0, 0)` : undefined;
 
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "app-no-drag group/tab relative flex h-9 max-w-48 shrink-0 items-center",
+        "app-no-drag group/tab relative flex max-w-48 shrink-0 touch-pan-x items-center",
         isDragging && "z-10 opacity-80",
       )}
       style={{
-        transform: CSS.Transform.toString(transform),
+        transform: horizontalTransform,
         transition,
       }}
     >
       <TabsTrigger
         value={artifact.id}
-        className="app-no-drag h-8 min-w-0 max-w-48 cursor-grab justify-start gap-1.5 rounded-lg px-3 text-sm data-active:!border-transparent hover:!bg-[#F4F4F4] data-active:!bg-[#F4F4F4] data-active:after:opacity-0 active:cursor-grabbing dark:hover:!bg-muted dark:data-active:!border-transparent dark:data-active:!bg-muted"
+        className="app-no-drag min-w-0 max-w-48 cursor-grab justify-start gap-1.5 rounded-lg !border-0 p-2 text-xs !shadow-none after:!hidden data-active:!border-0 data-active:!bg-[#F4F4F4] data-active:!shadow-none focus-visible:!border-0 hover:!bg-[#F4F4F4] active:cursor-grabbing dark:data-active:!border-0 dark:data-active:!bg-muted dark:hover:!bg-muted"
         {...attributes}
         {...listeners}
       >
@@ -175,7 +208,7 @@ function ArtifactTab({ artifact, onClose }: ArtifactTabProps) {
         type="button"
         variant="ghost"
         size="icon-xs"
-        className="app-no-drag absolute left-2 opacity-0 group-hover/tab:opacity-100 focus-visible:opacity-100"
+        className="app-no-drag absolute left-1 opacity-0 group-hover/tab:opacity-100 focus-visible:opacity-100"
         aria-label={`Close ${artifact.name}`}
         onClick={(event) => {
           event.stopPropagation();

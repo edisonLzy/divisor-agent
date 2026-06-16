@@ -19,12 +19,6 @@ export interface SessionArtifactState {
   isOpen: boolean;
 }
 
-export interface UpsertArtifactOptions {
-  activateOnCreate?: boolean;
-  activateOnUpdate?: boolean;
-  openOnCreate?: boolean;
-}
-
 export interface ArtifactSlice {
   artifactStates: Map<string, SessionArtifactState>;
   getArtifactState: (sessionId: string) => SessionArtifactState;
@@ -36,7 +30,6 @@ export interface ArtifactSlice {
     sessionId: string,
     artifact: Omit<ArtifactRecord<TContent>, "content" | "name"> &
       Partial<Pick<ArtifactRecord<TContent>, "content" | "name">>,
-    options?: UpsertArtifactOptions,
   ) => void;
 }
 
@@ -89,9 +82,8 @@ export const createArtifactSlice: StateCreator<MainStoreState, [], [], ArtifactS
     });
   },
 
-  upsertArtifact: (sessionId, artifact, options = {}) => {
+  upsertArtifact: (sessionId, artifact) => {
     set((prev) => {
-      const { activateOnCreate = true, activateOnUpdate = false, openOnCreate = true } = options;
       const artifactStates = new Map(prev.artifactStates);
       const state = getSessionArtifactState(artifactStates, sessionId);
       const existingIndex = state.artifacts.findIndex((item) => item.id === artifact.id);
@@ -104,19 +96,10 @@ export const createArtifactSlice: StateCreator<MainStoreState, [], [], ArtifactS
         existingIndex >= 0
           ? state.artifacts.map((item, index) => (index === existingIndex ? nextArtifact : item))
           : [...state.artifacts, nextArtifact];
-      const isNewArtifact = existingIndex < 0;
-      const activeArtifactId =
-        (isNewArtifact && activateOnCreate) ||
-        (!isNewArtifact && activateOnUpdate) ||
-        state.activeArtifactId === nextArtifact.id ||
-        (state.activeArtifactId === null && activateOnCreate)
-          ? nextArtifact.id
-          : state.activeArtifactId;
 
       artifactStates.set(sessionId, {
-        activeArtifactId,
+        ...state,
         artifacts,
-        isOpen: isNewArtifact && openOnCreate ? true : state.isOpen,
       });
 
       return { artifactStates };

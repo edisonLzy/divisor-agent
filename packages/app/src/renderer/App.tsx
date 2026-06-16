@@ -3,11 +3,10 @@ import {
   ExtensionsContextAPIProvider,
   type ExtensionsContextAPI,
 } from "@divisor-agent/extension-core/renderer";
-import { createAgentUserMessage } from "@renderer/lib/agent-message";
+import { createAgentUserMessage, createTextDocument } from "@renderer/lib/agent-message";
 import { mainStore } from "@renderer/store/main";
 import { sideChatStore } from "@renderer/store/side-chat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { JSONContent } from "@tiptap/core";
 import { useMemo } from "react";
 import { RouterProvider } from "react-router-dom";
 import { Toaster } from "sonner";
@@ -29,8 +28,8 @@ const queryClient = new QueryClient({
 export function App() {
   const extensionsContextAPI = useMemo<ExtensionsContextAPI>(
     () => ({
-      appendSideChatArtifact(input) {
-        mainStore.getState().upsertArtifact(input.parentSessionId, {
+      appendSideChatArtifact(parentSessionId, input) {
+        mainStore.getState().upsertArtifact(parentSessionId, {
           id: input.id,
           type: "side-chat",
           content: {},
@@ -39,17 +38,14 @@ export function App() {
 
         const sideChat = sideChatStore.getState();
         if (!sideChat.getSideChatMeta(input.id)) {
-          sideChat.initSideChat(
-            input.id,
-            input.parentSessionId,
-            input.context ?? {},
-            input.model,
-            input.pendingPrompt,
-            {
-              inputDisabled: input.inputDisabled,
-              kind: input.kind,
-            },
-          );
+          sideChat.appendSideChatMeta(input.id, {
+            mainSessionId: parentSessionId,
+            context: input.context ?? {},
+            model: input.model,
+            pendingPrompt: input.pendingPrompt,
+            createdAt: Date.now(),
+            inputDisabled: input.inputDisabled,
+          });
 
           sideChat.appendMessageEntry(
             input.id,
@@ -61,18 +57,8 @@ export function App() {
         mainStore.getState().setArtifactPanelOpen(sessionId, true);
         mainStore.getState().setActiveArtifactId(sessionId, artifactId);
       },
-      upsertArtifact(sessionId, artifact, options = {}) {
-        const { activate = true, open = true } = options;
-
-        mainStore.getState().upsertArtifact(sessionId, artifact, {
-          activateOnCreate: activate,
-          activateOnUpdate: activate,
-          openOnCreate: open,
-        });
-
-        if (open) {
-          mainStore.getState().setArtifactPanelOpen(sessionId, true);
-        }
+      upsertArtifact(sessionId, artifact) {
+        mainStore.getState().upsertArtifact(sessionId, artifact);
       },
     }),
     [],
@@ -92,16 +78,4 @@ export function App() {
       </ElectronIPCProvider>
     </QueryClientProvider>
   );
-}
-
-function createTextDocument(text: string): JSONContent {
-  return {
-    type: "doc",
-    content: [
-      {
-        type: "paragraph",
-        content: [{ type: "text", text }],
-      },
-    ],
-  };
 }

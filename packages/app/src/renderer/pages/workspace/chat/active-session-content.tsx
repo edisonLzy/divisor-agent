@@ -1,4 +1,3 @@
-import { Button } from "@renderer/components/ui/button";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -11,6 +10,7 @@ import { EntryStatus, type ToolExecutionState } from "@renderer/store/entries-sl
 import { mainStore } from "@renderer/store/main";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { motion } from "motion/react";
+import type { CSSProperties } from "react";
 import { useCallback } from "react";
 import { useStore } from "zustand";
 
@@ -129,19 +129,19 @@ function ToggleArtifactPanelButton({ sessionId }: ToggleArtifactPanelButtonProps
   const Icon = isOpen ? PanelRightClose : PanelRightOpen;
 
   return (
-    <Button
+    <button
       type="button"
-      variant="secondary"
-      size="icon-sm"
-      className="rounded-lg border border-border/70 bg-background/90 shadow-sm supports-backdrop-filter:backdrop-blur-xl"
+      className="flex items-center justify-center rounded-md p-1 text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+      style={{ WebkitAppRegion: "no-drag" } as CSSProperties}
       onClick={() => {
         const nextIsOpen = !mainStore.getState().getArtifactState(sessionId).isOpen;
         setArtifactPanelOpen(sessionId, nextIsOpen);
       }}
+      title={isOpen ? "关闭 Artifact 面板" : "打开 Artifact 面板"}
       aria-label={isOpen ? "Close artifacts panel" : "Open artifacts panel"}
     >
-      <Icon />
-    </Button>
+      <Icon className="size-4" />
+    </button>
   );
 }
 

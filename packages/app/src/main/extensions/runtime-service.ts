@@ -1,5 +1,4 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { randomUUID } from "node:crypto";
 
 import type {
   CreateExtensionAgentInput,
@@ -10,6 +9,7 @@ import type {
   MainExtensionRuntimeAPI,
 } from "@divisor-agent/extension-core/main";
 import Emittery from "emittery";
+import { v4 as uuidv4 } from "uuid";
 
 import type { AllowedMainExposeEvents } from "../../shared/events-ipc.js";
 import { AgentRuntime } from "../agent-runtime.js";
@@ -55,7 +55,7 @@ export class ExtensionRuntimeService
       throw new Error("Extension runtime service has not been attached to ExtensionService");
     }
 
-    const agentId = input.id ?? randomUUID();
+    const agentId = input.id ?? uuidv4();
     const inheritedModel = input.mode === "inherit-model" ? this.getCurrentModel() : undefined;
     const model = input.model ?? inheritedModel;
     const runtime = new AgentRuntime(this.modelRegistry, this.skillService, this.extensionService, {

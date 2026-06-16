@@ -4,6 +4,18 @@ import { isAgentUserMessage } from "@renderer/lib/is";
 import type { AgentMessageData, AgentUserMessage } from "@renderer/store/entries-slice";
 import type { JSONContent } from "@tiptap/core";
 
+export function createTextDocument(text: string): JSONContent {
+  return {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [{ type: "text", text }],
+      },
+    ],
+  };
+}
+
 export function createAgentUserMessage(content: JSONContent, text: string): AgentUserMessage {
   return {
     role: "user",

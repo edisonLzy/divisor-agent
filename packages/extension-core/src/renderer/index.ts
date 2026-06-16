@@ -7,10 +7,10 @@ export { ExtensionProvider, useExtensionRegistry } from "./provider";
 export { RendererExtensionRegistry } from "./registry";
 
 export type {
+  AppendSideChatArtifactInput,
   ExtensionArtifactInput,
   ExtensionsContextAPI,
   ExtensionsContextAPIProviderProps,
-  OpenArtifactOptions,
 } from "./contextAPI";
 export type { InstalledRendererExtension } from "./bridge";
 export type {

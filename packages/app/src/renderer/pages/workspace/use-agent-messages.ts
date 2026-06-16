@@ -278,16 +278,12 @@ function upsertArtifactsFromToolDetails(
   for (const artifact of artifacts) {
     if (!isRecord(artifact)) continue;
     if (typeof artifact.id !== "string" || typeof artifact.type !== "string") continue;
-    extensionsApi.upsertArtifact(
-      sessionId,
-      {
-        id: artifact.id,
-        type: artifact.type,
-        name: typeof artifact.name === "string" ? artifact.name : artifact.type,
-        content: isRecord(artifact.content) ? artifact.content : {},
-      },
-      { activate: false, open: false },
-    );
+    extensionsApi.upsertArtifact(sessionId, {
+      id: artifact.id,
+      type: artifact.type,
+      name: typeof artifact.name === "string" ? artifact.name : artifact.type,
+      content: isRecord(artifact.content) ? artifact.content : {},
+    });
   }
 }
 

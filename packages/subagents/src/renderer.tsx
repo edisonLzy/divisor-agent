@@ -42,7 +42,7 @@ function SubagentsListBlock({ props }: { props: Record<string, unknown> }) {
               type="button"
               className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onClick={() => {
-                api.appendSideChatArtifact({
+                api.appendSideChatArtifact(block.parentSessionId, {
                   context: {
                     runId: block.runId,
                     subagentId: subagent.id,
@@ -50,9 +50,7 @@ function SubagentsListBlock({ props }: { props: Record<string, unknown> }) {
                   },
                   id: subagent.artifactId,
                   inputDisabled: true,
-                  kind: "subagent",
                   model: subagent.model,
-                  parentSessionId: block.parentSessionId,
                   pendingPrompt: subagent.task,
                   title: subagent.name,
                 });

@@ -13,7 +13,6 @@ export interface SideChatMeta {
   pendingPrompt: string;
   createdAt: number;
   inputDisabled?: boolean;
-  kind?: "side-chat" | "subagent";
 }
 
 export interface SideChatArtifactContent extends Record<string, unknown> {
@@ -29,14 +28,7 @@ export interface SideChatSlice {
 
   getSideChatMeta: (sideChatId: string) => SideChatMeta | undefined;
   isSideChatSession: (sessionId: string) => boolean;
-  initSideChat: (
-    sideChatId: string,
-    mainSessionId: string,
-    context: SideChatContext,
-    model: Pick<AvailableModel, "modelId" | "providerId"> | undefined,
-    pendingPrompt: string,
-    options?: { inputDisabled?: boolean; kind?: "side-chat" | "subagent" },
-  ) => void;
+  appendSideChatMeta: (sideChatId: string, meta: SideChatMeta) => void;
   setSideChatModel: (
     sideChatId: string,
     model: Pick<AvailableModel, "modelId" | "providerId">,
@@ -58,18 +50,10 @@ export const createSideChatSlice: StateCreator<SideChatStoreState, [], [], SideC
     return get().sideChatMeta.has(sessionId);
   },
 
-  initSideChat: (sideChatId, mainSessionId, context, model, pendingPrompt, options = {}) => {
+  appendSideChatMeta: (sideChatId, meta) => {
     set((prev) => {
       const sideChatMeta = new Map(prev.sideChatMeta);
-      sideChatMeta.set(sideChatId, {
-        mainSessionId,
-        context,
-        model,
-        pendingPrompt,
-        createdAt: Date.now(),
-        inputDisabled: options.inputDisabled,
-        kind: options.kind ?? "side-chat",
-      });
+      sideChatMeta.set(sideChatId, meta);
       return { sideChatMeta };
     });
   },
