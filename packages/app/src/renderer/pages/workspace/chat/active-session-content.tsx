@@ -10,6 +10,7 @@ import { isAgentMessageEntry } from "@renderer/lib/is";
 import { EntryStatus, type ToolExecutionState } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
+import { motion } from "motion/react";
 import { useCallback } from "react";
 import { useStore } from "zustand";
 
@@ -20,7 +21,11 @@ import { PermissionApprovalPanel } from "./permission";
 import { PromptInput } from "./prompt-input";
 import type { PromptSubmission } from "./prompt-types";
 
-export function ActiveSessionContent() {
+interface ActiveSessionContentProps {
+  isSidebarCollapsed: boolean;
+}
+
+export function ActiveSessionContent({ isSidebarCollapsed }: ActiveSessionContentProps) {
   const {
     entries,
     isRunning,
@@ -58,7 +63,7 @@ export function ActiveSessionContent() {
       >
         <ResizablePanel defaultSize={isArtifactPanelOpen ? "68%" : "100%"} minSize="42%">
           <div className="flex h-full min-w-0 flex-col">
-            <PanelHeader dragRegion>
+            <PanelHeader dragRegion insetForWindowControls={isSidebarCollapsed}>
               <h1 className="truncate text-sm font-medium text-foreground">{sessionName}</h1>
             </PanelHeader>
             <section className="min-h-0 flex-1 px-6 pt-6">
@@ -72,7 +77,12 @@ export function ActiveSessionContent() {
               />
             </section>
 
-            <section className="shrink-0 px-6 pb-6 pt-4">
+            <motion.section
+              className="shrink-0 px-6 pb-6 pt-4"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+            >
               {activeSessionId && pendingPermissionRequest ? (
                 <PermissionApprovalPanel sessionId={activeSessionId} />
               ) : (
@@ -84,7 +94,7 @@ export function ActiveSessionContent() {
                   sessionId={activeSessionId}
                 />
               )}
-            </section>
+            </motion.section>
           </div>
         </ResizablePanel>
 

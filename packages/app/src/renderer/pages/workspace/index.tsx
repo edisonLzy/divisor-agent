@@ -48,7 +48,7 @@ export function WorkspacePage() {
         <ResizablePanel defaultSize="74%" minSize="60%">
           <div className="relative flex h-full w-full bg-sidebar/78 supports-backdrop-filter:bg-sidebar/68 supports-backdrop-filter:backdrop-blur-xl">
             <div className="min-w-0 flex-1">
-              <Chat />
+              <Chat isSidebarCollapsed={isCollapsed} />
             </div>
           </div>
         </ResizablePanel>
