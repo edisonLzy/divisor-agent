@@ -16,7 +16,7 @@ import { useAgentSessions } from "./use-agent-sessions";
 export function WorkspacePage() {
   const { isCollapsed, panelRef, setIsCollapsed, toggle } = useToggleSidebarButton();
   const [sidebarSize, setSidebarSize] = useState(26);
-  const titlebarWidth = isCollapsed ? "8rem" : `max(8rem, ${sidebarSize}%)`;
+  const titlebarWidth = isCollapsed ? "100%" : `max(8rem, ${sidebarSize}%)`;
 
   void useAgentMessages();
   void useSideChatMessages();
@@ -48,7 +48,7 @@ export function WorkspacePage() {
         <ResizablePanel defaultSize="74%" minSize="60%">
           <div className="relative flex h-full w-full bg-sidebar/78 supports-backdrop-filter:bg-sidebar/68 supports-backdrop-filter:backdrop-blur-xl">
             <div className="min-w-0 flex-1">
-              <Chat />
+              <Chat isSidebarCollapsed={isCollapsed} />
             </div>
           </div>
         </ResizablePanel>

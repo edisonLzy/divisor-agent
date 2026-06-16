@@ -35,7 +35,7 @@ export function OpenSideChatButton({
       id: sideChatId,
       type: "side-chat",
       content: {},
-      name: text.slice(0, 30) + (text.length > 30 ? "..." : ""),
+      name: '侧边聊天',
     });
 
     sideChatStore

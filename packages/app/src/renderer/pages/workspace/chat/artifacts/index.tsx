@@ -1,4 +1,20 @@
 import { useExtensionRegistry } from "@divisor-agent/extension-core/renderer";
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  horizontalListSortingStrategy,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@renderer/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@renderer/components/ui/tabs";
 import { UnknownArtifact } from "@renderer/extensions/fallback-renderers";
@@ -7,17 +23,19 @@ import { mainStore } from "@renderer/store/main";
 import type { ArtifactRecord } from "@renderer/store/main/artifact-slice";
 import type { SideChatArtifactRecord } from "@renderer/store/side-chat/side-chat-slice";
 import {
-  Code2,
+  Blocks,
+  Braces,
+  FileCode2,
   FileText,
-  ImageIcon,
+  Image,
   MessageSquareText,
-  Package,
-  PuzzleIcon,
-  Table2,
+  PackageOpen,
+  Sparkles,
+  TableProperties,
   X,
   type LucideIcon,
 } from "lucide-react";
-import { type DragEvent, useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { useStore } from "zustand";
 
 import { PanelHeader } from "../panel-header";
@@ -33,13 +51,17 @@ export function ArtifactsPanel({ className, sessionId }: ArtifactsPanelProps) {
   const setActiveArtifactId = useStore(mainStore, (state) => state.setActiveArtifactId);
   const removeArtifact = useStore(mainStore, (state) => state.removeArtifact);
   const reorderArtifacts = useStore(mainStore, (state) => state.reorderArtifacts);
-  const [draggedArtifactId, setDraggedArtifactId] = useState<string | null>(null);
 
   const artifacts = artifactState.artifacts;
+  const artifactIds = useMemo(() => artifacts.map((artifact) => artifact.id), [artifacts]);
   const activeArtifactId = artifactState.activeArtifactId ?? artifacts[0]?.id ?? "";
   const activeArtifact = useMemo(
     () => artifacts.find((artifact) => artifact.id === activeArtifactId) ?? null,
     [activeArtifactId, artifacts],
+  );
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   const handleCloseArtifact = useCallback(
@@ -49,16 +71,17 @@ export function ArtifactsPanel({ className, sessionId }: ArtifactsPanelProps) {
     [removeArtifact, sessionId],
   );
 
-  const handleDrop = useCallback(
-    (targetArtifactId: string) => {
-      if (!draggedArtifactId || draggedArtifactId === targetArtifactId) return;
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
 
-      const sourceIndex = artifacts.findIndex((artifact) => artifact.id === draggedArtifactId);
-      const targetIndex = artifacts.findIndex((artifact) => artifact.id === targetArtifactId);
+      const sourceIndex = artifacts.findIndex((artifact) => artifact.id === active.id);
+      const targetIndex = artifacts.findIndex((artifact) => artifact.id === over.id);
+      if (sourceIndex < 0 || targetIndex < 0) return;
       reorderArtifacts(sessionId, sourceIndex, targetIndex);
-      setDraggedArtifactId(null);
     },
-    [artifacts, draggedArtifactId, reorderArtifacts, sessionId],
+    [artifacts, reorderArtifacts, sessionId],
   );
 
   return (
@@ -75,30 +98,26 @@ export function ArtifactsPanel({ className, sessionId }: ArtifactsPanelProps) {
       >
         <PanelHeader className="app-no-drag pl-2">
           <div className="app-no-drag relative min-w-0 flex-1">
-            <TabsList
-              variant="line"
-              className="app-no-drag h-9 w-full min-w-0 justify-start gap-1 overflow-x-auto rounded-none p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
             >
-              {artifacts.map((artifact) => (
-                <ArtifactTab
-                  key={artifact.id}
-                  artifact={artifact}
-                  onClose={handleCloseArtifact}
-                  onDragStart={(event) => {
-                    const target = event.target;
-                    if (target instanceof Element && target.closest("[data-slot='button']")) {
-                      event.preventDefault();
-                      return;
-                    }
-
-                    setDraggedArtifactId(artifact.id);
-                  }}
-                  onDragEnd={() => setDraggedArtifactId(null)}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={() => handleDrop(artifact.id)}
-                />
-              ))}
-            </TabsList>
+              <SortableContext items={artifactIds} strategy={horizontalListSortingStrategy}>
+                <TabsList
+                  variant="line"
+                  className="app-no-drag h-9 w-full min-w-0 justify-start gap-1 overflow-x-auto rounded-none p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                >
+                  {artifacts.map((artifact) => (
+                    <ArtifactTab
+                      key={artifact.id}
+                      artifact={artifact}
+                      onClose={handleCloseArtifact}
+                    />
+                  ))}
+                </TabsList>
+              </SortableContext>
+            </DndContext>
             <div className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-background to-transparent" />
             <div className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent" />
           </div>
@@ -121,37 +140,34 @@ export function ArtifactsPanel({ className, sessionId }: ArtifactsPanelProps) {
 interface ArtifactTabProps {
   artifact: ArtifactRecord;
   onClose: (artifactId: string) => void;
-  onDragEnd: () => void;
-  onDragOver: (event: DragEvent<HTMLDivElement>) => void;
-  onDragStart: (event: DragEvent<HTMLDivElement>) => void;
-  onDrop: () => void;
 }
 
-function ArtifactTab({
-  artifact,
-  onClose,
-  onDragEnd,
-  onDragOver,
-  onDragStart,
-  onDrop,
-}: ArtifactTabProps) {
+function ArtifactTab({ artifact, onClose }: ArtifactTabProps) {
   const Icon = getArtifactIcon(artifact.type);
+  const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({
+    id: artifact.id,
+  });
 
   return (
     <div
-      draggable
-      className="app-no-drag group/tab relative flex h-9 max-w-48 shrink-0 items-center"
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
+      ref={setNodeRef}
+      className={cn(
+        "app-no-drag group/tab relative flex h-9 max-w-48 shrink-0 items-center",
+        isDragging && "z-10 opacity-80",
+      )}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
     >
       <TabsTrigger
         value={artifact.id}
-        className="app-no-drag h-8 min-w-0 max-w-48 justify-start gap-2 rounded-lg px-3 text-sm data-active:bg-muted data-active:after:opacity-0"
+        className="app-no-drag h-8 min-w-0 max-w-48 cursor-grab justify-start gap-1.5 rounded-lg px-3 text-sm hover:!bg-[#F4F4F4] data-active:!bg-[#F4F4F4] data-active:after:opacity-0 active:cursor-grabbing dark:hover:!bg-muted dark:data-active:!bg-muted"
+        {...attributes}
+        {...listeners}
       >
-        <span className="grid size-4 shrink-0 place-items-center text-muted-foreground transition-opacity group-hover/tab:opacity-0">
-          <Icon />
+        <span className="grid size-3.5 shrink-0 place-items-center text-muted-foreground/80 transition-opacity group-hover/tab:opacity-0">
+          <Icon className="size-3.5" strokeWidth={1.75} />
         </span>
         <span className="truncate">{artifact.name}</span>
       </TabsTrigger>
@@ -194,13 +210,15 @@ function getArtifactIcon(type: string): LucideIcon {
   const normalizedType = type.toLowerCase();
 
   if (normalizedType === "side-chat") return MessageSquareText;
-  if (normalizedType.includes("code") || normalizedType.includes("html")) return Code2;
-  if (normalizedType.includes("table") || normalizedType.includes("csv")) return Table2;
-  if (normalizedType.includes("image")) return ImageIcon;
+  if (normalizedType.includes("code")) return FileCode2;
+  if (normalizedType.includes("html") || normalizedType.includes("json")) return Braces;
+  if (normalizedType.includes("table") || normalizedType.includes("csv")) return TableProperties;
+  if (normalizedType.includes("image")) return Image;
   if (normalizedType.includes("doc") || normalizedType.includes("text")) return FileText;
-  if (normalizedType.includes("example")) return Package;
+  if (normalizedType.includes("example")) return PackageOpen;
+  if (normalizedType.includes("plugin") || normalizedType.includes("extension")) return Blocks;
 
-  return PuzzleIcon;
+  return Sparkles;
 }
 
 export function ArtifactPreview({ artifact }: { artifact: ArtifactRecord }) {
@@ -228,7 +246,7 @@ function ArtifactEmptyState() {
     <div className="grid h-full min-h-80 place-items-center">
       <div className="w-full max-w-sm px-6 text-center">
         <div className="mx-auto mb-4 grid size-11 place-items-center rounded-lg border border-dashed border-border bg-muted/40">
-          <PuzzleIcon className="text-muted-foreground" />
+          <Sparkles className="size-4 text-muted-foreground" strokeWidth={1.75} />
         </div>
         <div className="text-sm font-medium text-foreground">No artifact selected</div>
         <p className="mt-2 text-xs leading-5 text-muted-foreground">
