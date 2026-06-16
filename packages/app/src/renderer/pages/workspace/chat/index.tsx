@@ -5,7 +5,11 @@ import { useStore } from "zustand";
 import { ActiveSessionContent } from "./active-session-content";
 import { PendingSessionContent } from "./pending-session-content";
 
-export function Chat() {
+interface ChatProps {
+  isSidebarCollapsed: boolean;
+}
+
+export function Chat({ isSidebarCollapsed }: ChatProps) {
   const activeSessionId = useStore(mainStore, (state) => state.activeSessionId);
   const shouldRenderPendingState = !activeSessionId;
 
@@ -18,7 +22,11 @@ export function Chat() {
       }}
     >
       <ErrorBoundary>
-        {shouldRenderPendingState ? <PendingSessionContent /> : <ActiveSessionContent />}
+        {shouldRenderPendingState ? (
+          <PendingSessionContent isSidebarCollapsed={isSidebarCollapsed} />
+        ) : (
+          <ActiveSessionContent isSidebarCollapsed={isSidebarCollapsed} />
+        )}
       </ErrorBoundary>
     </div>
   );

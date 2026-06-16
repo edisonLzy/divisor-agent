@@ -102,7 +102,6 @@ export function PromptInput({
         | undefined;
 
       if (suggestionState?.active) {
-        event.preventDefault();
         return;
       }
 
@@ -110,10 +109,10 @@ export function PromptInput({
       void handleSubmit();
     };
 
-    container.addEventListener("keydown", handleKeyDown);
+    container.addEventListener("keydown", handleKeyDown, { capture: true });
 
     return () => {
-      container.removeEventListener("keydown", handleKeyDown);
+      container.removeEventListener("keydown", handleKeyDown, { capture: true });
     };
   }, [editor, handleSubmit]);
 
