@@ -1,8 +1,7 @@
-import { useExtensionsContextAPI } from "@divisor-agent/extension-core/renderer";
-import { defineRendererExtension } from "@divisor-agent/extension-core/renderer";
-import { Badge } from "@renderer/components/ui/badge";
-import { cn } from "@renderer/lib/utils";
-import { sideChatStore } from "@renderer/store/side-chat";
+import {
+  defineRendererExtension,
+  useExtensionsContextAPI,
+} from "@divisor-agent/extension-core/renderer";
 import {
   CheckCircleIcon,
   CircleIcon,
@@ -10,7 +9,6 @@ import {
   OctagonXIcon,
   XCircleIcon,
 } from "lucide-react";
-import { useSyncExternalStore } from "react";
 
 import {
   SUBAGENTS_LIST_BLOCK_TYPE,
@@ -21,7 +19,6 @@ import {
 function SubagentsListBlock({ props }: { props: Record<string, unknown> }) {
   const api = useExtensionsContextAPI();
   const block = parseListBlockProps(props);
-  const entryStates = useSideChatEntryStates();
 
   if (!block) {
     return null;
@@ -31,21 +28,36 @@ function SubagentsListBlock({ props }: { props: Record<string, unknown> }) {
     <div className="not-prose rounded-md border border-border/70 bg-card/70 p-2 text-sm text-card-foreground">
       <div className="mb-2 flex items-center justify-between gap-2 px-1">
         <span className="font-medium">Subagents</span>
-        <Badge variant="secondary">{block.subagents.length}</Badge>
+        <span className="inline-flex shrink-0 items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+          {block.subagents.length}
+        </span>
       </div>
       <div className="flex flex-col gap-1">
         {block.subagents.map((subagent) => {
-          const status = getLiveSubagentStatus(
-            entryStates.get(subagent.id)?.status,
-            subagent.status,
-          );
+          const status = subagent.status;
           const StatusIcon = getStatusIcon(status);
           return (
             <button
               key={subagent.id}
               type="button"
               className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              onClick={() => api.openArtifact(block.parentSessionId, subagent.artifactId)}
+              onClick={() => {
+                api.appendSideChatArtifact({
+                  context: {
+                    runId: block.runId,
+                    subagentId: subagent.id,
+                    task: subagent.task,
+                  },
+                  id: subagent.artifactId,
+                  inputDisabled: true,
+                  kind: "subagent",
+                  model: subagent.model,
+                  parentSessionId: block.parentSessionId,
+                  pendingPrompt: subagent.task,
+                  title: subagent.name,
+                });
+                api.openArtifact(block.parentSessionId, subagent.artifactId);
+              }}
             >
               <StatusIcon
                 className={cn(
@@ -61,9 +73,7 @@ function SubagentsListBlock({ props }: { props: Record<string, unknown> }) {
                   </span>
                 </div>
                 <div className="truncate text-xs text-muted-foreground">
-                  {status !== subagent.status
-                    ? getStatusLabel(status)
-                    : subagent.phase || subagent.task}
+                  {subagent.phase || subagent.task}
                 </div>
               </div>
             </button>
@@ -72,31 +82,6 @@ function SubagentsListBlock({ props }: { props: Record<string, unknown> }) {
       </div>
     </div>
   );
-}
-
-function useSideChatEntryStates() {
-  return useSyncExternalStore(
-    sideChatStore.subscribe,
-    () => sideChatStore.getState().entryStates,
-    () => sideChatStore.getState().entryStates,
-  );
-}
-
-function getLiveSubagentStatus(
-  status: "completed" | "failed" | "idle" | "running" | undefined,
-  fallback: SubagentStatus,
-): SubagentStatus {
-  switch (status) {
-    case "completed":
-      return "completed";
-    case "failed":
-      return "failed";
-    case "running":
-      return "running";
-    case "idle":
-    case undefined:
-      return fallback;
-  }
 }
 
 export default defineRendererExtension((ctx) => {
@@ -147,6 +132,7 @@ function parseListBlockProps(value: Record<string, unknown>): SubagentsListBlock
         {
           artifactId: item.artifactId,
           id: item.id,
+          model: parseModel(item.model),
           name: item.name,
           phase: typeof item.phase === "string" ? item.phase : undefined,
           status: item.status,
@@ -154,6 +140,21 @@ function parseListBlockProps(value: Record<string, unknown>): SubagentsListBlock
         },
       ];
     }),
+  };
+}
+
+function parseModel(value: unknown) {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  if (typeof value.modelId !== "string" || typeof value.providerId !== "string") {
+    return undefined;
+  }
+
+  return {
+    modelId: value.modelId,
+    providerId: value.providerId,
   };
 }
 
@@ -195,6 +196,10 @@ function isSubagentStatus(value: unknown): value is SubagentStatus {
     value === "queued" ||
     value === "running"
   );
+}
+
+function cn(...values: Array<false | null | string | undefined>) {
+  return values.filter(Boolean).join(" ");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

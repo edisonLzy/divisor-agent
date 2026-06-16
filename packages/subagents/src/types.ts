@@ -45,27 +45,8 @@ export interface SubagentRuntimeSnapshot {
   };
   parentSessionId: string;
   runId: string;
-  sideChatArtifacts: SubagentSideChatArtifact[];
   subagents: SubagentsListBlockProps["subagents"];
   type: "subagents.runtime";
-}
-
-export interface SubagentSideChatArtifact {
-  context: {
-    runId: string;
-    subagentId: string;
-    task: string;
-  };
-  id: string;
-  inputDisabled: true;
-  kind: "subagent";
-  model?: {
-    modelId: string;
-    providerId: string;
-  };
-  parentSessionId: string;
-  pendingPrompt: string;
-  title: string;
 }
 
 export interface SubagentsListBlockProps {
@@ -74,6 +55,10 @@ export interface SubagentsListBlockProps {
   subagents: Array<{
     artifactId: string;
     id: string;
+    model?: {
+      modelId: string;
+      providerId: string;
+    };
     name: string;
     phase?: string;
     status: SubagentStatus;

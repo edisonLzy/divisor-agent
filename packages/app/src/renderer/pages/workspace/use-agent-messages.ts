@@ -273,41 +273,6 @@ function upsertArtifactsFromToolDetails(
   details: unknown,
 ) {
   if (!isRecord(details)) return;
-  const sideChatArtifacts = Array.isArray(details.sideChatArtifacts)
-    ? details.sideChatArtifacts
-    : [];
-
-  for (const artifact of sideChatArtifacts) {
-    if (!isRecord(artifact)) continue;
-    if (
-      typeof artifact.id !== "string" ||
-      typeof artifact.parentSessionId !== "string" ||
-      typeof artifact.pendingPrompt !== "string" ||
-      typeof artifact.title !== "string"
-    ) {
-      continue;
-    }
-
-    const model = isRecord(artifact.model)
-      ? {
-          modelId: typeof artifact.model.modelId === "string" ? artifact.model.modelId : "",
-          providerId:
-            typeof artifact.model.providerId === "string" ? artifact.model.providerId : "",
-        }
-      : undefined;
-
-    extensionsApi.appendSideChatArtifact({
-      context: isRecord(artifact.context) ? artifact.context : undefined,
-      id: artifact.id,
-      inputDisabled: artifact.inputDisabled === true,
-      kind: artifact.kind === "subagent" ? "subagent" : "side-chat",
-      model: model && model.modelId && model.providerId ? model : undefined,
-      parentSessionId: artifact.parentSessionId,
-      pendingPrompt: artifact.pendingPrompt,
-      title: artifact.title,
-    });
-  }
-
   const artifacts = Array.isArray(details.artifacts) ? details.artifacts : [];
 
   for (const artifact of artifacts) {

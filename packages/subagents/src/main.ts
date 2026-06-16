@@ -144,9 +144,10 @@ function createRuntimeSnapshot(
   runId: string,
   subagents: SubagentSnapshot[],
 ): SubagentRuntimeSnapshot {
-  const listSubagents = subagents.map(({ artifactId, id, name, phase, status, task }) => ({
+  const listSubagents = subagents.map(({ artifactId, id, model, name, phase, status, task }) => ({
     artifactId,
     id,
+    model,
     name,
     phase,
     status,
@@ -162,20 +163,6 @@ function createRuntimeSnapshot(
       },
       type: SUBAGENTS_LIST_BLOCK_TYPE,
     },
-    sideChatArtifacts: subagents.map((subagent) => ({
-      context: {
-        runId,
-        subagentId: subagent.id,
-        task: subagent.task,
-      },
-      id: subagent.artifactId,
-      inputDisabled: true,
-      kind: "subagent",
-      model: subagent.model,
-      parentSessionId,
-      pendingPrompt: subagent.task,
-      title: subagent.name,
-    })),
     parentSessionId,
     runId,
     subagents: listSubagents,
