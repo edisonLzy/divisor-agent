@@ -1,9 +1,13 @@
 import { randomUUID } from "node:crypto";
 
+import type {
+  ExtensionAgentModel,
+  ExtensionAgentToolOptions,
+} from "@divisor-agent/extension-core/main";
 import { Agent } from "@mariozechner/pi-agent-core";
 import Emittery from "emittery";
 
-import type { AllowedMainExposeEvents } from "../shared/events-ipc.js";
+import type { AgentSessionScope, AllowedMainExposeEvents } from "../shared/events-ipc.js";
 import type { AgentModelsIPC } from "../shared/models-ipc.js";
 import type { PermissionMode } from "../shared/permissions-ipc.js";
 import type { AgentSessionIPC } from "../shared/session-ipc.js";
@@ -47,6 +51,7 @@ export type AgentRuntimeDelegate = {
     | "getModelConfig"
     | "saveModelConfig"
     | "setSessionId"
+    | "setSessionScope"
     | "destroySession"
     | "listSkills"
     | "setSkillEnabled"
@@ -55,14 +60,20 @@ export type AgentRuntimeDelegate = {
 } & {
   listSkills: AgentSkillsIPC["listSkills"];
   setSessionId(sessionId: string): void;
+  setSessionScope(scope: AgentSessionScope): void;
   setSkillEnabled: AgentSkillsIPC["setSkillEnabled"];
 };
+
+export interface AgentRuntimeOptions {
+  extensionTools?: ExtensionAgentToolOptions;
+  systemPrompt?: string;
+}
 
 // ── Event type map ──────────────────────────────────────────────────────────
 
 /** Derive base events from session-tagged events by stripping sessionId. */
 type AgentRuntimeEvents = {
-  [K in keyof AllowedMainExposeEvents]: Omit<AllowedMainExposeEvents[K], "sessionId">;
+  [K in keyof AllowedMainExposeEvents]: Omit<AllowedMainExposeEvents[K], "scope" | "sessionId">;
 };
 
 /**
@@ -72,15 +83,18 @@ type AgentRuntimeEvents = {
  * Emits raw AgentEvent-type events without sessionId — AgentPool handles tagging.
  */
 export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentRuntimeDelegate {
-  private agent: Agent;
+  private agent!: Agent;
   private permissionMode: PermissionMode;
   private permissionService: PermissionService;
+  private scope: AgentSessionScope = "main";
   private systemPromptService: SystemPromptService;
+  private sessionId: string | undefined;
 
   constructor(
     private modelRegistry = new ModelRegistry(),
     private skillService: SkillService,
-    private extensionService: ExtensionService,
+    private extensionService = new ExtensionService(),
+    private options: AgentRuntimeOptions = {},
   ) {
     super();
     this.permissionMode = "default";
@@ -93,6 +107,11 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
   }
 
   private createInternalAgent() {
+    const excludedToolNames = new Set(this.options.extensionTools?.excludeToolNames ?? []);
+    const builtinTools = [fsReadTextFileTool, fsWriteTextFileTool, terminalCreateTool].filter(
+      (tool) => !excludedToolNames.has(tool.name),
+    );
+
     this.permissionService.setRequestCallback((request) => {
       this.emit("permission_requested", {
         type: "permission_requested",
@@ -143,12 +162,16 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
         return this.modelRegistry.resolveApiKey(provider);
       },
       initialState: {
-        systemPrompt: this.systemPromptService.buildSystemPrompt(""),
+        systemPrompt: this.systemPromptService.buildSystemPrompt(this.options.systemPrompt ?? ""),
         tools: [
-          fsReadTextFileTool,
-          fsWriteTextFileTool,
-          terminalCreateTool,
-          ...this.extensionService.getTools(),
+          ...(this.options.extensionTools?.includeBuiltins === false ? [] : builtinTools),
+          ...this.extensionService.getToolsForRuntime(
+            {
+              getModel: () => this.getCurrentModel(),
+              getSessionId: () => this.sessionId,
+            },
+            this.options.extensionTools,
+          ),
         ],
       },
     });
@@ -163,8 +186,17 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
   // ── AgentRuntimeDelegate implementation ──────────────────────────────────
 
   public setSessionId: AgentRuntimeDelegate["setSessionId"] = (sessionId) => {
+    this.sessionId = sessionId;
     this.agent.sessionId = sessionId;
   };
+
+  public setSessionScope: AgentRuntimeDelegate["setSessionScope"] = (scope) => {
+    this.scope = scope;
+  };
+
+  public getScope() {
+    return this.scope;
+  }
 
   public setHistoryMessages: AgentRuntimeDelegate["setHistoryMessages"] = async (messages) => {
     this.agent.state.messages = messages;
@@ -185,7 +217,9 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
       await this.setModel(metadata.model);
     }
 
-    this.agent.state.systemPrompt = this.systemPromptService.buildSystemPrompt("");
+    this.agent.state.systemPrompt = this.systemPromptService.buildSystemPrompt(
+      this.options.systemPrompt ?? "",
+    );
     this.agent.prompt(this.skillService.expandSkillReferences(content, metadata.skillIds ?? []));
   };
 
@@ -223,6 +257,22 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
 
   public destroy() {
     this.clearListeners();
+  }
+
+  public waitForIdle() {
+    return this.agent.waitForIdle();
+  }
+
+  private getCurrentModel(): ExtensionAgentModel | undefined {
+    const model = this.agent?.state.model;
+    if (!model) {
+      return undefined;
+    }
+
+    return {
+      modelId: model.id,
+      providerId: model.provider,
+    };
   }
 }
 

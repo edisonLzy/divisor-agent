@@ -24,6 +24,7 @@ export interface ToolExecutionState {
   toolName: string;
   status: ToolExecutionStatus;
   args: unknown;
+  details?: unknown;
   output: string;
   requestId?: string;
   approvalStatus?: ToolApprovalStatus;

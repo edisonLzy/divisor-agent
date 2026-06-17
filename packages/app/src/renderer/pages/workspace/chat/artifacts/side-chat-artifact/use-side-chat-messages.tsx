@@ -5,12 +5,13 @@ import { isAgentMessageEntry, isFailedAssistantMessage } from "@renderer/lib/is"
 import { sideChatStore } from "@renderer/store/side-chat";
 import { useRef } from "react";
 
-function resolveSideChat(sessionId: string) {
-  return sideChatStore.getState().getSideChatMeta(sessionId);
-}
-
 function getSideChatToolState(sessionId: string, toolCallId: string) {
   return sideChatStore.getState().getEntryState(sessionId).toolStates.get(toolCallId);
+}
+
+function ensureSideChatSessionExist(sessionId: string) {
+  if (sideChatStore.getState().entryStates.has(sessionId)) return;
+  sideChatStore.getState().setStatus(sessionId, "idle");
 }
 
 export function useSideChatMessages() {
@@ -19,6 +20,7 @@ export function useSideChatMessages() {
   useSubscribeAgentEvents(
     {
       agent_start: (event) => {
+        ensureSideChatSessionExist(event.sessionId);
         sideChatStore.getState().setStatus(event.sessionId, "running");
       },
 
@@ -187,7 +189,7 @@ export function useSideChatMessages() {
     },
     {
       shouldHandleEvent: (event) => {
-        return Boolean(resolveSideChat(event.sessionId));
+        return event.scope === "side-chat";
       },
     },
   );

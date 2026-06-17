@@ -6,6 +6,7 @@ import { AgentSessionIPC } from "../shared/session-ipc.js";
 import { AgentSkillsIPC } from "../shared/skills-ipc.js";
 import { AgentRuntime } from "./agent-runtime.js";
 import { ExtensionService } from "./extensions/index.js";
+import { ExtensionRuntimeService } from "./extensions/runtime-service.js";
 import { ModelRegistry } from "./models/index.js";
 import { SkillService } from "./skills/index.js";
 
@@ -22,13 +23,24 @@ export class AgentPool
   private runtimes: Map<string, AgentRuntime>;
   private skillService: SkillService;
   private extensionService: ExtensionService;
+  private extensionRuntimeService: ExtensionRuntimeService;
 
   constructor() {
     super();
     this.modelRegistry = new ModelRegistry();
     this.runtimes = new Map();
     this.skillService = new SkillService();
-    this.extensionService = new ExtensionService();
+    this.extensionRuntimeService = new ExtensionRuntimeService(
+      this.modelRegistry,
+      this.skillService,
+    );
+    this.extensionRuntimeService.onAny(({ name, data }) => {
+      if (typeof name !== "string") return;
+
+      (this.emit as (...args: unknown[]) => Promise<void>)(name, data);
+    });
+    this.extensionService = new ExtensionService(this.extensionRuntimeService);
+    this.extensionRuntimeService.setExtensionService(this.extensionService);
   }
 
   // ── Runtime lifecycle ────────────────────────────────────────────────────
@@ -50,6 +62,7 @@ export class AgentPool
       if (typeof name !== "string") return;
 
       (this.emit as (...args: unknown[]) => Promise<void>)(name, {
+        scope: runtime.getScope(),
         sessionId,
         ...(data as object),
       });
@@ -71,6 +84,7 @@ export class AgentPool
       runtime.destroy();
     }
     this.runtimes.clear();
+    this.extensionRuntimeService.destroyAll();
     this.clearListeners();
   }
 
@@ -83,6 +97,11 @@ export class AgentPool
   public setSessionId: AgentSessionIPC["setSessionId"] = async (sessionId: string) => {
     const runtime = this.getOrCreateRuntime(sessionId);
     runtime.setSessionId(sessionId);
+  };
+
+  public setSessionScope: AgentSessionIPC["setSessionScope"] = async (sessionId, scope) => {
+    const runtime = this.getOrCreateRuntime(sessionId);
+    runtime.setSessionScope(scope);
   };
 
   public destroySession: AgentSessionIPC["destroySession"] = async (sessionId) => {
@@ -119,6 +138,7 @@ export class AgentPool
   public abortPrompt: AgentSessionIPC["abortPrompt"] = async (sessionId) => {
     const runtime = this.runtimes.get(sessionId);
     if (!runtime) {
+      await this.extensionRuntimeService.abortAgent(sessionId);
       return;
     }
 

@@ -4,17 +4,15 @@ import type { StateCreator } from "zustand/vanilla";
 import type { SideChatStoreState } from ".";
 import type { ArtifactRecord } from "../main/artifact-slice";
 
-export interface SideChatContext {
-  sourceEntryId: string;
-  selectedText: string;
-}
+export type SideChatContext = Record<string, unknown>;
 
 export interface SideChatMeta {
   mainSessionId: string;
   context: SideChatContext;
-  model?: AvailableModel;
+  model?: Pick<AvailableModel, "modelId" | "providerId">;
   pendingPrompt: string;
   createdAt: number;
+  inputDisabled?: boolean;
 }
 
 export interface SideChatArtifactContent extends Record<string, unknown> {
@@ -30,14 +28,11 @@ export interface SideChatSlice {
 
   getSideChatMeta: (sideChatId: string) => SideChatMeta | undefined;
   isSideChatSession: (sessionId: string) => boolean;
-  initSideChat: (
+  appendSideChatMeta: (sideChatId: string, meta: SideChatMeta) => void;
+  setSideChatModel: (
     sideChatId: string,
-    mainSessionId: string,
-    context: SideChatContext,
-    model: AvailableModel | undefined,
-    pendingPrompt: string,
+    model: Pick<AvailableModel, "modelId" | "providerId">,
   ) => void;
-  setSideChatModel: (sideChatId: string, model: AvailableModel) => void;
   removeSideChatMeta: (sideChatId: string) => void;
 }
 
@@ -55,16 +50,10 @@ export const createSideChatSlice: StateCreator<SideChatStoreState, [], [], SideC
     return get().sideChatMeta.has(sessionId);
   },
 
-  initSideChat: (sideChatId, mainSessionId, context, model, pendingPrompt) => {
+  appendSideChatMeta: (sideChatId, meta) => {
     set((prev) => {
       const sideChatMeta = new Map(prev.sideChatMeta);
-      sideChatMeta.set(sideChatId, {
-        mainSessionId,
-        context,
-        model,
-        pendingPrompt,
-        createdAt: Date.now(),
-      });
+      sideChatMeta.set(sideChatId, meta);
       return { sideChatMeta };
     });
   },

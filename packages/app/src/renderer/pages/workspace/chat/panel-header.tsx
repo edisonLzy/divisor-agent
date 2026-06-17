@@ -22,7 +22,7 @@ export function PanelHeader({
   return (
     <header
       className={cn(
-        "relative flex h-9 shrink-0 items-center border-b border-border/70 px-4 pr-14",
+        "relative flex min-h-10 shrink-0 items-center border-b border-border/70 px-4 py-1 pr-14",
         dragRegion && "app-drag-region",
         insetForWindowControls && "pl-28",
         className,
@@ -41,7 +41,7 @@ export function FixedActions({ children, className }: FixedActionsProps) {
   return (
     <div
       className={cn(
-        "app-no-drag pointer-events-none absolute right-3 top-1 z-50 flex h-7 items-center gap-2 [&>*]:pointer-events-auto",
+        "app-no-drag pointer-events-none absolute right-3 top-1.5 z-50 flex h-7 items-center gap-2 [&>*]:pointer-events-auto",
         className,
       )}
       style={{ WebkitAppRegion: "no-drag" } as CSSProperties}

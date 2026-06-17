@@ -105,6 +105,7 @@ export function AssistantMessage({
                 return (
                   <AssistantToolMessage
                     key={block.id}
+                    sessionId={sessionId}
                     toolName={block.name}
                     args={block.arguments}
                     toolState={toolStates.get(block.id)}

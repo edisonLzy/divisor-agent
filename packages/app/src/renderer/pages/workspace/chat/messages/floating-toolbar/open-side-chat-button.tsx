@@ -1,6 +1,6 @@
 import { Button } from "@renderer/components/ui/button";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
-import { createAgentUserMessage } from "@renderer/lib/agent-message";
+import { createAgentUserMessage, createTextDocument } from "@renderer/lib/agent-message";
 import { mainStore } from "@renderer/store/main";
 import { sideChatStore } from "@renderer/store/side-chat";
 import { PanelRightOpen } from "lucide-react";
@@ -37,30 +37,24 @@ export function OpenSideChatButton({
       content: {},
       name: "侧边聊天",
     });
+    mainStore.getState().setActiveArtifactId(sessionId, sideChatId);
 
-    sideChatStore
-      .getState()
-      .initSideChat(
-        sideChatId,
-        sessionId,
-        { sourceEntryId, selectedText: text },
-        model,
-        initialPrompt,
-      );
+    sideChatStore.getState().appendSideChatMeta(sideChatId, {
+      mainSessionId: sessionId,
+      context: { sourceEntryId, selectedText: text },
+      model,
+      pendingPrompt: initialPrompt,
+      createdAt: Date.now(),
+    });
 
-    const jsonContent = {
-      type: "doc" as const,
-      content: [
-        { type: "paragraph" as const, content: [{ type: "text" as const, text: initialPrompt }] },
-      ],
-    };
-    const userMessage = createAgentUserMessage(jsonContent, initialPrompt);
+    const userMessage = createAgentUserMessage(createTextDocument(initialPrompt), initialPrompt);
     sideChatStore.getState().appendMessageEntry(sideChatId, userMessage);
 
     if (!model) return;
 
     try {
       await invoke("setSessionId", sideChatId);
+      await invoke("setSessionScope", sideChatId, "side-chat");
       sideChatStore.getState().setStatus(sideChatId, "running");
       void invoke("prompt", sideChatId, initialPrompt, {
         model: { modelId: model.modelId, providerId: model.providerId },

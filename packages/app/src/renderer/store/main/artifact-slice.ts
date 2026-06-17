@@ -96,18 +96,10 @@ export const createArtifactSlice: StateCreator<MainStoreState, [], [], ArtifactS
         existingIndex >= 0
           ? state.artifacts.map((item, index) => (index === existingIndex ? nextArtifact : item))
           : [...state.artifacts, nextArtifact];
-      const isNewArtifact = existingIndex < 0;
-      const activeArtifactId =
-        isNewArtifact ||
-        state.activeArtifactId === null ||
-        state.activeArtifactId === nextArtifact.id
-          ? nextArtifact.id
-          : state.activeArtifactId;
 
       artifactStates.set(sessionId, {
-        activeArtifactId,
+        ...state,
         artifacts,
-        isOpen: isNewArtifact ? true : state.isOpen,
       });
 
       return { artifactStates };
