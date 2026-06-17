@@ -4,12 +4,15 @@ import {
   type ExtensionsContextAPI,
 } from "@divisor-agent/extension-core/renderer";
 import { createAgentUserMessage, createTextDocument } from "@renderer/lib/agent-message";
+import { isAgentMessageEntry, isAgentUserMessage } from "@renderer/lib/is";
+import { EntryStatus, type SessionEntry } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
 import { sideChatStore } from "@renderer/store/side-chat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { RouterProvider } from "react-router-dom";
 import { Toaster } from "sonner";
+import { v4 as uuidv4 } from "uuid";
 
 import { ThemeProvider } from "./components/theme-provider";
 import { ElectronIPCProvider } from "./context/ElectronIPCProvider";
@@ -28,31 +31,17 @@ const queryClient = new QueryClient({
 export function App() {
   const extensionsContextAPI = useMemo<ExtensionsContextAPI>(
     () => ({
-      appendSideChatArtifact(parentSessionId, input) {
-        mainStore.getState().upsertArtifact(parentSessionId, {
-          id: input.id,
-          type: "side-chat",
-          content: {},
-          name: input.title,
-        });
-
+      appendSideChatMeta(sideChatId, input) {
         const sideChat = sideChatStore.getState();
-        if (!sideChat.getSideChatMeta(input.id)) {
-          sideChat.appendSideChatMeta(input.id, {
-            mainSessionId: parentSessionId,
+        if (!sideChat.getSideChatMeta(sideChatId)) {
+          sideChat.appendSideChatMeta(sideChatId, {
+            mainSessionId: input.mainSessionId,
             context: input.context ?? {},
             model: input.model,
             pendingPrompt: input.pendingPrompt,
             createdAt: Date.now(),
             inputDisabled: input.inputDisabled,
           });
-
-          if (sideChat.getEntryState(input.id).entries.length === 0) {
-            sideChat.appendMessageEntry(
-              input.id,
-              createAgentUserMessage(createTextDocument(input.pendingPrompt), input.pendingPrompt),
-            );
-          }
         }
       },
       openArtifact(sessionId, artifactId) {
@@ -61,6 +50,48 @@ export function App() {
       },
       upsertArtifact(sessionId, artifact) {
         mainStore.getState().upsertArtifact(sessionId, artifact);
+      },
+      insertSideChatUserMessageEntry(sideChatId, input, position) {
+        const sideChat = sideChatStore.getState();
+        const currentEntries = sideChat.getEntryState(sideChatId).entries;
+        const insertIndex = clampEntryPosition(position, currentEntries.length);
+        const existingEntry = currentEntries[insertIndex];
+
+        if (
+          existingEntry &&
+          isAgentMessageEntry(existingEntry) &&
+          isAgentUserMessage(existingEntry.data) &&
+          existingEntry.data.text === input.text
+        ) {
+          return;
+        }
+
+        const entryId = uuidv4();
+        const previousEntry = insertIndex > 0 ? currentEntries[insertIndex - 1] : undefined;
+        const nextEntry = currentEntries[insertIndex];
+        const parentId = previousEntry?.id ?? null;
+        const userEntry: SessionEntry = {
+          id: entryId,
+          sessionId: sideChatId,
+          parentId,
+          type: "message",
+          timestamp: Date.now(),
+          data: createAgentUserMessage(createTextDocument(input.text), input.text),
+          status: EntryStatus.Local,
+        };
+
+        const entries = currentEntries.map((entry, index) => {
+          if (index !== insertIndex || entry.id !== nextEntry?.id || entry.parentId !== parentId) {
+            return entry;
+          }
+          return { ...entry, parentId: entryId };
+        });
+
+        sideChat.setSessionEntries(sideChatId, [
+          ...entries.slice(0, insertIndex),
+          userEntry,
+          ...entries.slice(insertIndex),
+        ]);
       },
     }),
     [],
@@ -80,4 +111,9 @@ export function App() {
       </ElectronIPCProvider>
     </QueryClientProvider>
   );
+}
+
+function clampEntryPosition(position: number, length: number) {
+  if (!Number.isFinite(position)) return length;
+  return Math.min(Math.max(Math.trunc(position), 0), length);
 }

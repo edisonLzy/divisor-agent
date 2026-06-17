@@ -10,24 +10,32 @@ export interface ExtensionArtifactInput<
   type: string;
 }
 
-export interface AppendSideChatArtifactInput {
+export interface AppendSideChatMetaInput {
   context?: Record<string, unknown>;
-  id: string;
   inputDisabled?: boolean;
+  mainSessionId: string;
   model?: {
     modelId: string;
     providerId: string;
   };
   pendingPrompt: string;
-  title: string;
+}
+
+export interface InsertSideChatUserMessageEntryInput {
+  text: string;
 }
 
 export interface ExtensionsContextAPI {
-  appendSideChatArtifact(parentSessionId: string, input: AppendSideChatArtifactInput): void;
+  appendSideChatMeta(sideChatId: string, input: AppendSideChatMetaInput): void;
   openArtifact(sessionId: string, artifactId: string): void;
   upsertArtifact<TContent extends Record<string, unknown> = Record<string, unknown>>(
     sessionId: string,
     artifact: ExtensionArtifactInput<TContent>,
+  ): void;
+  insertSideChatUserMessageEntry(
+    sideChatId: string,
+    input: InsertSideChatUserMessageEntryInput,
+    position: number,
   ): void;
 }
 
