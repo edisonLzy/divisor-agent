@@ -64,10 +64,10 @@ importers:
         version: link:../extension-core
       '@divisor-agent/extension-example':
         specifier: workspace:*
-        version: link:../extensions/example
+        version: link:../extension-example
       '@divisor-agent/extension-subagents':
         specifier: workspace:*
-        version: link:../subagents
+        version: link:../extension-subagents
       '@dnd-kit/core':
         specifier: ^6.3.1
         version: 6.3.1(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -307,11 +307,11 @@ importers:
         specifier: 'catalog:'
         version: 19.2.5
 
-  packages/extensions/example:
+  packages/extension-example:
     dependencies:
       '@divisor-agent/extension-core':
         specifier: workspace:*
-        version: link:../../extension-core
+        version: link:../extension-core
       '@sinclair/typebox':
         specifier: ^0.34.49
         version: 0.34.49
@@ -325,7 +325,7 @@ importers:
         specifier: 'catalog:'
         version: 19.2.5
 
-  packages/subagents:
+  packages/extension-subagents:
     dependencies:
       '@divisor-agent/extension-core':
         specifier: workspace:*
