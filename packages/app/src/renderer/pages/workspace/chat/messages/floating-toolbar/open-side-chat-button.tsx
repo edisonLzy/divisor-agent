@@ -54,6 +54,7 @@ export function OpenSideChatButton({
 
     try {
       await invoke("setSessionId", sideChatId);
+      await invoke("setSessionScope", sideChatId, "side-chat");
       sideChatStore.getState().setStatus(sideChatId, "running");
       void invoke("prompt", sideChatId, initialPrompt, {
         model: { modelId: model.modelId, providerId: model.providerId },

@@ -9,6 +9,7 @@ export type {
   ExtensionAgentEvent,
   ExtensionAgentHandle,
   ExtensionAgentModel,
+  ExtensionAgentScope,
   ExtensionAgentToolOptions,
   MainExtensionContext,
   MainExtensionDefinition,

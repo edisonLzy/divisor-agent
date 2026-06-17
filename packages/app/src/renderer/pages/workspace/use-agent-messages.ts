@@ -261,7 +261,7 @@ export function useAgentMessages() {
     },
     {
       shouldHandleEvent: (event) => {
-        return Boolean(mainStore.getState().getSession(event.sessionId));
+        return event.scope === "main";
       },
     },
   );

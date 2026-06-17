@@ -62,6 +62,7 @@ export class AgentPool
       if (typeof name !== "string") return;
 
       (this.emit as (...args: unknown[]) => Promise<void>)(name, {
+        scope: runtime.getScope(),
         sessionId,
         ...(data as object),
       });
@@ -96,6 +97,11 @@ export class AgentPool
   public setSessionId: AgentSessionIPC["setSessionId"] = async (sessionId: string) => {
     const runtime = this.getOrCreateRuntime(sessionId);
     runtime.setSessionId(sessionId);
+  };
+
+  public setSessionScope: AgentSessionIPC["setSessionScope"] = async (sessionId, scope) => {
+    const runtime = this.getOrCreateRuntime(sessionId);
+    runtime.setSessionScope(scope);
   };
 
   public destroySession: AgentSessionIPC["destroySession"] = async (sessionId) => {

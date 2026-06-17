@@ -7,7 +7,7 @@ import type {
 import { Agent } from "@mariozechner/pi-agent-core";
 import Emittery from "emittery";
 
-import type { AllowedMainExposeEvents } from "../shared/events-ipc.js";
+import type { AgentSessionScope, AllowedMainExposeEvents } from "../shared/events-ipc.js";
 import type { AgentModelsIPC } from "../shared/models-ipc.js";
 import type { PermissionMode } from "../shared/permissions-ipc.js";
 import type { AgentSessionIPC } from "../shared/session-ipc.js";
@@ -51,6 +51,7 @@ export type AgentRuntimeDelegate = {
     | "getModelConfig"
     | "saveModelConfig"
     | "setSessionId"
+    | "setSessionScope"
     | "destroySession"
     | "listSkills"
     | "setSkillEnabled"
@@ -59,6 +60,7 @@ export type AgentRuntimeDelegate = {
 } & {
   listSkills: AgentSkillsIPC["listSkills"];
   setSessionId(sessionId: string): void;
+  setSessionScope(scope: AgentSessionScope): void;
   setSkillEnabled: AgentSkillsIPC["setSkillEnabled"];
 };
 
@@ -71,7 +73,7 @@ export interface AgentRuntimeOptions {
 
 /** Derive base events from session-tagged events by stripping sessionId. */
 type AgentRuntimeEvents = {
-  [K in keyof AllowedMainExposeEvents]: Omit<AllowedMainExposeEvents[K], "sessionId">;
+  [K in keyof AllowedMainExposeEvents]: Omit<AllowedMainExposeEvents[K], "scope" | "sessionId">;
 };
 
 /**
@@ -84,6 +86,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
   private agent!: Agent;
   private permissionMode: PermissionMode;
   private permissionService: PermissionService;
+  private scope: AgentSessionScope = "main";
   private systemPromptService: SystemPromptService;
   private sessionId: string | undefined;
 
@@ -186,6 +189,14 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
     this.sessionId = sessionId;
     this.agent.sessionId = sessionId;
   };
+
+  public setSessionScope: AgentRuntimeDelegate["setSessionScope"] = (scope) => {
+    this.scope = scope;
+  };
+
+  public getScope() {
+    return this.scope;
+  }
 
   public setHistoryMessages: AgentRuntimeDelegate["setHistoryMessages"] = async (messages) => {
     this.agent.state.messages = messages;

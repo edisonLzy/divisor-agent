@@ -36,6 +36,7 @@ export function SideChatArtifact({ artifact }: SideChatArtifactProps) {
 
       try {
         await invoke("setSessionId", artifact.id);
+        await invoke("setSessionScope", artifact.id, "side-chat");
         await invoke("prompt", artifact.id, submission.text, {
           model: {
             modelId: submission.model.modelId,

@@ -62,6 +62,7 @@ export default defineMainExtension((ctx) => {
             id: subagent.id,
             label: subagent.name,
             mode: "inherit-model",
+            scope: "side-chat",
             systemPrompt: buildSubagentSystemPrompt(subagent),
             tools: {
               excludeToolNames: [SUBAGENTS_TOOL_NAME, "fs/write_text_file", "terminal/create"],

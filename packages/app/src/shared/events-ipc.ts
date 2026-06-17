@@ -5,7 +5,8 @@ import type { PermissionRequestedEvent } from "./permissions-ipc";
 import type { AgentSessionIPC } from "./session-ipc";
 import type { AgentSkillsIPC } from "./skills-ipc";
 
-type SessionTagged<T> = T & { sessionId: string };
+export type AgentSessionScope = "main" | "side-chat";
+type SessionTagged<T> = T & { scope: AgentSessionScope; sessionId: string };
 type AgentRuntimeEvent = AgentEvent | PermissionRequestedEvent;
 
 // main -> renderer events. These are verified at compile-time to be a subset of the
@@ -44,6 +45,7 @@ export const ALLOWED_RENDER_INVOKE_EVENTS: (keyof AgentRuntimeIPC)[] = [
   "abortPrompt",
   "setHistoryMessages",
   "setSessionId",
+  "setSessionScope",
   "destroySession",
   "setPermissionMode",
   "resolvePermissionRequest",

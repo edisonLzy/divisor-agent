@@ -47,10 +47,12 @@ export function App() {
             inputDisabled: input.inputDisabled,
           });
 
-          sideChat.appendMessageEntry(
-            input.id,
-            createAgentUserMessage(createTextDocument(input.pendingPrompt), input.pendingPrompt),
-          );
+          if (sideChat.getEntryState(input.id).entries.length === 0) {
+            sideChat.appendMessageEntry(
+              input.id,
+              createAgentUserMessage(createTextDocument(input.pendingPrompt), input.pendingPrompt),
+            );
+          }
         }
       },
       openArtifact(sessionId, artifactId) {

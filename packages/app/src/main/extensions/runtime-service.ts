@@ -64,6 +64,9 @@ export class ExtensionRuntimeService
     });
 
     runtime.setSessionId(agentId);
+    if (input.scope) {
+      runtime.setSessionScope(input.scope);
+    }
     if (model) {
       await runtime.setModel(model);
     }
@@ -72,6 +75,7 @@ export class ExtensionRuntimeService
       if (typeof name !== "string") return;
 
       (this.emit as (...args: unknown[]) => Promise<void>)(name, {
+        scope: runtime.getScope(),
         sessionId: agentId,
         ...(data as object),
       });

@@ -30,6 +30,7 @@ function registerIPCHandlers(agentPool: AgentPool) {
   typedIpcMain.handle("abortPrompt", agentPool.abortPrompt);
   typedIpcMain.handle("setHistoryMessages", agentPool.setHistoryMessages);
   typedIpcMain.handle("setSessionId", agentPool.setSessionId);
+  typedIpcMain.handle("setSessionScope", agentPool.setSessionScope);
   typedIpcMain.handle("destroySession", agentPool.destroySession);
   typedIpcMain.handle("setPermissionMode", agentPool.setPermissionMode);
   typedIpcMain.handle("resolvePermissionRequest", agentPool.resolvePermissionRequest);

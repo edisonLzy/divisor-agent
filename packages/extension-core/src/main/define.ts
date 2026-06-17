@@ -19,11 +19,14 @@ export interface ExtensionAgentToolOptions {
   includeExtensions?: boolean;
 }
 
+export type ExtensionAgentScope = "main" | "side-chat";
+
 export interface CreateExtensionAgentInput {
   id?: string;
   label?: string;
   mode?: "inherit-model" | "isolated";
   model?: ExtensionAgentModel;
+  scope?: ExtensionAgentScope;
   systemPrompt?: string;
   tools?: ExtensionAgentToolOptions;
 }
