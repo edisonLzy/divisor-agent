@@ -1,9 +1,7 @@
 import { createContext, useContext } from "react";
 import type { ReactNode } from "react";
 
-export interface ExtensionArtifactInput<
-  TContent extends Record<string, unknown> = Record<string, unknown>,
-> {
+export interface ExtensionArtifactInput<TContent = Record<string, unknown>> {
   content?: TContent;
   id: string;
   name?: string;
@@ -27,8 +25,13 @@ export interface InsertSideChatUserMessageEntryInput {
 
 export interface ExtensionsContextAPI {
   appendSideChatMeta(sideChatId: string, input: AppendSideChatMetaInput): void;
+  getActiveSessionId(): string | null;
+  getArtifact<TContent = Record<string, unknown>>(
+    sessionId: string,
+    artifactId: string,
+  ): { content: TContent; id: string; name: string; type: string } | null;
   openArtifact(sessionId: string, artifactId: string): void;
-  upsertArtifact<TContent extends Record<string, unknown> = Record<string, unknown>>(
+  upsertArtifact<TContent = Record<string, unknown>>(
     sessionId: string,
     artifact: ExtensionArtifactInput<TContent>,
   ): void;

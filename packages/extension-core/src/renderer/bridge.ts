@@ -31,6 +31,10 @@ export class RendererExtensionBridge {
         artifacts: {
           register: (artifact) => this.registry.registerArtifact(artifact),
         },
+        streamdown: {
+          registerComponents: (components) =>
+            this.registry.registerStreamdownComponents(components),
+        },
       });
     }
 
