@@ -6,15 +6,15 @@
 
 ## 功能概览
 
-| 维度         | 内容                                                                                   |
-| ------------ | -------------------------------------------------------------------------------------- |
-| Manifest id  | `subagents`                                                                            |
-| 注册的工具   | `subagents/run`                                                                        |
-| 注册的指令   | `/subagent`(在输入框输入 `/` 弹出)                                                     |
-| 注入系统提示 | `subagents.prompt` — 告诉主 Agent 何时以及如何调用本扩展                               |
-| 渲染区块     | `subagents.list` — 在聊天流中实时展示每个子 Agent 的状态                               |
+| 维度           | 内容                                                                               |
+| -------------- | ---------------------------------------------------------------------------------- |
+| Manifest id    | `subagents`                                                                        |
+| 注册的工具     | `subagents/run`                                                                    |
+| 注册的指令     | `/subagent`(在输入框输入 `/` 弹出)                                                 |
+| 注入系统提示   | `subagents.prompt` — 告诉主 Agent 何时以及如何调用本扩展                           |
+| 渲染区块       | `subagents.list` — 在聊天流中实时展示每个子 Agent 的状态                           |
 | 产物(Artifact) | 每个子 Agent 在主会话下创建一个 `side-chat` 类型的 artifact,点击列表行即可跳转查看 |
-| 子 Agent 上限 | 4(同时运行)                                                                          |
+| 子 Agent 上限  | 4(同时运行)                                                                        |
 
 ## 架构
 
@@ -48,12 +48,12 @@
 
 ## 暴露的入口(`exports`)
 
-| 子路径       | 来源             | 用途                                |
-| ------------ | ---------------- | ----------------------------------- |
-| `./manifest` | `src/manifest.ts` | `id: "subagents"`,`name: "Subagents"` |
-| `./main`     | `src/main.ts`     | 主进程扩展:工具 + 系统提示          |
-| `./renderer` | `src/renderer.tsx` | 渲染进程扩展:指令 + 区块            |
-| `./types`    | `src/types.ts`    | 子 Agent 快照、工具事件等共享类型    |
+| 子路径       | 来源               | 用途                                  |
+| ------------ | ------------------ | ------------------------------------- |
+| `./manifest` | `src/manifest.ts`  | `id: "subagents"`,`name: "Subagents"` |
+| `./main`     | `src/main.ts`      | 主进程扩展:工具 + 系统提示            |
+| `./renderer` | `src/renderer.tsx` | 渲染进程扩展:指令 + 区块              |
+| `./types`    | `src/types.ts`     | 子 Agent 快照、工具事件等共享类型     |
 
 主 App 通过 `packages/app/src/{main,renderer}/extensions/installed-extensions.ts` 引入 `manifest` + `main` / `renderer`,在主进程和渲染进程两侧各挂一次(参考 [electron-vite externalize 注意事项](#externalize-说明))。
 
@@ -64,7 +64,7 @@
   tasks: [
     { name: "string(可选,缺省 subagent-N)", task: "string(必填,非空)" },
     // 1 ≤ tasks.length ≤ 4
-  ]
+  ];
 }
 ```
 
@@ -90,10 +90,10 @@
 
 `SubagentStatus`:
 
-| 值         | 触发                                                                 |
-| ---------- | -------------------------------------------------------------------- |
-| `queued`   | 进入工具调用即初始值                                                 |
-| `running`  | `agent_start`                                                        |
+| 值                             | 触发                                                                         |
+| ------------------------------ | ---------------------------------------------------------------------------- |
+| `queued`                       | 进入工具调用即初始值                                                         |
+| `running`                      | `agent_start`                                                                |
 | `completed`/`failed`/`aborted` | `agent_end`,按 `messages[].stopReason`(`end_turn` / `error` / `aborted`)判定 |
 
 图标映射:queued → `CircleIcon`,running → `LoaderCircleIcon`(旋转),completed → `CheckCircleIcon`,failed → `XCircleIcon`,aborted → `OctagonXIcon`。

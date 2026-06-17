@@ -6,19 +6,19 @@
 
 ## 它演示了什么
 
-| 扩展点(API)         | 注册内容                                | 作用                                                                 |
-| -------------------- | --------------------------------------- | -------------------------------------------------------------------- |
-| `systemPrompt`       | `example.prompt`                        | 告诉主 Agent 何时发出 `divisor-block` / `divisor-artifact` 围栏代码块 |
-| `tools`              | `example/hello`                         | 最简单的工具:接收 `name`,返回 `Hello, <name>`                       |
-| `slashCommands`      | `example.insert-card`                   | 在输入框输入 `/Insert example card`,插入一段提示模板                  |
-| `assistantBlocks`    | `example.card`                          | 渲染端注册一个 assistant 区块类型,展示 `title` 字段                 |
-| `artifacts`          | `example.artifact`                      | 注册一个 artifact 类型,在右侧面板里渲染                              |
+| 扩展点(API)       | 注册内容              | 作用                                                                  |
+| ----------------- | --------------------- | --------------------------------------------------------------------- |
+| `systemPrompt`    | `example.prompt`      | 告诉主 Agent 何时发出 `divisor-block` / `divisor-artifact` 围栏代码块 |
+| `tools`           | `example/hello`       | 最简单的工具:接收 `name`,返回 `Hello, <name>`                         |
+| `slashCommands`   | `example.insert-card` | 在输入框输入 `/Insert example card`,插入一段提示模板                  |
+| `assistantBlocks` | `example.card`        | 渲染端注册一个 assistant 区块类型,展示 `title` 字段                   |
+| `artifacts`       | `example.artifact`    | 注册一个 artifact 类型,在右侧面板里渲染                               |
 
 每一项都是 `extension-core` 提供的最小可运行示例,复制改名即可成为新的扩展。
 
 ## 架构
 
-```
+````
 主进程 (src/main.ts)
   ─ systemPrompt.register("example.prompt")
        → 告诉 Agent 在合适的时候用围栏格式输出 UI
@@ -34,17 +34,17 @@
   ─ artifacts.register("example.artifact")
        → 当主 Agent 发出 ```divisor-artifact type=example.artifact``` 时,
           在右侧面板里渲染标题 + artifactId
-```
+````
 
 > 提示:主进程通过 `formatArtifactFence` / `formatAssistantBlockFence`(来自 `@divisor-agent/extension-core/common`)来生成合规的围栏字符串,主 Agent 看到这段提示后就能在回答里原样输出。直接手写 JSON 容易被模型丢掉字段或加多余空格。
 
 ## 暴露的入口(`exports`)
 
-| 子路径       | 来源             | 用途                                |
-| ------------ | ---------------- | ----------------------------------- |
-| `./manifest` | `src/manifest.ts` | `id: "example"`,`name: "Example"`    |
-| `./main`     | `src/main.ts`     | 主进程扩展:系统提示 + 工具          |
-| `./renderer` | `src/renderer.tsx` | 渲染进程扩展:指令 + 区块 + artifact  |
+| 子路径       | 来源               | 用途                                |
+| ------------ | ------------------ | ----------------------------------- |
+| `./manifest` | `src/manifest.ts`  | `id: "example"`,`name: "Example"`   |
+| `./main`     | `src/main.ts`      | 主进程扩展:系统提示 + 工具          |
+| `./renderer` | `src/renderer.tsx` | 渲染进程扩展:指令 + 区块 + artifact |
 
 主 App 通过 `packages/app/src/{main,renderer}/extensions/installed-extensions.ts` 在主进程 / 渲染进程两侧各挂一次。
 
