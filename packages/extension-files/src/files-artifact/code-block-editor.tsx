@@ -26,6 +26,23 @@ const HIGHLIGHT_DECORATION = Decoration.line({
   attributes: { class: HIGHLIGHT_DECORATION_CLASS },
 });
 
+// CodeMirror's default gutter styling is hardcoded light. Match it to the
+// surrounding dark background so the line-number column doesn't appear as a
+// bright strip in dark mode.
+const darkGutterTheme = EditorView.theme({
+  "&": { backgroundColor: "transparent" },
+  ".cm-gutters": {
+    backgroundColor: "transparent",
+    borderRight: "none",
+    color: "var(--muted-foreground)",
+  },
+  ".cm-activeLineGutter": {
+    backgroundColor: "transparent",
+    color: "var(--foreground)",
+  },
+  ".cm-content": { caretColor: "var(--foreground)" },
+});
+
 interface CodeBlockEditorProps {
   code: string;
   endLine?: number;
@@ -67,6 +84,7 @@ export function CodeBlockEditor({
 
         const extensions: Extension[] = [
           lineNumbers(),
+          darkGutterTheme,
           history(),
           highlightActiveLine(),
           highlightSelectionMatches(),
