@@ -1,6 +1,6 @@
 import type { Editor, Range } from "@tiptap/core";
 import type { ComponentType, JSX } from "react";
-import type { Components as StreamdownComponents } from "streamdown";
+import type { Components as StreamdownComponents, StreamdownProps } from "streamdown";
 
 import type { ExtensionManifest } from "../manifest.js";
 
@@ -46,6 +46,10 @@ export type StreamdownComponentComposer = (Base: StreamdownComponent) => Streamd
 export type StreamdownComponentComposerMap = Partial<
   Record<keyof StreamdownComponents | string, StreamdownComponentComposer>
 >;
+export type StreamdownRehypePlugins = NonNullable<StreamdownProps["rehypePlugins"]>;
+export type StreamdownRehypePluginComposer = (
+  plugins: StreamdownRehypePlugins,
+) => StreamdownRehypePlugins;
 
 export interface RendererExtensionContext {
   manifest: ExtensionManifest;
@@ -69,6 +73,7 @@ export interface RendererExtensionContext {
    */
   streamdown: {
     registerComponents(components: StreamdownComponentComposerMap): void;
+    registerRehypePlugins(composer: StreamdownRehypePluginComposer): void;
   };
 }
 

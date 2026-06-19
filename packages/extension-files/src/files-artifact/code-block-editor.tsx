@@ -19,9 +19,8 @@ import {
 } from "@codemirror/view";
 import { useEffect, useRef } from "react";
 
+import { HIGHLIGHT_DECORATION_CLASS } from "../constants";
 import { loadLanguageExtension } from "./language-from-path";
-
-const HIGHLIGHT_DECORATION_CLASS = "cm-file-highlight";
 
 const HIGHLIGHT_DECORATION = Decoration.line({
   attributes: { class: HIGHLIGHT_DECORATION_CLASS },

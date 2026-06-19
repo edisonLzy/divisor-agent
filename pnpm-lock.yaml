@@ -384,6 +384,9 @@ importers:
       react:
         specifier: 'catalog:'
         version: 19.2.5
+      streamdown:
+        specifier: ^2.5.0
+        version: 2.5.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
 
   packages/extension-subagents:
     dependencies:

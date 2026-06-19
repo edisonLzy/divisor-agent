@@ -2,11 +2,12 @@ import { useExtensionsContextAPI } from "@divisor-agent/extension-core/renderer"
 import { useEffect, useMemo, useRef } from "react";
 
 import {
-  basename,
   FILES_ARTIFACT_ID,
+  FILES_ARTIFACT_NAME,
   FILES_ARTIFACT_TYPE,
-  type ParsedFileHref,
-} from "../file-href";
+  FS_READ_TEXT_FILE_CHANNEL,
+} from "../constants";
+import { getFileBaseName, type ParsedFileHref } from "../helper";
 import { CodeBlockEditor } from "./code-block-editor";
 import { FilesTabBar } from "./files-tab-bar";
 import { languageFromPath } from "./language-from-path";
@@ -65,7 +66,7 @@ export function FilesArtifact({ content, sessionId }: FilesArtifactProps) {
 
     let cancelled = false;
     getElectronAPI()
-      .invoke("fsReadTextFile", active.path)
+      .invoke(FS_READ_TEXT_FILE_CHANNEL, active.path)
       .then((result) => {
         if (cancelled) return;
         if (result && typeof result === "object" && "error" in result) {
@@ -98,7 +99,7 @@ export function FilesArtifact({ content, sessionId }: FilesArtifactProps) {
     api.upsertArtifact<FilesArtifactContent>(sessionId, {
       content: { ...content, activePath: path },
       id: FILES_ARTIFACT_ID,
-      name: "Files",
+      name: FILES_ARTIFACT_NAME,
       type: FILES_ARTIFACT_TYPE,
     });
   };
@@ -112,7 +113,7 @@ export function FilesArtifact({ content, sessionId }: FilesArtifactProps) {
     api.upsertArtifact<FilesArtifactContent>(sessionId, {
       content: { activePath: nextActive, files: nextFiles },
       id: FILES_ARTIFACT_ID,
-      name: "Files",
+      name: FILES_ARTIFACT_NAME,
       type: FILES_ARTIFACT_TYPE,
     });
   };
@@ -123,8 +124,8 @@ export function FilesArtifact({ content, sessionId }: FilesArtifactProps) {
         <div>
           <div className="font-medium text-foreground">No files open</div>
           <p className="mt-1 text-xs">
-            Click a <code className="rounded bg-muted px-1 py-0.5">file://</code> link in the chat
-            to preview a file here.
+            Click an <code className="rounded bg-muted px-1 py-0.5">extension-file://</code> link in
+            the chat to preview a file here.
           </p>
         </div>
       </div>
@@ -135,7 +136,7 @@ export function FilesArtifact({ content, sessionId }: FilesArtifactProps) {
     <div ref={containerRef} className="flex h-full flex-col">
       <FilesTabBar
         activePath={content.activePath}
-        files={files.map((f) => ({ label: basename(f.path), path: f.path }))}
+        files={files.map((f) => ({ label: getFileBaseName(f.path), path: f.path }))}
         onActivate={setActivePath}
         onClose={closeFile}
       />
@@ -179,7 +180,7 @@ export function addOrActivateFile(
   api.upsertArtifact<FilesArtifactContent>(sessionId, {
     content: { activePath: parsed.path, files: nextFiles },
     id: FILES_ARTIFACT_ID,
-    name: "Files",
+    name: FILES_ARTIFACT_NAME,
     type: FILES_ARTIFACT_TYPE,
   });
   api.openArtifact(sessionId, FILES_ARTIFACT_ID);
@@ -196,7 +197,7 @@ function updateEntry(
   api.upsertArtifact<FilesArtifactContent>(sessionId, {
     content: { activePath: baseContent.activePath, files: nextFiles },
     id: FILES_ARTIFACT_ID,
-    name: "Files",
+    name: FILES_ARTIFACT_NAME,
     type: FILES_ARTIFACT_TYPE,
   });
 }

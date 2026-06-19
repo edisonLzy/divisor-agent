@@ -7,6 +7,8 @@ import type {
   RendererSlashCommand,
   StreamdownComponent,
   StreamdownComponentComposerMap,
+  StreamdownRehypePluginComposer,
+  StreamdownRehypePlugins,
 } from "./define";
 
 type StreamdownComponentRegistration = {
@@ -19,6 +21,7 @@ export class RendererExtensionRegistry {
   private assistantBlocks = new Map<string, AssistantBlockRegistration>();
   private artifacts = new Map<string, ArtifactRegistration<any>>();
   private streamdownComponents: StreamdownComponentRegistration[] = [];
+  private streamdownRehypePluginComposers: StreamdownRehypePluginComposer[] = [];
 
   registerExtension(manifest: ExtensionManifest) {
     this.extensions.set(manifest.id, manifest);
@@ -38,6 +41,10 @@ export class RendererExtensionRegistry {
 
   registerStreamdownComponents(components: StreamdownComponentComposerMap) {
     this.streamdownComponents.push({ components });
+  }
+
+  registerStreamdownRehypePlugins(composer: StreamdownRehypePluginComposer) {
+    this.streamdownRehypePluginComposers.push(composer);
   }
 
   listExtensions() {
@@ -73,6 +80,13 @@ export class RendererExtensionRegistry {
     }
 
     return components as Partial<StreamdownComponents>;
+  }
+
+  getStreamdownRehypePlugins(basePlugins: StreamdownRehypePlugins): StreamdownRehypePlugins {
+    return this.streamdownRehypePluginComposers.reduce(
+      (plugins, compose) => compose(plugins),
+      basePlugins,
+    );
   }
 }
 

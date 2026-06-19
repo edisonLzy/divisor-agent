@@ -1,20 +1,18 @@
 /**
- * Helpers for working with `file://` links in assistant messages.
+ * Helpers for working with `extension-file://` links in assistant messages.
  *
  * Format:
- *   file://<path>            (no line number)
- *   file://<path>:<line>     (1-indexed start line)
- *   file://<path>:<start>-<end>  (line range, inclusive)
+ *   extension-file://<path>            (no line number)
+ *   extension-file://<path>:<line>     (1-indexed start line)
+ *   extension-file://<path>:<start>-<end>  (line range, inclusive)
  *
  * `<path>` may be relative (resolved against the workspace) or absolute
  * (starting with `/`). URL-encoded characters are decoded.
+ *
+ * URL-scheme and artifact-id constants live in `./constants.ts`.
  */
 
-/** Artifact type registered with the extension registry. */
-export const FILES_ARTIFACT_TYPE = "files";
-
-/** Singleton artifact id (one files artifact per session). */
-export const FILES_ARTIFACT_ID = "files";
+import { FILE_HREF_PREFIX } from "../constants";
 
 export interface ParsedFileHref {
   endLine?: number;
@@ -22,17 +20,15 @@ export interface ParsedFileHref {
   path: string;
 }
 
-const FILE_PREFIX = "file://";
-
 /** Cross-platform basename: `a/b/c.ts` → `c.ts`, `/abs/foo.txt` → `foo.txt`. */
-export function basename(p: string): string {
+export function getFileBaseName(p: string): string {
   return p.split("/").pop() ?? p;
 }
 
 export function parseFileHref(href: string): ParsedFileHref | null {
-  if (!href.startsWith(FILE_PREFIX)) return null;
+  if (!href.startsWith(FILE_HREF_PREFIX)) return null;
 
-  const body = href.slice(FILE_PREFIX.length);
+  const body = href.slice(FILE_HREF_PREFIX.length);
   if (!body) return null;
 
   // Match: <path>(:line)?(-line)?

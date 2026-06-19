@@ -25,5 +25,8 @@
     "@types/react": "catalog:",
     "lucide-react": "^1.8.0",
     "react": "catalog:"
+  },
+  "peerDependencies": {
+    "streamdown": "^2.5.0"
   }
 }

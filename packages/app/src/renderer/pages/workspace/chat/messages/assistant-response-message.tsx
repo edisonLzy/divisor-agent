@@ -12,6 +12,7 @@ import type {
   CustomRendererProps,
   PluginConfig,
 } from "streamdown";
+import { defaultRehypePlugins } from "streamdown";
 
 interface AssistantResponseMessageProps {
   content: string;
@@ -45,6 +46,10 @@ export function AssistantResponseMessage({ content, isStreaming }: AssistantResp
     () => registry.getStreamdownComponents(),
     [registry],
   );
+  const rehypePlugins = useMemo(
+    () => registry.getStreamdownRehypePlugins(Object.values(defaultRehypePlugins)),
+    [registry],
+  );
 
   return (
     <MessageResponse
@@ -52,6 +57,7 @@ export function AssistantResponseMessage({ content, isStreaming }: AssistantResp
       components={components}
       isAnimating={isStreaming}
       plugins={plugins}
+      rehypePlugins={rehypePlugins}
     >
       {content}
     </MessageResponse>

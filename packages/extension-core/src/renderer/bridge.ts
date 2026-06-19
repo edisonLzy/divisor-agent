@@ -34,6 +34,8 @@ export class RendererExtensionBridge {
         streamdown: {
           registerComponents: (components) =>
             this.registry.registerStreamdownComponents(components),
+          registerRehypePlugins: (composer) =>
+            this.registry.registerStreamdownRehypePlugins(composer),
         },
       });
     }
