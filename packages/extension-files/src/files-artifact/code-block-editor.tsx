@@ -22,6 +22,8 @@ import { useEffect, useRef } from "react";
 import { HIGHLIGHT_DECORATION_CLASS } from "../constants";
 import { loadLanguageExtension } from "./language-from-path";
 
+const HIGHLIGHT_DURATION_MS = 2000;
+
 const HIGHLIGHT_DECORATION = Decoration.line({
   attributes: { class: HIGHLIGHT_DECORATION_CLASS },
 });
@@ -30,18 +32,28 @@ const HIGHLIGHT_DECORATION = Decoration.line({
 // diffing means the `animation` only fires when a line *gains* the
 // `cm-file-highlight` class — i.e. on first mount with a range, or when the
 // user clicks a different link. Lines that keep the class across renders
-// don't re-trigger. Fades from a stronger accent down to the steady 40%
-// background defined on the wrapper.
+// don't re-trigger. Fades from a stronger primary tint down to the steady
+// background defined in the CodeMirror theme below.
 const HIGHLIGHT_INTRO_STYLE = `
 @keyframes file-highlight-intro {
-  from { background-color: color-mix(in oklch, var(--accent) 72%, transparent); }
-  to   { background-color: color-mix(in oklch, var(--accent) 40%, transparent); }
+  from {
+    background-color: color-mix(in oklch, var(--primary) 28%, transparent);
+    box-shadow:
+      inset 4px 0 0 color-mix(in oklch, var(--primary) 90%, transparent),
+      0 0 0 1px color-mix(in oklch, var(--primary) 32%, transparent);
+  }
+  to {
+    background-color: color-mix(in oklch, var(--primary) 16%, transparent);
+    box-shadow:
+      inset 4px 0 0 color-mix(in oklch, var(--primary) 74%, transparent),
+      0 0 0 1px color-mix(in oklch, var(--primary) 20%, transparent);
+  }
 }
-.cm-file-highlight {
+.cm-line.cm-file-highlight {
   animation: file-highlight-intro 1200ms ease-out forwards;
 }
 @media (prefers-reduced-motion: reduce) {
-  .cm-file-highlight { animation: none; }
+  .cm-line.cm-file-highlight { animation: none; }
 }
 `;
 
@@ -62,16 +74,31 @@ const darkGutterTheme = EditorView.theme({
   ".cm-content": { caretColor: "var(--foreground)" },
 });
 
+const fileHighlightTheme = EditorView.theme({
+  ".cm-line.cm-file-highlight": {
+    backgroundColor: "color-mix(in oklch, var(--primary) 16%, transparent)",
+    borderRadius: "4px",
+    boxShadow:
+      "inset 4px 0 0 color-mix(in oklch, var(--primary) 74%, transparent), 0 0 0 1px color-mix(in oklch, var(--primary) 20%, transparent)",
+    color: "var(--foreground)",
+    paddingLeft: "0.5rem",
+  },
+});
+
 interface CodeBlockEditorProps {
   code: string;
   endLine?: number;
   error?: string;
+  highlightExpiresAt?: number;
+  highlightRequestId?: number;
   highlightLine?: number;
   language?: string;
 }
 
 interface HighlightRange {
   end?: number;
+  expiresAt?: number;
+  requestId?: number;
   start?: number;
 }
 
@@ -80,6 +107,8 @@ export function CodeBlockEditor({
   language,
   highlightLine,
   endLine,
+  highlightExpiresAt,
+  highlightRequestId,
   error,
 }: CodeBlockEditorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -104,6 +133,7 @@ export function CodeBlockEditor({
         const extensions: Extension[] = [
           lineNumbers(),
           darkGutterTheme,
+          fileHighlightTheme,
           history(),
           highlightActiveLine(),
           highlightSelectionMatches(),
@@ -147,25 +177,73 @@ export function CodeBlockEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code, language]);
 
-  // Update the highlight range and scroll to the new line, without
-  // remounting the editor. Safe to run before the editor mounts — the
-  // mount effect reads the ref when building its initial decorations.
+  // Update the transient highlight range and scroll to the new line, without
+  // remounting the editor. Safe to run before the editor mounts — the mount
+  // effect reads the ref when building its initial decorations.
   useEffect(() => {
     const previous = highlightRef.current;
-    if (previous.start === highlightLine && previous.end === endLine) return;
+    const now = Date.now();
+    const isFreshHighlight =
+      highlightLine !== undefined && highlightExpiresAt !== undefined && highlightExpiresAt > now;
+    const next: HighlightRange = isFreshHighlight
+      ? {
+          start: highlightLine,
+          end: endLine,
+          expiresAt: highlightExpiresAt,
+          requestId: highlightRequestId,
+        }
+      : {};
+    const isSameRange = previous.start === next.start && previous.end === next.end;
+    const isSameRequest =
+      isSameRange && previous.requestId === next.requestId && previous.expiresAt === next.expiresAt;
+    if (isSameRequest) return undefined;
 
-    highlightRef.current = { start: highlightLine, end: endLine };
+    highlightRef.current = next;
+    let clearTimer: ReturnType<typeof setTimeout> | undefined;
+
+    if (isFreshHighlight) {
+      clearTimer = setTimeout(
+        () => {
+          if (highlightRef.current.requestId !== highlightRequestId) return;
+          highlightRef.current = {};
+          viewRef.current?.dispatch({});
+        },
+        Math.min(highlightExpiresAt - now, HIGHLIGHT_DURATION_MS),
+      );
+    }
 
     const view = viewRef.current;
-    if (!view) return;
+    if (!view) {
+      return () => {
+        if (clearTimer) clearTimeout(clearTimer);
+      };
+    }
 
-    view.dispatch({
-      effects: EditorView.scrollIntoView(
-        view.state.doc.line(Math.min(highlightLine ?? 1, view.state.doc.lines)).from,
-        { y: "center" },
-      ),
-    });
-  }, [highlightLine, endLine]);
+    if (!isFreshHighlight) {
+      view.dispatch({});
+      return () => {
+        if (clearTimer) clearTimeout(clearTimer);
+      };
+    }
+
+    if (isSameRange) {
+      highlightRef.current = {};
+      view.dispatch({});
+      const frame = requestAnimationFrame(() => {
+        highlightRef.current = next;
+        scrollToLine(view, highlightLine);
+      });
+      return () => {
+        cancelAnimationFrame(frame);
+        if (clearTimer) clearTimeout(clearTimer);
+      };
+    }
+
+    scrollToLine(view, highlightLine);
+    return () => {
+      if (clearTimer) clearTimeout(clearTimer);
+    };
+  }, [highlightLine, endLine, highlightExpiresAt, highlightRequestId]);
 
   if (error) {
     return (
@@ -176,13 +254,18 @@ export function CodeBlockEditor({
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="h-full overflow-auto bg-background p-3 [&_.cm-file-highlight]:bg-[color-mix(in_oklch,var(--accent)_40%,transparent)] [&_.cm-file-highlight]:transition-colors"
-    >
+    <div ref={containerRef} className="h-full overflow-auto bg-background p-3">
       <style>{HIGHLIGHT_INTRO_STYLE}</style>
     </div>
   );
+}
+
+function scrollToLine(view: EditorView, lineNumber: number) {
+  const safeLine = Math.min(Math.max(lineNumber, 1), view.state.doc.lines);
+  const line = view.state.doc.line(safeLine);
+  view.dispatch({
+    effects: EditorView.scrollIntoView(line.from, { y: "center" }),
+  });
 }
 
 function lineHighlightPlugin(highlightRef: { current: HighlightRange }) {

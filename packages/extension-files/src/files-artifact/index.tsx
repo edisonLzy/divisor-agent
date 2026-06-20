@@ -18,6 +18,8 @@ export interface FileEntry {
   endLine?: number;
   error?: string;
   fetchedAt?: number;
+  highlightExpiresAt?: number;
+  highlightRequestId?: number;
   language?: string;
   line?: number;
   path: string;
@@ -146,6 +148,8 @@ export function FilesArtifact({ content, sessionId }: FilesArtifactProps) {
             code={active.content ?? ""}
             endLine={active.endLine}
             error={active.error}
+            highlightExpiresAt={active.highlightExpiresAt}
+            highlightRequestId={active.highlightRequestId}
             highlightLine={active.line}
             language={active.language ?? languageFromPath(active.path)}
           />
@@ -165,13 +169,24 @@ export function addOrActivateFile(
   const existing = api.getArtifact<FilesArtifactContent>(sessionId, FILES_ARTIFACT_ID);
   const current: FilesArtifactContent = existing?.content ?? EMPTY_FILES_CONTENT;
   const found = current.files.find((f) => f.path === parsed.path);
+  const nextHighlightRequestId =
+    parsed.line !== undefined ? (found?.highlightRequestId ?? 0) + 1 : undefined;
+  const highlightExpiresAt = parsed.line !== undefined ? Date.now() + 2000 : undefined;
   const newEntry: FileEntry = found
     ? {
         ...found,
-        endLine: parsed.endLine ?? found.endLine,
-        line: parsed.line ?? found.line,
+        endLine: parsed.line !== undefined ? parsed.endLine : undefined,
+        highlightExpiresAt,
+        highlightRequestId: nextHighlightRequestId,
+        line: parsed.line,
       }
-    : { endLine: parsed.endLine, line: parsed.line, path: parsed.path };
+    : {
+        endLine: parsed.line !== undefined ? parsed.endLine : undefined,
+        highlightExpiresAt,
+        highlightRequestId: nextHighlightRequestId,
+        line: parsed.line,
+        path: parsed.path,
+      };
 
   const nextFiles = found
     ? current.files.map((f) => (f.path === parsed.path ? newEntry : f))
@@ -193,9 +208,11 @@ function updateEntry(
   baseContent: FilesArtifactContent,
   patch: Partial<FileEntry>,
 ): void {
-  const nextFiles = baseContent.files.map((f) => (f.path === path ? { ...f, ...patch } : f));
+  const latest = api.getArtifact<FilesArtifactContent>(sessionId, FILES_ARTIFACT_ID);
+  const current = latest?.content ?? baseContent;
+  const nextFiles = current.files.map((f) => (f.path === path ? { ...f, ...patch } : f));
   api.upsertArtifact<FilesArtifactContent>(sessionId, {
-    content: { activePath: baseContent.activePath, files: nextFiles },
+    content: { activePath: current.activePath, files: nextFiles },
     id: FILES_ARTIFACT_ID,
     name: FILES_ARTIFACT_NAME,
     type: FILES_ARTIFACT_TYPE,
