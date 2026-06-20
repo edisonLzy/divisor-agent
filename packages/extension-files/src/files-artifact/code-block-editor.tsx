@@ -26,6 +26,25 @@ const HIGHLIGHT_DECORATION = Decoration.line({
   attributes: { class: HIGHLIGHT_DECORATION_CLASS },
 });
 
+// One-shot intro flash for freshly-highlighted lines. CodeMirror's decoration
+// diffing means the `animation` only fires when a line *gains* the
+// `cm-file-highlight` class — i.e. on first mount with a range, or when the
+// user clicks a different link. Lines that keep the class across renders
+// don't re-trigger. Fades from a stronger accent down to the steady 40%
+// background defined on the wrapper.
+const HIGHLIGHT_INTRO_STYLE = `
+@keyframes file-highlight-intro {
+  from { background-color: color-mix(in oklch, var(--accent) 72%, transparent); }
+  to   { background-color: color-mix(in oklch, var(--accent) 40%, transparent); }
+}
+.cm-file-highlight {
+  animation: file-highlight-intro 1200ms ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cm-file-highlight { animation: none; }
+}
+`;
+
 // CodeMirror's default gutter styling is hardcoded light. Match it to the
 // surrounding dark background so the line-number column doesn't appear as a
 // bright strip in dark mode.
@@ -160,7 +179,9 @@ export function CodeBlockEditor({
     <div
       ref={containerRef}
       className="h-full overflow-auto bg-background p-3 [&_.cm-file-highlight]:bg-[color-mix(in_oklch,var(--accent)_40%,transparent)] [&_.cm-file-highlight]:transition-colors"
-    />
+    >
+      <style>{HIGHLIGHT_INTRO_STYLE}</style>
+    </div>
   );
 }
 
