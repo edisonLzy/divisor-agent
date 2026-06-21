@@ -12,7 +12,6 @@ export interface PendingPromptsSlice {
   getPendingPromptsState: (sessionId: string) => SessionPendingPromptsState;
   addPendingPrompt: (sessionId: string, pendingPrompt: PendingPrompt) => void;
   removePendingPrompt: (sessionId: string, pendingPromptId: string) => void;
-  removeConsumedPendingPrompt: (sessionId: string, content: string, createdAt: number) => void;
   reorderPendingPrompts: (sessionId: string, sourceIndex: number, targetIndex: number) => void;
   clearPendingPromptsState: (sessionId: string) => void;
 }
@@ -63,26 +62,6 @@ export const createPendingPromptsSlice: StateCreator<
       pendingPromptStates.set(sessionId, {
         ...existing,
         pendingPrompts: existing.pendingPrompts.filter((item) => item.id !== pendingPromptId),
-      });
-      return { pendingPromptStates };
-    });
-  },
-
-  removeConsumedPendingPrompt: (sessionId, content, createdAt) => {
-    set((prev) => {
-      const pendingPromptStates = new Map(prev.pendingPromptStates);
-      const existing = getStoredPendingPromptsState(pendingPromptStates, sessionId);
-      const consumedIndex = existing.pendingPrompts.findIndex((item) => {
-        return item.createdAt === createdAt || item.content === content;
-      });
-
-      if (consumedIndex < 0) {
-        return prev;
-      }
-
-      pendingPromptStates.set(sessionId, {
-        ...existing,
-        pendingPrompts: existing.pendingPrompts.filter((_, index) => index !== consumedIndex),
       });
       return { pendingPromptStates };
     });

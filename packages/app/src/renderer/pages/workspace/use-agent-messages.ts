@@ -110,14 +110,6 @@ export function useAgentMessages() {
 
       message_start: (event) => {
         const { sessionId, message } = event;
-        if (message.role === "user") {
-          const content = getUserMessageText(message.content);
-          if (content) {
-            mainStore.getState().removeConsumedPendingPrompt(sessionId, content, message.timestamp);
-          }
-          return;
-        }
-
         if (message.role !== "assistant") return;
 
         const turnStartIdx = turnContentStartIndicesRef.current[sessionId] ?? 0;
@@ -273,24 +265,6 @@ export function useAgentMessages() {
       },
     },
   );
-}
-
-function getUserMessageText(content: unknown): string {
-  if (typeof content === "string") {
-    return content.trim();
-  }
-
-  if (!Array.isArray(content)) {
-    return "";
-  }
-
-  return content
-    .filter((block): block is { type: "text"; text: string } => {
-      return isRecord(block) && block.type === "text" && typeof block.text === "string";
-    })
-    .map((block) => block.text)
-    .join("\n")
-    .trim();
 }
 
 function upsertArtifactsFromToolDetails(
