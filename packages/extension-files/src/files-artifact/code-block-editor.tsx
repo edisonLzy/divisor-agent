@@ -329,6 +329,7 @@ export function CodeBlockEditor({
   const commentsRef = useRef<FileComment[]>(comments);
   const activeCommentIdRef = useRef<string | null>(null);
   const dragSelectionRef = useRef<DragSelectionState | null>(null);
+  const focusScrollFrameRef = useRef<number | null>(null);
   const manualSelectionRef = useRef(false);
   const callbacksRef = useRef<CommentCallbacks>({
     deleteComment: () => {},
@@ -481,12 +482,21 @@ export function CodeBlockEditor({
     if (!comment) return;
     setActiveCommentId(commentId);
     setPendingSelection(null);
-    const view = viewRef.current;
-    if (!view) return;
-    const positions = commentRangeToPositions(view.state, comment.range);
-    if (!positions) return;
-    view.dispatch({
-      effects: EditorView.scrollIntoView(positions.to, { y: "center" }),
+
+    if (focusScrollFrameRef.current !== null) {
+      cancelAnimationFrame(focusScrollFrameRef.current);
+    }
+
+    focusScrollFrameRef.current = requestAnimationFrame(() => {
+      focusScrollFrameRef.current = null;
+      const view = viewRef.current;
+      const latestComment = commentsRef.current.find((item) => item.id === commentId);
+      if (!view || !latestComment) return;
+      const positions = commentRangeToPositions(view.state, latestComment.range);
+      if (!positions) return;
+      view.dispatch({
+        effects: EditorView.scrollIntoView(positions.to, { y: "center" }),
+      });
     });
   }, []);
 
@@ -562,11 +572,15 @@ export function CodeBlockEditor({
           commentDecorationField,
           EditorView.updateListener.of((update) => {
             if (update.selectionSet) {
-              updatePendingSelection(
-                selectionToPending(update.view, {
-                  allowEditorSelection: manualSelectionRef.current,
-                }),
-              );
+              const view = update.view;
+              window.setTimeout(() => {
+                if (viewRef.current !== view) return;
+                updatePendingSelection(
+                  selectionToPending(view, {
+                    allowEditorSelection: manualSelectionRef.current,
+                  }),
+                );
+              }, 0);
             }
           }),
           EditorView.domEventHandlers({
@@ -700,17 +714,37 @@ export function CodeBlockEditor({
     commentsRef.current = comments;
     const view = viewRef.current;
     if (view) {
-      syncCommentDecorations(view, comments, activeCommentIdRef.current, callbacksRef);
+      return scheduleCommentDecorationsSync(
+        view,
+        comments,
+        activeCommentIdRef.current,
+        callbacksRef,
+      );
     }
+    return undefined;
   }, [comments]);
 
   useEffect(() => {
     activeCommentIdRef.current = activeCommentId;
     const view = viewRef.current;
     if (view) {
-      syncCommentDecorations(view, commentsRef.current, activeCommentId, callbacksRef);
+      return scheduleCommentDecorationsSync(
+        view,
+        commentsRef.current,
+        activeCommentId,
+        callbacksRef,
+      );
     }
+    return undefined;
   }, [activeCommentId]);
+
+  useEffect(() => {
+    return () => {
+      if (focusScrollFrameRef.current !== null) {
+        cancelAnimationFrame(focusScrollFrameRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!deletedComment) return undefined;
@@ -1133,6 +1167,19 @@ function syncCommentDecorations(
   });
 }
 
+function scheduleCommentDecorationsSync(
+  view: EditorView,
+  comments: FileComment[],
+  activeCommentId: string | null,
+  callbacksRef: { current: CommentCallbacks },
+) {
+  const frame = requestAnimationFrame(() => {
+    syncCommentDecorations(view, comments, activeCommentId, callbacksRef);
+  });
+
+  return () => cancelAnimationFrame(frame);
+}
+
 function buildCommentDecorations(
   state: EditorState,
   comments: FileComment[],
@@ -1190,21 +1237,27 @@ class CommentWidget extends WidgetType {
   toDOM() {
     const wrapper = document.createElement("div");
     wrapper.className = "cm-file-comment-widget";
-    this.root = createRoot(wrapper);
-    this.root.render(
-      <CommentWidgetCard
-        callbacksRef={this.callbacksRef}
-        comment={this.comment}
-        isActive={this.isActive}
-      />,
-    );
+    const root = createRoot(wrapper);
+    this.root = root;
+    queueMicrotask(() => {
+      if (this.root !== root) return;
+      root.render(
+        <CommentWidgetCard
+          callbacksRef={this.callbacksRef}
+          comment={this.comment}
+          isActive={this.isActive}
+        />,
+      );
+    });
     return wrapper;
   }
 
   destroy() {
     const root = this.root;
     this.root = null;
-    root?.unmount();
+    if (root) {
+      queueMicrotask(() => root.unmount());
+    }
   }
 
   ignoreEvent() {
