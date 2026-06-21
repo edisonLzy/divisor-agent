@@ -14,7 +14,13 @@ import {
   searchKeymap,
   setSearchQuery,
 } from "@codemirror/search";
-import { EditorState, type Extension, type Range } from "@codemirror/state";
+import {
+  EditorState,
+  StateEffect,
+  StateField,
+  type Extension,
+  type Range as CodeMirrorRange,
+} from "@codemirror/state";
 import {
   Decoration,
   type DecorationSet,
@@ -23,12 +29,22 @@ import {
   keymap,
   lineNumbers,
   ViewPlugin,
+  WidgetType,
   type ViewUpdate,
 } from "@codemirror/view";
-import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ChevronDown,
+  ChevronUp,
+  MessageSquarePlus,
+  MessageSquareText,
+  Search,
+  Undo2,
+  X,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import { HIGHLIGHT_DECORATION_CLASS } from "../constants";
+import type { FileComment, FileCommentRange } from "./index";
 import { loadLanguageExtension } from "./language-from-path";
 
 const HIGHLIGHT_DURATION_MS = 1000;
@@ -106,14 +122,105 @@ const searchHighlightTheme = EditorView.theme({
   },
 });
 
+const commentTheme = EditorView.theme({
+  ".cm-file-comment-underline": {
+    textDecorationColor: "var(--comment, #f2c94c)",
+    textDecorationLine: "underline",
+    textDecorationSkipInk: "none",
+    textDecorationThickness: "2px",
+    textUnderlineOffset: "4px",
+  },
+  ".cm-file-comment-widget": {
+    boxSizing: "border-box",
+    margin: "6px 0 10px",
+    maxWidth: "var(--files-comment-card-max-width, 100%)",
+    width: "var(--files-comment-card-max-width, 100%)",
+  },
+  ".cm-file-comment-card": {
+    backgroundColor: "var(--card)",
+    border: "1px solid color-mix(in oklch, var(--border) 82%, transparent)",
+    borderLeft: "3px solid color-mix(in oklch, var(--comment, #f2c94c) 72%, var(--border))",
+    borderRadius: "8px",
+    boxShadow: "0 1px 2px rgb(0 0 0 / 0.04)",
+    boxSizing: "border-box",
+    color: "var(--foreground)",
+    cursor: "pointer",
+    fontFamily:
+      "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    maxWidth: "100%",
+    overflow: "hidden",
+    transition: "border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease",
+    width: "100%",
+  },
+  ".cm-file-comment-card:hover": {
+    backgroundColor: "color-mix(in oklch, var(--card) 94%, var(--muted))",
+    borderColor: "color-mix(in oklch, var(--border) 70%, var(--foreground))",
+    boxShadow: "0 8px 24px rgb(0 0 0 / 0.07)",
+  },
+  ".cm-file-comment-card.is-active": {
+    borderColor: "color-mix(in oklch, var(--comment, #f2c94c) 46%, var(--border))",
+    borderLeftColor: "var(--comment, #f2c94c)",
+    boxShadow:
+      "0 8px 24px rgb(0 0 0 / 0.07), 0 0 0 1px color-mix(in oklch, var(--comment, #f2c94c) 28%, transparent)",
+  },
+  ".cm-file-comment-header": {
+    alignItems: "center",
+    borderBottom: "1px solid color-mix(in oklch, var(--border) 58%, transparent)",
+    display: "flex",
+    gap: "8px",
+    minHeight: "32px",
+    padding: "6px 8px 6px 9px",
+  },
+  ".cm-file-comment-dot": {
+    backgroundColor: "var(--comment, #f2c94c)",
+    borderRadius: "999px",
+    boxShadow: "0 0 0 2px color-mix(in oklch, var(--comment, #f2c94c) 18%, transparent)",
+    flex: "0 0 auto",
+    height: "6px",
+    width: "6px",
+  },
+  ".cm-file-comment-meta": {
+    color: "var(--muted-foreground)",
+    flex: "1 1 auto",
+    fontSize: "11px",
+    lineHeight: "16px",
+    minWidth: "0",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  ".cm-file-comment-body": {
+    color: "var(--foreground)",
+    fontSize: "12px",
+    lineHeight: "20px",
+    margin: "0",
+    padding: "8px 10px 9px",
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+  },
+  ".cm-file-comment-empty": {
+    color: "var(--muted-foreground)",
+  },
+  ".cm-file-comment-card textarea": {
+    backgroundColor: "color-mix(in oklch, var(--background) 86%, transparent)",
+    boxSizing: "border-box",
+    fontFamily:
+      "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    maxWidth: "100%",
+  },
+});
+
 interface CodeBlockEditorProps {
   code: string;
+  comments?: FileComment[];
   endLine?: number;
   error?: string;
+  filePath?: string;
   highlightExpiresAt?: number;
   highlightRequestId?: number;
   highlightLine?: number;
   language?: string;
+  onCommentsChange?: (comments: FileComment[]) => void;
 }
 
 interface HighlightRange {
@@ -123,16 +230,75 @@ interface HighlightRange {
   start?: number;
 }
 
+interface PendingSelection {
+  range: FileCommentRange;
+  x: number;
+  y: number;
+}
+
+interface DeletedCommentState {
+  comment: FileComment;
+  index: number;
+}
+
+interface DragSelectionState {
+  anchor: number;
+  head: number;
+  moved: boolean;
+}
+
+interface CommentCallbacks {
+  deleteComment: (commentId: string) => void;
+  focusComment: (commentId: string) => void;
+  saveComment: (commentId: string, body: string) => void;
+}
+
+interface CommentDecorationPayload {
+  activeCommentId: string | null;
+  callbacksRef: { current: CommentCallbacks };
+  comments: FileComment[];
+}
+
+const setCommentDecorationsEffect = StateEffect.define<CommentDecorationPayload>();
+
+const commentDecorationField = StateField.define<DecorationSet>({
+  create() {
+    return Decoration.none;
+  },
+  update(decorations, transaction) {
+    for (const effect of transaction.effects) {
+      if (effect.is(setCommentDecorationsEffect)) {
+        return buildCommentDecorations(
+          transaction.state,
+          effect.value.comments,
+          effect.value.activeCommentId,
+          effect.value.callbacksRef,
+        );
+      }
+    }
+    if (transaction.docChanged) {
+      return decorations.map(transaction.changes);
+    }
+    return decorations;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
+
 export function CodeBlockEditor({
   code,
+  comments = [],
   language,
   highlightLine,
   endLine,
   highlightExpiresAt,
   highlightRequestId,
+  filePath,
   error,
+  onCommentsChange,
 }: CodeBlockEditorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const commentPocketRef = useRef<HTMLDivElement | null>(null);
+  const editorHostRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const isSearchOpenRef = useRef(false);
@@ -140,10 +306,35 @@ export function CodeBlockEditor({
   // update so we can change the highlighted lines without rebuilding the
   // editor (e.g. when the user clicks a different line of the same file).
   const highlightRef = useRef<HighlightRange>({});
+  const commentsRef = useRef<FileComment[]>(comments);
+  const activeCommentIdRef = useRef<string | null>(null);
+  const dragSelectionRef = useRef<DragSelectionState | null>(null);
+  const callbacksRef = useRef<CommentCallbacks>({
+    deleteComment: () => {},
+    focusComment: () => {},
+    saveComment: () => {},
+  });
+  const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [activeMatchIndex, setActiveMatchIndex] = useState(0);
+  const [commentPocketOpen, setCommentPocketOpen] = useState(false);
+  const [deletedComment, setDeletedComment] = useState<DeletedCommentState | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [pendingSelection, setPendingSelection] = useState<PendingSelection | null>(null);
   const [searchText, setSearchText] = useState("");
 
+  commentsRef.current = comments;
+  activeCommentIdRef.current = activeCommentId;
+
+  const commentList = useMemo(
+    () =>
+      [...comments].sort(
+        (a, b) =>
+          a.range.startLine - b.range.startLine ||
+          a.range.startColumn - b.range.startColumn ||
+          a.createdAt - b.createdAt,
+      ),
+    [comments],
+  );
   const searchMatches = useMemo(() => findSearchMatches(code, searchText), [code, searchText]);
   const searchStatus =
     searchText.length === 0
@@ -211,23 +402,97 @@ export function CodeBlockEditor({
     [applySearchQuery, searchMatches.length, searchText, syncActiveMatch],
   );
 
+  const emitComments = useCallback(
+    (nextComments: FileComment[]) => {
+      commentsRef.current = nextComments;
+      onCommentsChange?.(nextComments);
+    },
+    [onCommentsChange],
+  );
+
+  const updatePendingSelection = useCallback((nextSelection: PendingSelection | null) => {
+    setPendingSelection(nextSelection);
+  }, []);
+
+  const syncPendingSelection = useCallback(() => {
+    window.setTimeout(() => {
+      const view = viewRef.current;
+      if (!view) return;
+      updatePendingSelection(selectionToPending(view));
+    }, 0);
+  }, [updatePendingSelection]);
+
+  const finishPointerSelection = useCallback(
+    (event: MouseEvent | PointerEvent) => {
+      const dragSelection = dragSelectionRef.current;
+      window.setTimeout(() => {
+        const view = viewRef.current;
+        if (!view) return;
+        updatePendingSelection(pointerSelectionToPending(view, event, dragSelection));
+        if (dragSelectionRef.current === dragSelection) {
+          dragSelectionRef.current = null;
+        }
+      }, 0);
+    },
+    [updatePendingSelection],
+  );
+
+  const focusComment = useCallback((commentId: string) => {
+    const comment = commentsRef.current.find((item) => item.id === commentId);
+    if (!comment) return;
+    setActiveCommentId(commentId);
+    setPendingSelection(null);
+    const view = viewRef.current;
+    if (!view) return;
+    const positions = commentRangeToPositions(view.state, comment.range);
+    if (!positions) return;
+    view.dispatch({
+      effects: EditorView.scrollIntoView(positions.to, { y: "center" }),
+    });
+  }, []);
+
+  callbacksRef.current = {
+    deleteComment: (commentId) => {
+      const index = commentsRef.current.findIndex((comment) => comment.id === commentId);
+      if (index < 0) return;
+      const comment = commentsRef.current[index];
+      emitComments(commentsRef.current.filter((item) => item.id !== commentId));
+      setDeletedComment({ comment, index });
+      if (activeCommentIdRef.current === commentId) {
+        setActiveCommentId(null);
+      }
+    },
+    focusComment,
+    saveComment: (commentId, body) => {
+      const trimmed = body.trim();
+      if (!trimmed) return;
+      emitComments(
+        commentsRef.current.map((comment) =>
+          comment.id === commentId ? { ...comment, body: trimmed, updatedAt: Date.now() } : comment,
+        ),
+      );
+    },
+  };
+
   // Mount / unmount the editor when the source file (code/language) changes.
   useEffect(() => {
-    const root = containerRef.current;
+    const root = editorHostRef.current;
     if (!root) return;
 
     let view: EditorView | null = null;
+    let resizeObserver: ResizeObserver | undefined;
     let cancelled = false;
 
     Promise.resolve(loadLanguageExtension(language) ?? [])
       .then((langExtensions) => {
-        if (cancelled || !containerRef.current) return;
+        if (cancelled || !editorHostRef.current) return;
 
         const extensions: Extension[] = [
           lineNumbers(),
           darkGutterTheme,
           fileHighlightTheme,
           searchHighlightTheme,
+          commentTheme,
           history(),
           highlightActiveLine(),
           highlightSelectionMatches(),
@@ -255,12 +520,60 @@ export function CodeBlockEditor({
           keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
           EditorState.readOnly.of(true),
           lineHighlightPlugin(highlightRef),
+          commentDecorationField,
+          EditorView.updateListener.of((update) => {
+            if (update.selectionSet) {
+              updatePendingSelection(selectionToPending(update.view));
+            }
+          }),
+          EditorView.domEventHandlers({
+            mousedown: (event, view) => {
+              if (event.button !== 0 || isCommentWidgetEvent(event)) {
+                return false;
+              }
+              const pos = positionFromPointer(view, event);
+              if (pos === null) {
+                return false;
+              }
+              dragSelectionRef.current = { anchor: pos, head: pos, moved: false };
+              updatePendingSelection(null);
+              view.dispatch({ selection: { anchor: pos } });
+              return false;
+            },
+            mousemove: (event, view) => {
+              const drag = dragSelectionRef.current;
+              if (!drag) return false;
+              if ((event.buttons & 1) !== 1) return false;
+              const pos = positionFromPointer(view, event);
+              if (pos === null) return false;
+              drag.head = pos;
+              drag.moved = drag.moved || pos !== drag.anchor;
+              view.dispatch({ selection: { anchor: drag.anchor, head: pos } });
+              return false;
+            },
+            keyup: (_event, view) => {
+              window.setTimeout(() => updatePendingSelection(selectionToPending(view)), 0);
+            },
+            mouseup: (event, view) => {
+              const dragSelection = dragSelectionRef.current;
+              updatePendingSelection(pointerSelectionToPending(view, event, dragSelection));
+              dragSelectionRef.current = null;
+            },
+          }),
           ...langExtensions,
         ];
 
         const state = EditorState.create({ doc: code, extensions });
-        view = new EditorView({ state, parent: containerRef.current });
+        view = new EditorView({ state, parent: editorHostRef.current });
         viewRef.current = view;
+        updateCommentLayoutVars(view);
+        if (typeof ResizeObserver !== "undefined") {
+          resizeObserver = new ResizeObserver(() => {
+            if (view) updateCommentLayoutVars(view);
+          });
+          resizeObserver.observe(view.scrollDOM);
+        }
+        syncCommentDecorations(view, commentsRef.current, activeCommentIdRef.current, callbacksRef);
 
         const { start } = highlightRef.current;
         if (start) {
@@ -280,13 +593,14 @@ export function CodeBlockEditor({
 
     return () => {
       cancelled = true;
+      resizeObserver?.disconnect();
       viewRef.current?.destroy();
       viewRef.current = null;
     };
     // We intentionally rebuild the editor only when the source file changes.
     // Highlight line updates are handled by the second effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [closeSearch, code, language, openSearch]);
+  }, [closeSearch, code, language, openSearch, updatePendingSelection]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -303,6 +617,18 @@ export function CodeBlockEditor({
   }, [openSearch]);
 
   useEffect(() => {
+    document.addEventListener("selectionchange", syncPendingSelection);
+    document.addEventListener("mouseup", finishPointerSelection);
+    document.addEventListener("keyup", syncPendingSelection);
+
+    return () => {
+      document.removeEventListener("selectionchange", syncPendingSelection);
+      document.removeEventListener("mouseup", finishPointerSelection);
+      document.removeEventListener("keyup", syncPendingSelection);
+    };
+  }, [finishPointerSelection, syncPendingSelection]);
+
+  useEffect(() => {
     applySearchQuery(searchText);
     if (searchText.length === 0 || searchMatches.length === 0) {
       setActiveMatchIndex(0);
@@ -310,6 +636,57 @@ export function CodeBlockEditor({
     }
     requestAnimationFrame(syncActiveMatch);
   }, [applySearchQuery, searchMatches.length, searchText, syncActiveMatch]);
+
+  useEffect(() => {
+    commentsRef.current = comments;
+    const view = viewRef.current;
+    if (view) {
+      syncCommentDecorations(view, comments, activeCommentIdRef.current, callbacksRef);
+    }
+  }, [comments]);
+
+  useEffect(() => {
+    activeCommentIdRef.current = activeCommentId;
+    const view = viewRef.current;
+    if (view) {
+      syncCommentDecorations(view, commentsRef.current, activeCommentId, callbacksRef);
+    }
+  }, [activeCommentId]);
+
+  useEffect(() => {
+    if (!deletedComment) return undefined;
+    const timer = setTimeout(() => setDeletedComment(null), 4500);
+    return () => clearTimeout(timer);
+  }, [deletedComment]);
+
+  useEffect(() => {
+    if (comments.length > 0) return;
+    setCommentPocketOpen(false);
+  }, [comments.length]);
+
+  useEffect(() => {
+    if (!commentPocketOpen) return undefined;
+
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && commentPocketRef.current?.contains(target)) return;
+      setCommentPocketOpen(false);
+    };
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setCommentPocketOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsidePointer, true);
+    document.addEventListener("keydown", closeOnEscape, true);
+
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer, true);
+      document.removeEventListener("keydown", closeOnEscape, true);
+    };
+  }, [commentPocketOpen]);
 
   // Update the transient highlight range and scroll to the new line, without
   // remounting the editor. Safe to run before the editor mounts — the mount
@@ -379,6 +756,34 @@ export function CodeBlockEditor({
     };
   }, [highlightLine, endLine, highlightExpiresAt, highlightRequestId]);
 
+  const addComment = () => {
+    if (!pendingSelection) return;
+    const nextComment: FileComment = {
+      body: "",
+      createdAt: Date.now(),
+      id: createCommentId(),
+      range: pendingSelection.range,
+    };
+    emitComments([...commentsRef.current, nextComment]);
+    setActiveCommentId(nextComment.id);
+    setCommentPocketOpen(false);
+    setPendingSelection(null);
+    viewRef.current?.focus();
+  };
+
+  const restoreDeletedComment = () => {
+    if (!deletedComment) return;
+    const nextComments = [...commentsRef.current];
+    nextComments.splice(
+      Math.min(deletedComment.index, nextComments.length),
+      0,
+      deletedComment.comment,
+    );
+    emitComments(nextComments);
+    setActiveCommentId(deletedComment.comment.id);
+    setDeletedComment(null);
+  };
+
   if (error) {
     return (
       <div className="grid h-full place-items-center px-4 text-center text-sm text-destructive">
@@ -388,7 +793,7 @@ export function CodeBlockEditor({
   }
 
   return (
-    <div className="relative flex h-full flex-col bg-background">
+    <div className="relative flex h-full flex-col bg-background" data-file-path={filePath}>
       {isSearchOpen ? (
         <div className="flex shrink-0 items-center gap-1 border-b border-border/70 bg-background/95 px-2 py-1.5">
           <div className="flex h-7 min-w-0 flex-1 items-center gap-1 rounded-md border border-input bg-background px-2 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/50">
@@ -444,9 +849,109 @@ export function CodeBlockEditor({
           </button>
         </div>
       ) : null}
-      <div ref={containerRef} className="min-h-0 flex-1 overflow-auto p-3">
+      <div ref={containerRef} className="relative min-h-0 flex-1 overflow-auto p-3">
         <style>{HIGHLIGHT_INTRO_STYLE}</style>
+        <div
+          ref={editorHostRef}
+          className="min-h-full"
+          onMouseUpCapture={syncPendingSelection}
+          onPointerUpCapture={syncPendingSelection}
+        />
+        {pendingSelection ? (
+          <div
+            className="absolute z-50 -translate-x-1/2 -translate-y-full rounded-lg border border-border/70 bg-background/95 p-1 shadow-md supports-backdrop-filter:backdrop-blur-xl"
+            style={getPendingToolbarStyle(containerRef.current, pendingSelection)}
+            onMouseDown={(event) => event.preventDefault()}
+          >
+            <button
+              className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs text-foreground hover:bg-muted"
+              onClick={addComment}
+              type="button"
+            >
+              <MessageSquarePlus className="size-3.5" strokeWidth={1.75} />
+              Add comment
+            </button>
+          </div>
+        ) : null}
       </div>
+      {commentList.length > 0 ? (
+        <div
+          ref={commentPocketRef}
+          className={cn(
+            "pointer-events-none absolute right-3 z-50 flex max-w-[calc(100%_-_1.5rem)] flex-col items-end gap-2",
+            isSearchOpen ? "top-14" : "top-3",
+          )}
+        >
+          <button
+            aria-controls="files-comment-pocket-list"
+            aria-expanded={commentPocketOpen}
+            aria-label={`Show ${commentList.length} file comments`}
+            className="pointer-events-auto inline-flex h-7 items-center gap-1.5 rounded-md border border-border/70 bg-background/95 px-2 text-xs text-foreground shadow-md transition-colors hover:bg-muted supports-backdrop-filter:backdrop-blur-xl"
+            onClick={() => setCommentPocketOpen((open) => !open)}
+            type="button"
+          >
+            <MessageSquareText className="size-3.5" strokeWidth={1.75} />
+            <span className="font-medium tabular-nums">{commentList.length}</span>
+          </button>
+          {commentPocketOpen ? (
+            <section
+              aria-label="Current file comments"
+              className="pointer-events-auto w-80 max-w-full overflow-hidden rounded-lg border border-border/70 bg-background/95 text-xs shadow-lg supports-backdrop-filter:backdrop-blur-xl"
+              id="files-comment-pocket-list"
+            >
+              <div className="flex items-center justify-between gap-3 border-b border-border/70 px-3 py-2">
+                <div className="font-medium text-foreground">Current file comments</div>
+                <div className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  {commentList.length}
+                </div>
+              </div>
+              <div className="max-h-64 overflow-y-auto p-1">
+                {commentList.map((comment) => {
+                  const isActive = comment.id === activeCommentId;
+                  return (
+                    <button
+                      key={comment.id}
+                      className={cn(
+                        "grid w-full grid-cols-[3rem_minmax(0,1fr)] gap-2 rounded-md p-2 text-left transition-colors",
+                        isActive ? "bg-muted text-foreground" : "text-foreground hover:bg-muted/70",
+                      )}
+                      onClick={() => focusComment(comment.id)}
+                      type="button"
+                    >
+                      <span className="inline-flex h-5 items-center justify-center rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground tabular-nums">
+                        {formatCommentRangeLabel(comment.range)}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-1.5 text-[10px] leading-4 text-muted-foreground">
+                          <span>{comment.updatedAt ? "Edited" : "You"}</span>
+                          <span>·</span>
+                          <span>{formatCommentTime(comment.updatedAt ?? comment.createdAt)}</span>
+                        </span>
+                        <span className="block truncate leading-5">
+                          {formatCommentPreview(comment)}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
+        </div>
+      ) : null}
+      {deletedComment ? (
+        <div className="absolute right-4 bottom-4 z-50 flex items-center gap-2 rounded-lg border border-border/70 bg-background/95 px-3 py-2 text-xs shadow-lg supports-backdrop-filter:backdrop-blur-xl">
+          <span>Comment deleted</span>
+          <button
+            className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-foreground hover:bg-muted/80"
+            onClick={restoreDeletedComment}
+            type="button"
+          >
+            <Undo2 className="size-3.5" strokeWidth={1.75} />
+            Undo
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -504,11 +1009,473 @@ function buildDecorations(
 ): DecorationSet {
   if (!start) return Decoration.none;
   const last = Math.min(end ?? start, view.state.doc.lines);
-  const builder: Range<Decoration>[] = [];
+  const builder: CodeMirrorRange<Decoration>[] = [];
   for (let l = start; l <= last; l++) {
     if (l < 1) continue;
     const line = view.state.doc.line(l);
     builder.push(HIGHLIGHT_DECORATION.range(line.from));
   }
   return Decoration.set(builder);
+}
+
+function syncCommentDecorations(
+  view: EditorView,
+  comments: FileComment[],
+  activeCommentId: string | null,
+  callbacksRef: { current: CommentCallbacks },
+) {
+  view.dispatch({
+    effects: setCommentDecorationsEffect.of({
+      activeCommentId,
+      callbacksRef,
+      comments,
+    }),
+  });
+}
+
+function buildCommentDecorations(
+  state: EditorState,
+  comments: FileComment[],
+  activeCommentId: string | null,
+  callbacksRef: { current: CommentCallbacks },
+): DecorationSet {
+  const decorations: CodeMirrorRange<Decoration>[] = [];
+
+  for (const comment of comments) {
+    const positions = commentRangeToPositions(state, comment.range);
+    if (!positions) continue;
+
+    decorations.push(
+      Decoration.mark({
+        class:
+          comment.id === activeCommentId
+            ? "cm-file-comment-underline cm-file-comment-active"
+            : "cm-file-comment-underline",
+      }).range(positions.from, positions.to),
+    );
+
+    const endLine = state.doc.lineAt(positions.to);
+    decorations.push(
+      Decoration.widget({
+        block: true,
+        side: 1,
+        widget: new CommentWidget(comment, comment.id === activeCommentId, callbacksRef),
+      }).range(endLine.to),
+    );
+  }
+
+  return Decoration.set(decorations, true);
+}
+
+class CommentWidget extends WidgetType {
+  constructor(
+    private readonly comment: FileComment,
+    private readonly isActive: boolean,
+    private readonly callbacksRef: { current: CommentCallbacks },
+  ) {
+    super();
+  }
+
+  eq(other: CommentWidget) {
+    return (
+      other.comment.id === this.comment.id &&
+      other.comment.body === this.comment.body &&
+      other.comment.updatedAt === this.comment.updatedAt &&
+      other.isActive === this.isActive
+    );
+  }
+
+  toDOM() {
+    const wrapper = document.createElement("div");
+    wrapper.className = "cm-file-comment-widget";
+
+    const card = document.createElement("section");
+    card.className = ["cm-file-comment-card", this.isActive ? "is-active" : ""]
+      .filter(Boolean)
+      .join(" ");
+    card.tabIndex = 0;
+
+    const header = document.createElement("div");
+    header.className = "cm-file-comment-header";
+
+    const dot = document.createElement("span");
+    dot.className = "cm-file-comment-dot";
+    header.append(dot);
+
+    const meta = document.createElement("span");
+    meta.className = "cm-file-comment-meta";
+    meta.textContent = `${this.comment.updatedAt ? "Edited" : "You"} · ${formatCommentRange(this.comment.range)}`;
+    header.append(meta);
+
+    const editButton = createIconButton("Edit comment", "pencil");
+    const deleteButton = createIconButton("Delete comment", "trash", true);
+    header.append(editButton, deleteButton);
+
+    const body = document.createElement("p");
+    body.className = ["cm-file-comment-body", this.comment.body ? "" : "cm-file-comment-empty"]
+      .filter(Boolean)
+      .join(" ");
+    body.textContent = this.comment.body || "Add a note about this selection.";
+
+    const renderEditor = () => {
+      body.replaceChildren();
+      body.className = "cm-file-comment-body";
+      const textarea = document.createElement("textarea");
+      textarea.className =
+        "min-h-16 w-full resize-y rounded-md border border-input px-2.5 py-2 text-xs leading-5 outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+      textarea.value = this.comment.body;
+      textarea.placeholder = "Write a comment...";
+
+      const actions = document.createElement("div");
+      actions.className = "mt-2 flex items-center justify-between gap-2";
+      const hint = document.createElement("span");
+      hint.className = "text-[11px] text-muted-foreground";
+      hint.textContent = "Cmd/Ctrl + Enter to save";
+
+      const buttons = document.createElement("span");
+      buttons.className = "flex items-center gap-1.5";
+      const cancel = createTextButton("Cancel", false);
+      const save = createTextButton("Save", true);
+      buttons.append(cancel, save);
+      actions.append(hint, buttons);
+      body.append(textarea, actions);
+
+      const saveEdit = () => {
+        const nextBody = textarea.value.trim();
+        if (!nextBody) return;
+        this.callbacksRef.current.saveComment(this.comment.id, nextBody);
+      };
+      save.addEventListener("click", saveEdit);
+      cancel.addEventListener("click", () => {
+        if (!this.comment.body) {
+          this.callbacksRef.current.deleteComment(this.comment.id);
+          return;
+        }
+        body.textContent = this.comment.body || "Add a note about this selection.";
+        body.className = ["cm-file-comment-body", this.comment.body ? "" : "cm-file-comment-empty"]
+          .filter(Boolean)
+          .join(" ");
+      });
+      textarea.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          if (!this.comment.body) {
+            this.callbacksRef.current.deleteComment(this.comment.id);
+            return;
+          }
+          body.textContent = this.comment.body || "Add a note about this selection.";
+          body.className = [
+            "cm-file-comment-body",
+            this.comment.body ? "" : "cm-file-comment-empty",
+          ]
+            .filter(Boolean)
+            .join(" ");
+        }
+        if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+          event.preventDefault();
+          saveEdit();
+        }
+      });
+      textarea.focus();
+      textarea.select();
+    };
+
+    const focusComment = () => this.callbacksRef.current.focusComment(this.comment.id);
+    card.addEventListener("click", (event) => {
+      if ((event.target as HTMLElement).closest("button, textarea")) return;
+      focusComment();
+    });
+    card.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      focusComment();
+    });
+    editButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      renderEditor();
+    });
+    deleteButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      this.callbacksRef.current.deleteComment(this.comment.id);
+    });
+
+    card.append(header, body);
+    wrapper.append(card);
+
+    if (!this.comment.body) {
+      queueMicrotask(renderEditor);
+    }
+
+    return wrapper;
+  }
+
+  ignoreEvent() {
+    return false;
+  }
+}
+
+function createIconButton(label: string, iconName: "pencil" | "trash", destructive = false) {
+  const button = document.createElement("button");
+  button.ariaLabel = label;
+  button.className = [
+    "grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground",
+    destructive ? "hover:bg-destructive/10 hover:text-destructive" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  button.type = "button";
+  const icon = document.createElement("span");
+  icon.innerHTML = iconName === "pencil" ? pencilSvg() : trashSvg();
+  button.append(icon);
+  return button;
+}
+
+function createTextButton(label: string, primary: boolean) {
+  const button = document.createElement("button");
+  button.className = primary
+    ? "rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground"
+    : "rounded-md border border-border px-2 py-1 text-xs text-foreground hover:bg-muted";
+  button.type = "button";
+  button.textContent = label;
+  return button;
+}
+
+function commentRangeToPositions(
+  state: EditorState,
+  range: FileCommentRange,
+): { from: number; to: number } | null {
+  if (range.startLine < 1 || range.endLine < 1) return null;
+  if (range.startLine > state.doc.lines || range.endLine > state.doc.lines) return null;
+
+  const startLine = state.doc.line(range.startLine);
+  const endLine = state.doc.line(range.endLine);
+  const from = clamp(startLine.from + range.startColumn, startLine.from, startLine.to);
+  const to = clamp(endLine.from + range.endColumn, endLine.from, endLine.to);
+  if (from === to) return null;
+  return from < to ? { from, to } : { from: to, to: from };
+}
+
+function pointerSelectionToPending(
+  view: EditorView,
+  event: MouseEvent | PointerEvent,
+  dragSelection: DragSelectionState | null,
+): PendingSelection | null {
+  if (dragSelection?.moved && dragSelection.anchor !== dragSelection.head) {
+    const pointerPos = positionFromPointer(view, event);
+    const head = pointerPos ?? dragSelection.head;
+    return positionsToPending(view, dragSelection.anchor, head);
+  }
+
+  return selectionToPending(view);
+}
+
+function positionsToPending(
+  view: EditorView,
+  anchor: number,
+  head: number,
+): PendingSelection | null {
+  const from = Math.min(anchor, head);
+  const to = Math.max(anchor, head);
+  if (from === to) return null;
+
+  const startLine = view.state.doc.lineAt(from);
+  const endLine = view.state.doc.lineAt(to);
+  const selectedText = view.state.doc.sliceString(from, to).trim();
+  if (!selectedText) return null;
+
+  const startRect = view.coordsAtPos(from);
+  const endRect = view.coordsAtPos(to);
+  const rect = endRect ?? startRect;
+  if (!rect) return null;
+
+  return {
+    range: {
+      endColumn: to - endLine.from,
+      endLine: endLine.number,
+      selectedText,
+      startColumn: from - startLine.from,
+      startLine: startLine.number,
+    },
+    x: rect.left + (rect.right - rect.left) / 2,
+    y: rect.top,
+  };
+}
+
+function selectionToPending(view: EditorView): PendingSelection | null {
+  const domPending = domSelectionToPending(view);
+  if (domPending) return domPending;
+
+  const domSelection = window.getSelection();
+  if (domSelection && !domSelection.isCollapsed && domSelection.toString().trim()) return null;
+
+  return editorSelectionToPending(view);
+}
+
+function editorSelectionToPending(view: EditorView): PendingSelection | null {
+  const selection = view.state.selection.main;
+  if (selection.empty) return null;
+
+  return positionsToPending(view, selection.from, selection.to);
+}
+
+function domSelectionToPending(view: EditorView): PendingSelection | null {
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed || !selection.rangeCount) return null;
+  const range = selection.getRangeAt(0);
+  if (!selection.toString().trim()) return null;
+
+  if (!selectionTouchesContent(view, range)) return null;
+
+  const rects = Array.from(range.getClientRects());
+  const firstRect = rects[0] ?? range.getBoundingClientRect();
+  const lastRect = rects[rects.length - 1] ?? firstRect;
+  if (!firstRect || !lastRect) return null;
+
+  const viewRect = view.contentDOM.getBoundingClientRect();
+  const intersectsEditor =
+    firstRect.right >= viewRect.left &&
+    firstRect.left <= viewRect.right &&
+    firstRect.bottom >= viewRect.top &&
+    firstRect.top <= viewRect.bottom;
+  if (!intersectsEditor) return null;
+
+  const startPos = view.posAtCoords({
+    x: Math.max(firstRect.left + 1, viewRect.left + 1),
+    y: firstRect.top + Math.min(firstRect.height / 2, 8),
+  });
+  const endPos = view.posAtCoords({
+    x: Math.min(Math.max(lastRect.right - 1, viewRect.left + 1), viewRect.right - 1),
+    y: lastRect.top + Math.min(lastRect.height / 2, 8),
+  });
+  if (startPos === null || endPos === null || startPos === endPos) return null;
+
+  return positionsToPending(view, startPos, endPos);
+}
+
+function positionFromPointer(view: EditorView, event: MouseEvent | PointerEvent): number | null {
+  if (!isCodeContentEvent(view, event)) return null;
+
+  const pos = view.posAtCoords({
+    x: event.clientX,
+    y: event.clientY,
+  });
+  if (pos === null) return null;
+
+  const line = view.state.doc.lineAt(pos);
+  return clamp(pos, line.from, line.to);
+}
+
+function isCodeContentEvent(view: EditorView, event: MouseEvent | PointerEvent): boolean {
+  const target = view.dom.ownerDocument.elementFromPoint(event.clientX, event.clientY);
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.closest(".cm-file-comment-widget")) return false;
+  return view.contentDOM.contains(target);
+}
+
+function isCommentWidgetEvent(event: Event): boolean {
+  return (
+    event.target instanceof HTMLElement && Boolean(event.target.closest(".cm-file-comment-widget"))
+  );
+}
+
+function selectionTouchesContent(view: EditorView, range: globalThis.Range): boolean {
+  const startElement = nodeElement(range.startContainer);
+  const endElement = nodeElement(range.endContainer);
+  if (!startElement || !endElement) return false;
+  return view.contentDOM.contains(startElement) && view.contentDOM.contains(endElement);
+}
+
+function nodeElement(node: Node): HTMLElement | null {
+  if (node instanceof HTMLElement) return node;
+  const parent = node.parentElement;
+  return parent instanceof HTMLElement ? parent : null;
+}
+
+function updateCommentLayoutVars(view: EditorView) {
+  const gutterWidth = view.dom.querySelector(".cm-gutters")?.getBoundingClientRect().width ?? 0;
+  const width = Math.max(260, view.scrollDOM.clientWidth - gutterWidth - 24);
+  view.dom.style.setProperty("--files-comment-card-max-width", `${Math.floor(width)}px`);
+}
+
+function getPendingToolbarStyle(
+  container: HTMLDivElement | null,
+  selection: PendingSelection,
+): CSSProperties {
+  const position = getPendingToolbarPosition(container, selection);
+  return {
+    left: position.left,
+    top: position.top,
+  };
+}
+
+function getPendingToolbarPosition(
+  container: HTMLDivElement | null,
+  selection: PendingSelection,
+): { left: number; top: number } {
+  if (!container) {
+    return { left: selection.x, top: selection.y - 8 };
+  }
+
+  const rect = container.getBoundingClientRect();
+  const localLeft = selection.x - rect.left + container.scrollLeft;
+  const localTop = selection.y - rect.top + container.scrollTop - 8;
+  const minLeft = container.scrollLeft + 56;
+  const maxLeft = container.scrollLeft + Math.max(56, container.clientWidth - 56);
+  const minTop = container.scrollTop + 28;
+  const maxTop = container.scrollTop + Math.max(28, container.clientHeight - 8);
+
+  return {
+    left: clamp(localLeft, minLeft, maxLeft),
+    top: clamp(localTop, minTop, maxTop),
+  };
+}
+
+function formatCommentRange(range: FileCommentRange) {
+  if (range.startLine === range.endLine) {
+    return `line ${range.startLine}`;
+  }
+  return `lines ${range.startLine}-${range.endLine}`;
+}
+
+function formatCommentRangeLabel(range: FileCommentRange) {
+  if (range.startLine === range.endLine) {
+    return range.startLine;
+  }
+  return `${range.startLine}-${range.endLine}`;
+}
+
+function formatCommentPreview(comment: FileComment) {
+  const body = comment.body.trim();
+  if (body) return body;
+  return comment.range.selectedText.trim() || "Add a note about this selection.";
+}
+
+function formatCommentTime(timestamp: number) {
+  const elapsed = Math.max(0, Date.now() - timestamp);
+  if (elapsed < 60_000) return "just now";
+  if (elapsed < 3_600_000) return `${Math.floor(elapsed / 60_000)}m ago`;
+  if (elapsed < 86_400_000) return `${Math.floor(elapsed / 3_600_000)}h ago`;
+  return `${Math.floor(elapsed / 86_400_000)}d ago`;
+}
+
+function cn(...values: Array<false | null | string | undefined>) {
+  return values.filter(Boolean).join(" ");
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function createCommentId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `comment-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function pencilSvg() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`;
+}
+
+function trashSvg() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>`;
 }

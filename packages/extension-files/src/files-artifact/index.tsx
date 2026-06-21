@@ -14,6 +14,7 @@ import { languageFromPath } from "./language-from-path";
 
 export interface FileEntry {
   bytes?: number;
+  comments?: FileComment[];
   content?: string;
   endLine?: number;
   error?: string;
@@ -23,6 +24,22 @@ export interface FileEntry {
   language?: string;
   line?: number;
   path: string;
+}
+
+export interface FileComment {
+  body: string;
+  createdAt: number;
+  id: string;
+  range: FileCommentRange;
+  updatedAt?: number;
+}
+
+export interface FileCommentRange {
+  endColumn: number;
+  endLine: number;
+  selectedText: string;
+  startColumn: number;
+  startLine: number;
 }
 
 export interface FilesArtifactContent {
@@ -120,6 +137,11 @@ export function FilesArtifact({ content, sessionId }: FilesArtifactProps) {
     });
   };
 
+  const updateActiveComments = (comments: FileComment[]) => {
+    if (!active) return;
+    updateEntry(api, sessionId, active.path, content, { comments });
+  };
+
   if (files.length === 0) {
     return (
       <div className="grid h-full place-items-center px-6 text-center text-sm text-muted-foreground">
@@ -146,12 +168,15 @@ export function FilesArtifact({ content, sessionId }: FilesArtifactProps) {
         <div className="min-h-0 flex-1 overflow-hidden">
           <CodeBlockEditor
             code={active.content ?? ""}
+            comments={active.comments ?? []}
             endLine={active.endLine}
             error={active.error}
+            filePath={active.path}
             highlightExpiresAt={active.highlightExpiresAt}
             highlightRequestId={active.highlightRequestId}
             highlightLine={active.line}
             language={active.language ?? languageFromPath(active.path)}
+            onCommentsChange={updateActiveComments}
           />
         </div>
       ) : null}
