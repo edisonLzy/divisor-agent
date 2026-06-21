@@ -5,7 +5,8 @@
   "exports": {
     "./manifest": "./src/manifest.ts",
     "./main": "./src/main.ts",
-    "./renderer": "./src/renderer.tsx"
+    "./renderer": "./src/renderer.tsx",
+    "./style.css": "./src/style.css"
   },
   "dependencies": {
     "@codemirror/commands": "^6.0.0",
@@ -26,7 +27,16 @@
     "lucide-react": "^1.8.0",
     "react": "catalog:"
   },
+  "devDependencies": {
+    "@floating-ui/dom": "^1.7.6",
+    "@types/react-dom": "^19.2.3",
+    "clsx": "^2.1.1",
+    "react-dom": "^19.2.1"
+  },
   "peerDependencies": {
+    "@floating-ui/dom": "^1.7.6",
+    "clsx": "^2.1.1",
+    "react-dom": "^19.0.0",
     "streamdown": "^2.5.0"
   }
 }

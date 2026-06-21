@@ -32,16 +32,31 @@ import {
   WidgetType,
   type ViewUpdate,
 } from "@codemirror/view";
+import { computePosition, flip, offset, shift, type VirtualElement } from "@floating-ui/dom";
+import { clsx } from "clsx";
 import {
   ChevronDown,
   ChevronUp,
   MessageSquarePlus,
   MessageSquareText,
+  Pencil,
   Search,
+  Trash2,
   Undo2,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
+import { createRoot, type Root } from "react-dom/client";
 
 import { HIGHLIGHT_DECORATION_CLASS } from "../constants";
 import type { FileComment, FileCommentRange } from "./index";
@@ -247,6 +262,10 @@ interface DragSelectionState {
   moved: boolean;
 }
 
+interface SelectionToPendingOptions {
+  allowEditorSelection?: boolean;
+}
+
 interface CommentCallbacks {
   deleteComment: (commentId: string) => void;
   focusComment: (commentId: string) => void;
@@ -299,6 +318,7 @@ export function CodeBlockEditor({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const commentPocketRef = useRef<HTMLDivElement | null>(null);
   const editorHostRef = useRef<HTMLDivElement | null>(null);
+  const pendingToolbarRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const isSearchOpenRef = useRef(false);
@@ -309,6 +329,7 @@ export function CodeBlockEditor({
   const commentsRef = useRef<FileComment[]>(comments);
   const activeCommentIdRef = useRef<string | null>(null);
   const dragSelectionRef = useRef<DragSelectionState | null>(null);
+  const manualSelectionRef = useRef(false);
   const callbacksRef = useRef<CommentCallbacks>({
     deleteComment: () => {},
     focusComment: () => {},
@@ -320,6 +341,9 @@ export function CodeBlockEditor({
   const [deletedComment, setDeletedComment] = useState<DeletedCommentState | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [pendingSelection, setPendingSelection] = useState<PendingSelection | null>(null);
+  const [pendingToolbarStyle, setPendingToolbarStyle] = useState<CSSProperties>({
+    opacity: 0,
+  });
   const [searchText, setSearchText] = useState("");
 
   commentsRef.current = comments;
@@ -364,6 +388,9 @@ export function CodeBlockEditor({
   const applySearchQuery = useCallback((query: string) => {
     const view = viewRef.current;
     if (!view) return;
+    manualSelectionRef.current = false;
+    setPendingToolbarStyle({ opacity: 0 });
+    setPendingSelection(null);
     view.dispatch({
       effects: setSearchQuery.of(
         new SearchQuery({
@@ -375,6 +402,9 @@ export function CodeBlockEditor({
 
   const openSearch = useCallback(() => {
     isSearchOpenRef.current = true;
+    manualSelectionRef.current = false;
+    setPendingToolbarStyle({ opacity: 0 });
+    setPendingSelection(null);
     setIsSearchOpen(true);
     requestAnimationFrame(() => {
       searchInputRef.current?.focus();
@@ -384,6 +414,7 @@ export function CodeBlockEditor({
 
   const closeSearch = useCallback(() => {
     isSearchOpenRef.current = false;
+    manualSelectionRef.current = false;
     setIsSearchOpen(false);
     setSearchText("");
     setActiveMatchIndex(0);
@@ -395,6 +426,9 @@ export function CodeBlockEditor({
     (direction: "next" | "previous") => {
       const view = viewRef.current;
       if (!view || searchText.length === 0 || searchMatches.length === 0) return;
+      manualSelectionRef.current = false;
+      setPendingToolbarStyle({ opacity: 0 });
+      setPendingSelection(null);
       applySearchQuery(searchText);
       const didFind = direction === "next" ? findNext(view) : findPrevious(view);
       if (didFind) requestAnimationFrame(syncActiveMatch);
@@ -411,6 +445,7 @@ export function CodeBlockEditor({
   );
 
   const updatePendingSelection = useCallback((nextSelection: PendingSelection | null) => {
+    setPendingToolbarStyle({ opacity: 0 });
     setPendingSelection(nextSelection);
   }, []);
 
@@ -418,7 +453,11 @@ export function CodeBlockEditor({
     window.setTimeout(() => {
       const view = viewRef.current;
       if (!view) return;
-      updatePendingSelection(selectionToPending(view));
+      updatePendingSelection(
+        selectionToPending(view, {
+          allowEditorSelection: manualSelectionRef.current,
+        }),
+      );
     }, 0);
   }, [updatePendingSelection]);
 
@@ -523,7 +562,11 @@ export function CodeBlockEditor({
           commentDecorationField,
           EditorView.updateListener.of((update) => {
             if (update.selectionSet) {
-              updatePendingSelection(selectionToPending(update.view));
+              updatePendingSelection(
+                selectionToPending(update.view, {
+                  allowEditorSelection: manualSelectionRef.current,
+                }),
+              );
             }
           }),
           EditorView.domEventHandlers({
@@ -535,6 +578,7 @@ export function CodeBlockEditor({
               if (pos === null) {
                 return false;
               }
+              manualSelectionRef.current = true;
               dragSelectionRef.current = { anchor: pos, head: pos, moved: false };
               updatePendingSelection(null);
               view.dispatch({ selection: { anchor: pos } });
@@ -551,8 +595,23 @@ export function CodeBlockEditor({
               view.dispatch({ selection: { anchor: drag.anchor, head: pos } });
               return false;
             },
+            keydown: (event) => {
+              if (isCommentWidgetEvent(event)) return false;
+              if (isKeyboardSelectionEvent(event)) {
+                manualSelectionRef.current = true;
+              }
+              return false;
+            },
             keyup: (_event, view) => {
-              window.setTimeout(() => updatePendingSelection(selectionToPending(view)), 0);
+              window.setTimeout(
+                () =>
+                  updatePendingSelection(
+                    selectionToPending(view, {
+                      allowEditorSelection: manualSelectionRef.current,
+                    }),
+                  ),
+                0,
+              );
             },
             mouseup: (event, view) => {
               const dragSelection = dragSelectionRef.current;
@@ -688,6 +747,45 @@ export function CodeBlockEditor({
     };
   }, [commentPocketOpen]);
 
+  useLayoutEffect(() => {
+    const toolbar = pendingToolbarRef.current;
+    if (!pendingSelection || !toolbar) {
+      setPendingToolbarStyle({ opacity: 0 });
+      return undefined;
+    }
+
+    let active = true;
+    const updatePosition = () => {
+      const virtualSelection: VirtualElement = {
+        getBoundingClientRect: () => new DOMRect(pendingSelection.x, pendingSelection.y, 0, 0),
+      };
+
+      computePosition(virtualSelection, toolbar, {
+        middleware: [offset(8), flip(), shift({ padding: 8 })],
+        placement: "top",
+        strategy: "fixed",
+      }).then(({ x, y }) => {
+        if (!active) return;
+        setPendingToolbarStyle({
+          left: x,
+          opacity: 1,
+          top: y,
+        });
+      });
+    };
+
+    updatePosition();
+    const container = containerRef.current;
+    container?.addEventListener("scroll", updatePosition, { passive: true });
+    window.addEventListener("resize", updatePosition);
+
+    return () => {
+      active = false;
+      container?.removeEventListener("scroll", updatePosition);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [pendingSelection]);
+
   // Update the transient highlight range and scroll to the new line, without
   // remounting the editor. Safe to run before the editor mounts — the mount
   // effect reads the ref when building its initial decorations.
@@ -767,6 +865,7 @@ export function CodeBlockEditor({
     emitComments([...commentsRef.current, nextComment]);
     setActiveCommentId(nextComment.id);
     setCommentPocketOpen(false);
+    manualSelectionRef.current = false;
     setPendingSelection(null);
     viewRef.current?.focus();
   };
@@ -859,8 +958,9 @@ export function CodeBlockEditor({
         />
         {pendingSelection ? (
           <div
-            className="absolute z-50 -translate-x-1/2 -translate-y-full rounded-lg border border-border/70 bg-background/95 p-1 shadow-md supports-backdrop-filter:backdrop-blur-xl"
-            style={getPendingToolbarStyle(containerRef.current, pendingSelection)}
+            ref={pendingToolbarRef}
+            className="fixed z-50 rounded-lg border border-border/70 bg-background/95 p-1 shadow-md supports-backdrop-filter:backdrop-blur-xl"
+            style={pendingToolbarStyle}
             onMouseDown={(event) => event.preventDefault()}
           >
             <button
@@ -877,7 +977,7 @@ export function CodeBlockEditor({
       {commentList.length > 0 ? (
         <div
           ref={commentPocketRef}
-          className={cn(
+          className={clsx(
             "pointer-events-none absolute right-3 z-50 flex max-w-[calc(100%_-_1.5rem)] flex-col items-end gap-2",
             isSearchOpen ? "top-14" : "top-3",
           )}
@@ -911,7 +1011,7 @@ export function CodeBlockEditor({
                   return (
                     <button
                       key={comment.id}
-                      className={cn(
+                      className={clsx(
                         "grid w-full grid-cols-[3rem_minmax(0,1fr)] gap-2 rounded-md p-2 text-left transition-colors",
                         isActive ? "bg-muted text-foreground" : "text-foreground hover:bg-muted/70",
                       )}
@@ -1068,6 +1168,8 @@ function buildCommentDecorations(
 }
 
 class CommentWidget extends WidgetType {
+  private root: Root | null = null;
+
   constructor(
     private readonly comment: FileComment,
     private readonly isActive: boolean,
@@ -1088,156 +1190,175 @@ class CommentWidget extends WidgetType {
   toDOM() {
     const wrapper = document.createElement("div");
     wrapper.className = "cm-file-comment-widget";
-
-    const card = document.createElement("section");
-    card.className = ["cm-file-comment-card", this.isActive ? "is-active" : ""]
-      .filter(Boolean)
-      .join(" ");
-    card.tabIndex = 0;
-
-    const header = document.createElement("div");
-    header.className = "cm-file-comment-header";
-
-    const dot = document.createElement("span");
-    dot.className = "cm-file-comment-dot";
-    header.append(dot);
-
-    const meta = document.createElement("span");
-    meta.className = "cm-file-comment-meta";
-    meta.textContent = `${this.comment.updatedAt ? "Edited" : "You"} · ${formatCommentRange(this.comment.range)}`;
-    header.append(meta);
-
-    const editButton = createIconButton("Edit comment", "pencil");
-    const deleteButton = createIconButton("Delete comment", "trash", true);
-    header.append(editButton, deleteButton);
-
-    const body = document.createElement("p");
-    body.className = ["cm-file-comment-body", this.comment.body ? "" : "cm-file-comment-empty"]
-      .filter(Boolean)
-      .join(" ");
-    body.textContent = this.comment.body || "Add a note about this selection.";
-
-    const renderEditor = () => {
-      body.replaceChildren();
-      body.className = "cm-file-comment-body";
-      const textarea = document.createElement("textarea");
-      textarea.className =
-        "min-h-16 w-full resize-y rounded-md border border-input px-2.5 py-2 text-xs leading-5 outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
-      textarea.value = this.comment.body;
-      textarea.placeholder = "Write a comment...";
-
-      const actions = document.createElement("div");
-      actions.className = "mt-2 flex items-center justify-between gap-2";
-      const hint = document.createElement("span");
-      hint.className = "text-[11px] text-muted-foreground";
-      hint.textContent = "Cmd/Ctrl + Enter to save";
-
-      const buttons = document.createElement("span");
-      buttons.className = "flex items-center gap-1.5";
-      const cancel = createTextButton("Cancel", false);
-      const save = createTextButton("Save", true);
-      buttons.append(cancel, save);
-      actions.append(hint, buttons);
-      body.append(textarea, actions);
-
-      const saveEdit = () => {
-        const nextBody = textarea.value.trim();
-        if (!nextBody) return;
-        this.callbacksRef.current.saveComment(this.comment.id, nextBody);
-      };
-      save.addEventListener("click", saveEdit);
-      cancel.addEventListener("click", () => {
-        if (!this.comment.body) {
-          this.callbacksRef.current.deleteComment(this.comment.id);
-          return;
-        }
-        body.textContent = this.comment.body || "Add a note about this selection.";
-        body.className = ["cm-file-comment-body", this.comment.body ? "" : "cm-file-comment-empty"]
-          .filter(Boolean)
-          .join(" ");
-      });
-      textarea.addEventListener("keydown", (event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          if (!this.comment.body) {
-            this.callbacksRef.current.deleteComment(this.comment.id);
-            return;
-          }
-          body.textContent = this.comment.body || "Add a note about this selection.";
-          body.className = [
-            "cm-file-comment-body",
-            this.comment.body ? "" : "cm-file-comment-empty",
-          ]
-            .filter(Boolean)
-            .join(" ");
-        }
-        if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-          event.preventDefault();
-          saveEdit();
-        }
-      });
-      textarea.focus();
-      textarea.select();
-    };
-
-    const focusComment = () => this.callbacksRef.current.focusComment(this.comment.id);
-    card.addEventListener("click", (event) => {
-      if ((event.target as HTMLElement).closest("button, textarea")) return;
-      focusComment();
-    });
-    card.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter" && event.key !== " ") return;
-      event.preventDefault();
-      focusComment();
-    });
-    editButton.addEventListener("click", (event) => {
-      event.stopPropagation();
-      renderEditor();
-    });
-    deleteButton.addEventListener("click", (event) => {
-      event.stopPropagation();
-      this.callbacksRef.current.deleteComment(this.comment.id);
-    });
-
-    card.append(header, body);
-    wrapper.append(card);
-
-    if (!this.comment.body) {
-      queueMicrotask(renderEditor);
-    }
-
+    this.root = createRoot(wrapper);
+    this.root.render(
+      <CommentWidgetCard
+        callbacksRef={this.callbacksRef}
+        comment={this.comment}
+        isActive={this.isActive}
+      />,
+    );
     return wrapper;
   }
 
+  destroy() {
+    const root = this.root;
+    this.root = null;
+    root?.unmount();
+  }
+
   ignoreEvent() {
-    return false;
+    return true;
   }
 }
 
-function createIconButton(label: string, iconName: "pencil" | "trash", destructive = false) {
-  const button = document.createElement("button");
-  button.ariaLabel = label;
-  button.className = [
-    "grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground",
-    destructive ? "hover:bg-destructive/10 hover:text-destructive" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-  button.type = "button";
-  const icon = document.createElement("span");
-  icon.innerHTML = iconName === "pencil" ? pencilSvg() : trashSvg();
-  button.append(icon);
-  return button;
+interface CommentWidgetCardProps {
+  callbacksRef: { current: CommentCallbacks };
+  comment: FileComment;
+  isActive: boolean;
 }
 
-function createTextButton(label: string, primary: boolean) {
-  const button = document.createElement("button");
-  button.className = primary
-    ? "rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground"
-    : "rounded-md border border-border px-2 py-1 text-xs text-foreground hover:bg-muted";
-  button.type = "button";
-  button.textContent = label;
-  return button;
+function CommentWidgetCard({ callbacksRef, comment, isActive }: CommentWidgetCardProps) {
+  const [draft, setDraft] = useState(comment.body);
+  const [isEditing, setIsEditing] = useState(comment.body.length === 0);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    setDraft(comment.body);
+    if (comment.body.length === 0) {
+      setIsEditing(true);
+    }
+  }, [comment.body, comment.id]);
+
+  useEffect(() => {
+    if (!isEditing) return undefined;
+    const frame = requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.select();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [isEditing]);
+
+  const focusComment = useCallback(() => {
+    callbacksRef.current.focusComment(comment.id);
+  }, [callbacksRef, comment.id]);
+
+  const cancelEdit = useCallback(() => {
+    if (!comment.body) {
+      callbacksRef.current.deleteComment(comment.id);
+      return;
+    }
+    setDraft(comment.body);
+    setIsEditing(false);
+  }, [callbacksRef, comment.body, comment.id]);
+
+  const saveEdit = useCallback(() => {
+    const nextBody = draft.trim();
+    if (!nextBody) return;
+    callbacksRef.current.saveComment(comment.id, nextBody);
+    setIsEditing(false);
+  }, [callbacksRef, comment.id, draft]);
+
+  const handleCardClick = (event: ReactMouseEvent<HTMLElement>) => {
+    if ((event.target as HTMLElement).closest("button, textarea")) return;
+    focusComment();
+  };
+
+  const handleCardKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    if ((event.target as HTMLElement).closest("button, textarea")) return;
+    event.preventDefault();
+    focusComment();
+  };
+
+  const handleEditorKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    event.stopPropagation();
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cancelEdit();
+      return;
+    }
+
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      saveEdit();
+    }
+  };
+
+  return (
+    <section
+      className={clsx("cm-file-comment-card", isActive && "is-active")}
+      onClick={handleCardClick}
+      onKeyDown={handleCardKeyDown}
+      onMouseDown={(event) => event.stopPropagation()}
+      onPointerDown={(event) => event.stopPropagation()}
+      tabIndex={0}
+    >
+      <div className="cm-file-comment-header">
+        <span className="cm-file-comment-dot" />
+        <span className="cm-file-comment-meta">
+          {comment.updatedAt ? "Edited" : "You"} · {formatCommentRange(comment.range)}
+        </span>
+        <button
+          aria-label="Edit comment"
+          className="grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+          onClick={(event) => {
+            event.stopPropagation();
+            setIsEditing(true);
+          }}
+          type="button"
+        >
+          <Pencil className="size-3.5" strokeWidth={1.75} />
+        </button>
+        <button
+          aria-label="Delete comment"
+          className="grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+          onClick={(event) => {
+            event.stopPropagation();
+            callbacksRef.current.deleteComment(comment.id);
+          }}
+          type="button"
+        >
+          <Trash2 className="size-3.5" strokeWidth={1.75} />
+        </button>
+      </div>
+      {isEditing ? (
+        <div className="cm-file-comment-body">
+          <textarea
+            ref={textareaRef}
+            className="min-h-16 w-full resize-y rounded-md border border-input px-2.5 py-2 text-xs leading-5 outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={handleEditorKeyDown}
+            placeholder="Write a comment..."
+            value={draft}
+          />
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <span className="text-[11px] text-muted-foreground">Cmd/Ctrl + Enter to save</span>
+            <span className="flex items-center gap-1.5">
+              <button
+                className="rounded-md border border-border px-2 py-1 text-xs text-foreground hover:bg-muted"
+                onClick={cancelEdit}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground"
+                onClick={saveEdit}
+                type="button"
+              >
+                Save
+              </button>
+            </span>
+          </div>
+        </div>
+      ) : (
+        <p className={clsx("cm-file-comment-body", !comment.body && "cm-file-comment-empty")}>
+          {comment.body || "Add a note about this selection."}
+        </p>
+      )}
+    </section>
+  );
 }
 
 function commentRangeToPositions(
@@ -1266,7 +1387,7 @@ function pointerSelectionToPending(
     return positionsToPending(view, dragSelection.anchor, head);
   }
 
-  return selectionToPending(view);
+  return selectionToPending(view, { allowEditorSelection: Boolean(dragSelection?.moved) });
 }
 
 function positionsToPending(
@@ -1301,12 +1422,16 @@ function positionsToPending(
   };
 }
 
-function selectionToPending(view: EditorView): PendingSelection | null {
+function selectionToPending(
+  view: EditorView,
+  options: SelectionToPendingOptions = {},
+): PendingSelection | null {
   const domPending = domSelectionToPending(view);
   if (domPending) return domPending;
 
   const domSelection = window.getSelection();
   if (domSelection && !domSelection.isCollapsed && domSelection.toString().trim()) return null;
+  if (!options.allowEditorSelection) return null;
 
   return editorSelectionToPending(view);
 }
@@ -1378,6 +1503,20 @@ function isCommentWidgetEvent(event: Event): boolean {
   );
 }
 
+function isKeyboardSelectionEvent(event: KeyboardEvent): boolean {
+  if (!event.shiftKey) return false;
+  return [
+    "ArrowDown",
+    "ArrowLeft",
+    "ArrowRight",
+    "ArrowUp",
+    "End",
+    "Home",
+    "PageDown",
+    "PageUp",
+  ].includes(event.key);
+}
+
 function selectionTouchesContent(view: EditorView, range: globalThis.Range): boolean {
   const startElement = nodeElement(range.startContainer);
   const endElement = nodeElement(range.endContainer);
@@ -1395,39 +1534,6 @@ function updateCommentLayoutVars(view: EditorView) {
   const gutterWidth = view.dom.querySelector(".cm-gutters")?.getBoundingClientRect().width ?? 0;
   const width = Math.max(260, view.scrollDOM.clientWidth - gutterWidth - 24);
   view.dom.style.setProperty("--files-comment-card-max-width", `${Math.floor(width)}px`);
-}
-
-function getPendingToolbarStyle(
-  container: HTMLDivElement | null,
-  selection: PendingSelection,
-): CSSProperties {
-  const position = getPendingToolbarPosition(container, selection);
-  return {
-    left: position.left,
-    top: position.top,
-  };
-}
-
-function getPendingToolbarPosition(
-  container: HTMLDivElement | null,
-  selection: PendingSelection,
-): { left: number; top: number } {
-  if (!container) {
-    return { left: selection.x, top: selection.y - 8 };
-  }
-
-  const rect = container.getBoundingClientRect();
-  const localLeft = selection.x - rect.left + container.scrollLeft;
-  const localTop = selection.y - rect.top + container.scrollTop - 8;
-  const minLeft = container.scrollLeft + 56;
-  const maxLeft = container.scrollLeft + Math.max(56, container.clientWidth - 56);
-  const minTop = container.scrollTop + 28;
-  const maxTop = container.scrollTop + Math.max(28, container.clientHeight - 8);
-
-  return {
-    left: clamp(localLeft, minLeft, maxLeft),
-    top: clamp(localTop, minTop, maxTop),
-  };
 }
 
 function formatCommentRange(range: FileCommentRange) {
@@ -1458,10 +1564,6 @@ function formatCommentTime(timestamp: number) {
   return `${Math.floor(elapsed / 86_400_000)}d ago`;
 }
 
-function cn(...values: Array<false | null | string | undefined>) {
-  return values.filter(Boolean).join(" ");
-}
-
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
@@ -1470,12 +1572,4 @@ function createCommentId() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `comment-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function pencilSvg() {
-  return `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`;
-}
-
-function trashSvg() {
-  return `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>`;
 }

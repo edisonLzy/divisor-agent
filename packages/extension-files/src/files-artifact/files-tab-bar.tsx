@@ -1,3 +1,4 @@
+import { clsx } from "clsx";
 import { X } from "lucide-react";
 
 export interface FilesTabBarItem {
@@ -12,10 +13,6 @@ interface FilesTabBarProps {
   onClose: (path: string) => void;
 }
 
-function cn(...values: Array<false | null | string | undefined>): string {
-  return values.filter(Boolean).join(" ");
-}
-
 export function FilesTabBar({ activePath, files, onActivate, onClose }: FilesTabBarProps) {
   return (
     <div className="flex items-center gap-1 overflow-x-auto border-b border-border/70 bg-background/60 px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -24,7 +21,7 @@ export function FilesTabBar({ activePath, files, onActivate, onClose }: FilesTab
         return (
           <div key={file.path} className="relative shrink-0">
             <div
-              className={cn(
+              className={clsx(
                 "group/tab relative flex max-w-48 items-center overflow-hidden rounded-md px-2 py-1 text-xs transition-colors",
                 isActive
                   ? "bg-muted text-foreground"

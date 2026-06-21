@@ -42,7 +42,37 @@ export default defineRendererExtension((ctx) => {
         return <FileLink href={href}>{children}</FileLink>;
       },
   });
-  ctx.streamdown.registerRehypePlugins(allowFileHrefProtocol);
+  ctx.streamdown.registerRehypePlugins(
+    (plugins) =>
+      plugins.map((plugin) => {
+        if (plugin === defaultRehypePlugins.sanitize) {
+          const [sanitize, options] = plugin as unknown as RehypePluginTuple;
+          return [
+            sanitize,
+            {
+              ...options,
+              protocols: {
+                ...options.protocols,
+                href: [...(options.protocols?.href ?? []), FILE_HREF_SCHEME],
+              },
+            },
+          ];
+        }
+
+        if (plugin === defaultRehypePlugins.harden) {
+          const [harden, options] = plugin as unknown as RehypePluginTuple;
+          return [
+            harden,
+            {
+              ...options,
+              allowedProtocols: [...(options.allowedProtocols ?? []), FILE_HREF_PROTOCOL],
+            },
+          ];
+        }
+
+        return plugin;
+      }) as StreamdownRehypePlugins,
+  );
 
   ctx.artifacts.register({
     type: FILES_ARTIFACT_TYPE,
@@ -57,37 +87,6 @@ type RehypePluginTuple = [
     protocols?: Record<string, string[]>;
   } & Record<string, unknown>,
 ];
-
-function allowFileHrefProtocol(plugins: StreamdownRehypePlugins): StreamdownRehypePlugins {
-  return plugins.map((plugin) => {
-    if (plugin === defaultRehypePlugins.sanitize) {
-      const [sanitize, options] = plugin as unknown as RehypePluginTuple;
-      return [
-        sanitize,
-        {
-          ...options,
-          protocols: {
-            ...options.protocols,
-            href: [...(options.protocols?.href ?? []), FILE_HREF_SCHEME],
-          },
-        },
-      ];
-    }
-
-    if (plugin === defaultRehypePlugins.harden) {
-      const [harden, options] = plugin as unknown as RehypePluginTuple;
-      return [
-        harden,
-        {
-          ...options,
-          allowedProtocols: [...(options.allowedProtocols ?? []), FILE_HREF_PROTOCOL],
-        },
-      ];
-    }
-
-    return plugin;
-  }) as StreamdownRehypePlugins;
-}
 
 function FileLink({ href, children }: { children: React.ReactNode; href: string }) {
   const api = useExtensionsContextAPI();

@@ -1,5 +1,5 @@
 import { useExtensionsContextAPI } from "@divisor-agent/extension-core/renderer";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
 
 import {
   FILES_ARTIFACT_ID,
@@ -70,7 +70,6 @@ function getElectronAPI() {
 
 export function FilesArtifact({ content, sessionId }: FilesArtifactProps) {
   const api = useExtensionsContextAPI();
-  const containerRef = useRef<HTMLDivElement | null>(null);
 
   const files = content.files;
   const active = useMemo(
@@ -157,7 +156,7 @@ export function FilesArtifact({ content, sessionId }: FilesArtifactProps) {
   }
 
   return (
-    <div ref={containerRef} className="flex h-full flex-col">
+    <div className="flex h-full flex-col">
       <FilesTabBar
         activePath={content.activePath}
         files={files.map((f) => ({ label: getFileBaseName(f.path), path: f.path }))}
