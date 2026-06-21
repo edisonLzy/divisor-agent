@@ -11,14 +11,18 @@ function ExampleCard({ props }: { props: Record<string, unknown> }) {
 function ExampleArtifact({
   artifactId,
   content,
+  sessionId,
 }: {
   artifactId: string;
   content: Record<string, unknown>;
+  sessionId: string;
 }) {
   return (
     <div className="rounded-md border bg-card p-3 text-sm text-card-foreground">
       <div className="font-medium">{String(content.title ?? "Example artifact")}</div>
-      <div className="mt-1 text-muted-foreground">{artifactId}</div>
+      <div className="mt-1 text-muted-foreground">
+        {artifactId} · {sessionId}
+      </div>
     </div>
   );
 }

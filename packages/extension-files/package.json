@@ -1,0 +1,42 @@
+{
+  "name": "@divisor-agent/extension-files",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./manifest": "./src/manifest.ts",
+    "./main": "./src/main.ts",
+    "./renderer": "./src/renderer.tsx",
+    "./style.css": "./src/style.css"
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6.0.0",
+    "@codemirror/lang-css": "^6.3.1",
+    "@codemirror/lang-go": "^6.0.1",
+    "@codemirror/lang-html": "^6.4.11",
+    "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/lang-markdown": "^6.5.0",
+    "@codemirror/lang-python": "^6.2.1",
+    "@codemirror/lang-rust": "^6.0.2",
+    "@codemirror/language": "^6.0.0",
+    "@codemirror/search": "^6.0.0",
+    "@codemirror/state": "^6.0.0",
+    "@codemirror/view": "^6.0.0",
+    "@divisor-agent/extension-core": "workspace:*",
+    "@types/react": "catalog:",
+    "lucide-react": "^1.8.0",
+    "react": "catalog:"
+  },
+  "devDependencies": {
+    "@floating-ui/dom": "^1.7.6",
+    "@types/react-dom": "^19.2.3",
+    "clsx": "^2.1.1",
+    "react-dom": "^19.2.1"
+  },
+  "peerDependencies": {
+    "@floating-ui/dom": "^1.7.6",
+    "clsx": "^2.1.1",
+    "react-dom": "^19.0.0",
+    "streamdown": "^2.5.0"
+  }
+}

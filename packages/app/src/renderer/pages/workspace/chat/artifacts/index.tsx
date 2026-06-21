@@ -157,7 +157,7 @@ export function ArtifactsPanel({ className, sessionId }: ArtifactsPanelProps) {
 
         {activeArtifact ? (
           <TabsContent value={activeArtifact.id} className="min-h-0 overflow-hidden">
-            <ArtifactContent artifact={activeArtifact} />
+            <ArtifactContent artifact={activeArtifact} sessionId={sessionId} />
           </TabsContent>
         ) : (
           <TabsContent value="" className="min-h-0">
@@ -227,14 +227,14 @@ function ArtifactTab({ artifact, onClose }: ArtifactTabProps) {
   );
 }
 
-function ArtifactContent({ artifact }: { artifact: ArtifactRecord }) {
+function ArtifactContent({ artifact, sessionId }: { artifact: ArtifactRecord; sessionId: string }) {
   if (artifact.type === "side-chat") {
     return <SideChatArtifact artifact={artifact as SideChatArtifactRecord} />;
   }
 
   return (
-    <div className="h-full overflow-auto bg-background p-3">
-      <ArtifactPreview artifact={artifact} />
+    <div className="h-full overflow-hidden bg-background p-3">
+      <ArtifactPreview artifact={artifact} sessionId={sessionId} />
     </div>
   );
 }
@@ -254,7 +254,13 @@ function getArtifactIcon(type: string): LucideIcon {
   return Sparkles;
 }
 
-export function ArtifactPreview({ artifact }: { artifact: ArtifactRecord }) {
+export function ArtifactPreview({
+  artifact,
+  sessionId,
+}: {
+  artifact: ArtifactRecord;
+  sessionId: string;
+}) {
   const registry = useExtensionRegistry();
   const registration = registry.getArtifact(artifact.type);
 
@@ -269,7 +275,7 @@ export function ArtifactPreview({ artifact }: { artifact: ArtifactRecord }) {
   const Renderer = registration.render;
   return (
     <div className="h-full min-h-full">
-      <Renderer artifactId={artifact.id} content={artifact.content} />
+      <Renderer artifactId={artifact.id} content={artifact.content} sessionId={sessionId} />
     </div>
   );
 }

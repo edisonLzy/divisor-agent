@@ -23,5 +23,7 @@ export type {
   RendererExtensionDefinition,
   RendererSlashCommand,
   RendererSlashCommandRunContext,
+  StreamdownRehypePluginComposer,
+  StreamdownRehypePlugins,
 } from "./define";
 export type { ParsedExtensionPart } from "./parser";

@@ -31,6 +31,23 @@ const queryClient = new QueryClient({
 export function App() {
   const extensionsContextAPI = useMemo<ExtensionsContextAPI>(
     () => ({
+      getActiveSessionId() {
+        return mainStore.getState().activeSessionId;
+      },
+      getArtifact<TContent = Record<string, unknown>>(sessionId: string, artifactId: string) {
+        const artifact = mainStore
+          .getState()
+          .getArtifactState(sessionId)
+          .artifacts.find((a) => a.id === artifactId);
+        return artifact
+          ? {
+              content: artifact.content as TContent,
+              id: artifact.id,
+              name: artifact.name,
+              type: artifact.type,
+            }
+          : null;
+      },
       appendSideChatMeta(sideChatId, input) {
         const sideChat = sideChatStore.getState();
         if (!sideChat.getSideChatMeta(sideChatId)) {

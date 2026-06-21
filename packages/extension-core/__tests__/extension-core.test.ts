@@ -67,6 +67,8 @@ describe("extension-core", () => {
       return null;
     }
 
+    function testRehypePlugin() {}
+
     const setup = vi.fn((ctx) => {
       ctx.slashCommands.register({
         id: "test.command",
@@ -83,6 +85,7 @@ describe("extension-core", () => {
         type: "test.artifact",
         render: TestRenderer,
       });
+      ctx.streamdown.registerRehypePlugins((plugins) => [...plugins, testRehypePlugin]);
     });
     const extensions: InstalledRendererExtension[] = [
       {
@@ -101,6 +104,7 @@ describe("extension-core", () => {
     expect(registry.getSlashCommands()).toHaveLength(1);
     expect(registry.getAssistantBlock("test.block")).toBeDefined();
     expect(registry.getArtifact("test.artifact")).toBeDefined();
+    expect(registry.getStreamdownRehypePlugins([])).toEqual([testRehypePlugin]);
   });
 
   it("parses extension blocks and artifacts while preserving markdown text", () => {
