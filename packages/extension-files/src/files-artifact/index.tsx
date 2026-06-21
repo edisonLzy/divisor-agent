@@ -171,7 +171,7 @@ export function addOrActivateFile(
   const found = current.files.find((f) => f.path === parsed.path);
   const nextHighlightRequestId =
     parsed.line !== undefined ? (found?.highlightRequestId ?? 0) + 1 : undefined;
-  const highlightExpiresAt = parsed.line !== undefined ? Date.now() + 2000 : undefined;
+  const highlightExpiresAt = parsed.line !== undefined ? Date.now() + 1000 : undefined;
   const newEntry: FileEntry = found
     ? {
         ...found,

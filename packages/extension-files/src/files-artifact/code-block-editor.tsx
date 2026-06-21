@@ -31,35 +31,38 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HIGHLIGHT_DECORATION_CLASS } from "../constants";
 import { loadLanguageExtension } from "./language-from-path";
 
-const HIGHLIGHT_DURATION_MS = 2000;
+const HIGHLIGHT_DURATION_MS = 1000;
 
 const HIGHLIGHT_DECORATION = Decoration.line({
   attributes: { class: HIGHLIGHT_DECORATION_CLASS },
 });
 
-// One-shot intro flash for freshly-highlighted lines. CodeMirror's decoration
-// diffing means the `animation` only fires when a line *gains* the
-// `cm-file-highlight` class — i.e. on first mount with a range, or when the
-// user clicks a different link. Lines that keep the class across renders
-// don't re-trigger. Fades from a stronger primary tint down to the steady
-// background defined in the CodeMirror theme below.
+// One-shot flash for freshly-highlighted lines. CodeMirror's decoration
+// diffing means the animation only fires when a line gains the class, so
+// repeated clicks on the same line briefly remove and re-add it below.
 const HIGHLIGHT_INTRO_STYLE = `
 @keyframes file-highlight-intro {
-  from {
+  0% {
     background-color: color-mix(in oklch, var(--primary) 28%, transparent);
     box-shadow:
       inset 4px 0 0 color-mix(in oklch, var(--primary) 90%, transparent),
       0 0 0 1px color-mix(in oklch, var(--primary) 32%, transparent);
   }
-  to {
-    background-color: color-mix(in oklch, var(--primary) 16%, transparent);
+  45% {
+    background-color: color-mix(in oklch, var(--primary) 18%, transparent);
     box-shadow:
-      inset 4px 0 0 color-mix(in oklch, var(--primary) 74%, transparent),
-      0 0 0 1px color-mix(in oklch, var(--primary) 20%, transparent);
+      inset 4px 0 0 color-mix(in oklch, var(--primary) 70%, transparent),
+      0 0 0 1px color-mix(in oklch, var(--primary) 18%, transparent);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow:
+      inset 4px 0 0 transparent,
+      0 0 0 1px transparent;
   }
 }
 .cm-line.cm-file-highlight {
-  animation: file-highlight-intro 1200ms ease-out forwards;
+  animation: file-highlight-intro ${HIGHLIGHT_DURATION_MS}ms ease-out forwards;
 }
 @media (prefers-reduced-motion: reduce) {
   .cm-line.cm-file-highlight { animation: none; }
@@ -85,10 +88,7 @@ const darkGutterTheme = EditorView.theme({
 
 const fileHighlightTheme = EditorView.theme({
   ".cm-line.cm-file-highlight": {
-    backgroundColor: "color-mix(in oklch, var(--primary) 16%, transparent)",
     borderRadius: "4px",
-    boxShadow:
-      "inset 4px 0 0 color-mix(in oklch, var(--primary) 74%, transparent), 0 0 0 1px color-mix(in oklch, var(--primary) 20%, transparent)",
     color: "var(--foreground)",
     paddingLeft: "0.5rem",
   },
@@ -253,7 +253,6 @@ export function CodeBlockEditor({
             },
           ]),
           keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
-          EditorView.editable.of(false),
           EditorState.readOnly.of(true),
           lineHighlightPlugin(highlightRef),
           ...langExtensions,
