@@ -35,7 +35,8 @@ export function agentMessageToRuntimeMessage(message: AgentMessageData): AgentMe
 
 function agentUserMessageToUserMessage(message: AgentUserMessage): UserMessage {
   return {
-    ...message,
+    role: message.role,
     content: message.text,
+    timestamp: message.timestamp,
   };
 }

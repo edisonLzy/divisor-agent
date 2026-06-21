@@ -27,6 +27,9 @@ function registerIPCHandlers(agentPool: AgentPool) {
   typedIpcMain.handle("getModelConfig", agentPool.getModelConfig);
   typedIpcMain.handle("saveModelConfig", agentPool.saveModelConfig);
   typedIpcMain.handle("prompt", agentPool.prompt);
+  typedIpcMain.handle("steerPrompt", agentPool.steerPrompt);
+  typedIpcMain.handle("followUpPrompt", agentPool.followUpPrompt);
+  typedIpcMain.handle("clearPendingPrompts", agentPool.clearPendingPrompts);
   typedIpcMain.handle("abortPrompt", agentPool.abortPrompt);
   typedIpcMain.handle("setHistoryMessages", agentPool.setHistoryMessages);
   typedIpcMain.handle("setSessionId", agentPool.setSessionId);

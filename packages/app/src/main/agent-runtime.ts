@@ -9,6 +9,7 @@ import Emittery from "emittery";
 
 import type { AgentSessionScope, AllowedMainExposeEvents } from "../shared/events-ipc.js";
 import type { AgentModelsIPC } from "../shared/models-ipc.js";
+import type { PendingPromptInput, PendingPromptKind } from "../shared/pending-prompts-ipc.js";
 import type { PermissionMode } from "../shared/permissions-ipc.js";
 import type { AgentSessionIPC } from "../shared/session-ipc.js";
 import type { AgentSkillsIPC } from "../shared/skills-ipc.js";
@@ -223,6 +224,18 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
     this.agent.prompt(this.skillService.expandSkillReferences(content, metadata.skillIds ?? []));
   };
 
+  public steerPrompt: AgentRuntimeDelegate["steerPrompt"] = async (input) => {
+    await this.queuePrompt("steer", input);
+  };
+
+  public followUpPrompt: AgentRuntimeDelegate["followUpPrompt"] = async (input) => {
+    await this.queuePrompt("followup", input);
+  };
+
+  public clearPendingPrompts: AgentRuntimeDelegate["clearPendingPrompts"] = async () => {
+    this.agent.clearAllQueues();
+  };
+
   public abortPrompt: AgentRuntimeDelegate["abortPrompt"] = async () => {
     this.agent.abort();
   };
@@ -256,6 +269,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
   };
 
   public destroy() {
+    this.agent.clearAllQueues();
     this.clearListeners();
   }
 
@@ -273,6 +287,29 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
       modelId: model.id,
       providerId: model.provider,
     };
+  }
+
+  private async queuePrompt(kind: PendingPromptKind, input: PendingPromptInput) {
+    const content = input.content.trim();
+    if (!content) {
+      return;
+    }
+
+    if (input.metadata?.model) {
+      await this.setModel(input.metadata.model);
+    }
+
+    const message = {
+      role: "user" as const,
+      content: this.skillService.expandSkillReferences(content, input.metadata?.skillIds ?? []),
+      timestamp: input.createdAt ?? Date.now(),
+    };
+
+    if (kind === "steer") {
+      this.agent.steer(message);
+    } else {
+      this.agent.followUp(message);
+    }
   }
 }
 

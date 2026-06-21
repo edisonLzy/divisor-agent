@@ -73,6 +73,8 @@ export interface EntriesSlice {
   getEntryState: (sessionId: string) => EntryState;
 
   appendMessageEntry: (sessionId: string, message: AgentMessageData) => string;
+  removeMessageEntry: (sessionId: string, entryId: string) => void;
+  reorderMessageEntries: (sessionId: string, entryIdsInOrder: string[]) => void;
   updateMessageEntry: (sessionId: string, entryId: string, message: AssistantMessage) => void;
   setEntryStatus: (sessionId: string, entryIds: string[], status: EntryStatus) => void;
   setStreamingEntryId: (sessionId: string, id: string | undefined) => void;
@@ -136,6 +138,53 @@ export const createEntriesSlice: StateCreator<EntriesSlice, [], [], EntriesSlice
     });
 
     return entryId;
+  },
+
+  removeMessageEntry: (sessionId, entryId) => {
+    set((prev) => {
+      const entryStates = new Map(prev.entryStates);
+      const current = getOrCreateEntryState(entryStates, sessionId);
+      entryStates.set(sessionId, {
+        ...current,
+        entries: current.entries.filter((entry) => entry.id !== entryId),
+      });
+      return { entryStates };
+    });
+  },
+
+  reorderMessageEntries: (sessionId, entryIdsInOrder) => {
+    if (entryIdsInOrder.length < 2) return;
+
+    set((prev) => {
+      const entryStates = new Map(prev.entryStates);
+      const current = getOrCreateEntryState(entryStates, sessionId);
+      const pendingEntriesById = new Map(
+        current.entries
+          .filter((entry) => entryIdsInOrder.includes(entry.id))
+          .map((entry) => [entry.id, entry]),
+      );
+
+      if (pendingEntriesById.size < 2) {
+        return prev;
+      }
+
+      const orderedEntries = entryIdsInOrder
+        .map((entryId) => pendingEntriesById.get(entryId))
+        .filter((entry): entry is SessionEntry => Boolean(entry));
+      let orderedEntryIndex = 0;
+
+      entryStates.set(sessionId, {
+        ...current,
+        entries: current.entries.map((entry) => {
+          if (!pendingEntriesById.has(entry.id)) {
+            return entry;
+          }
+
+          return orderedEntries[orderedEntryIndex++] ?? entry;
+        }),
+      });
+      return { entryStates };
+    });
   },
 
   updateMessageEntry: (sessionId, entryId, message) => {
