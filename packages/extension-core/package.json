@@ -13,6 +13,7 @@
     "@sinclair/typebox": "^0.34.0",
     "@tiptap/core": "catalog:",
     "@types/react": "catalog:",
-    "react": "catalog:"
+    "react": "catalog:",
+    "streamdown": "^2.5.0"
   }
 }

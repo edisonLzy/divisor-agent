@@ -1,5 +1,8 @@
+import { readFile } from "node:fs/promises";
+
 import { BrowserWindow, ipcMain } from "electron";
 
+import type { FileSystemIPC } from "../shared/file-system-ipc";
 import type { AgentModelsIPC } from "../shared/models-ipc";
 import type { AgentSessionIPC } from "../shared/session-ipc";
 import type { AgentSkillsIPC } from "../shared/skills-ipc";
@@ -36,10 +39,22 @@ function registerIPCHandlers(agentPool: AgentPool) {
   typedIpcMain.handle("resolvePermissionRequest", agentPool.resolvePermissionRequest);
   typedIpcMain.handle("listSkills", agentPool.listSkills);
   typedIpcMain.handle("setSkillEnabled", agentPool.setSkillEnabled);
+  typedIpcMain.handle("fsReadTextFile", handleFsReadTextFile);
 
   return () => {
     typedIpcMain.removeAllListeners();
   };
+}
+
+async function handleFsReadTextFile(
+  path: string,
+): Promise<{ content: string; bytes: number } | { error: string }> {
+  try {
+    const content = await readFile(path, "utf-8");
+    return { content, bytes: Buffer.byteLength(content, "utf-8") };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export function bindAgentRuntimeIPC(
@@ -57,7 +72,7 @@ export function bindAgentRuntimeIPC(
 }
 
 function createTypedIpcMain() {
-  type AgentIPC = AgentModelsIPC & AgentSessionIPC & AgentSkillsIPC;
+  type AgentIPC = AgentModelsIPC & AgentSessionIPC & AgentSkillsIPC & FileSystemIPC;
   return {
     ...ipcMain,
     handle<C extends keyof AgentIPC = keyof AgentIPC>(channel: C, listener: AgentIPC[C]) {

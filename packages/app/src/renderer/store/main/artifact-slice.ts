@@ -4,9 +4,7 @@ import type { MainStoreState } from "./store-state";
 
 export type ArtifactType = "side-chat" | string;
 
-export interface ArtifactRecord<
-  TContent extends Record<string, unknown> = Record<string, unknown>,
-> {
+export interface ArtifactRecord<TContent = Record<string, unknown>> {
   id: string;
   name: string;
   type: ArtifactType;
@@ -26,7 +24,7 @@ export interface ArtifactSlice {
   setActiveArtifactId: (sessionId: string, artifactId: string | null) => void;
   removeArtifact: (sessionId: string, artifactId: string) => void;
   reorderArtifacts: (sessionId: string, sourceIndex: number, targetIndex: number) => void;
-  upsertArtifact: <TContent extends Record<string, unknown> = Record<string, unknown>>(
+  upsertArtifact: <TContent = Record<string, unknown>>(
     sessionId: string,
     artifact: Omit<ArtifactRecord<TContent>, "content" | "name"> &
       Partial<Pick<ArtifactRecord<TContent>, "content" | "name">>,

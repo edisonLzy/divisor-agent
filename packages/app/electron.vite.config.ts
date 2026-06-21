@@ -27,6 +27,7 @@ export default defineConfig({
           "@divisor-agent/extension-core",
           "@divisor-agent/extension-example",
           "@divisor-agent/extension-subagents",
+          "@divisor-agent/extension-files",
         ],
       },
     },
