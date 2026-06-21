@@ -5,7 +5,15 @@ import {
   indentOnInput,
   syntaxHighlighting,
 } from "@codemirror/language";
-import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
+import {
+  findNext,
+  findPrevious,
+  highlightSelectionMatches,
+  search,
+  SearchQuery,
+  searchKeymap,
+  setSearchQuery,
+} from "@codemirror/search";
 import { EditorState, type Extension, type Range } from "@codemirror/state";
 import {
   Decoration,
@@ -17,7 +25,8 @@ import {
   ViewPlugin,
   type ViewUpdate,
 } from "@codemirror/view";
-import { useEffect, useRef } from "react";
+import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { HIGHLIGHT_DECORATION_CLASS } from "../constants";
 import { loadLanguageExtension } from "./language-from-path";
@@ -85,6 +94,18 @@ const fileHighlightTheme = EditorView.theme({
   },
 });
 
+const searchHighlightTheme = EditorView.theme({
+  ".cm-searchMatch": {
+    backgroundColor: "color-mix(in oklch, var(--primary) 26%, transparent)",
+    borderRadius: "3px",
+    outline: "1px solid color-mix(in oklch, var(--primary) 30%, transparent)",
+  },
+  ".cm-searchMatch-selected": {
+    backgroundColor: "color-mix(in oklch, var(--primary) 46%, transparent)",
+    outline: "1px solid color-mix(in oklch, var(--primary) 68%, transparent)",
+  },
+});
+
 interface CodeBlockEditorProps {
   code: string;
   endLine?: number;
@@ -112,11 +133,83 @@ export function CodeBlockEditor({
   error,
 }: CodeBlockEditorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
+  const isSearchOpenRef = useRef(false);
   // Mutable highlight range; the ViewPlugin reads from this on every
   // update so we can change the highlighted lines without rebuilding the
   // editor (e.g. when the user clicks a different line of the same file).
   const highlightRef = useRef<HighlightRange>({});
+  const [activeMatchIndex, setActiveMatchIndex] = useState(0);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchText, setSearchText] = useState("");
+
+  const searchMatches = useMemo(() => findSearchMatches(code, searchText), [code, searchText]);
+  const searchStatus =
+    searchText.length === 0
+      ? "No query"
+      : searchMatches.length === 0
+        ? "No results"
+        : `${activeMatchIndex || 1}/${searchMatches.length}`;
+
+  const syncActiveMatch = useCallback(() => {
+    const view = viewRef.current;
+    if (!view || searchMatches.length === 0) {
+      setActiveMatchIndex(0);
+      return;
+    }
+    const selection = view.state.selection.main;
+    const selectedIndex = searchMatches.findIndex(
+      (match) => match.from === selection.from && match.to === selection.to,
+    );
+    if (selectedIndex >= 0) {
+      setActiveMatchIndex(selectedIndex + 1);
+      return;
+    }
+    const nextIndex = searchMatches.findIndex((match) => match.from >= selection.from);
+    setActiveMatchIndex(nextIndex >= 0 ? nextIndex + 1 : 1);
+  }, [searchMatches]);
+
+  const applySearchQuery = useCallback((query: string) => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: setSearchQuery.of(
+        new SearchQuery({
+          search: query,
+        }),
+      ),
+    });
+  }, []);
+
+  const openSearch = useCallback(() => {
+    isSearchOpenRef.current = true;
+    setIsSearchOpen(true);
+    requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    });
+  }, []);
+
+  const closeSearch = useCallback(() => {
+    isSearchOpenRef.current = false;
+    setIsSearchOpen(false);
+    setSearchText("");
+    setActiveMatchIndex(0);
+    applySearchQuery("");
+    viewRef.current?.focus();
+  }, [applySearchQuery]);
+
+  const navigateSearch = useCallback(
+    (direction: "next" | "previous") => {
+      const view = viewRef.current;
+      if (!view || searchText.length === 0 || searchMatches.length === 0) return;
+      applySearchQuery(searchText);
+      const didFind = direction === "next" ? findNext(view) : findPrevious(view);
+      if (didFind) requestAnimationFrame(syncActiveMatch);
+    },
+    [applySearchQuery, searchMatches.length, searchText, syncActiveMatch],
+  );
 
   // Mount / unmount the editor when the source file (code/language) changes.
   useEffect(() => {
@@ -134,12 +227,31 @@ export function CodeBlockEditor({
           lineNumbers(),
           darkGutterTheme,
           fileHighlightTheme,
+          searchHighlightTheme,
           history(),
           highlightActiveLine(),
           highlightSelectionMatches(),
+          search(),
           syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
           indentOnInput(),
           bracketMatching(),
+          keymap.of([
+            {
+              key: "Mod-f",
+              run() {
+                openSearch();
+                return true;
+              },
+            },
+            {
+              key: "Escape",
+              run() {
+                if (!isSearchOpenRef.current) return false;
+                closeSearch();
+                return true;
+              },
+            },
+          ]),
           keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
           EditorView.editable.of(false),
           EditorState.readOnly.of(true),
@@ -175,7 +287,30 @@ export function CodeBlockEditor({
     // We intentionally rebuild the editor only when the source file changes.
     // Highlight line updates are handled by the second effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code, language]);
+  }, [closeSearch, code, language, openSearch]);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        openSearch();
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [openSearch]);
+
+  useEffect(() => {
+    applySearchQuery(searchText);
+    if (searchText.length === 0 || searchMatches.length === 0) {
+      setActiveMatchIndex(0);
+      return;
+    }
+    requestAnimationFrame(syncActiveMatch);
+  }, [applySearchQuery, searchMatches.length, searchText, syncActiveMatch]);
 
   // Update the transient highlight range and scroll to the new line, without
   // remounting the editor. Safe to run before the editor mounts — the mount
@@ -254,10 +389,80 @@ export function CodeBlockEditor({
   }
 
   return (
-    <div ref={containerRef} className="h-full overflow-auto bg-background p-3">
-      <style>{HIGHLIGHT_INTRO_STYLE}</style>
+    <div className="relative flex h-full flex-col bg-background">
+      {isSearchOpen ? (
+        <div className="flex shrink-0 items-center gap-1 border-b border-border/70 bg-background/95 px-2 py-1.5">
+          <div className="flex h-7 min-w-0 flex-1 items-center gap-1 rounded-md border border-input bg-background px-2 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/50">
+            <Search className="size-3.5 shrink-0 text-muted-foreground" />
+            <input
+              ref={searchInputRef}
+              aria-label="Search in file"
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              onChange={(event) => {
+                setSearchText(event.target.value);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  navigateSearch(event.shiftKey ? "previous" : "next");
+                } else if (event.key === "Escape") {
+                  event.preventDefault();
+                  closeSearch();
+                }
+              }}
+              placeholder="Search"
+              value={searchText}
+            />
+            <span className="shrink-0 tabular-nums text-xs text-muted-foreground">
+              {searchStatus}
+            </span>
+          </div>
+          <button
+            aria-label="Previous match"
+            className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={searchText.length === 0 || searchMatches.length === 0}
+            onClick={() => navigateSearch("previous")}
+            type="button"
+          >
+            <ChevronUp className="size-4" />
+          </button>
+          <button
+            aria-label="Next match"
+            className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={searchText.length === 0 || searchMatches.length === 0}
+            onClick={() => navigateSearch("next")}
+            type="button"
+          >
+            <ChevronDown className="size-4" />
+          </button>
+          <button
+            aria-label="Close search"
+            className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            onClick={closeSearch}
+            type="button"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      ) : null}
+      <div ref={containerRef} className="min-h-0 flex-1 overflow-auto p-3">
+        <style>{HIGHLIGHT_INTRO_STYLE}</style>
+      </div>
     </div>
   );
+}
+
+function findSearchMatches(code: string, searchText: string): Array<{ from: number; to: number }> {
+  if (searchText.length === 0) return [];
+  const state = EditorState.create({ doc: code });
+  const query = new SearchQuery({ search: searchText });
+  if (!query.valid) return [];
+  const cursor = query.getCursor(state);
+  const matches: Array<{ from: number; to: number }> = [];
+  for (let next = cursor.next(); !next.done; next = cursor.next()) {
+    matches.push({ from: next.value.from, to: next.value.to });
+  }
+  return matches;
 }
 
 function scrollToLine(view: EditorView, lineNumber: number) {
