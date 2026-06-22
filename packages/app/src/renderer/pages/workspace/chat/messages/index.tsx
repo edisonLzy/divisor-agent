@@ -95,6 +95,7 @@ export function ChatMessages({
                     message={message}
                     sessionId={sessionId}
                     startedAt={entry.timestamp}
+                    steerMessages={entry.steerMessages ?? []}
                     toolStates={toolStates}
                   />
                 ) : null}

@@ -13,11 +13,12 @@ import {
 } from "@renderer/components/ui/collapsible";
 import { Separator } from "@renderer/components/ui/separator";
 import { cn } from "@renderer/lib/utils";
-import type { SessionEntry, ToolExecutionState } from "@renderer/store/entries-slice";
+import type { SessionEntry, SteerMessage, ToolExecutionState } from "@renderer/store/entries-slice";
 import { ChevronRightIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AssistantResponseMessage } from "./assistant-response-message";
+import { AssistantSteerMessage } from "./assistant-steer-message";
 import { AssistantThinkingMessage } from "./assistant-thinking-message";
 import { AssistantToolMessage } from "./assistant-tool-message";
 import { FloatingToolbar } from "./floating-toolbar";
@@ -33,6 +34,7 @@ interface AssistantMessageProps {
   message: AssistantMessageType;
   sessionId: string;
   startedAt: number;
+  steerMessages: SteerMessage[];
   toolStates: Map<string, ToolExecutionState>;
 }
 
@@ -44,34 +46,34 @@ export function AssistantMessage({
   message,
   sessionId,
   startedAt,
+  steerMessages,
   toolStates,
 }: AssistantMessageProps) {
   const contentArray = Array.isArray(message.content) ? message.content : [];
   const errorMessage = message.errorMessage?.trim();
   const hasError =
     message.stopReason === "error" || message.stopReason === "aborted" || Boolean(errorMessage);
-  const { processingContent, textContent } = contentArray.reduce<{
-    processingContent: (ThinkingContent | ToolCall)[];
+  const { textContent, thinkingContent, toolCallContent } = contentArray.reduce<{
     textContent: TextContent[];
+    thinkingContent: ThinkingContent[];
+    toolCallContent: ToolCall[];
   }>(
     (acc, block) => {
-      if (block.type === "thinking" || block.type === "toolCall") {
-        acc.processingContent.push(block);
+      if (block.type === "thinking") {
+        acc.thinkingContent.push(block);
+      } else if (block.type === "toolCall") {
+        acc.toolCallContent.push(block);
       } else if (block.type === "text") {
         acc.textContent.push(block);
       }
       return acc;
     },
-    { processingContent: [], textContent: [] },
+    { textContent: [], thinkingContent: [], toolCallContent: [] },
   );
 
   const assistantText = textContent.map((block) => block.text).join("\n");
 
   const [isProcessingOpen, setIsProcessingOpen] = useState(true);
-
-  useEffect(() => {
-    setIsProcessingOpen(textContent.length === 0);
-  }, [textContent.length]);
 
   return (
     <Message from="assistant" className="gap-1">
@@ -91,30 +93,26 @@ export function AssistantMessage({
           </div>
 
           <CollapsibleContent className="mt-2 flex flex-col gap-2">
-            {processingContent.map((block) => {
-              if (block.type === "thinking") {
-                return (
-                  <AssistantThinkingMessage
-                    key={`thinking-${block.thinking.slice(0, 20)}`}
-                    content={block.thinking}
-                  />
-                );
-              }
+            {thinkingContent.map((block) => (
+              <AssistantThinkingMessage
+                key={`thinking-${block.thinking.slice(0, 20)}`}
+                content={block.thinking}
+              />
+            ))}
 
-              if (block.type === "toolCall") {
-                return (
-                  <AssistantToolMessage
-                    key={block.id}
-                    sessionId={sessionId}
-                    toolName={block.name}
-                    args={block.arguments}
-                    toolState={toolStates.get(block.id)}
-                  />
-                );
-              }
+            {steerMessages.map((steerMessage) => (
+              <AssistantSteerMessage key={steerMessage.id} message={steerMessage} />
+            ))}
 
-              return null;
-            })}
+            {toolCallContent.map((block) => (
+              <AssistantToolMessage
+                key={block.id}
+                sessionId={sessionId}
+                toolName={block.name}
+                args={block.arguments}
+                toolState={toolStates.get(block.id)}
+              />
+            ))}
           </CollapsibleContent>
         </Collapsible>
 

@@ -196,56 +196,45 @@ function useActiveSessionChat() {
     [activeSessionId, invoke],
   );
 
-  const enqueuePendingPrompt = useCallback(
-    async (
-      kind: PendingPrompt["kind"],
-      submission: PromptSubmission,
-      ipcChannel: "steerPrompt" | "followUpPrompt",
-    ) => {
-      if (!activeSessionId || !isRunning) {
-        return;
-      }
+  async function enqueuePendingPrompt(
+    kind: PendingPrompt["kind"],
+    submission: PromptSubmission,
+    ipcChannel: "steerPrompt" | "followUpPrompt",
+  ) {
+    if (!activeSessionId || !isRunning) {
+      return;
+    }
 
-      const pendingPrompt: PendingPrompt = {
-        id: uuidv4(),
-        kind,
-        content: submission.text,
-        createdAt: Date.now(),
-        metadata: {
-          model: {
-            modelId: submission.model.modelId,
-            providerId: submission.model.providerId,
-          },
-          skillIds: submission.skillIds,
-        },
-      };
+    const createdAt = Date.now();
+    const message = createAgentUserMessage(submission.jsonContent, submission.text);
+    message.timestamp = createdAt;
 
-      mainStore.getState().addPendingPrompt(activeSessionId, pendingPrompt);
+    const pendingPrompt: PendingPrompt = {
+      id: uuidv4(),
+      kind,
+      message,
+      metadata: {
+        skillIds: submission.skillIds,
+      },
+    };
 
-      try {
-        await invoke(ipcChannel, activeSessionId, {
-          content: pendingPrompt.content,
-          createdAt: pendingPrompt.createdAt,
-          metadata: pendingPrompt.metadata,
-        });
-      } catch (error) {
-        console.error(`Failed to enqueue ${kind} prompt`, error);
-        mainStore.getState().removePendingPrompt(activeSessionId, pendingPrompt.id);
-      }
-    },
-    [activeSessionId, invoke, isRunning],
-  );
+    mainStore.getState().addPendingPrompt(activeSessionId, pendingPrompt);
 
-  const steerPrompt = useCallback(
-    (submission: PromptSubmission) => enqueuePendingPrompt("steer", submission, "steerPrompt"),
-    [enqueuePendingPrompt],
-  );
+    try {
+      await invoke(ipcChannel, activeSessionId, pendingPrompt.message.text, pendingPrompt.metadata);
+    } catch (error) {
+      console.error(`Failed to enqueue ${kind} prompt`, error);
+      mainStore.getState().removePendingPrompt(activeSessionId, pendingPrompt.id);
+    }
+  }
 
-  const followUpPrompt = useCallback(
-    (submission: PromptSubmission) =>
-      enqueuePendingPrompt("followup", submission, "followUpPrompt"),
-    [enqueuePendingPrompt],
-  );
+  function steerPrompt(submission: PromptSubmission) {
+    return enqueuePendingPrompt("steer", submission, "steerPrompt");
+  }
+
+  function followUpPrompt(submission: PromptSubmission) {
+    return enqueuePendingPrompt("followup", submission, "followUpPrompt");
+  }
 
   const stopPrompt = useCallback(async () => {
     if (!activeSessionId) {

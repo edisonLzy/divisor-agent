@@ -1,0 +1,1030 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Divisor Agent - Steer Interaction Prototypes</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --background: #111111;
+        --panel: #141414;
+        --panel-2: #181818;
+        --muted: #222222;
+        --muted-2: #2c2c2c;
+        --text: #d4d4d4;
+        --text-strong: #f0f0f0;
+        --text-muted: #858585;
+        --border: #2c2c2c;
+        --border-soft: #242424;
+        --blue: #7aa7ff;
+        --blue-soft: rgba(122, 167, 255, 0.12);
+        --amber: #e6b450;
+        --amber-soft: rgba(230, 180, 80, 0.12);
+        --green: #86d49c;
+        --green-soft: rgba(134, 212, 156, 0.12);
+        --violet: #b79cff;
+        --violet-soft: rgba(183, 156, 255, 0.12);
+        --danger: #ef7d7d;
+        --shadow: 0 24px 70px rgba(0, 0, 0, 0.32);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--background);
+        color: var(--text);
+      }
+
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      .shell {
+        display: grid;
+        grid-template-columns: 260px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      .sidebar {
+        border-right: 1px solid var(--border);
+        background: var(--panel);
+        padding: 14px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 38px;
+        margin-bottom: 16px;
+      }
+
+      .brand-title {
+        font-size: 14px;
+        font-weight: 650;
+        color: var(--text-strong);
+      }
+
+      .small-icon {
+        display: grid;
+        place-items: center;
+        width: 28px;
+        height: 28px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        color: var(--text-muted);
+        background: var(--panel-2);
+      }
+
+      .session-list {
+        display: grid;
+        gap: 6px;
+      }
+
+      .session {
+        padding: 10px;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        color: var(--text-muted);
+      }
+
+      .session.active {
+        background: var(--muted);
+        border-color: var(--border);
+        color: var(--text);
+      }
+
+      .session-title {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 13px;
+      }
+
+      .session-meta {
+        margin-top: 4px;
+        font-size: 11px;
+        color: #676767;
+      }
+
+      .main {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        min-width: 0;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 54px;
+        padding: 0 22px;
+        border-bottom: 1px solid var(--border-soft);
+        background: rgba(17, 17, 17, 0.86);
+      }
+
+      .topbar h1 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-strong);
+      }
+
+      .decision {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 24px;
+        padding: 0 9px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--panel-2);
+        color: var(--text-muted);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .pill.blue {
+        border-color: rgba(122, 167, 255, 0.28);
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .pill.amber {
+        border-color: rgba(230, 180, 80, 0.28);
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      .content {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 330px;
+        min-height: 0;
+      }
+
+      .stage {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        min-width: 0;
+        min-height: 0;
+        padding: 18px 24px 24px;
+      }
+
+      .version-tabs {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        max-width: 880px;
+        margin: 0 auto 14px;
+        width: 100%;
+      }
+
+      .tab {
+        min-height: 48px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--panel);
+        color: var(--text-muted);
+        text-align: left;
+        padding: 8px 10px;
+      }
+
+      .tab.active {
+        border-color: rgba(122, 167, 255, 0.46);
+        background: rgba(122, 167, 255, 0.08);
+        color: var(--text);
+      }
+
+      .tab-title {
+        display: block;
+        font-size: 12px;
+        font-weight: 650;
+        color: var(--text-strong);
+      }
+
+      .tab-subtitle {
+        display: block;
+        margin-top: 3px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 11px;
+      }
+
+      .chat {
+        min-height: 0;
+        overflow: auto;
+        padding: 4px 10px 10px;
+      }
+
+      .chat-inner {
+        width: min(100%, 860px);
+        margin: 0 auto;
+      }
+
+      .message-row {
+        display: flex;
+        margin: 18px 0;
+      }
+
+      .message-row.user {
+        justify-content: flex-end;
+      }
+
+      .bubble {
+        max-width: min(680px, 86%);
+        border-radius: 20px;
+        padding: 13px 15px;
+        font-size: 14px;
+        line-height: 1.65;
+      }
+
+      .bubble.user {
+        background: var(--muted);
+        color: var(--text);
+        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.18);
+      }
+
+      .assistant-block {
+        max-width: 760px;
+        color: var(--text);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .assistant-block p {
+        margin: 0 0 11px;
+      }
+
+      .assistant-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+
+      .spinner {
+        width: 12px;
+        height: 12px;
+        border: 2px solid var(--border);
+        border-top-color: var(--text-muted);
+        border-radius: 999px;
+        animation: spin 0.9s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .steer-inline {
+        display: grid;
+        gap: 7px;
+        margin: 12px 0 14px;
+        padding: 10px 12px;
+        border: 1px solid rgba(122, 167, 255, 0.22);
+        border-radius: 8px;
+        background: var(--blue-soft);
+      }
+
+      .steer-inline .label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        color: var(--blue);
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .steer-inline .body {
+        color: var(--text);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .control-lane {
+        display: grid;
+        gap: 8px;
+        margin: 0 auto 10px;
+        width: min(100%, 760px);
+      }
+
+      .handoff-flow {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        align-items: stretch;
+        gap: 8px;
+        width: min(100%, 760px);
+        margin: 0 auto 10px;
+      }
+
+      .handoff-card {
+        display: grid;
+        gap: 7px;
+        min-height: 78px;
+        padding: 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+
+      .handoff-card.active {
+        border-color: rgba(122, 167, 255, 0.32);
+        background: rgba(122, 167, 255, 0.07);
+      }
+
+      .handoff-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        color: var(--text-strong);
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .handoff-body {
+        color: var(--text-muted);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .handoff-arrow {
+        display: grid;
+        place-items: center;
+        color: var(--text-muted);
+        font-size: 18px;
+      }
+
+      .lane-card {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px;
+        min-height: 42px;
+        padding: 8px 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: 0 14px 40px rgba(0, 0, 0, 0.2);
+      }
+
+      .lane-card strong {
+        color: var(--text-strong);
+        font-size: 12px;
+      }
+
+      .lane-card span {
+        display: block;
+        overflow: hidden;
+        color: var(--text-muted);
+        font-size: 12px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--green);
+        box-shadow: 0 0 0 4px var(--green-soft);
+      }
+
+      .composer {
+        width: min(100%, 760px);
+        margin: 16px auto 0;
+        border: 1px solid var(--border);
+        border-radius: 22px;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .mode-bar {
+        display: flex;
+        gap: 6px;
+        padding: 8px 8px 0;
+      }
+
+      .mode-btn {
+        height: 28px;
+        border: 1px solid transparent;
+        border-radius: 7px;
+        background: transparent;
+        color: var(--text-muted);
+        padding: 0 10px;
+        font-size: 12px;
+      }
+
+      .mode-btn.active {
+        border-color: rgba(122, 167, 255, 0.28);
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .input-shell {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: end;
+        gap: 12px;
+        padding: 10px 12px 12px;
+      }
+
+      .fake-input {
+        min-height: 42px;
+        resize: none;
+        border: 0;
+        outline: none;
+        background: transparent;
+        color: var(--text);
+        line-height: 1.55;
+      }
+
+      .send {
+        display: grid;
+        place-items: center;
+        width: 30px;
+        height: 30px;
+        border: 0;
+        border-radius: 999px;
+        background: #e6e6e6;
+        color: #111111;
+        font-weight: 700;
+      }
+
+      .inspector {
+        min-width: 0;
+        border-left: 1px solid var(--border);
+        background: var(--panel);
+        padding: 18px;
+        overflow: auto;
+      }
+
+      .inspector h2 {
+        margin: 0 0 8px;
+        color: var(--text-strong);
+        font-size: 14px;
+      }
+
+      .inspector p {
+        margin: 0 0 14px;
+        color: var(--text-muted);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .rule-card {
+        margin: 12px 0;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--panel-2);
+      }
+
+      .rule-card h3 {
+        margin: 0 0 8px;
+        color: var(--text-strong);
+        font-size: 13px;
+      }
+
+      .rule-card ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--text-muted);
+        font-size: 12px;
+        line-height: 1.65;
+      }
+
+      .code-note {
+        display: grid;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .code-chip {
+        display: inline-flex;
+        width: fit-content;
+        align-items: center;
+        min-height: 24px;
+        padding: 0 8px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: #101010;
+        color: var(--text);
+        font-family:
+          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        font-size: 11px;
+      }
+
+      .event-log {
+        display: grid;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .event {
+        display: grid;
+        gap: 4px;
+        padding: 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #121212;
+      }
+
+      .event b {
+        color: var(--text);
+        font-size: 12px;
+      }
+
+      .event span {
+        color: var(--text-muted);
+        font-size: 11px;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      @media (max-width: 980px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          display: none;
+        }
+
+        .content {
+          grid-template-columns: 1fr;
+        }
+
+        .inspector {
+          border-left: 0;
+          border-top: 1px solid var(--border);
+        }
+
+        .version-tabs {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-title">Divisor Agent</div>
+          <div class="small-icon">+</div>
+        </div>
+        <div class="session-list">
+          <div class="session active">
+            <div class="session-title">steer message 行为设计</div>
+            <div class="session-meta">running · Claude Sonnet</div>
+          </div>
+          <div class="session">
+            <div class="session-title">extension runtime 调研</div>
+            <div class="session-meta">completed</div>
+          </div>
+          <div class="session">
+            <div class="session-title">session tree rewind</div>
+            <div class="session-meta">draft</div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <h1>steer message 行为设计</h1>
+          <div class="decision">
+            <span>Goal</span>
+            <span class="pill blue">方案 A · Assistant Steer Event</span>
+          </div>
+        </header>
+
+        <section class="content">
+          <div class="stage">
+            <div class="version-tabs" role="tablist" aria-label="Steer interaction versions">
+              <button class="tab active" data-version="inline" type="button">
+                <span class="tab-title">A. Assistant Steer Event · Goal</span>
+                <span class="tab-subtitle">目标方案：消费后落入 AssistantMessage processing</span>
+              </button>
+              <button class="tab" data-version="lane" type="button">
+                <span class="tab-title">B. 运行控制队列 · Reference</span>
+                <span class="tab-subtitle">仅作对照：可短暂反馈，但归属感较弱</span>
+              </button>
+              <button class="tab" data-version="turn" type="button">
+                <span class="tab-title">C. 强制新回合 · Avoid</span>
+                <span class="tab-subtitle">不采用：会让 steer 误变成新对话轮次</span>
+              </button>
+            </div>
+
+            <div class="control-lane hidden" data-panel="lane">
+              <div class="lane-card">
+                <div class="status-dot"></div>
+                <div>
+                  <strong>已注入当前运行</strong>
+                  <span>不要继续重构数据层，先只修复 steer UI 的消息归属。</span>
+                </div>
+                <span class="pill blue">Steer</span>
+              </div>
+              <div class="lane-card">
+                <div
+                  class="status-dot"
+                  style="background: var(--amber); box-shadow: 0 0 0 4px var(--amber-soft)"
+                ></div>
+                <div>
+                  <strong>排队到完成后</strong>
+                  <span>完成后总结 runtime 行为，并列出需要改的文件。</span>
+                </div>
+                <span class="pill amber">Follow-up</span>
+              </div>
+            </div>
+
+            <div class="handoff-flow" data-panel="inline">
+              <div class="handoff-card">
+                <div class="handoff-title">
+                  <span>1. Pending Prompts</span>
+                  <span class="pill">queued</span>
+                </div>
+                <div class="handoff-body">
+                  发送后先出现在输入框上方，表示 runtime 尚未消费，可撤销、重排。
+                </div>
+              </div>
+              <div class="handoff-arrow">→</div>
+              <div class="handoff-card active">
+                <div class="handoff-title">
+                  <span>2. Assistant response stream</span>
+                  <span class="pill blue">applied</span>
+                </div>
+                <div class="handoff-body">
+                  一旦被消费，从 pending 消失，并插入到当前 assistant 已输出内容之后。
+                </div>
+              </div>
+            </div>
+
+            <div class="chat" id="chat">
+              <div class="chat-inner">
+                <div class="message-row user">
+                  <div class="bubble user">
+                    steer message
+                    再被处理的时候应该作为新一轮对话，还是在当前进行中的会话中处理？前端 UI
+                    交互应该如何设计？
+                  </div>
+                </div>
+
+                <div class="message-row">
+                  <div class="assistant-block">
+                    <div class="assistant-header">
+                      <span class="spinner"></span>
+                      <span>Assistant is working</span>
+                      <span class="pill">message_start · assistant</span>
+                    </div>
+                    <p>
+                      我会先判断 steer 的产品语义，再把 UI 状态和消息流对齐。当前实现把 steer
+                      消费后的 user message append 到会话列表，但 runtime 不一定产生新的 assistant
+                      message，所以用户会看到一条“没有被回复”的消息。
+                    </p>
+
+                    <div class="steer-inline" data-panel="inline">
+                      <div class="label">
+                        <span>Steer consumed from pending and applied here</span>
+                        <span>10:42:18 · applied</span>
+                      </div>
+                      <div class="body">
+                        不要把 steer 当成新的对话轮次。它应该改变当前 assistant
+                        正在生成的路线，并作为当前 assistant entry 的 UI 控制事件展示。
+                      </div>
+                    </div>
+
+                    <p data-panel="inline">
+                      收到。结合现有代码，steer 不适合塞进
+                      <span class="code-chip">ThinkingContent</span>，因为 thinking
+                      是模型产生的内部推理内容；也不适合塞进
+                      <span class="code-chip">TextContent</span
+                      >，否则复制、fork、历史消息都会把控制指令误当成 assistant
+                      正文。更合适的是在当前 streaming assistant entry 上挂一个 UI metadata 事件，由
+                      <span class="code-chip">AssistantMessage</span> 的处理区渲染。
+                    </p>
+
+                    <p data-panel="lane" class="hidden">
+                      收到控制指令。因为 steer
+                      在控制队列中已经显示为“已注入当前运行”，聊天正文里不再重复出现一条 user
+                      message。当前 assistant 继续输出时，语义上就是已经采用了这条实时指令。
+                    </p>
+
+                    <div
+                      class="message-row user hidden"
+                      data-panel="turn"
+                      style="margin: 12px 0 12px 80px"
+                    >
+                      <div class="bubble user">
+                        不要把 steer 当成新的对话轮次。它应该改变当前 assistant 正在生成的路线。
+                      </div>
+                    </div>
+
+                    <div
+                      class="steer-inline hidden"
+                      data-panel="turn"
+                      style="border-color: rgba(230, 180, 80, 0.28); background: var(--amber-soft)"
+                    >
+                      <div class="label" style="color: var(--amber)">
+                        <span>Assistant turn placeholder is required</span>
+                        <span>10:42:18</span>
+                      </div>
+                      <div class="body">
+                        如果 UI 坚持把 steer 放进消息列表作为 user turn，下一行必须出现 assistant
+                        的“正在调整当前回答”状态，否则用户会误以为系统漏回了。
+                      </div>
+                    </div>
+
+                    <p data-panel="turn" class="hidden">
+                      正在调整当前回答。这个版本能保持传统 user/assistant 交替，但它会把 steer
+                      误导成“新一轮对话”，同时要求 runtime 或前端合成一个 assistant placeholder
+                      来闭合回合。
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="composer">
+              <div class="mode-bar">
+                <button class="mode-btn active" type="button" data-mode="steer">
+                  Steer current
+                </button>
+                <button class="mode-btn" type="button" data-mode="followup">Follow-up next</button>
+                <button class="mode-btn" type="button" data-mode="prompt">New prompt</button>
+              </div>
+              <div class="input-shell">
+                <textarea class="fake-input" rows="2">
+不要继续重构数据层，先只修复 steer UI 的消息归属。</textarea
+                >
+                <button class="send" type="button" title="Send">↑</button>
+              </div>
+            </div>
+          </div>
+
+          <aside class="inspector">
+            <h2 id="inspector-title">A. Assistant Steer Event · Goal</h2>
+            <p id="inspector-summary">
+              目标方案。steer 是当前 assistant 生成过程的 UI 控制事件：pending
+              只表示未消费；消费后从 pending 移除，并出现在当前 assistant response 的消费位置。
+            </p>
+
+            <div class="rule-card">
+              <h3>消息语义</h3>
+              <ul id="semantics">
+                <li>Steer：影响当前运行，不开启新 user/assistant turn。</li>
+                <li>Follow-up：排队到当前完成后，开启下一轮 user/assistant。</li>
+                <li>Thinking：只展示模型真实 thinking，不混入用户 steer。</li>
+              </ul>
+            </div>
+
+            <div class="rule-card">
+              <h3>落点判断</h3>
+              <div class="code-note" id="code-layer">
+                <span class="code-chip">AssistantMessage UI event</span>
+                <ul id="code-layer-rules">
+                  <li>
+                    不是 <span class="code-chip">ThinkingContent</span>：steer
+                    来自用户，不是模型内部推理。
+                  </li>
+                  <li>
+                    不是 <span class="code-chip">TextContent</span>：不应进入复制、fork、历史正文。
+                  </li>
+                  <li>不放在 processing 顶部：应按被消费时的 response offset 插入正文流。</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="rule-card">
+              <h3>需要改的 UI 规则</h3>
+              <ul id="ui-rules">
+                <li>pending 表示“未消费”，被消费后必须从 pending 区域移除。</li>
+                <li>移除后记录当前 assistant 已输出文本长度，按 response offset 插入。</li>
+                <li>输入框上方可短暂显示 recently applied，随后只在 assistant 内长期保留。</li>
+              </ul>
+            </div>
+
+            <div class="rule-card">
+              <h3>事件流示意</h3>
+              <div class="event-log" id="event-log">
+                <div class="event">
+                  <b>user prompt</b>
+                  <span>append message entry，启动 assistant streaming</span>
+                </div>
+                <div class="event">
+                  <b>steerPrompt</b>
+                  <span
+                    >add pending prompt，runtime 消费后绑定到 current assistant entry metadata</span
+                  >
+                </div>
+                <div class="event">
+                  <b>assistant continues</b>
+                  <span>同一个 assistant message 继续更新，不新建回复</span>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const tabs = Array.from(document.querySelectorAll(".tab"));
+      const panels = Array.from(document.querySelectorAll("[data-panel]"));
+      const title = document.querySelector("#inspector-title");
+      const summary = document.querySelector("#inspector-summary");
+      const semantics = document.querySelector("#semantics");
+      const uiRules = document.querySelector("#ui-rules");
+      const eventLog = document.querySelector("#event-log");
+      const codeLayer = document.querySelector("#code-layer");
+      const codeLayerRules = document.querySelector("#code-layer-rules");
+      const modes = Array.from(document.querySelectorAll(".mode-btn"));
+
+      const content = {
+        inline: {
+          title: "A. Assistant Steer Event · Goal",
+          summary:
+            "目标方案。steer 是当前 assistant 生成过程的 UI 控制事件：pending 只表示未消费；消费后从 pending 移除，并出现在当前 assistant response 的消费位置。",
+          semantics: [
+            "Steer：影响当前运行，不开启新 user/assistant turn。",
+            "Follow-up：排队到当前完成后，开启下一轮 user/assistant。",
+            "Thinking：只展示模型真实 thinking，不混入用户 steer。",
+          ],
+          rules: [
+            "pending 表示未消费，被消费后必须从 pending 区域移除。",
+            "移除后记录当前 assistant 已输出文本长度，按 response offset 插入。",
+            "输入框上方可短暂显示 recently applied，随后只在 assistant 内长期保留。",
+          ],
+          layer: {
+            chip: "AssistantMessage UI event",
+            rules: [
+              "不是 ThinkingContent：steer 来自用户，不是模型内部推理。",
+              "不是 TextContent：不应进入复制、fork、历史正文。",
+              "不放在 processing 顶部：应按被消费时的 response offset 插入正文流。",
+            ],
+          },
+          events: [
+            ["user prompt", "append message entry，启动 assistant streaming"],
+            ["steer pending", "先进入 PendingPromptsPanel，可撤销、重排"],
+            [
+              "steer consumed",
+              "从 pending 移除，追加到 current assistant entry 的 steerEvents metadata",
+            ],
+            [
+              "assistant response",
+              "AssistantMessage 按 responseOffset 在正文流中展示 applied steer",
+            ],
+            ["assistant continues", "同一个 assistant message 继续更新，不新建回复"],
+          ],
+        },
+        lane: {
+          title: "B. 运行控制队列 · Reference",
+          summary:
+            "对照方案。它适合表达实时运行控制，但 consumed steer 的长期归属仍需要回到 assistant entry，否则用户很难知道它影响了哪次回答。",
+          semantics: [
+            "Steer：立即注入当前运行，显示在输入框上方的控制队列。",
+            "Follow-up：同队列展示，但明确标记为完成后运行。",
+            "正文消息保持纯净；必要时在 AssistantMessage header 展示 steer count。",
+          ],
+          rules: [
+            "pending panel 区分 pending、applied、queued-next 三种状态。",
+            "steer 被消费后可在控制队列中短暂变成 applied，再折叠到 assistant header。",
+            "聊天正文不追加 steer user message；assistant 内可有简短关联锚点。",
+          ],
+          layer: {
+            chip: "RunControlEvent",
+            rules: [
+              "更少侵入 AssistantMessage content 类型。",
+              "适合多条 steer/follow-up 排队管理，但和最终回答的归属感稍弱。",
+              "可以在 AssistantMessage header 同步一个 steer count 作为关联提示。",
+            ],
+          },
+          events: [
+            ["steer queued", "出现在控制队列顶部，状态为 pending"],
+            ["steer consumed", "状态切换为 applied，2-3 秒后从控制队列折叠"],
+            ["assistant header", "显示 1 steer applied，点击可展开控制记录"],
+            ["assistant continues", "正文继续流式更新，不进入 messageEntries"],
+          ],
+        },
+        turn: {
+          title: "C. 强制新回合 · Avoid",
+          summary:
+            "不采用。把 steer 展示成新 user turn 会制造新的 assistant 回复期待，也会污染会话历史、fork 和 rewind 语义。",
+          semantics: [
+            "Steer 被表达成新 user turn，用户会期待 assistant 响应。",
+            "当前 assistant 的继续输出需要被 UI 标成“正在调整当前回答”。",
+            "这会弱化 steer 与 follow-up 的差异，也会污染历史会话结构。",
+          ],
+          rules: [
+            "pending 被消费后 append steer user message，会造成用户期待新回复。",
+            "必须立即 append assistant status entry 闭合视觉回合。",
+            "完成后还要把 placeholder 合并回原 assistant continuation，维护成本最高。",
+          ],
+          layer: {
+            chip: "Synthetic assistant placeholder",
+            rules: [
+              "需要前端合成 assistant 状态，否则仍会出现 steer 无回复的问题。",
+              "会让 steer 看起来像 follow-up，产品语义变模糊。",
+              "历史、fork、rewind 都要处理 placeholder 合并，复杂度最高。",
+            ],
+          },
+          events: [
+            ["steer user message", "append 到 message list"],
+            ["assistant placeholder", "立即显示“正在调整当前回答”"],
+            [
+              "merge on completion",
+              "把 placeholder 与原 assistant continuation 归并或保留状态说明",
+            ],
+          ],
+        },
+      };
+
+      function renderList(node, items) {
+        node.innerHTML = "";
+        for (const item of items) {
+          const li = document.createElement("li");
+          li.textContent = item;
+          node.appendChild(li);
+        }
+      }
+
+      function renderEvents(items) {
+        eventLog.innerHTML = "";
+        for (const [name, body] of items) {
+          const item = document.createElement("div");
+          item.className = "event";
+          item.innerHTML = `<b>${name}</b><span>${body}</span>`;
+          eventLog.appendChild(item);
+        }
+      }
+
+      function renderLayer(layer) {
+        codeLayer.querySelector(".code-chip").textContent = layer.chip;
+        codeLayerRules.innerHTML = "";
+        for (const item of layer.rules) {
+          const li = document.createElement("li");
+          li.textContent = item;
+          codeLayerRules.appendChild(li);
+        }
+      }
+
+      function setVersion(version) {
+        tabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.version === version));
+        panels.forEach((panel) => {
+          panel.classList.toggle("hidden", panel.dataset.panel !== version);
+        });
+
+        const data = content[version];
+        title.textContent = data.title;
+        summary.textContent = data.summary;
+        renderList(semantics, data.semantics);
+        renderList(uiRules, data.rules);
+        renderLayer(data.layer);
+        renderEvents(data.events);
+      }
+
+      tabs.forEach((tab) => {
+        tab.addEventListener("click", () => setVersion(tab.dataset.version));
+      });
+
+      modes.forEach((mode) => {
+        mode.addEventListener("click", () => {
+          modes.forEach((item) => item.classList.toggle("active", item === mode));
+        });
+      });
+    </script>
+  </body>
+</html>

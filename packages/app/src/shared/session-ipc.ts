@@ -2,7 +2,6 @@ import type { AgentMessage } from "@mariozechner/pi-agent-core";
 
 import type { AgentSessionScope } from "./events-ipc";
 import type { AvailableModel } from "./models-ipc";
-import type { PendingPromptInput } from "./pending-prompts-ipc";
 import type { PermissionMode, PermissionResolution } from "./permissions-ipc";
 
 export interface PromptMetadata {
@@ -12,8 +11,8 @@ export interface PromptMetadata {
 
 export interface AgentSessionIPC {
   prompt: (sessionId: string, content: string, metadata?: PromptMetadata) => Promise<void>;
-  steerPrompt: (sessionId: string, input: PendingPromptInput) => Promise<void>;
-  followUpPrompt: (sessionId: string, input: PendingPromptInput) => Promise<void>;
+  steerPrompt: (sessionId: string, content: string, metadata?: PromptMetadata) => Promise<void>;
+  followUpPrompt: (sessionId: string, content: string, metadata?: PromptMetadata) => Promise<void>;
   clearPendingPrompts: (sessionId: string) => Promise<void>;
   abortPrompt: (sessionId: string) => Promise<void>;
   setHistoryMessages: (sessionId: string, messages: AgentMessage[]) => Promise<void>;

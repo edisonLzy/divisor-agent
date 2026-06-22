@@ -2,9 +2,11 @@ import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import type { AssistantMessage, UserMessage } from "@mariozechner/pi-ai";
 import type { Entry } from "@renderer/apis/sessions";
 import { isAgentMessageEntry } from "@renderer/lib/is";
-import type { JSONContent } from "@tiptap/core";
+import type { AgentUserMessage } from "@shared/agent-message-ipc";
 import { v4 as uuidv4 } from "uuid";
 import type { StateCreator } from "zustand/vanilla";
+
+export type { AgentUserMessage } from "@shared/agent-message-ipc";
 
 export type SessionStatus = "idle" | "running" | "completed" | "failed";
 
@@ -30,9 +32,11 @@ export interface ToolExecutionState {
   approvalStatus?: ToolApprovalStatus;
 }
 
-export interface AgentUserMessage extends Omit<UserMessage, "content"> {
-  content: JSONContent;
-  text: string;
+export interface SteerMessage {
+  id: string;
+  content: string;
+  createdAt: number;
+  appliedAt: number;
 }
 
 export type AgentMessageData = Exclude<AgentMessage, UserMessage> | AgentUserMessage;
@@ -42,6 +46,7 @@ interface AgentMessageEntry extends Omit<Entry, "type" | "data"> {
   data: AgentMessageData;
   status: EntryStatus;
   completedAt?: number;
+  steerMessages?: SteerMessage[];
 }
 
 export interface ModelChangedData {
@@ -73,9 +78,11 @@ export interface EntriesSlice {
   getEntryState: (sessionId: string) => EntryState;
 
   appendMessageEntry: (sessionId: string, message: AgentMessageData) => string;
-  removeMessageEntry: (sessionId: string, entryId: string) => void;
-  reorderMessageEntries: (sessionId: string, entryIdsInOrder: string[]) => void;
   updateMessageEntry: (sessionId: string, entryId: string, message: AssistantMessage) => void;
+  appendSteerMessageToStreamingEntry: (
+    sessionId: string,
+    steerMessage: Omit<SteerMessage, "appliedAt">,
+  ) => void;
   setEntryStatus: (sessionId: string, entryIds: string[], status: EntryStatus) => void;
   setStreamingEntryId: (sessionId: string, id: string | undefined) => void;
   setStreamingEntryCompletedAt: (sessionId: string, completedAt: number) => void;
@@ -140,53 +147,6 @@ export const createEntriesSlice: StateCreator<EntriesSlice, [], [], EntriesSlice
     return entryId;
   },
 
-  removeMessageEntry: (sessionId, entryId) => {
-    set((prev) => {
-      const entryStates = new Map(prev.entryStates);
-      const current = getOrCreateEntryState(entryStates, sessionId);
-      entryStates.set(sessionId, {
-        ...current,
-        entries: current.entries.filter((entry) => entry.id !== entryId),
-      });
-      return { entryStates };
-    });
-  },
-
-  reorderMessageEntries: (sessionId, entryIdsInOrder) => {
-    if (entryIdsInOrder.length < 2) return;
-
-    set((prev) => {
-      const entryStates = new Map(prev.entryStates);
-      const current = getOrCreateEntryState(entryStates, sessionId);
-      const pendingEntriesById = new Map(
-        current.entries
-          .filter((entry) => entryIdsInOrder.includes(entry.id))
-          .map((entry) => [entry.id, entry]),
-      );
-
-      if (pendingEntriesById.size < 2) {
-        return prev;
-      }
-
-      const orderedEntries = entryIdsInOrder
-        .map((entryId) => pendingEntriesById.get(entryId))
-        .filter((entry): entry is SessionEntry => Boolean(entry));
-      let orderedEntryIndex = 0;
-
-      entryStates.set(sessionId, {
-        ...current,
-        entries: current.entries.map((entry) => {
-          if (!pendingEntriesById.has(entry.id)) {
-            return entry;
-          }
-
-          return orderedEntries[orderedEntryIndex++] ?? entry;
-        }),
-      });
-      return { entryStates };
-    });
-  },
-
   updateMessageEntry: (sessionId, entryId, message) => {
     const state = get().getEntryState(sessionId);
     const entryIndex = state.entries.findIndex((entry) => entry.id === entryId);
@@ -200,6 +160,56 @@ export const createEntriesSlice: StateCreator<EntriesSlice, [], [], EntriesSlice
       const current = getOrCreateEntryState(entryStates, sessionId);
       const entries = [...current.entries];
       entries[entryIndex] = { ...existingEntry, data: message };
+      entryStates.set(sessionId, { ...current, entries });
+      return { entryStates };
+    });
+  },
+
+  appendSteerMessageToStreamingEntry: (sessionId, steerMessage) => {
+    const state = get().getEntryState(sessionId);
+    const streamingEntryId = get().streamingEntryIds.get(sessionId);
+    const targetEntry =
+      state.entries.find((entry) => entry.id === streamingEntryId) ??
+      [...state.entries].reverse().find((entry) => {
+        return isAgentMessageEntry(entry) && entry.data.role === "assistant";
+      });
+
+    if (
+      !targetEntry ||
+      !isAgentMessageEntry(targetEntry) ||
+      targetEntry.data.role !== "assistant"
+    ) {
+      return;
+    }
+
+    set((prev) => {
+      const entryStates = new Map(prev.entryStates);
+      const current = getOrCreateEntryState(entryStates, sessionId);
+      const entries = current.entries.map((entry) => {
+        if (
+          entry.id !== targetEntry.id ||
+          !isAgentMessageEntry(entry) ||
+          entry.data.role !== "assistant"
+        ) {
+          return entry;
+        }
+
+        const existingMessages = entry.steerMessages ?? [];
+        if (existingMessages.some((item) => item.id === steerMessage.id)) {
+          return entry;
+        }
+
+        return {
+          ...entry,
+          steerMessages: [
+            ...existingMessages,
+            {
+              ...steerMessage,
+              appliedAt: Date.now(),
+            },
+          ],
+        };
+      });
       entryStates.set(sessionId, { ...current, entries });
       return { entryStates };
     });

@@ -39,7 +39,6 @@ export function PromptInput({
   const permissionSelectorProps = usePermissionSelector(sessionId);
 
   const editorContainerRef = useRef<HTMLDivElement | null>(null);
-  const canUseQueueMode = typeof onSteer === "function" && typeof onFollowUp === "function";
 
   const { editor, hasContent } = useChatEditor({
     disabled,
@@ -63,7 +62,7 @@ export function PromptInput({
   const canSubmitPrompt =
     !disabled && !isRunning && hasContent && modelSelectorProps.value !== null;
   const canSubmitPendingPrompt =
-    !disabled && isRunning && canUseQueueMode && hasContent && modelSelectorProps.value !== null;
+    !disabled && isRunning && hasContent && modelSelectorProps.value !== null;
   const isStopEnabled = isRunning && typeof onStop === "function";
 
   const handleSubmit = useCallback(
@@ -126,19 +125,23 @@ export function PromptInput({
         return;
       }
 
-      if ((event.metaKey || event.ctrlKey) && event.shiftKey) {
+      if (isRunning) {
+        if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey) {
+          event.preventDefault();
+          void handleSubmit("steer");
+          return;
+        }
+
+        if (event.shiftKey || event.altKey) {
+          return;
+        }
+
         event.preventDefault();
         void handleSubmit("followup");
         return;
       }
 
-      if (event.metaKey || event.ctrlKey) {
-        event.preventDefault();
-        void handleSubmit("steer");
-        return;
-      }
-
-      if (event.shiftKey || event.altKey) {
+      if (event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) {
         return;
       }
 
@@ -151,7 +154,7 @@ export function PromptInput({
     return () => {
       container.removeEventListener("keydown", handleKeyDown, { capture: true });
     };
-  }, [editor, handleSubmit]);
+  }, [editor, handleSubmit, isRunning]);
 
   return (
     <div

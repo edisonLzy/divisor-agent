@@ -9,7 +9,7 @@ import Emittery from "emittery";
 
 import type { AgentSessionScope, AllowedMainExposeEvents } from "../shared/events-ipc.js";
 import type { AgentModelsIPC } from "../shared/models-ipc.js";
-import type { PendingPromptInput, PendingPromptKind } from "../shared/pending-prompts-ipc.js";
+import type { PendingPromptKind } from "../shared/pending-prompts-ipc.js";
 import type { PermissionMode } from "../shared/permissions-ipc.js";
 import type { AgentSessionIPC } from "../shared/session-ipc.js";
 import type { AgentSkillsIPC } from "../shared/skills-ipc.js";
@@ -224,12 +224,12 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
     this.agent.prompt(this.skillService.expandSkillReferences(content, metadata.skillIds ?? []));
   };
 
-  public steerPrompt: AgentRuntimeDelegate["steerPrompt"] = async (input) => {
-    await this.queuePrompt("steer", input);
+  public steerPrompt: AgentRuntimeDelegate["steerPrompt"] = async (content, metadata) => {
+    await this.queuePrompt("steer", content, metadata);
   };
 
-  public followUpPrompt: AgentRuntimeDelegate["followUpPrompt"] = async (input) => {
-    await this.queuePrompt("followup", input);
+  public followUpPrompt: AgentRuntimeDelegate["followUpPrompt"] = async (content, metadata) => {
+    await this.queuePrompt("followup", content, metadata);
   };
 
   public clearPendingPrompts: AgentRuntimeDelegate["clearPendingPrompts"] = async () => {
@@ -289,20 +289,20 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
     };
   }
 
-  private async queuePrompt(kind: PendingPromptKind, input: PendingPromptInput) {
-    const content = input.content.trim();
-    if (!content) {
+  private async queuePrompt(
+    kind: PendingPromptKind,
+    content: string,
+    metadata?: Parameters<AgentRuntimeDelegate["prompt"]>[1],
+  ) {
+    const trimmedContent = content.trim();
+    if (!trimmedContent) {
       return;
-    }
-
-    if (input.metadata?.model) {
-      await this.setModel(input.metadata.model);
     }
 
     const message = {
       role: "user" as const,
-      content: this.skillService.expandSkillReferences(content, input.metadata?.skillIds ?? []),
-      timestamp: input.createdAt ?? Date.now(),
+      content: this.skillService.expandSkillReferences(trimmedContent, metadata?.skillIds ?? []),
+      timestamp: Date.now(),
     };
 
     if (kind === "steer") {

@@ -135,14 +135,18 @@ export class AgentPool
     runtime.prompt(content, metadata);
   };
 
-  public steerPrompt: AgentSessionIPC["steerPrompt"] = async (sessionId, input) => {
+  public steerPrompt: AgentSessionIPC["steerPrompt"] = async (sessionId, content, metadata) => {
     const runtime = this.getOrCreateRuntime(sessionId);
-    await runtime.steerPrompt(input);
+    await runtime.steerPrompt(content, metadata);
   };
 
-  public followUpPrompt: AgentSessionIPC["followUpPrompt"] = async (sessionId, input) => {
+  public followUpPrompt: AgentSessionIPC["followUpPrompt"] = async (
+    sessionId,
+    content,
+    metadata,
+  ) => {
     const runtime = this.getOrCreateRuntime(sessionId);
-    await runtime.followUpPrompt(input);
+    await runtime.followUpPrompt(content, metadata);
   };
 
   public clearPendingPrompts: AgentSessionIPC["clearPendingPrompts"] = async (sessionId) => {
