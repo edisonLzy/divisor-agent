@@ -1,6 +1,7 @@
 import { useExtensionsContextAPI } from "@divisor-agent/extension-core/renderer";
 import type { AssistantMessage, ToolCall } from "@mariozechner/pi-ai";
 import { appendEntries } from "@renderer/apis/sessions";
+import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { useSubscribeAgentEvents } from "@renderer/hooks/use-subscribe-agent-events";
 import { extractToolResultText, formatToolArgs } from "@renderer/lib/agent-tool";
 import {
@@ -34,6 +35,7 @@ function findMissingFailureMessage(
 
 export function useAgentMessages() {
   const extensionsApi = useExtensionsContextAPI();
+  const { invoke } = useElectronIPC();
   const turnContentStartIndicesRef = useRef<Record<string, number>>({});
   const hasPersistedRef = useRef<Record<string, boolean>>({});
 
@@ -60,6 +62,21 @@ export function useAgentMessages() {
 
         const status = event.messages.some(isFailedAssistantMessage) ? "failed" : "completed";
         mainStore.getState().setStatus(sessionId, status);
+        if (status === "failed") {
+          void invoke("recordEngineeringEvent", {
+            type: "agent_failure",
+            severity: "error",
+            source: "agent",
+            message: "Agent run failed",
+            sessionId,
+            scope: event.scope,
+            metadata: {
+              stopReasons: event.messages
+                .map((message) => ("stopReason" in message ? message.stopReason : undefined))
+                .filter(Boolean),
+            },
+          });
+        }
 
         if (!hasPersistedRef.current[sessionId]) {
           hasPersistedRef.current[sessionId] = true;
@@ -240,6 +257,21 @@ export function useAgentMessages() {
           requestId: existing?.requestId,
           approvalStatus: existing?.approvalStatus,
         });
+
+        if (isError) {
+          void invoke("recordEngineeringEvent", {
+            type: "tool_failure",
+            severity: "error",
+            source: "tool",
+            message: `${toolName} failed`,
+            sessionId,
+            scope: event.scope,
+            toolName,
+            metadata: {
+              output,
+            },
+          });
+        }
       },
 
       permission_requested: (event) => {

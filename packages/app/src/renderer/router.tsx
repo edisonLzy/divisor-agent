@@ -3,6 +3,7 @@ import { createMemoryRouter, Navigate } from "react-router-dom";
 import { NotFoundRedirect } from "./Layout";
 import { SettingsPage } from "./pages/settings";
 import { SettingsAppearancePage } from "./pages/settings/appearance";
+import { SettingsEngineeringPage } from "./pages/settings/engineering";
 import { SettingsModelsPage } from "./pages/settings/models";
 import { SettingsSkillsPage } from "./pages/settings/skills";
 import { WorkspacePage } from "./pages/workspace";
@@ -31,6 +32,10 @@ export const router = createMemoryRouter([
       {
         path: "skills",
         element: <SettingsSkillsPage />,
+      },
+      {
+        path: "engineering",
+        element: <SettingsEngineeringPage />,
       },
     ],
   },

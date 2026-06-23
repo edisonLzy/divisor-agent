@@ -51,6 +51,20 @@ export function useCurrentPermissionRequest(sessionId: string | null) {
         await invoke("resolvePermissionRequest", sessionId, request.requestId, resolution);
         mainStore.getState().resolvePermissionRequest(sessionId, request.requestId, resolution);
         updateResolvedToolState(sessionId, request, resolution);
+        if (!resolution.approved) {
+          void invoke("recordEngineeringEvent", {
+            type: "permission_denial",
+            severity: "warning",
+            source: "tool",
+            message: `${request.toolLabel || request.toolName} permission denied`,
+            sessionId,
+            toolName: request.toolName,
+            metadata: {
+              operation: request.operation,
+              reason: resolution.reason,
+            },
+          });
+        }
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "提交审批结果失败");
       } finally {
