@@ -1,4 +1,4 @@
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 
 import type { AgentSessionScope } from "./events-ipc";
 import type { AvailableModel } from "./models-ipc";

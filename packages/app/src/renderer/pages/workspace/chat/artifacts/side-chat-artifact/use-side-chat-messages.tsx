@@ -1,4 +1,4 @@
-import type { AssistantMessage, ToolCall } from "@mariozechner/pi-ai";
+import type { AssistantMessage, ToolCall } from "@earendil-works/pi-ai";
 import { useSubscribeAgentEvents } from "@renderer/hooks/use-subscribe-agent-events";
 import { extractToolResultText, formatToolArgs } from "@renderer/lib/agent-tool";
 import { isAgentMessageEntry, isFailedAssistantMessage } from "@renderer/lib/is";

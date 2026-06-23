@@ -1,5 +1,5 @@
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
-import type { UserMessage } from "@mariozechner/pi-ai";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import type { UserMessage } from "@earendil-works/pi-ai";
 import { isAgentUserMessage } from "@renderer/lib/is";
 import type { AgentMessageData, AgentUserMessage } from "@renderer/store/entries-slice";
 import type { JSONContent } from "@tiptap/core";

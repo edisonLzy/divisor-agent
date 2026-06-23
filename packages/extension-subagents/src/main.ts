@@ -1,6 +1,6 @@
 import { defineMainExtension } from "@divisor-agent/extension-core/main";
 import type { ExtensionAgentEvent } from "@divisor-agent/extension-core/main";
-import { Type } from "@sinclair/typebox";
+import { Type } from "@earendil-works/pi-ai";
 
 import {
   SUBAGENTS_LIST_BLOCK_TYPE,

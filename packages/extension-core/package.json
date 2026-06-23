@@ -9,8 +9,8 @@
     "./renderer": "./src/renderer/index.ts"
   },
   "peerDependencies": {
-    "@mariozechner/pi-agent-core": "^0.68.0",
-    "@sinclair/typebox": "^0.34.0",
+    "@earendil-works/pi-agent-core": "^0.79.10",
+    "@earendil-works/pi-ai": "^0.79.10",
     "@tiptap/core": "catalog:",
     "@types/react": "catalog:",
     "react": "catalog:",

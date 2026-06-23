@@ -16,3 +16,7 @@ catalog:
   "@types/react": ^19.2.7
   "@tiptap/core": ^3.22.5
   react: ^19.2.1
+
+minimumReleaseAgeExclude:
+  - "@earendil-works/pi-agent-core@0.79.10"
+  - "@earendil-works/pi-ai@0.79.10"

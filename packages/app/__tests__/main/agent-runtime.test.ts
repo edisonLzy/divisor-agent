@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ── Mock dependencies ───────────────────────────────────────────────────────
 
 // Mock pi-ai for built-in models (needs to be before AgentRuntime import)
-vi.mock("@mariozechner/pi-ai", () => {
+vi.mock("@earendil-works/pi-ai", () => {
   const Type = {
     Object: vi.fn((props) => props),
     String: vi.fn((opts) => ({ type: "string", ...opts })),
@@ -59,7 +59,7 @@ const { mockAgentInstance, mockSubscribeFn, mockPromptFn, MockAgent } = vi.hoist
   return { mockAgentInstance, mockSubscribeFn: mockSubscribe, mockPromptFn: mockPrompt, MockAgent };
 });
 
-vi.mock("@mariozechner/pi-agent-core", () => ({
+vi.mock("@earendil-works/pi-agent-core", () => ({
   Agent: MockAgent,
 }));
 

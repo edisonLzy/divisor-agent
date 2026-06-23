@@ -4,7 +4,7 @@ import type {
   ExtensionAgentModel,
   ExtensionAgentToolOptions,
 } from "@divisor-agent/extension-core/main";
-import { Agent } from "@mariozechner/pi-agent-core";
+import { Agent } from "@earendil-works/pi-agent-core";
 import Emittery from "emittery";
 
 import type { AgentSessionScope, AllowedMainExposeEvents } from "../shared/events-ipc.js";

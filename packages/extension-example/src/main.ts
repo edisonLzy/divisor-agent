@@ -3,7 +3,7 @@ import {
   formatAssistantBlockFence,
 } from "@divisor-agent/extension-core/common";
 import { defineMainExtension } from "@divisor-agent/extension-core/main";
-import { Type } from "@sinclair/typebox";
+import { Type } from "@earendil-works/pi-ai";
 
 export default defineMainExtension((ctx) => {
   ctx.systemPrompt.register({

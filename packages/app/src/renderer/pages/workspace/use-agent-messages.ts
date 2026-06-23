@@ -1,5 +1,5 @@
 import { useExtensionsContextAPI } from "@divisor-agent/extension-core/renderer";
-import type { AssistantMessage, ToolCall } from "@mariozechner/pi-ai";
+import type { AssistantMessage, ToolCall } from "@earendil-works/pi-ai";
 import { appendEntries } from "@renderer/apis/sessions";
 import { useSubscribeAgentEvents } from "@renderer/hooks/use-subscribe-agent-events";
 import { extractToolResultText, formatToolArgs } from "@renderer/lib/agent-tool";

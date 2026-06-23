@@ -1,5 +1,5 @@
-import type { AgentEvent, AgentTool } from "@mariozechner/pi-agent-core";
-import type { TSchema } from "@sinclair/typebox";
+import type { AgentEvent, AgentTool } from "@earendil-works/pi-agent-core";
+import type { TSchema } from "@earendil-works/pi-ai";
 
 import type { ExtensionManifest } from "../manifest.js";
 
