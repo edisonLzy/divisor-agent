@@ -17,8 +17,8 @@ catalog:
   "@types/react-dom": ^19.2.3
 
   # Agent runtime(版本敏感,minimumReleaseAgeExclude 同步锁)
-  "@earendil-works/pi-agent-core": ^0.79.10
-  "@earendil-works/pi-ai": ^0.79.10
+  "@earendil-works/pi-agent-core": 0.74.0
+  "@earendil-works/pi-ai": 0.74.0
 
   # UI 基础
   "@tiptap/core": ^3.22.5
@@ -32,5 +32,5 @@ catalog:
   vitest: ^4.0.16
 
 minimumReleaseAgeExclude:
-  - "@earendil-works/pi-agent-core@0.79.10"
-  - "@earendil-works/pi-ai@0.79.10"
+  - "@earendil-works/pi-agent-core@0.74.0"
+  - "@earendil-works/pi-ai@0.74.0"
