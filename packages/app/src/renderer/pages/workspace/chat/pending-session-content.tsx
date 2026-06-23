@@ -21,12 +21,13 @@ import { useInvalidateWorkspaceSessions } from "../sessions/use-workspaces";
 import { PanelHeader } from "./panel-header";
 import { PromptInput } from "./prompt-input";
 import type { PromptSubmission } from "./prompt-types";
+import { createSessionTitleFromPrompt } from "./session-title";
 
 interface PendingSessionContentProps {
-  isSidebarCollapsed: boolean;
+  insetForWindowControls: boolean;
 }
 
-export function PendingSessionContent({ isSidebarCollapsed }: PendingSessionContentProps) {
+export function PendingSessionContent({ insetForWindowControls }: PendingSessionContentProps) {
   const { invoke } = useElectronIPC();
   const invalidateStandalone = useInvalidateStandaloneSessions();
   const invalidateWorkspaceSessions = useInvalidateWorkspaceSessions();
@@ -38,9 +39,10 @@ export function PendingSessionContent({ isSidebarCollapsed }: PendingSessionCont
     try {
       const store = mainStore.getState();
       const workspaceId = store.pendingSession?.workspaceId ?? null;
+      const title = createSessionTitleFromPrompt(submission.content);
 
       const newSession = await createSession({
-        name: "新对话",
+        name: title,
         workspaceId,
         parentSessionId: null,
       });
@@ -58,8 +60,9 @@ export function PendingSessionContent({ isSidebarCollapsed }: PendingSessionCont
       }
 
       mainStore.getState().setStatus(newSession.id, "running");
-      const submissionText = submission.content;
+      mainStore.getState().setModel(newSession.id, submission.model);
 
+      const submissionText = submission.content;
       const appUserMessage: AppUserMessage = {
         role: "user",
         content: submissionText,
@@ -89,7 +92,11 @@ export function PendingSessionContent({ isSidebarCollapsed }: PendingSessionCont
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <PanelHeader dragRegion insetForWindowControls={isSidebarCollapsed} className="border-b-0">
+      <PanelHeader
+        dragRegion
+        insetForWindowControls={insetForWindowControls}
+        className="border-b-0"
+      >
         <span className="sr-only">New session</span>
       </PanelHeader>
       <section className="min-h-0 flex-1 px-6 pt-6">

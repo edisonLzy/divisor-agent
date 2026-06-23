@@ -1,17 +1,21 @@
 import type { AppUserMessage } from "@earendil-works/pi-agent-core";
+import { renameSession } from "@renderer/apis/sessions";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@renderer/components/ui/resizable";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
-import { isAgentMessageEntry } from "@renderer/lib/is";
+import { isAgentMessageEntry, isAgentUserMessage } from "@renderer/lib/is";
+import { cn } from "@renderer/lib/utils";
 import type { ToolExecutionState } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
+import { useQueryClient } from "@tanstack/react-query";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { motion } from "motion/react";
 import type { CSSProperties } from "react";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
+import { usePanelRef } from "react-resizable-panels";
 import { useStore } from "zustand";
 
 import { ArtifactsPanel } from "./artifacts";
@@ -20,12 +24,13 @@ import { FixedActions, PanelHeader } from "./panel-header";
 import { PermissionApprovalPanel } from "./permission";
 import { PromptInput } from "./prompt-input";
 import type { PromptSubmission } from "./prompt-types";
+import { createSessionTitleFromPrompt, shouldAutoRenameSession } from "./session-title";
 
 interface ActiveSessionContentProps {
-  isSidebarCollapsed: boolean;
+  insetForWindowControls: boolean;
 }
 
-export function ActiveSessionContent({ isSidebarCollapsed }: ActiveSessionContentProps) {
+export function ActiveSessionContent({ insetForWindowControls }: ActiveSessionContentProps) {
   const {
     entries,
     isRunning,
@@ -37,12 +42,10 @@ export function ActiveSessionContent({ isSidebarCollapsed }: ActiveSessionConten
   } = useActiveSessionChat();
 
   const activeSessionId = useStore(mainStore, (state) => state.activeSessionId!);
+  const { artifactPanelRef, isArtifactPanelOpen } = useArtifactPanel(activeSessionId);
 
   const activeSession = useStore(mainStore, (state) =>
     activeSessionId ? state.getSession(activeSessionId) : undefined,
-  );
-  const artifactState = useStore(mainStore, (state) =>
-    activeSessionId ? state.getArtifactState(activeSessionId) : null,
   );
   const pendingPermissionRequest = useStore(mainStore, (state) => {
     if (!activeSessionId) {
@@ -51,19 +54,17 @@ export function ActiveSessionContent({ isSidebarCollapsed }: ActiveSessionConten
 
     return state.getPermissionState(activeSessionId).requests[0] ?? null;
   });
-  const isArtifactPanelOpen = Boolean(activeSessionId && artifactState?.isOpen);
   const sessionName = activeSession?.name.trim() || "untitled";
 
   return (
     <div className="relative isolate flex min-h-0 flex-1">
       <ResizablePanelGroup
-        key={isArtifactPanelOpen ? "artifacts-open" : "artifacts-closed"}
         orientation="horizontal"
-        className="min-h-0 flex-1"
+        className="min-h-0 flex-1 [&>[data-panel]]:transition-[flex-grow] [&>[data-panel]]:duration-200 [&>[data-panel]]:ease-out"
       >
         <ResizablePanel defaultSize={isArtifactPanelOpen ? "68%" : "100%"} minSize="42%">
           <div className="flex h-full min-w-0 flex-col">
-            <PanelHeader dragRegion insetForWindowControls={isSidebarCollapsed}>
+            <PanelHeader dragRegion insetForWindowControls={insetForWindowControls}>
               <h1 className="truncate text-sm font-medium text-foreground">{sessionName}</h1>
             </PanelHeader>
             <section className="min-h-0 flex-1 px-6 pt-6">
@@ -88,6 +89,7 @@ export function ActiveSessionContent({ isSidebarCollapsed }: ActiveSessionConten
               ) : (
                 <PromptInput
                   disabled={false}
+                  initialModel={activeSession?.model ?? null}
                   isRunning={isRunning}
                   onStop={stopPrompt}
                   onSubmit={submitPrompt}
@@ -98,14 +100,27 @@ export function ActiveSessionContent({ isSidebarCollapsed }: ActiveSessionConten
           </div>
         </ResizablePanel>
 
-        {isArtifactPanelOpen ? (
-          <>
-            <ResizableHandle />
-            <ResizablePanel defaultSize="32%" minSize="22%" maxSize="48%">
-              <ArtifactsPanel sessionId={activeSessionId} />
-            </ResizablePanel>
-          </>
-        ) : null}
+        <ResizableHandle
+          disabled={!isArtifactPanelOpen}
+          className={cn(
+            "transition-opacity duration-150",
+            !isArtifactPanelOpen && "pointer-events-none opacity-0",
+          )}
+        />
+        <ResizablePanel
+          panelRef={artifactPanelRef}
+          collapsible
+          collapsedSize="0%"
+          defaultSize={isArtifactPanelOpen ? "32%" : "0%"}
+          minSize="22%"
+          maxSize="48%"
+          className={cn(
+            "min-w-0 transition-opacity duration-150",
+            !isArtifactPanelOpen && "pointer-events-none opacity-0",
+          )}
+        >
+          <ArtifactsPanel sessionId={activeSessionId} />
+        </ResizablePanel>
       </ResizablePanelGroup>
 
       <FixedActions>
@@ -116,6 +131,30 @@ export function ActiveSessionContent({ isSidebarCollapsed }: ActiveSessionConten
 }
 
 const EMPTY_TOOL_STATES = new Map<string, ToolExecutionState>();
+
+function useArtifactPanel(sessionId: string) {
+  const artifactPanelRef = usePanelRef();
+  const isArtifactPanelOpen = useStore(
+    mainStore,
+    (state) => state.getArtifactState(sessionId).isOpen,
+  );
+
+  useEffect(() => {
+    const panel = artifactPanelRef.current;
+    if (!panel) return;
+
+    if (isArtifactPanelOpen) {
+      panel.expand();
+    } else {
+      panel.collapse();
+    }
+  }, [artifactPanelRef, isArtifactPanelOpen]);
+
+  return {
+    artifactPanelRef,
+    isArtifactPanelOpen,
+  };
+}
 
 interface ToggleArtifactPanelButtonProps {
   sessionId: string;
@@ -147,7 +186,9 @@ function ToggleArtifactPanelButton({ sessionId }: ToggleArtifactPanelButtonProps
 
 function useActiveSessionChat() {
   const { invoke } = useElectronIPC();
+  const queryClient = useQueryClient();
   const { activeSessionId } = useStore(mainStore);
+  const activeSession = activeSessionId ? mainStore.getState().getSession(activeSessionId) : null;
   const entryState = activeSessionId
     ? mainStore.getState().getEntryState(activeSessionId)
     : { entries: [], toolStates: EMPTY_TOOL_STATES, status: "idle" as const };
@@ -165,6 +206,21 @@ function useActiveSessionChat() {
       mainStore.getState().setStatus(activeSessionId, "running");
       mainStore.getState().setModel(activeSessionId, submission.model);
       const submissionText = submission.content;
+      const shouldRename =
+        shouldAutoRenameSession(activeSession?.name) &&
+        !entries.some((entry) => isAgentMessageEntry(entry) && isAgentUserMessage(entry.data));
+
+      if (shouldRename) {
+        const title = createSessionTitleFromPrompt(submissionText);
+        mainStore.getState().setSessionName(activeSessionId, title);
+        void renameSession({ id: activeSessionId, name: title })
+          .then(async () => {
+            await queryClient.invalidateQueries({ queryKey: ["sessions"] });
+          })
+          .catch((error) => {
+            console.error("Failed to rename session", error);
+          });
+      }
 
       try {
         const appUserMessage: AppUserMessage = {
@@ -187,7 +243,7 @@ function useActiveSessionChat() {
         mainStore.getState().setStatus(activeSessionId, "idle");
       }
     },
-    [activeSessionId, invoke],
+    [activeSession?.name, activeSessionId, entries, invoke, queryClient],
   );
 
   const stopPrompt = useCallback(async () => {

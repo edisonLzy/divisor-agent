@@ -28,6 +28,7 @@ export interface SessionsSlice {
   addSessions: (sessions: Session[]) => void;
   setModel: (sessionId: string, model: AvailableModel) => void;
   setCwd: (sessionId: string, cwd: string) => void;
+  setSessionName: (sessionId: string, name: string) => void;
 }
 
 const PENDING_SESSION_SYMBOL = Symbol("pending-session");
@@ -139,6 +140,20 @@ export const createSessionsSlice: StateCreator<MainStoreState, [], [], SessionsS
 
       const sessions = [...prev.sessions];
       sessions[sessionIndex] = { ...session, cwd };
+      return { sessions };
+    });
+  },
+
+  setSessionName: (sessionId, name) => {
+    const session = get().getSession(sessionId);
+    if (!session || session.name === name) return;
+
+    set((prev) => {
+      const sessionIndex = prev.sessions.findIndex((candidate) => candidate.id === sessionId);
+      if (sessionIndex < 0) return prev;
+
+      const sessions = [...prev.sessions];
+      sessions[sessionIndex] = { ...session, name };
       return { sessions };
     });
   },
