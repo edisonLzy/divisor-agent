@@ -31,6 +31,7 @@ export function SideChatArtifact({ artifact }: SideChatArtifactProps) {
   const submitPrompt = useCallback(
     async (submission: PromptSubmission) => {
       sideChatStore.getState().setStatus(artifact.id, "running");
+      sideChatStore.getState().setSideChatModel(artifact.id, submission.model);
 
       try {
         await invoke("setSessionId", artifact.id);
@@ -82,6 +83,7 @@ export function SideChatArtifact({ artifact }: SideChatArtifactProps) {
       <div className="shrink-0 px-2 pb-2 pt-2">
         <PromptInput
           disabled={inputDisabled}
+          initialModel={meta?.model ?? null}
           isRunning={isRunning}
           onStop={stopPrompt}
           onSubmit={submitPrompt}

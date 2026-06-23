@@ -5,6 +5,7 @@ import type { AgentModelsIPC } from "./models-ipc";
 import type { PermissionRequestedEvent } from "./permissions-ipc";
 import type { AgentSessionIPC } from "./session-ipc";
 import type { AgentSkillsIPC } from "./skills-ipc";
+import type { SystemIPC } from "./system-ipc";
 
 export type AgentSessionScope = "main" | "side-chat";
 type SessionTagged<T> = T & { scope: AgentSessionScope; sessionId: string };
@@ -35,7 +36,11 @@ export type AllowedMainExposeEvents = {
 
 // render -> main
 
-export type AgentRuntimeIPC = AgentModelsIPC & AgentSessionIPC & AgentSkillsIPC & FileSystemIPC;
+export type AgentRuntimeIPC = AgentModelsIPC &
+  AgentSessionIPC &
+  AgentSkillsIPC &
+  FileSystemIPC &
+  SystemIPC;
 
 export const ALLOWED_RENDER_INVOKE_EVENTS: (keyof AgentRuntimeIPC)[] = [
   "setModel",
@@ -53,6 +58,7 @@ export const ALLOWED_RENDER_INVOKE_EVENTS: (keyof AgentRuntimeIPC)[] = [
   "listSkills",
   "setSkillEnabled",
   "fsReadTextFile",
+  "isWindowFullScreen",
 ];
 
 export type AllowedRenderInvokeEvents = (typeof ALLOWED_RENDER_INVOKE_EVENTS)[number];

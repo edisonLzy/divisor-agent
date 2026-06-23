@@ -1,6 +1,7 @@
 import { cn } from "@renderer/lib/utils";
 import Fuse from "fuse.js";
 import { BoxIcon } from "lucide-react";
+import { useEffect, useRef } from "react";
 
 import type { CommandItem } from "../types";
 
@@ -61,8 +62,18 @@ export function SuggestionsPanel({
   onHighlight,
   maxHeight,
 }: SuggestionsPanelProps) {
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const filteredItems = filterCommandItems(items, query);
   const groups = groupCommandItems(filteredItems);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    const selected = container?.querySelector<HTMLElement>(
+      `[data-command-index="${selectedIndex}"]`,
+    );
+
+    selected?.scrollIntoView({ block: "nearest" });
+  }, [selectedIndex, filteredItems]);
 
   if (filteredItems.length === 0) {
     return (
@@ -74,6 +85,7 @@ export function SuggestionsPanel({
 
   return (
     <div
+      ref={scrollContainerRef}
       className="overflow-y-auto rounded-[18px] border border-border/80 bg-popover/95 p-1.5 shadow-[0_24px_64px_rgb(15_23_42/0.18)] backdrop-blur-xl dark:shadow-[0_24px_64px_rgb(0_0_0/0.45)]"
       style={{ maxHeight }}
     >

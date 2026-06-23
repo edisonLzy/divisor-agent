@@ -100,7 +100,7 @@ export const createEntriesSlice: StateCreator<EntriesSlice, [], [], EntriesSlice
   getEntryState: (sessionId) => {
     const existing = get().entryStates.get(sessionId);
     if (existing) return existing;
-    return { ...EMPTY_ENTRY_STATE, toolStates: new Map() };
+    return EMPTY_ENTRY_STATE;
   },
 
   appendMessageEntry: (sessionId, message) => {

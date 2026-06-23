@@ -241,10 +241,10 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
       this.options.systemPrompt ?? "",
     );
 
-    const content = this.skillService.expandSkillReferences(
-      message.content,
-      message.metadata?.skillIds ?? [],
-    );
+    const content =
+      typeof message.content === "string"
+        ? this.skillService.expandSkillReferences(message.content, message.metadata?.skillIds ?? [])
+        : message.content;
     this.agent.prompt({ ...message, content });
   };
 

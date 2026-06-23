@@ -15,10 +15,13 @@ function CollapsibleContent({ className, children, ...props }: CollapsiblePrimit
   return (
     <CollapsiblePrimitive.Panel
       data-slot="collapsible-content"
-      className="overflow-hidden [--radix-collapsible-content-height:var(--collapsible-panel-height)] data-open:animate-collapsible-down data-closed:animate-collapsible-up"
+      className={cn(
+        "overflow-hidden [--radix-collapsible-content-height:var(--collapsible-panel-height)] data-open:animate-collapsible-down data-closed:animate-collapsible-up",
+        className,
+      )}
       {...props}
     >
-      <div className={cn("h-(--collapsible-panel-height)", className)}>{children}</div>
+      <div className="min-h-0">{children}</div>
     </CollapsiblePrimitive.Panel>
   );
 }

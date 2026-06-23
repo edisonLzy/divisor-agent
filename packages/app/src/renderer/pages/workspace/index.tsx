@@ -27,7 +27,10 @@ export function WorkspacePage() {
       <Titlebar style={{ width: titlebarWidth }}>
         <ToggleSidebarButton isCollapsed={isCollapsed} onToggle={toggle} />
       </Titlebar>
-      <ResizablePanelGroup orientation="horizontal" className="flex-1">
+      <ResizablePanelGroup
+        orientation="horizontal"
+        className="flex-1 [&>[data-panel]]:transition-[flex-grow] [&>[data-panel]]:duration-200 [&>[data-panel]]:ease-out"
+      >
         <ResizablePanel
           panelRef={panelRef}
           collapsible
