@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@divisor-agent/extension-core": "workspace:*",
-    "@earendil-works/pi-ai": "^0.79.10"
+    "@earendil-works/pi-ai": "catalog:"
   },
   "peerDependencies": {
     "@tiptap/core": "catalog:",

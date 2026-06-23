@@ -9,11 +9,11 @@
     "./renderer": "./src/renderer/index.ts"
   },
   "peerDependencies": {
-    "@earendil-works/pi-agent-core": "^0.79.10",
-    "@earendil-works/pi-ai": "^0.79.10",
+    "@earendil-works/pi-agent-core": "catalog:",
+    "@earendil-works/pi-ai": "catalog:",
     "@tiptap/core": "catalog:",
     "@types/react": "catalog:",
     "react": "catalog:",
-    "streamdown": "^2.5.0"
+    "streamdown": "catalog:"
   }
 }

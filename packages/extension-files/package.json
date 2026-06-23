@@ -24,19 +24,19 @@
     "@codemirror/view": "^6.0.0",
     "@divisor-agent/extension-core": "workspace:*",
     "@types/react": "catalog:",
-    "lucide-react": "^1.8.0",
+    "lucide-react": "catalog:",
     "react": "catalog:"
   },
   "devDependencies": {
-    "@floating-ui/dom": "^1.7.6",
-    "@types/react-dom": "^19.2.3",
-    "clsx": "^2.1.1",
-    "react-dom": "^19.2.1"
+    "@floating-ui/dom": "catalog:",
+    "@types/react-dom": "catalog:",
+    "clsx": "catalog:",
+    "react-dom": "catalog:"
   },
   "peerDependencies": {
-    "@floating-ui/dom": "^1.7.6",
-    "clsx": "^2.1.1",
+    "@floating-ui/dom": "catalog:",
+    "clsx": "catalog:",
     "react-dom": "^19.0.0",
-    "streamdown": "^2.5.0"
+    "streamdown": "catalog:"
   }
 }
