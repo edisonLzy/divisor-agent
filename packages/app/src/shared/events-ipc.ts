@@ -1,5 +1,6 @@
 import type { AgentEvent } from "@mariozechner/pi-agent-core";
 
+import type { EngineeringIPC } from "./engineering-ipc";
 import type { FileSystemIPC } from "./file-system-ipc";
 import type { AgentModelsIPC } from "./models-ipc";
 import type { PermissionRequestedEvent } from "./permissions-ipc";
@@ -35,7 +36,11 @@ export type AllowedMainExposeEvents = {
 
 // render -> main
 
-export type AgentRuntimeIPC = AgentModelsIPC & AgentSessionIPC & AgentSkillsIPC & FileSystemIPC;
+export type AgentRuntimeIPC = AgentModelsIPC &
+  AgentSessionIPC &
+  AgentSkillsIPC &
+  FileSystemIPC &
+  EngineeringIPC;
 
 export const ALLOWED_RENDER_INVOKE_EVENTS: (keyof AgentRuntimeIPC)[] = [
   "setModel",
@@ -53,6 +58,12 @@ export const ALLOWED_RENDER_INVOKE_EVENTS: (keyof AgentRuntimeIPC)[] = [
   "listSkills",
   "setSkillEnabled",
   "fsReadTextFile",
+  "getDevelopmentMode",
+  "setDevelopmentMode",
+  "recordEngineeringEvent",
+  "listEngineeringEvents",
+  "listEngineeringTasks",
+  "createGitHubIssue",
 ];
 
 export type AllowedRenderInvokeEvents = (typeof ALLOWED_RENDER_INVOKE_EVENTS)[number];

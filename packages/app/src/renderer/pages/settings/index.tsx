@@ -5,11 +5,11 @@ import {
   ResizablePanelGroup,
 } from "@renderer/components/ui/resizable";
 import { cn } from "@renderer/lib/utils";
-import { ArrowLeft, Bot, BoxIcon, Paintbrush, Settings } from "lucide-react";
+import { ArrowLeft, Bot, BoxIcon, Paintbrush, Settings, Wrench } from "lucide-react";
 import { type CSSProperties } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 
-type SettingsSection = "appearance" | "models" | "skills";
+type SettingsSection = "appearance" | "models" | "skills" | "engineering";
 
 const SECTIONS: Array<{
   id: SettingsSection;
@@ -20,6 +20,7 @@ const SECTIONS: Array<{
   { id: "appearance", label: "外观", path: "/settings/appearance", icon: Paintbrush },
   { id: "models", label: "Models", path: "/settings/models", icon: Bot },
   { id: "skills", label: "Skills", path: "/settings/skills", icon: BoxIcon },
+  { id: "engineering", label: "Engineering", path: "/settings/engineering", icon: Wrench },
 ];
 
 export function SettingsPage() {

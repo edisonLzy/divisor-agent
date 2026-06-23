@@ -2,11 +2,13 @@ import { readFile } from "node:fs/promises";
 
 import { BrowserWindow, ipcMain } from "electron";
 
+import type { EngineeringIPC } from "../shared/engineering-ipc";
 import type { FileSystemIPC } from "../shared/file-system-ipc";
 import type { AgentModelsIPC } from "../shared/models-ipc";
 import type { AgentSessionIPC } from "../shared/session-ipc";
 import type { AgentSkillsIPC } from "../shared/skills-ipc";
 import type { AgentPool } from "./agent-pool";
+import type { EngineeringService } from "./engineering/index.js";
 
 function registerAgentRuntimeHandlers(agentPool: AgentPool, browserWindow: BrowserWindow) {
   const offAny = agentPool.onAny(({ name, data }) => {
@@ -22,7 +24,7 @@ function registerAgentRuntimeHandlers(agentPool: AgentPool, browserWindow: Brows
   };
 }
 
-function registerIPCHandlers(agentPool: AgentPool) {
+function registerIPCHandlers(agentPool: AgentPool, engineeringService: EngineeringService) {
   const typedIpcMain = createTypedIpcMain();
 
   typedIpcMain.handle("setModel", agentPool.setModel);
@@ -40,6 +42,30 @@ function registerIPCHandlers(agentPool: AgentPool) {
   typedIpcMain.handle("listSkills", agentPool.listSkills);
   typedIpcMain.handle("setSkillEnabled", agentPool.setSkillEnabled);
   typedIpcMain.handle("fsReadTextFile", handleFsReadTextFile);
+  typedIpcMain.handle(
+    "getDevelopmentMode",
+    engineeringService.getDevelopmentMode.bind(engineeringService),
+  );
+  typedIpcMain.handle(
+    "setDevelopmentMode",
+    engineeringService.setDevelopmentMode.bind(engineeringService),
+  );
+  typedIpcMain.handle(
+    "recordEngineeringEvent",
+    engineeringService.recordEngineeringEvent.bind(engineeringService),
+  );
+  typedIpcMain.handle(
+    "listEngineeringEvents",
+    engineeringService.listEngineeringEvents.bind(engineeringService),
+  );
+  typedIpcMain.handle(
+    "listEngineeringTasks",
+    engineeringService.listEngineeringTasks.bind(engineeringService),
+  );
+  typedIpcMain.handle(
+    "createGitHubIssue",
+    engineeringService.createGitHubIssue.bind(engineeringService),
+  );
 
   return () => {
     typedIpcMain.removeAllListeners();
@@ -60,9 +86,10 @@ async function handleFsReadTextFile(
 export function bindAgentRuntimeIPC(
   agentPool: AgentPool,
   browserWindow: BrowserWindow,
+  engineeringService: EngineeringService,
 ): () => void {
   const unregisterAgentRuntimeHandlers = registerAgentRuntimeHandlers(agentPool, browserWindow);
-  const unregisterIPCHandlers = registerIPCHandlers(agentPool);
+  const unregisterIPCHandlers = registerIPCHandlers(agentPool, engineeringService);
 
   return () => {
     // Unbind logic here
@@ -72,7 +99,11 @@ export function bindAgentRuntimeIPC(
 }
 
 function createTypedIpcMain() {
-  type AgentIPC = AgentModelsIPC & AgentSessionIPC & AgentSkillsIPC & FileSystemIPC;
+  type AgentIPC = AgentModelsIPC &
+    AgentSessionIPC &
+    AgentSkillsIPC &
+    FileSystemIPC &
+    EngineeringIPC;
   return {
     ...ipcMain,
     handle<C extends keyof AgentIPC = keyof AgentIPC>(channel: C, listener: AgentIPC[C]) {

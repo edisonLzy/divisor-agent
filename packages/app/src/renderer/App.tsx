@@ -3,6 +3,7 @@ import {
   ExtensionsContextAPIProvider,
   type ExtensionsContextAPI,
 } from "@divisor-agent/extension-core/renderer";
+import { useEngineeringCapture } from "@renderer/hooks/use-engineering-capture";
 import { createAgentUserMessage, createTextDocument } from "@renderer/lib/agent-message";
 import { isAgentMessageEntry, isAgentUserMessage } from "@renderer/lib/is";
 import { EntryStatus, type SessionEntry } from "@renderer/store/entries-slice";
@@ -117,6 +118,7 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ElectronIPCProvider>
+        <EngineeringCapture />
         <ExtensionProvider extensions={installedRendererExtensions}>
           <ExtensionsContextAPIProvider api={extensionsContextAPI}>
             <ThemeProvider defaultTheme="system" storageKey="divisor-agent.theme">
@@ -128,6 +130,11 @@ export function App() {
       </ElectronIPCProvider>
     </QueryClientProvider>
   );
+}
+
+function EngineeringCapture() {
+  useEngineeringCapture();
+  return null;
 }
 
 function clampEntryPosition(position: number, length: number) {

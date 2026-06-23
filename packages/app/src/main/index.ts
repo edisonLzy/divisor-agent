@@ -4,6 +4,7 @@ import { app, BrowserWindow } from "electron";
 
 import { bindAgentRuntimeIPC } from "./agent-ipc.js";
 import { AgentPool } from "./agent-pool.js";
+import { EngineeringService } from "./engineering/index.js";
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -41,8 +42,30 @@ function createAgentRuntime() {
 app.whenReady().then(async () => {
   const browserWindow = createWindow();
   const agentPool = createAgentRuntime();
+  const engineeringService = new EngineeringService();
 
-  const unbind = bindAgentRuntimeIPC(agentPool, browserWindow);
+  process.on("uncaughtException", (error) => {
+    void engineeringService.recordEngineeringEvent({
+      type: "main_error",
+      severity: "error",
+      source: "main",
+      message: error.message,
+      stack: error.stack,
+    });
+  });
+
+  process.on("unhandledRejection", (reason) => {
+    const error = reason instanceof Error ? reason : new Error(String(reason));
+    void engineeringService.recordEngineeringEvent({
+      type: "unhandled_rejection",
+      severity: "error",
+      source: "main",
+      message: error.message,
+      stack: error.stack,
+    });
+  });
+
+  const unbind = bindAgentRuntimeIPC(agentPool, browserWindow, engineeringService);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
