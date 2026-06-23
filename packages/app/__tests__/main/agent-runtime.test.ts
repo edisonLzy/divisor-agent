@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mock pi-ai for built-in models (needs to be before AgentRuntime import)
 vi.mock("@earendil-works/pi-ai", () => {
   const Type = {
+    Array: vi.fn((items, opts) => ({ type: "array", items, ...opts })),
     Object: vi.fn((props) => props),
     String: vi.fn((opts) => ({ type: "string", ...opts })),
     Optional: vi.fn((schema) => schema),
@@ -158,23 +159,31 @@ describe("AgentRuntime", () => {
   describe("prompt", () => {
     it("calls agent.prompt with content", async () => {
       const runtime = createRuntime();
-
-      await runtime.prompt({
-        sessionId: "session-123",
+      const message = {
+        role: "user" as const,
         content: "Hello, agent!",
-        model: undefined,
-      });
+        timestamp: Date.now(),
+        kind: "prompt" as const,
+        jsonContent: { type: "doc" },
+      };
 
-      expect(mockPromptFn).toHaveBeenCalledWith("Hello, agent!");
+      await runtime.prompt(message);
+
+      expect(mockPromptFn).toHaveBeenCalledWith(message);
     });
 
     it("sets model before prompting if model is provided", async () => {
       const runtime = createRuntime();
 
       await runtime.prompt({
-        sessionId: "session-456",
+        role: "user",
         content: "Hello!",
-        model: { modelId: "claude-sonnet-4-20250514", providerId: "anthropic" },
+        timestamp: Date.now(),
+        kind: "prompt",
+        jsonContent: { type: "doc" },
+        metadata: {
+          model: { modelId: "claude-sonnet-4-20250514", providerId: "anthropic" },
+        },
       });
 
       expect(mockPromptFn).toHaveBeenCalled();
@@ -187,9 +196,11 @@ describe("AgentRuntime", () => {
       // Should not throw
       await expect(
         runtime.prompt({
-          sessionId: "session-throw",
+          role: "user",
           content: "Hello!",
-          model: undefined,
+          timestamp: Date.now(),
+          kind: "prompt",
+          jsonContent: { type: "doc" },
         }),
       ).resolves.not.toThrow();
     });

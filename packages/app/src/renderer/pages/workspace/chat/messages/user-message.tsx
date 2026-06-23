@@ -1,10 +1,10 @@
+import type { AppUserMessage } from "@earendil-works/pi-agent-core";
 import { setLeaf } from "@renderer/apis/sessions";
 import { getSelectedCommandIds } from "@renderer/components/richtext/extensions/slash-commands";
 import { skillNode } from "@renderer/components/richtext/inline/skill-node";
 import { Button } from "@renderer/components/ui/button";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
-import { agentMessageToRuntimeMessage, createAgentUserMessage } from "@renderer/lib/agent-message";
-import type { AgentUserMessage, MessageEntry, SessionEntry } from "@renderer/store/entries-slice";
+import type { MessageEntry, SessionEntry } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
 import Mention from "@tiptap/extension-mention";
 import { EditorContent, useEditor } from "@tiptap/react";
@@ -18,7 +18,7 @@ import { EditMessageButton } from "./toolbar/edit-message-button";
 import { MessageToolbar } from "./toolbar/message-toolbar";
 
 interface UserMessageProps {
-  message: AgentUserMessage;
+  message: AppUserMessage;
   entryId: string;
   sessionId: string;
   isRunning: boolean;
@@ -50,13 +50,13 @@ export function UserMessage({ message, entryId, sessionId, isRunning, entries }:
 }
 
 interface ReadonlyUserMessageProps {
-  message: AgentUserMessage;
+  message: AppUserMessage;
   isRunning: boolean;
   onStartEdit: () => void;
 }
 
 function ReadonlyUserMessage({ message, isRunning, onStartEdit }: ReadonlyUserMessageProps) {
-  const readOnlyEditor = useUserMessageEditor(message.content);
+  const readOnlyEditor = useUserMessageEditor(message.jsonContent);
 
   return (
     <div className="ml-auto flex max-w-2xl flex-col items-end gap-1">
@@ -66,7 +66,7 @@ function ReadonlyUserMessage({ message, isRunning, onStartEdit }: ReadonlyUserMe
         </div>
       </div>
       <MessageToolbar align="end">
-        <CopyMessageButton text={message.text} />
+        <CopyMessageButton text={message.content} />
         <EditMessageButton isRunning={isRunning} onEdit={onStartEdit} />
       </MessageToolbar>
     </div>
@@ -76,7 +76,7 @@ function ReadonlyUserMessage({ message, isRunning, onStartEdit }: ReadonlyUserMe
 interface EditableUserMessageProps {
   entries: SessionEntry[];
   entryId: string;
-  message: AgentUserMessage;
+  message: AppUserMessage;
   sessionId: string;
   onCancel: () => void;
 }
@@ -90,7 +90,7 @@ function EditableUserMessage({
 }: EditableUserMessageProps) {
   const { invoke } = useElectronIPC();
   const { editor, hasContent } = useChatEditor({
-    content: message.content,
+    content: message.jsonContent,
     disabled: false,
   });
 
@@ -119,17 +119,23 @@ function EditableUserMessage({
 
       const runtimeMessages = rewindEntries
         .filter((entry): entry is MessageEntry => entry.type === "message")
-        .map((entry) => agentMessageToRuntimeMessage(entry.data));
+        .map((entry) => entry.data);
       await invoke("setHistoryMessages", sessionId, runtimeMessages);
 
       onCancel();
       mainStore.getState().setStatus(sessionId, "running");
-      const userMessage = createAgentUserMessage(jsonContent, text);
-      mainStore.getState().appendMessageEntry(sessionId, userMessage);
 
-      await invoke("prompt", sessionId, text, {
-        skillIds: getSelectedCommandIds(editor),
-      });
+      const appUserMessage: AppUserMessage = {
+        role: "user",
+        content: text,
+        timestamp: Date.now(),
+        kind: "prompt",
+        jsonContent,
+        metadata: {
+          skillIds: getSelectedCommandIds(editor),
+        },
+      };
+      await invoke("prompt", sessionId, appUserMessage);
     } catch (error) {
       console.error("Failed to resubmit edited message:", error);
       toast.error("发送失败");
@@ -160,7 +166,7 @@ function EditableUserMessage({
 
 // ── Readonly Editor ───────────────────────────────────────────────────────────
 
-function useUserMessageEditor(document: AgentUserMessage["content"]) {
+function useUserMessageEditor(document: AppUserMessage["jsonContent"]) {
   return useEditor(
     {
       extensions: [

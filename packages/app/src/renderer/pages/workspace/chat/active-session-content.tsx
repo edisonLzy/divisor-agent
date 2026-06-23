@@ -1,12 +1,12 @@
+import type { AppUserMessage } from "@earendil-works/pi-agent-core";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@renderer/components/ui/resizable";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
-import { createAgentUserMessage } from "@renderer/lib/agent-message";
 import { isAgentMessageEntry } from "@renderer/lib/is";
-import { EntryStatus, type ToolExecutionState } from "@renderer/store/entries-slice";
+import type { ToolExecutionState } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { motion } from "motion/react";
@@ -164,21 +164,26 @@ function useActiveSessionChat() {
 
       mainStore.getState().setStatus(activeSessionId, "running");
       mainStore.getState().setModel(activeSessionId, submission.model);
-      const userMessage = createAgentUserMessage(submission.jsonContent, submission.text);
-      const entryId = mainStore.getState().appendMessageEntry(activeSessionId, userMessage);
-      const submissionText = submission.text;
+      const submissionText = submission.content;
 
       try {
-        await invoke("prompt", activeSessionId, submissionText, {
-          model: {
-            modelId: submission.model.modelId,
-            providerId: submission.model.providerId,
+        const appUserMessage: AppUserMessage = {
+          role: "user",
+          content: submissionText,
+          timestamp: Date.now(),
+          kind: "prompt",
+          jsonContent: submission.jsonContent,
+          metadata: {
+            model: {
+              modelId: submission.model.modelId,
+              providerId: submission.model.providerId,
+            },
+            skillIds: submission.skillIds,
           },
-          skillIds: submission.skillIds,
-        });
+        };
+        await invoke("prompt", activeSessionId, appUserMessage);
       } catch (error) {
         console.error("Failed to submit prompt", error);
-        mainStore.getState().setEntryStatus(activeSessionId, [entryId], EntryStatus.Failed);
         mainStore.getState().setStatus(activeSessionId, "idle");
       }
     },

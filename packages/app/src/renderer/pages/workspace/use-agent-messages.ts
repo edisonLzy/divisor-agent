@@ -6,6 +6,7 @@ import { extractToolResultText, formatToolArgs } from "@renderer/lib/agent-tool"
 import {
   isAgentAssistantMessage,
   isAgentMessageEntry,
+  isAgentUserMessage,
   isFailedAssistantMessage,
 } from "@renderer/lib/is";
 import { EntryStatus, type SessionEntry } from "@renderer/store/entries-slice";
@@ -110,7 +111,11 @@ export function useAgentMessages() {
 
       message_start: (event) => {
         const { sessionId, message } = event;
-        if (message.role !== "assistant") return;
+
+        if (isAgentUserMessage(message)) {
+          mainStore.getState().appendMessageEntry(sessionId, message);
+          return;
+        }
 
         const turnStartIdx = turnContentStartIndicesRef.current[sessionId] ?? 0;
         if (turnStartIdx !== 0) return;
@@ -121,7 +126,7 @@ export function useAgentMessages() {
 
       message_update: (event) => {
         const { sessionId, message } = event;
-        if (message.role !== "assistant") return;
+        if (!isAgentAssistantMessage(message)) return;
 
         const streamingEntryId = mainStore.getState().streamingEntryIds.get(sessionId);
         if (!streamingEntryId) return;
@@ -163,7 +168,7 @@ export function useAgentMessages() {
 
       message_end: (event) => {
         const { sessionId, message } = event;
-        if (message.role !== "assistant") return;
+        if (!isAgentAssistantMessage(message)) return;
 
         const streamingEntryId = mainStore.getState().streamingEntryIds.get(sessionId);
         if (!streamingEntryId) return;

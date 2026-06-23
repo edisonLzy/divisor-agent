@@ -3,8 +3,9 @@ import {
   ExtensionsContextAPIProvider,
   type ExtensionsContextAPI,
 } from "@divisor-agent/extension-core/renderer";
-import { createAgentUserMessage, createTextDocument } from "@renderer/lib/agent-message";
+import type { AppUserMessage } from "@earendil-works/pi-agent-core";
 import { isAgentMessageEntry, isAgentUserMessage } from "@renderer/lib/is";
+import { createTextDocument } from "@renderer/lib/rich-text";
 import { EntryStatus, type SessionEntry } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
 import { sideChatStore } from "@renderer/store/side-chat";
@@ -78,7 +79,7 @@ export function App() {
           existingEntry &&
           isAgentMessageEntry(existingEntry) &&
           isAgentUserMessage(existingEntry.data) &&
-          existingEntry.data.text === input.text
+          existingEntry.data.content === input.text
         ) {
           return;
         }
@@ -87,13 +88,21 @@ export function App() {
         const previousEntry = insertIndex > 0 ? currentEntries[insertIndex - 1] : undefined;
         const nextEntry = currentEntries[insertIndex];
         const parentId = previousEntry?.id ?? null;
+        const timestamp = Date.now();
+        const appUserMessage: AppUserMessage = {
+          role: "user",
+          content: input.text,
+          timestamp,
+          kind: "prompt",
+          jsonContent: createTextDocument(input.text),
+        };
         const userEntry: SessionEntry = {
           id: entryId,
           sessionId: sideChatId,
           parentId,
           type: "message",
-          timestamp: Date.now(),
-          data: createAgentUserMessage(createTextDocument(input.text), input.text),
+          timestamp,
+          data: appUserMessage,
           status: EntryStatus.Local,
         };
 

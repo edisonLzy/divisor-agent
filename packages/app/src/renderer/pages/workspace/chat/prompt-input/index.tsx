@@ -69,7 +69,7 @@ export function PromptInput({
     }
 
     await onSubmit({
-      text: submissionText,
+      content: submissionText,
       jsonContent,
       model: modelSelectorProps.value,
       skillIds: getSelectedCommandIds(editor),

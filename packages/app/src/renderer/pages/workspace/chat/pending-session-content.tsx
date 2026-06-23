@@ -1,3 +1,4 @@
+import type { AppUserMessage } from "@earendil-works/pi-agent-core";
 import { createSession, type Workspace } from "@renderer/apis/sessions";
 import {
   Command,
@@ -9,8 +10,6 @@ import {
 } from "@renderer/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@renderer/components/ui/popover";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
-import { createAgentUserMessage } from "@renderer/lib/agent-message";
-import { EntryStatus } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
 import { Check, ChevronDown, Folder, X } from "lucide-react";
 import { useState } from "react";
@@ -59,22 +58,23 @@ export function PendingSessionContent({ isSidebarCollapsed }: PendingSessionCont
       }
 
       mainStore.getState().setStatus(newSession.id, "running");
-      const userMessage = createAgentUserMessage(submission.jsonContent, submission.text);
-      const entryId = mainStore.getState().appendMessageEntry(newSession.id, userMessage);
-      const submissionText = submission.text;
+      const submissionText = submission.content;
 
-      try {
-        await invoke("prompt", newSession.id, submissionText, {
+      const appUserMessage: AppUserMessage = {
+        role: "user",
+        content: submissionText,
+        timestamp: Date.now(),
+        kind: "prompt",
+        jsonContent: submission.jsonContent,
+        metadata: {
           model: {
             modelId: submission.model.modelId,
             providerId: submission.model.providerId,
           },
           skillIds: submission.skillIds,
-        });
-      } catch (error) {
-        mainStore.getState().setEntryStatus(newSession.id, [entryId], EntryStatus.Failed);
-        throw error;
-      }
+        },
+      };
+      await invoke("prompt", newSession.id, appUserMessage);
     } catch (error) {
       console.error("Failed to submit prompt", error);
 

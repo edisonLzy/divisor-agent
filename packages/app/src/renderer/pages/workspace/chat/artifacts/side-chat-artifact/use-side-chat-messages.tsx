@@ -1,7 +1,12 @@
 import type { AssistantMessage, ToolCall } from "@earendil-works/pi-ai";
 import { useSubscribeAgentEvents } from "@renderer/hooks/use-subscribe-agent-events";
 import { extractToolResultText, formatToolArgs } from "@renderer/lib/agent-tool";
-import { isAgentMessageEntry, isFailedAssistantMessage } from "@renderer/lib/is";
+import {
+  isAgentAssistantMessage,
+  isAgentMessageEntry,
+  isAgentUserMessage,
+  isFailedAssistantMessage,
+} from "@renderer/lib/is";
 import { sideChatStore } from "@renderer/store/side-chat";
 import { useRef } from "react";
 
@@ -45,18 +50,22 @@ export function useSideChatMessages() {
 
       message_start: (event) => {
         const { sessionId, message } = event;
-        if (message.role !== "assistant") return;
+        if (isAgentUserMessage(message)) {
+          sideChatStore.getState().appendMessageEntry(sessionId, message);
+        }
 
-        const turnStartIdx = turnContentStartIndicesRef.current[sessionId] ?? 0;
-        if (turnStartIdx !== 0) return;
+        if (isAgentAssistantMessage(message)) {
+          const turnStartIdx = turnContentStartIndicesRef.current[sessionId] ?? 0;
+          if (turnStartIdx !== 0) return;
 
-        const entryId = sideChatStore.getState().appendMessageEntry(sessionId, message);
-        sideChatStore.getState().setStreamingEntryId(sessionId, entryId);
+          const entryId = sideChatStore.getState().appendMessageEntry(sessionId, message);
+          sideChatStore.getState().setStreamingEntryId(sessionId, entryId);
+        }
       },
 
       message_update: (event) => {
         const { sessionId, message } = event;
-        if (message.role !== "assistant") return;
+        if (!isAgentAssistantMessage(message)) return;
 
         const streamingEntryId = sideChatStore.getState().streamingEntryIds.get(sessionId);
         if (!streamingEntryId) return;
@@ -98,7 +107,7 @@ export function useSideChatMessages() {
 
       message_end: (event) => {
         const { sessionId, message } = event;
-        if (message.role !== "assistant") return;
+        if (!isAgentAssistantMessage(message)) return;
 
         const streamingEntryId = sideChatStore.getState().streamingEntryIds.get(sessionId);
         if (!streamingEntryId) return;

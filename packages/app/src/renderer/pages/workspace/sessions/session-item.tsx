@@ -1,7 +1,6 @@
 import type { Session } from "@renderer/apis/sessions";
 import { pinSession, deleteSession, getSessionEntries } from "@renderer/apis/sessions";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
-import { agentMessageToRuntimeMessage } from "@renderer/lib/agent-message";
 import { formatRelativeTime } from "@renderer/lib/date";
 import { cn } from "@renderer/lib/utils";
 import {
@@ -73,7 +72,7 @@ export function SessionItem({ session }: SessionItemProps) {
     if (updatedEntries.length > 0) {
       const messages = updatedEntries
         .filter((e): e is MessageEntry => e.type === "message")
-        .map((e) => agentMessageToRuntimeMessage(e.data));
+        .map((e) => e.data);
       try {
         await invoke("setHistoryMessages", session.id, messages);
       } catch (error) {

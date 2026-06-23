@@ -1,7 +1,7 @@
+import type { AppUserMessage } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type {
   AgentMessageData,
-  AgentUserMessage,
   MessageEntry,
   ModelChangedEntry,
   SessionEntry,
@@ -15,7 +15,7 @@ export function isModelChangedEntry(entry: SessionEntry): entry is ModelChangedE
   return entry.type === "model_change";
 }
 
-export function isAgentUserMessage(message: AgentMessageData): message is AgentUserMessage {
+export function isAgentUserMessage(message: AgentMessageData): message is AppUserMessage {
   return message.role === "user";
 }
 

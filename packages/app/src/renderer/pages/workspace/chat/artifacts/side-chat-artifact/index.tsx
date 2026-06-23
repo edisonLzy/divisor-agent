@@ -1,5 +1,5 @@
+import type { AppUserMessage } from "@earendil-works/pi-agent-core";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
-import { createAgentUserMessage } from "@renderer/lib/agent-message";
 import { isAgentMessageEntry } from "@renderer/lib/is";
 import { sideChatStore } from "@renderer/store/side-chat";
 import type { SideChatArtifactRecord } from "@renderer/store/side-chat/side-chat-slice";
@@ -31,19 +31,25 @@ export function SideChatArtifact({ artifact }: SideChatArtifactProps) {
   const submitPrompt = useCallback(
     async (submission: PromptSubmission) => {
       sideChatStore.getState().setStatus(artifact.id, "running");
-      const userMessage = createAgentUserMessage(submission.jsonContent, submission.text);
-      sideChatStore.getState().appendMessageEntry(artifact.id, userMessage);
 
       try {
         await invoke("setSessionId", artifact.id);
         await invoke("setSessionScope", artifact.id, "side-chat");
-        await invoke("prompt", artifact.id, submission.text, {
-          model: {
-            modelId: submission.model.modelId,
-            providerId: submission.model.providerId,
+        const appUserMessage: AppUserMessage = {
+          role: "user",
+          content: submission.content,
+          timestamp: Date.now(),
+          kind: "prompt",
+          jsonContent: submission.jsonContent,
+          metadata: {
+            model: {
+              modelId: submission.model.modelId,
+              providerId: submission.model.providerId,
+            },
+            skillIds: submission.skillIds,
           },
-          skillIds: submission.skillIds,
-        });
+        };
+        await invoke("prompt", artifact.id, appUserMessage);
       } catch (error) {
         console.error("Failed to submit side chat prompt", error);
         sideChatStore.getState().setStatus(artifact.id, "idle");

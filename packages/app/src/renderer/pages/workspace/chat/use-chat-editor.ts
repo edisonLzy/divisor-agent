@@ -7,7 +7,7 @@ import {
 import { insertSkillNode, skillNode } from "@renderer/components/richtext/inline/skill-node";
 import type { CommandItem } from "@renderer/components/richtext/types";
 import { useAgentSkills } from "@renderer/hooks/use-agent-skills";
-import type { AgentUserMessage } from "@renderer/store/entries-slice";
+import type { JSONContent } from "@tiptap/core";
 import Placeholder from "@tiptap/extension-placeholder";
 import { useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -18,7 +18,7 @@ interface VirtualElement {
 }
 
 interface UseChatEditorOptions {
-  content?: AgentUserMessage["content"];
+  content?: JSONContent;
   disabled: boolean;
   getFloatingReference?: () => Element | VirtualElement | null;
 }

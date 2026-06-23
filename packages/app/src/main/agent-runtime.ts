@@ -5,6 +5,7 @@ import type {
   ExtensionAgentToolOptions,
 } from "@divisor-agent/extension-core/main";
 import { Agent } from "@earendil-works/pi-agent-core";
+import type { Message } from "@earendil-works/pi-ai";
 import Emittery from "emittery";
 
 import type { AgentSessionScope, AllowedMainExposeEvents } from "../shared/events-ipc.js";
@@ -120,6 +121,25 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
     });
 
     const agent = new Agent({
+      convertToLlm: (messages) => {
+        return messages.flatMap((message): Message[] => {
+          if (message.role === "user") {
+            return [
+              {
+                role: "user",
+                content: message.content,
+                timestamp: message.timestamp,
+              },
+            ];
+          }
+
+          if (message.role === "assistant" || message.role === "toolResult") {
+            return [message];
+          }
+
+          return [];
+        });
+      },
       beforeToolCall: async (context) => {
         if (this.permissionMode === "bypasspermission") {
           return undefined;
@@ -212,15 +232,20 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
     return true;
   };
 
-  public prompt: AgentRuntimeDelegate["prompt"] = async (content, metadata = {}) => {
-    if (metadata.model) {
-      await this.setModel(metadata.model);
+  public prompt: AgentRuntimeDelegate["prompt"] = async (message) => {
+    if (message.metadata?.model) {
+      await this.setModel(message.metadata.model);
     }
 
     this.agent.state.systemPrompt = this.systemPromptService.buildSystemPrompt(
       this.options.systemPrompt ?? "",
     );
-    this.agent.prompt(this.skillService.expandSkillReferences(content, metadata.skillIds ?? []));
+
+    const content = this.skillService.expandSkillReferences(
+      message.content,
+      message.metadata?.skillIds ?? [],
+    );
+    this.agent.prompt({ ...message, content });
   };
 
   public abortPrompt: AgentRuntimeDelegate["abortPrompt"] = async () => {

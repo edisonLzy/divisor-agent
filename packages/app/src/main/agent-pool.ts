@@ -130,9 +130,9 @@ export class AgentPool
     await runtime.resolvePermissionRequest(requestId, resolution);
   };
 
-  public prompt: AgentSessionIPC["prompt"] = async (sessionId, content, metadata) => {
+  public prompt: AgentSessionIPC["prompt"] = async (sessionId, message) => {
     const runtime = this.getOrCreateRuntime(sessionId);
-    runtime.prompt(content, metadata);
+    await runtime.prompt(message);
   };
 
   public abortPrompt: AgentSessionIPC["abortPrompt"] = async (sessionId) => {
