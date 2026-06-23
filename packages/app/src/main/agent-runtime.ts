@@ -54,6 +54,7 @@ export type AgentRuntimeDelegate = {
     | "setSessionId"
     | "setSessionScope"
     | "destroySession"
+    | "runOneTimeAgent"
     | "listSkills"
     | "setSkillEnabled"
     ? never

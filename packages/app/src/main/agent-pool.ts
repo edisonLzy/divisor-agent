@@ -1,3 +1,6 @@
+import { Agent } from "@earendil-works/pi-agent-core";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import type { Message } from "@earendil-works/pi-ai";
 import Emittery from "emittery";
 
 import { AllowedMainExposeEvents } from "../shared/events-ipc.js";
@@ -135,6 +138,63 @@ export class AgentPool
     await runtime.prompt(message);
   };
 
+  public runOneTimeAgent: AgentSessionIPC["runOneTimeAgent"] = async (messages, options) => {
+    const timeout = options.timeout ?? 30_000;
+
+    await this.modelRegistry.getAvailableModels();
+
+    const model = this.modelRegistry.resolveModel(options.model.providerId, options.model.modelId);
+    if (!model) {
+      throw new Error(`Model not found: ${options.model.providerId}/${options.model.modelId}`);
+    }
+
+    let output = "";
+
+    const agent = new Agent({
+      getApiKey: (provider) => this.modelRegistry.resolveApiKey(provider),
+      convertToLlm: convertAgentMessagesToLlmMessages,
+      initialState: {
+        systemPrompt: options.systemPrompt,
+        model,
+        tools: [],
+        messages,
+      },
+    });
+
+    agent.subscribe((event) => {
+      if (event.type !== "message_update") return;
+      if (event.assistantMessageEvent.type !== "text_delta") return;
+
+      output += event.assistantMessageEvent.delta;
+    });
+
+    const runPromise = (async () => {
+      await agent.continue();
+      await agent.waitForIdle();
+    })();
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timerPromise = new Promise<"timeout">((resolve) => {
+      timer = setTimeout(() => {
+        agent.abort();
+        resolve("timeout");
+      }, timeout);
+    });
+
+    try {
+      const result = await Promise.race([runPromise.then(() => "done" as const), timerPromise]);
+      if (result === "timeout") {
+        void runPromise.catch(() => undefined);
+      }
+
+      return cleanOneTimeAgentOutput(output);
+    } finally {
+      if (timer) {
+        clearTimeout(timer);
+      }
+    }
+  };
+
   public abortPrompt: AgentSessionIPC["abortPrompt"] = async (sessionId) => {
     const runtime = this.runtimes.get(sessionId);
     if (!runtime) {
@@ -183,4 +243,32 @@ export class AgentPool
   public setSkillEnabled: AgentSkillsIPC["setSkillEnabled"] = async (skillId, enabled) => {
     return this.skillService.setSkillEnabled(skillId, enabled);
   };
+}
+
+function convertAgentMessagesToLlmMessages(messages: AgentMessage[]): Message[] {
+  return messages.flatMap((message): Message[] => {
+    if (message.role === "user") {
+      return [
+        {
+          role: "user",
+          content: message.content,
+          timestamp: message.timestamp,
+        },
+      ];
+    }
+
+    if (message.role === "assistant" || message.role === "toolResult") {
+      return [message];
+    }
+
+    return [];
+  });
+}
+
+function cleanOneTimeAgentOutput(output: string) {
+  return output
+    .replace(/^```(?:\w+)?\s*/, "")
+    .replace(/\s*```$/, "")
+    .replace(/^["'“‘]+|["'”’]+$/g, "")
+    .trim();
 }

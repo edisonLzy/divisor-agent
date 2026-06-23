@@ -48,6 +48,7 @@ export const ALLOWED_RENDER_INVOKE_EVENTS: (keyof AgentRuntimeIPC)[] = [
   "getModelConfig",
   "saveModelConfig",
   "prompt",
+  "runOneTimeAgent",
   "abortPrompt",
   "setHistoryMessages",
   "setSessionId",
