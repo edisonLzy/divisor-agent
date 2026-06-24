@@ -87,8 +87,8 @@ export function PromptInput({
         skillIds: getSelectedCommandIds(editor),
       };
 
-      if (kind === "steering" && onSteer) {
-        await onSteer(submission);
+      if (kind === "steering") {
+        await onSteer?.(submission);
       } else if (kind === "follow-up" && onFollowUp) {
         await onFollowUp(submission);
       } else {

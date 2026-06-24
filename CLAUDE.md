@@ -106,6 +106,7 @@ shadcn/ui (base-nova style) with 25+ components in `packages/app/src/renderer/co
 - **Workspace (source-only) package imports**: Packages like `@divisor-agent/extension-core` have no `tsc` build step and are bundled directly by Vite. Use **no extension** in relative imports (`import "./bridge"`, not `import "./bridge.js"`). Writing `.js` will not match any on-disk file at runtime and breaks the source-direct `exports` resolution.
 - **Type imports**: Use `import type { ... }` for pure type imports
 - **React imports**: React 19 + new JSX Runtime — do NOT manually `import React from 'react'` in `.tsx`/`.jsx` files
+- **React memo hooks**: Do not use `useMemo` or `useCallback` unless the user explicitly asks for them
 - **Package Manager**: Strictly use `pnpm`. Use `pnpx` instead of `npx`
 - **Node Linker**: `nodeLinker=hoisted` in `.npmrc` for flat `node_modules`
 - **Dependencies**: Strictly on-demand. Never install unused dependencies

@@ -20,7 +20,7 @@ import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { cn } from "@renderer/lib/utils";
 import { mainStore } from "@renderer/store/main";
 import { ArrowDown, ArrowUp, GripVertical, Trash2 } from "lucide-react";
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 import { useStore } from "zustand";
 
 interface PendingMessagesPanelProps {
@@ -45,46 +45,37 @@ export function PendingMessagesPanel({ sessionId }: PendingMessagesPanelProps) {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  const syncAgentQueues = useCallback(() => {
-    void (async () => {
+  const syncAgentQueues = async () => {
+    try {
       await invoke("clearAllQueues", sessionId);
       for (const message of mainStore.getState().getSessionPendingMessages(sessionId)) {
         await invoke("prompt", sessionId, message);
       }
-    })().catch((error) => {
+    } catch (error) {
       console.error("Failed to sync pending messages", error);
-    });
-  }, [invoke, sessionId]);
+    }
+  };
 
-  const handleRemoveAt = useCallback(
-    (index: number) => {
-      mainStore.getState().removePendingMessageAt(sessionId, index);
-      syncAgentQueues();
-    },
-    [sessionId, syncAgentQueues],
-  );
+  const handleRemoveAt = (index: number) => {
+    mainStore.getState().removePendingMessageAt(sessionId, index);
+    syncAgentQueues();
+  };
 
-  const handleMove = useCallback(
-    (fromIndex: number, toIndex: number) => {
-      mainStore.getState().reorderPendingMessages(sessionId, fromIndex, toIndex);
-      syncAgentQueues();
-    },
-    [sessionId, syncAgentQueues],
-  );
+  const handleMove = (fromIndex: number, toIndex: number) => {
+    mainStore.getState().reorderPendingMessages(sessionId, fromIndex, toIndex);
+    syncAgentQueues();
+  };
 
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const { active, over } = event;
-      if (!over || active.id === over.id) return;
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
 
-      const fromIndex = sortableIds.indexOf(String(active.id));
-      const toIndex = sortableIds.indexOf(String(over.id));
-      if (fromIndex < 0 || toIndex < 0) return;
+    const fromIndex = sortableIds.indexOf(String(active.id));
+    const toIndex = sortableIds.indexOf(String(over.id));
+    if (fromIndex < 0 || toIndex < 0) return;
 
-      handleMove(fromIndex, toIndex);
-    },
-    [handleMove, sortableIds],
-  );
+    handleMove(fromIndex, toIndex);
+  };
 
   if (messages.length === 0) {
     return null;

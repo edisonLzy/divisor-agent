@@ -68,6 +68,7 @@ shadcn/ui (base-nova style) with 25+ components in `packages/app/src/renderer/co
 - **Server imports**: Always include `.js` extension for local TypeScript imports (ESM requirement)
 - **Type imports**: Use `import type { ... }` for pure type imports
 - **React imports**: React 19 + new JSX Runtime — do NOT manually `import React from 'react'` in `.tsx`/`.jsx` files
+- **React memo hooks**: Do not use `useMemo` or `useCallback` unless the user explicitly asks for them
 - **Package Manager**: Strictly use `pnpm`. Use `pnpx` instead of `npx`
 - **Node Linker**: `nodeLinker=hoisted` in `.npmrc` for flat `node_modules`
 - **Component file structure**: Main exported component at top of file; internal private sub-components placed below it. Only extract a component to a separate file when it is used in multiple files — otherwise keep sub-components colocated in the same file.

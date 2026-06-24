@@ -7,6 +7,7 @@ import { AgentPool } from "./agent-pool.js";
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
+    icon: join(__dirname, "../../resources/icon.png"),
     frame: false,
     titleBarStyle: "hiddenInset",
     vibrancy: "under-window",
