@@ -1,4 +1,4 @@
-import type { AgentTool } from "@mariozechner/pi-agent-core";
+import type { AgentTool } from "@earendil-works/pi-agent-core";
 
 import type { ExtensionManifest } from "../manifest.js";
 import type { MainSystemPromptRegistration } from "./define";

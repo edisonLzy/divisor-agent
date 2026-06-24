@@ -1,6 +1,6 @@
 import { defineMainExtension } from "@divisor-agent/extension-core/main";
 import type { ExtensionAgentEvent } from "@divisor-agent/extension-core/main";
-import { Type } from "@sinclair/typebox";
+import { Type } from "@earendil-works/pi-ai";
 
 import {
   SUBAGENTS_LIST_BLOCK_TYPE,
@@ -80,7 +80,22 @@ export default defineMainExtension((ctx) => {
           signal?.addEventListener("abort", abort, { once: true });
 
           try {
-            await ctx.runtime.promptAgent(agent.id, subagent.task);
+            const appUserMessage: Parameters<typeof ctx.runtime.promptAgent>[1] = {
+              role: "user",
+              content: subagent.task,
+              timestamp: Date.now(),
+              kind: "prompt",
+              jsonContent: {
+                type: "doc",
+                content: [
+                  {
+                    type: "paragraph",
+                    content: [{ type: "text", text: subagent.task }],
+                  },
+                ],
+              },
+            };
+            await ctx.runtime.promptAgent(agent.id, appUserMessage);
           } catch (error) {
             subagent.status = "failed";
             subagent.completedAt = Date.now();

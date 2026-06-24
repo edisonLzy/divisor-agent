@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 
-import { Type } from "@mariozechner/pi-ai";
-import type { Static } from "@sinclair/typebox";
+import { Type } from "@earendil-works/pi-ai";
+import type { Static } from "@earendil-works/pi-ai";
 
 import type { AppTool } from "./types.js";
 

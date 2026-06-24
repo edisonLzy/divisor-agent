@@ -89,9 +89,12 @@ export class ExtensionRuntimeService
     };
   }
 
-  async promptAgent(agentId: string, content: string, metadata?: { model?: ExtensionAgentModel }) {
+  async promptAgent(
+    agentId: string,
+    message: Parameters<MainExtensionRuntimeAPI["promptAgent"]>[1],
+  ) {
     const runtime = this.getRuntime(agentId);
-    await runtime.prompt(content, metadata);
+    await runtime.prompt(message);
     await runtime.waitForIdle();
   }
 

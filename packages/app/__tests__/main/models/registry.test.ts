@@ -6,7 +6,7 @@ vi.mock("node:fs/promises", () => ({
   readFile: vi.fn(),
 }));
 
-vi.mock("@mariozechner/pi-ai", () => ({
+vi.mock("@earendil-works/pi-ai", () => ({
   getProviders: vi.fn(() => ["anthropic", "openai"]),
   getModels: vi.fn((provider: string) => {
     if (provider === "anthropic") {

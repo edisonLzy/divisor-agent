@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@divisor-agent/extension-core": "workspace:*",
-    "@sinclair/typebox": "^0.34.49"
+    "@earendil-works/pi-ai": "catalog:"
   },
   "peerDependencies": {
     "@tiptap/core": "catalog:",

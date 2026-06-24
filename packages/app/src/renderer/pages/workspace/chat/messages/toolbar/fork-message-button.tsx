@@ -1,7 +1,6 @@
 import { createSession } from "@renderer/apis/sessions";
 import { MessageAction } from "@renderer/components/ai-elements/message";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
-import { agentMessageToRuntimeMessage } from "@renderer/lib/agent-message";
 import { type MessageEntry, type SessionEntry } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
 import { GitBranch } from "lucide-react";
@@ -63,7 +62,7 @@ export function ForkMessageButton({ sessionId, entries, targetEntryId }: ForkMes
 
       // 6. Set history messages on the runtime
       const messageEntries = slicedEntries.filter((e): e is MessageEntry => e.type === "message");
-      const runtimeMessages = messageEntries.map((e) => agentMessageToRuntimeMessage(e.data));
+      const runtimeMessages = messageEntries.map((e) => e.data);
       if (runtimeMessages.length > 0) {
         await invoke("setHistoryMessages", newSession.id, runtimeMessages);
       }

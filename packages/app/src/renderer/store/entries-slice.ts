@@ -1,8 +1,7 @@
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
-import type { AssistantMessage, UserMessage } from "@mariozechner/pi-ai";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { Entry } from "@renderer/apis/sessions";
 import { isAgentMessageEntry } from "@renderer/lib/is";
-import type { JSONContent } from "@tiptap/core";
 import { v4 as uuidv4 } from "uuid";
 import type { StateCreator } from "zustand/vanilla";
 
@@ -30,12 +29,7 @@ export interface ToolExecutionState {
   approvalStatus?: ToolApprovalStatus;
 }
 
-export interface AgentUserMessage extends Omit<UserMessage, "content"> {
-  content: JSONContent;
-  text: string;
-}
-
-export type AgentMessageData = Exclude<AgentMessage, UserMessage> | AgentUserMessage;
+export type AgentMessageData = AgentMessage;
 
 interface AgentMessageEntry extends Omit<Entry, "type" | "data"> {
   type: "message";
@@ -106,7 +100,7 @@ export const createEntriesSlice: StateCreator<EntriesSlice, [], [], EntriesSlice
   getEntryState: (sessionId) => {
     const existing = get().entryStates.get(sessionId);
     if (existing) return existing;
-    return { ...EMPTY_ENTRY_STATE, toolStates: new Map() };
+    return EMPTY_ENTRY_STATE;
   },
 
   appendMessageEntry: (sessionId, message) => {

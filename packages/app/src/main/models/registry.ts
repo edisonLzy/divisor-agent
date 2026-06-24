@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
 
-import type { Api, Model, OAuthProviderInterface } from "@mariozechner/pi-ai";
+import type { Api, Model, OAuthProviderInterface } from "@earendil-works/pi-ai";
 
 import type {
   ModelsConfigFile,

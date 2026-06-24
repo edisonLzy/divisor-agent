@@ -3,7 +3,7 @@ import type {
   TextContent,
   ThinkingContent,
   ToolCall,
-} from "@mariozechner/pi-ai";
+} from "@earendil-works/pi-ai";
 import { Message } from "@renderer/components/ai-elements/message";
 import { Shimmer } from "@renderer/components/ai-elements/shimmer";
 import {

@@ -1,5 +1,5 @@
-import type { AgentEvent, AgentTool } from "@mariozechner/pi-agent-core";
-import type { TSchema } from "@sinclair/typebox";
+import type { AgentEvent, AgentTool, AppUserMessage } from "@earendil-works/pi-agent-core";
+import type { TSchema } from "@earendil-works/pi-ai";
 
 import type { ExtensionManifest } from "../manifest.js";
 
@@ -48,11 +48,7 @@ export interface MainExtensionRuntimeAPI {
   createAgent(input?: CreateExtensionAgentInput): Promise<ExtensionAgentHandle>;
   destroyAgent(agentId: string): Promise<void>;
   getCurrentAgentContext(): ExtensionCurrentAgentContext | undefined;
-  promptAgent(
-    agentId: string,
-    content: string,
-    metadata?: { model?: ExtensionAgentModel },
-  ): Promise<void>;
+  promptAgent(agentId: string, message: AppUserMessage): Promise<void>;
   subscribeAgentEvents(
     agentId: string,
     listener: (event: ExtensionAgentEvent) => void | Promise<void>,

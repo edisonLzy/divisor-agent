@@ -9,7 +9,7 @@ export type SideChatContext = Record<string, unknown>;
 export interface SideChatMeta {
   mainSessionId: string;
   context: SideChatContext;
-  model?: Pick<AvailableModel, "modelId" | "providerId">;
+  model?: AvailableModel;
   pendingPrompt: string;
   createdAt: number;
   inputDisabled?: boolean;
@@ -29,10 +29,7 @@ export interface SideChatSlice {
   getSideChatMeta: (sideChatId: string) => SideChatMeta | undefined;
   isSideChatSession: (sessionId: string) => boolean;
   appendSideChatMeta: (sideChatId: string, meta: SideChatMeta) => void;
-  setSideChatModel: (
-    sideChatId: string,
-    model: Pick<AvailableModel, "modelId" | "providerId">,
-  ) => void;
+  setSideChatModel: (sideChatId: string, model: AvailableModel) => void;
   removeSideChatMeta: (sideChatId: string) => void;
 }
 

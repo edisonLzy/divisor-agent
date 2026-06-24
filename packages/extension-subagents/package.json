@@ -10,11 +10,11 @@
   },
   "dependencies": {
     "@divisor-agent/extension-core": "workspace:*",
-    "@sinclair/typebox": "^0.34.49"
+    "@earendil-works/pi-ai": "catalog:"
   },
   "peerDependencies": {
     "@types/react": "catalog:",
-    "lucide-react": "^1.8.0",
+    "lucide-react": "catalog:",
     "react": "catalog:"
   }
 }

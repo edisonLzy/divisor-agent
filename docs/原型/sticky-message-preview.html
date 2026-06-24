@@ -1,0 +1,1199 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sticky User Message Fallback Preview</title>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+      :root {
+        color-scheme: light;
+        --background: #ffffff;
+        --foreground: #181818;
+        --card: #ffffff;
+        --card-foreground: #181818;
+        --popover: #ffffff;
+        --popover-foreground: #181818;
+        --primary: #222222;
+        --primary-foreground: #fafafa;
+        --secondary: #f2f2f2;
+        --secondary-foreground: #252525;
+        --muted: #f2f2f2;
+        --muted-foreground: #707070;
+        --accent: #f2f2f2;
+        --accent-foreground: #252525;
+        --border: #e7e7e7;
+        --input: #e7e7e7;
+        --ring: #a3a3a3;
+        --sidebar: #fafafa;
+        --sidebar-foreground: #252525;
+        --sidebar-accent: #f2f2f2;
+        --sidebar-border: #e7e7e7;
+        --workspace-surface: rgba(255, 255, 255, 0.82);
+        --workspace-glow: rgba(255, 255, 255, 0.55);
+        --shadow-soft: 0 18px 48px rgba(15, 23, 42, 0.08);
+        --shadow-float: 0 20px 70px rgba(15, 23, 42, 0.14);
+        --radius: 10px;
+      }
+
+      [data-theme="dark"] {
+        color-scheme: dark;
+        --background: #111111;
+        --foreground: #d4d4d4;
+        --card: #141414;
+        --card-foreground: #d4d4d4;
+        --popover: #141414;
+        --popover-foreground: #d4d4d4;
+        --primary: #efefef;
+        --primary-foreground: #111111;
+        --secondary: #222222;
+        --secondary-foreground: #d4d4d4;
+        --muted: #222222;
+        --muted-foreground: #777777;
+        --accent: #222222;
+        --accent-foreground: #efefef;
+        --border: #2c2c2c;
+        --input: #2c2c2c;
+        --ring: #666666;
+        --sidebar: #141414;
+        --sidebar-foreground: #d4d4d4;
+        --sidebar-accent: #222222;
+        --sidebar-border: #2c2c2c;
+        --workspace-surface: rgba(17, 17, 17, 0.88);
+        --workspace-glow: rgba(255, 255, 255, 0.06);
+        --shadow-soft: 0 18px 48px rgba(0, 0, 0, 0.2);
+        --shadow-float: 0 24px 80px rgba(0, 0, 0, 0.38);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+      }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 10% 0%, rgba(255, 255, 255, 0.72), transparent 34%),
+          linear-gradient(135deg, #f7f7f7, #ededed 45%, #f8f8f8);
+        color: var(--foreground);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        letter-spacing: 0;
+      }
+
+      [data-theme="dark"] body {
+        background:
+          radial-gradient(circle at 10% 0%, rgba(255, 255, 255, 0.07), transparent 34%),
+          linear-gradient(135deg, #161616, #0f0f0f 48%, #191919);
+      }
+
+      button {
+        font: inherit;
+      }
+
+      .app {
+        display: grid;
+        grid-template-columns: 300px minmax(0, 1fr);
+        height: 100vh;
+        padding: 12px;
+        gap: 12px;
+      }
+
+      .sidebar {
+        min-width: 0;
+        border: 1px solid var(--sidebar-border);
+        border-radius: 18px;
+        background: color-mix(in srgb, var(--sidebar) 82%, transparent);
+        backdrop-filter: blur(18px);
+        padding: 14px;
+        overflow: auto;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 6px 14px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .mark {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        background: var(--primary);
+        color: var(--primary-foreground);
+        display: grid;
+        place-items: center;
+        font-weight: 680;
+      }
+
+      .brand h1 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 620;
+      }
+
+      .brand p {
+        margin: 1px 0 0;
+        color: var(--muted-foreground);
+        font-size: 12px;
+      }
+
+      .section-title {
+        margin: 18px 6px 8px;
+        color: var(--muted-foreground);
+        font-size: 11px;
+        font-weight: 650;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .mode-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .mode-button {
+        display: grid;
+        grid-template-columns: 18px minmax(0, 1fr);
+        gap: 10px;
+        width: 100%;
+        min-height: 52px;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        background: transparent;
+        color: var(--sidebar-foreground);
+        padding: 9px 10px;
+        text-align: left;
+        cursor: pointer;
+        transition:
+          background 140ms ease,
+          border-color 140ms ease,
+          transform 140ms ease;
+      }
+
+      .mode-button:hover {
+        background: var(--sidebar-accent);
+      }
+
+      .mode-button.active {
+        border-color: var(--border);
+        background: var(--background);
+        box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
+      }
+
+      .mode-button svg {
+        width: 16px;
+        height: 16px;
+        margin-top: 2px;
+        color: var(--muted-foreground);
+      }
+
+      .mode-button strong {
+        display: block;
+        font-size: 13px;
+        font-weight: 620;
+      }
+
+      .mode-button span {
+        display: block;
+        margin-top: 2px;
+        color: var(--muted-foreground);
+        font-size: 12px;
+        line-height: 1.35;
+      }
+
+      .notes {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .note {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--background) 72%, transparent);
+        padding: 10px;
+      }
+
+      .note h2 {
+        margin: 0 0 7px;
+        font-size: 12px;
+      }
+
+      .note p,
+      .note li {
+        color: var(--muted-foreground);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .note p {
+        margin: 0;
+      }
+
+      .note ol {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      .shell {
+        min-width: 0;
+        overflow: hidden;
+        border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+        border-left: 0;
+        border-radius: 20px;
+        background:
+          radial-gradient(circle at 10% 0%, var(--workspace-glow), transparent 40%),
+          var(--workspace-surface);
+        backdrop-filter: blur(20px);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .topbar {
+        min-height: 52px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+        padding: 0 18px;
+      }
+
+      .title-wrap {
+        min-width: 0;
+      }
+
+      .title-wrap h2 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 610;
+      }
+
+      .title-wrap p {
+        margin: 2px 0 0;
+        color: var(--muted-foreground);
+        font-size: 12px;
+      }
+
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .style-switcher {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        max-width: min(54vw, 560px);
+        overflow-x: auto;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--background) 72%, transparent);
+        padding: 3px;
+      }
+
+      .style-switcher::-webkit-scrollbar {
+        display: none;
+      }
+
+      .switch-button {
+        min-width: max-content;
+        height: 26px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--muted-foreground);
+        cursor: pointer;
+        padding: 0 9px;
+        font-size: 12px;
+        font-weight: 560;
+        transition:
+          background 140ms ease,
+          color 140ms ease;
+      }
+
+      .switch-button:hover {
+        background: var(--muted);
+        color: var(--foreground);
+      }
+
+      .switch-button.active {
+        background: var(--primary);
+        color: var(--primary-foreground);
+      }
+
+      .icon-button,
+      .text-button {
+        border: 1px solid transparent;
+        border-radius: 9px;
+        background: transparent;
+        color: var(--foreground);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        transition:
+          background 140ms ease,
+          border-color 140ms ease,
+          color 140ms ease,
+          transform 140ms ease;
+      }
+
+      .icon-button {
+        width: 32px;
+        height: 32px;
+      }
+
+      .text-button {
+        height: 32px;
+        padding: 0 10px;
+        font-size: 13px;
+        font-weight: 560;
+      }
+
+      .icon-button:hover,
+      .text-button:hover {
+        background: var(--muted);
+      }
+
+      .icon-button:active,
+      .text-button:active {
+        transform: translateY(1px);
+      }
+
+      .icon-button svg,
+      .text-button svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      .workspace {
+        min-height: 0;
+        flex: 1;
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) auto;
+      }
+
+      .chat-stage {
+        position: relative;
+        min-height: 0;
+        padding: 24px 24px 0;
+      }
+
+      .scroll {
+        height: 100%;
+        overflow-y: auto;
+        padding-right: 8px;
+        scroll-behavior: smooth;
+      }
+
+      .scroll::-webkit-scrollbar {
+        width: 10px;
+      }
+
+      .scroll::-webkit-scrollbar-thumb {
+        border: 3px solid transparent;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--muted-foreground) 40%, transparent);
+        background-clip: padding-box;
+      }
+
+      .spacer {
+        min-height: 980px;
+      }
+
+      .message-stack {
+        max-width: 860px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        padding-bottom: 64px;
+      }
+
+      .message-row {
+        display: flex;
+        width: 100%;
+      }
+
+      .message-row.user {
+        justify-content: flex-end;
+      }
+
+      .assistant-bubble {
+        max-width: 760px;
+        color: var(--foreground);
+        font-size: 15px;
+        line-height: 1.7;
+      }
+
+      .assistant-bubble p {
+        margin: 0 0 12px;
+      }
+
+      .assistant-bubble p:last-child {
+        margin-bottom: 0;
+      }
+
+      .process {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+        color: var(--muted-foreground);
+        font-size: 12px;
+      }
+
+      .process::after {
+        content: "";
+        height: 1px;
+        flex: 1;
+        background: var(--border);
+      }
+
+      .user-message {
+        max-width: 640px;
+        margin-left: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 6px;
+      }
+
+      .user-bubble {
+        border-radius: 20px;
+        background: var(--secondary);
+        color: var(--secondary-foreground);
+        box-shadow: var(--shadow-soft);
+        padding: 10px 16px;
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      .message-tools {
+        display: flex;
+        justify-content: flex-end;
+        gap: 2px;
+        opacity: 0;
+        transition: opacity 140ms ease;
+      }
+
+      .user-message:hover .message-tools {
+        opacity: 1;
+      }
+
+      .tool-button {
+        width: 28px;
+        height: 28px;
+        display: grid;
+        place-items: center;
+        border: 0;
+        border-radius: 9px;
+        background: transparent;
+        color: var(--muted-foreground);
+        cursor: pointer;
+      }
+
+      .tool-button:hover {
+        background: var(--muted);
+        color: var(--foreground);
+      }
+
+      .tool-button svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      .sticky-layer {
+        pointer-events: none;
+        position: absolute;
+        inset: 0 24px auto 24px;
+        z-index: 30;
+        min-height: 0;
+      }
+
+      .sticky-layer.hidden {
+        display: none;
+      }
+
+      .sticky-layer::before {
+        content: "";
+        position: absolute;
+        inset: 0 -8px auto -8px;
+        height: 86px;
+        pointer-events: none;
+        background: linear-gradient(
+          to bottom,
+          color-mix(in srgb, var(--workspace-surface) 92%, transparent),
+          transparent
+        );
+      }
+
+      .sticky-inner {
+        position: relative;
+        max-width: 860px;
+        margin: 0 auto;
+        min-height: 80px;
+        padding-top: 6px;
+      }
+
+      .sticky-card {
+        pointer-events: auto;
+        margin-left: auto;
+        width: min(640px, 76%);
+        transform: translateY(-10px);
+        opacity: 0;
+        transition:
+          opacity 160ms ease,
+          transform 160ms ease,
+          width 160ms ease;
+      }
+
+      .sticky-layer.visible .sticky-card {
+        transform: translateY(0);
+        opacity: 1;
+      }
+
+      .sticky-card .user-bubble {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px;
+        border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+        background: color-mix(in srgb, var(--secondary) 86%, var(--background));
+        backdrop-filter: blur(18px);
+        box-shadow: var(--shadow-float);
+      }
+
+      .sticky-mode-compact .sticky-card {
+        width: min(420px, 68%);
+      }
+
+      .sticky-mode-compact .sticky-text {
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
+      }
+
+      .sticky-mode-compact .user-bubble {
+        border-radius: 999px;
+        padding-block: 8px;
+      }
+
+      .sticky-mode-full .sticky-inner {
+        max-width: none;
+      }
+
+      .sticky-mode-full .sticky-card {
+        width: min(100%, 940px);
+        margin: 0 auto;
+      }
+
+      .sticky-mode-full .sticky-card .user-bubble {
+        gap: 12px;
+        border-radius: 14px;
+        background: color-mix(in srgb, var(--background) 88%, var(--secondary));
+        padding: 10px 12px;
+      }
+
+      .sticky-mode-full .sticky-text {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+
+      .sticky-mode-rail .sticky-inner {
+        max-width: none;
+      }
+
+      .sticky-mode-rail .sticky-card {
+        width: min(760px, 92%);
+        margin: 0 auto;
+      }
+
+      .sticky-mode-rail .sticky-card .user-bubble {
+        gap: 10px;
+        border-radius: 12px;
+        padding: 8px 10px;
+      }
+
+      .sticky-mode-rail .sticky-text {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+
+      .sticky-mode-peek .sticky-card {
+        width: min(560px, 74%);
+      }
+
+      .sticky-mode-peek .user-bubble {
+        gap: 8px;
+        border-radius: 999px;
+        padding-block: 8px;
+      }
+
+      .sticky-mode-peek .sticky-text {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+
+      .sticky-text {
+        min-width: 0;
+      }
+
+      .jump-button {
+        min-width: max-content;
+        height: 26px;
+        border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+        border-radius: 8px;
+        background: color-mix(in srgb, var(--background) 80%, transparent);
+        color: var(--muted-foreground);
+        cursor: pointer;
+        padding: 0 9px;
+        font-size: 12px;
+        font-weight: 560;
+        white-space: nowrap;
+        transition:
+          background 140ms ease,
+          color 140ms ease,
+          border-color 140ms ease;
+      }
+
+      .jump-button:hover {
+        border-color: var(--ring);
+        background: var(--muted);
+        color: var(--foreground);
+      }
+
+      .composer {
+        border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+        padding: 16px 24px 20px;
+      }
+
+      .composer-box {
+        max-width: 860px;
+        min-height: 86px;
+        margin: 0 auto;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: color-mix(in srgb, var(--background) 74%, transparent);
+        box-shadow: 0 8px 30px rgba(15, 23, 42, 0.06);
+        display: grid;
+        grid-template-rows: 1fr auto;
+        overflow: hidden;
+      }
+
+      .composer-placeholder {
+        padding: 14px 16px 4px;
+        color: var(--muted-foreground);
+        font-size: 14px;
+      }
+
+      .composer-footer {
+        min-height: 38px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 7px;
+      }
+
+      .chip-row {
+        display: flex;
+        gap: 6px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        height: 24px;
+        border-radius: 8px;
+        background: var(--muted);
+        color: var(--muted-foreground);
+        padding: 0 8px;
+        font-size: 12px;
+      }
+
+      .send-button {
+        width: 30px;
+        height: 30px;
+        border: 0;
+        border-radius: 9px;
+        background: var(--primary);
+        color: var(--primary-foreground);
+        display: grid;
+        place-items: center;
+      }
+
+      .send-button svg {
+        width: 15px;
+        height: 15px;
+      }
+
+      .toast {
+        position: absolute;
+        right: 24px;
+        bottom: 118px;
+        z-index: 80;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--popover);
+        color: var(--popover-foreground);
+        box-shadow: var(--shadow-float);
+        padding: 9px 12px;
+        font-size: 13px;
+        opacity: 0;
+        transform: translateY(8px);
+        transition:
+          opacity 160ms ease,
+          transform 160ms ease;
+        pointer-events: none;
+      }
+
+      .toast.visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      @media (max-width: 980px) {
+        .app {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          display: none;
+        }
+
+        .shell {
+          border-left: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+        }
+
+        .sticky-card {
+          width: min(640px, 94%);
+        }
+      }
+
+      @media (max-width: 760px) {
+        .topbar {
+          align-items: flex-start;
+          flex-direction: column;
+          padding-block: 10px;
+        }
+
+        .actions {
+          width: 100%;
+        }
+
+        .style-switcher {
+          max-width: none;
+          flex: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="mark">D</div>
+          <div>
+            <h1>StickyMessage fallback</h1>
+            <p>Interaction preview for Divisor Agent</p>
+          </div>
+        </div>
+
+        <div class="section-title">Interaction</div>
+        <div class="mode-list" role="tablist" aria-label="Sticky message modes">
+          <button class="mode-button active" type="button" data-mode="dock">
+            <i data-lucide="panel-top"></i>
+            <span>
+              <strong>Docked bubble</strong>
+              <span>Most faithful to the current user message shape.</span>
+            </span>
+          </button>
+          <button class="mode-button" type="button" data-mode="full">
+            <i data-lucide="panel-top-open"></i>
+            <span>
+              <strong>Full-width bar</strong>
+              <span>Spans the reading column when the prompt is global context.</span>
+            </span>
+          </button>
+          <button class="mode-button" type="button" data-mode="compact">
+            <i data-lucide="minimize-2"></i>
+            <span>
+              <strong>Compact pill</strong>
+              <span>Single-line prompt preview with one jump action.</span>
+            </span>
+          </button>
+          <button class="mode-button" type="button" data-mode="rail">
+            <i data-lucide="grip-horizontal"></i>
+            <span>
+              <strong>Context rail</strong>
+              <span>A quiet top rail for reading long assistant output.</span>
+            </span>
+          </button>
+          <button class="mode-button" type="button" data-mode="peek">
+            <i data-lucide="mouse-pointer-click"></i>
+            <span>
+              <strong>Peek chip</strong>
+              <span>Small while scrolling, with jump kept explicit.</span>
+            </span>
+          </button>
+        </div>
+
+        <div class="notes">
+          <div class="note">
+            <h2>Fallback architecture</h2>
+            <ol>
+              <li>Keep virtual rows exactly as they are.</li>
+              <li>Track the nearest user message above the viewport.</li>
+              <li>Render one independent overlay as a sibling of the scroll list.</li>
+              <li>Keep exactly one action: Click to jump back to the source UserMessage.</li>
+            </ol>
+          </div>
+          <div class="note">
+            <h2>Sticky condition</h2>
+            <p>
+              Show when a user row's measured end is above scrollOffset plus a small top inset.
+              Hide when no previous user row has left the viewport.
+            </p>
+          </div>
+          <div class="note">
+            <h2>Why this avoids the bug</h2>
+            <p>
+              The overlay is outside the absolute row and its translateY transform, so it is not
+              constrained by a short virtual item parent.
+            </p>
+          </div>
+        </div>
+      </aside>
+
+      <main class="shell">
+        <header class="topbar">
+          <div class="title-wrap">
+            <h2 id="modeTitle">Docked bubble</h2>
+            <p id="modeDescription">Scroll the transcript until a user message leaves the top.</p>
+          </div>
+          <div class="actions">
+            <div class="style-switcher" role="tablist" aria-label="Sticky style switcher">
+              <button class="switch-button active" type="button" data-mode="dock">Docked</button>
+              <button class="switch-button" type="button" data-mode="full">Full bar</button>
+              <button class="switch-button" type="button" data-mode="compact">Pill</button>
+              <button class="switch-button" type="button" data-mode="rail">Rail</button>
+              <button class="switch-button" type="button" data-mode="peek">Peek</button>
+            </div>
+            <button class="text-button" type="button" id="resetScroll">
+              <i data-lucide="rotate-ccw"></i>
+              Reset
+            </button>
+            <button class="icon-button" type="button" id="themeToggle" aria-label="Toggle theme">
+              <i data-lucide="moon"></i>
+            </button>
+          </div>
+        </header>
+
+        <section class="workspace">
+          <div class="chat-stage">
+            <div class="scroll" id="scrollArea">
+              <div class="message-stack">
+                <div class="message-row user user-row" data-label="Initial prompt">
+                  <div class="user-message">
+                    <div class="user-bubble">
+                      <span class="user-text"
+                        >Audit why the sticky user prompt is not staying visible in the virtual
+                        chat list. Focus on the transform layout and propose a fallback.</span
+                      >
+                    </div>
+                    <div class="message-tools">
+                      <button class="tool-button" type="button" aria-label="Copy">
+                        <i data-lucide="copy"></i>
+                      </button>
+                      <button class="tool-button" type="button" aria-label="Edit">
+                        <i data-lucide="pencil"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="message-row assistant">
+                  <div class="assistant-bubble">
+                    <div class="process">Processed 4s</div>
+                    <p>
+                      The current sticky wrapper sits inside a virtual row that is absolutely
+                      positioned and moved with transform. The sticky element can only stick inside
+                      that row's containing block, which is roughly the height of the message.
+                    </p>
+                    <p>
+                      Once the row is outside the virtual range, React Virtual can unmount it. So a
+                      nested sticky child has neither enough containing space nor stable DOM
+                      lifetime.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="message-row user user-row" data-label="Follow-up prompt">
+                  <div class="user-message">
+                    <div class="user-bubble">
+                      <span class="user-text"
+                        >Give me a fallback implementation plan. The sticky message should only
+                        care about the latest user prompt that has left the viewport.</span
+                      >
+                    </div>
+                    <div class="message-tools">
+                      <button class="tool-button" type="button" aria-label="Copy">
+                        <i data-lucide="copy"></i>
+                      </button>
+                      <button class="tool-button" type="button" aria-label="Edit">
+                        <i data-lucide="pencil"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="message-row assistant">
+                  <div class="assistant-bubble">
+                    <div class="process">Processed 9s</div>
+                    <p>
+                      The clean fallback is a sibling overlay inside ChatMessages. The scrollable
+                      virtual list keeps its current absolute row structure. The overlay listens to
+                      virtualizer state and renders the active user prompt independently.
+                    </p>
+                    <p>
+                      On every scroll or virtualizer change, read scrollOffset and the measurements
+                      cache. Walk the user-message indexes and select the last one whose measured
+                      end is before the viewport top. That entry becomes the active sticky prompt.
+                    </p>
+                    <p>
+                      The overlay can reuse the user bubble styling, but it should avoid joining
+                      the measured virtual row tree. Actions can be overlay-local: copy text,
+                      scrollToIndex for jump, and optionally request edit mode on the source row.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="message-row user user-row" data-label="Design prompt">
+                  <div class="user-message">
+                    <div class="user-bubble">
+                      <span class="user-text"
+                        >Design several interactions that match the existing desktop chat style,
+                        then output a previewable HTML file.</span
+                      >
+                    </div>
+                    <div class="message-tools">
+                      <button class="tool-button" type="button" aria-label="Copy">
+                        <i data-lucide="copy"></i>
+                      </button>
+                      <button class="tool-button" type="button" aria-label="Edit">
+                        <i data-lucide="pencil"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="message-row assistant">
+                  <div class="assistant-bubble">
+                    <div class="process">Processing</div>
+                    <p>
+                      The five variants here stay close to the app's language: neutral surfaces,
+                      restrained borders, right aligned bubbles, full-width context bars, compact
+                      icon controls, and no major layout shift when sticky state changes.
+                    </p>
+                    <p>
+                      Scroll upward and downward to see when the overlay appears. Try switching
+                      modes while the same active prompt is pinned.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="spacer"></div>
+              </div>
+            </div>
+
+            <div class="sticky-layer hidden sticky-mode-dock" id="stickyLayer" aria-live="polite">
+              <div class="sticky-inner">
+                <div class="sticky-card">
+                  <div class="user-bubble" id="stickyBubble">
+                    <span class="sticky-text" id="stickyText"></span>
+                    <button class="jump-button" type="button" id="jumpSticky">Click to jump</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="toast" id="toast">Copied prompt text</div>
+          </div>
+
+          <footer class="composer">
+            <div class="composer-box">
+              <div class="composer-placeholder">Ask the agent anything...</div>
+              <div class="composer-footer">
+                <div class="chip-row">
+                  <span class="chip"><i data-lucide="bot"></i>gpt-5-codex</span>
+                  <span class="chip"><i data-lucide="shield-check"></i>workspace</span>
+                </div>
+                <button class="send-button" type="button" aria-label="Send">
+                  <i data-lucide="arrow-up"></i>
+                </button>
+              </div>
+            </div>
+          </footer>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const root = document.documentElement;
+      const scrollArea = document.querySelector("#scrollArea");
+      const stickyLayer = document.querySelector("#stickyLayer");
+      const stickyText = document.querySelector("#stickyText");
+      const modeTitle = document.querySelector("#modeTitle");
+      const modeDescription = document.querySelector("#modeDescription");
+      const toast = document.querySelector("#toast");
+      const modes = {
+        dock: {
+          title: "Docked bubble",
+          description: "A faithful floating clone of the latest departed user prompt.",
+        },
+        full: {
+          title: "Full-width bar",
+          description: "A cross-row context bar for prompts that frame the whole response.",
+        },
+        compact: {
+          title: "Compact pill",
+          description: "A quiet one-line prompt chip with only the jump action.",
+        },
+        rail: {
+          title: "Context rail",
+          description: "A centered rail for long reading sessions where the prompt is context.",
+        },
+        peek: {
+          title: "Peek chip",
+          description: "A small context chip with an explicit jump target.",
+        },
+      };
+      let activeRow = null;
+      let toastTimer = 0;
+
+      function syncIcons() {
+        if (window.lucide) {
+          window.lucide.createIcons();
+        }
+      }
+
+      function setMode(mode) {
+        stickyLayer.className = `sticky-layer sticky-mode-${mode}`;
+        document.querySelectorAll(".mode-button").forEach((button) => {
+          button.classList.toggle("active", button.dataset.mode === mode);
+        });
+        document.querySelectorAll(".switch-button").forEach((button) => {
+          button.classList.toggle("active", button.dataset.mode === mode);
+        });
+        modeTitle.textContent = modes[mode].title;
+        modeDescription.textContent = modes[mode].description;
+        renderSticky();
+      }
+
+      function getDepartedUserRow() {
+        const top = scrollArea.scrollTop + 8;
+        const rows = Array.from(document.querySelectorAll(".user-row"));
+        let candidate = null;
+        rows.forEach((row) => {
+          const end = row.offsetTop + row.offsetHeight;
+          if (end <= top) {
+            candidate = row;
+          }
+        });
+        return candidate;
+      }
+
+      function renderSticky() {
+        activeRow = getDepartedUserRow();
+        if (!activeRow) {
+          stickyLayer.classList.add("hidden");
+          stickyLayer.classList.remove("visible");
+          return;
+        }
+
+        const text = activeRow.querySelector(".user-text").textContent.trim();
+        stickyText.textContent = text;
+        stickyLayer.classList.remove("hidden");
+        stickyLayer.classList.add("visible");
+      }
+
+      function showToast(message) {
+        window.clearTimeout(toastTimer);
+        toast.textContent = message;
+        toast.classList.add("visible");
+        toastTimer = window.setTimeout(() => {
+          toast.classList.remove("visible");
+        }, 1300);
+      }
+
+      function jumpToActiveRow() {
+        if (!activeRow) return;
+        scrollArea.scrollTo({
+          top: Math.max(0, activeRow.offsetTop - 12),
+          behavior: "smooth",
+        });
+      }
+
+      document.querySelectorAll(".mode-button").forEach((button) => {
+        button.addEventListener("click", () => {
+          setMode(button.dataset.mode);
+        });
+      });
+
+      document.querySelectorAll(".switch-button").forEach((button) => {
+        button.addEventListener("click", () => {
+          setMode(button.dataset.mode);
+        });
+      });
+
+      scrollArea.addEventListener("scroll", renderSticky, { passive: true });
+
+      document.querySelector("#resetScroll").addEventListener("click", () => {
+        scrollArea.scrollTo({ top: 0, behavior: "smooth" });
+      });
+
+      document.querySelector("#themeToggle").addEventListener("click", () => {
+        const nextTheme = root.dataset.theme === "dark" ? "light" : "dark";
+        root.dataset.theme = nextTheme;
+        document.querySelector("#themeToggle").innerHTML =
+          nextTheme === "dark"
+            ? '<i data-lucide="sun"></i>'
+            : '<i data-lucide="moon"></i>';
+        syncIcons();
+      });
+
+      document.querySelector("#jumpSticky").addEventListener("click", () => {
+        jumpToActiveRow();
+      });
+
+      document.querySelectorAll(".message-tools .tool-button").forEach((button) => {
+        if (!button.id) {
+          button.addEventListener("click", () => showToast("Message action preview"));
+        }
+      });
+
+      setMode("dock");
+      renderSticky();
+      syncIcons();
+    </script>
+  </body>
+</html>

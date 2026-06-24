@@ -1,16 +1,19 @@
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
+import type { AgentMessage, AppUserMessage } from "@earendil-works/pi-agent-core";
 
 import type { AgentSessionScope } from "./events-ipc";
 import type { AvailableModel } from "./models-ipc";
 import type { PermissionMode, PermissionResolution } from "./permissions-ipc";
 
-export interface PromptMetadata {
-  model?: Pick<AvailableModel, "modelId" | "providerId">;
-  skillIds?: string[];
-}
-
 export interface AgentSessionIPC {
-  prompt: (sessionId: string, content: string, metadata?: PromptMetadata) => Promise<void>;
+  prompt: (sessionId: string, message: AppUserMessage) => Promise<void>;
+  runOneTimeAgent: (
+    messages: AgentMessage[],
+    options: {
+      timeout?: number;
+      systemPrompt: string;
+      model: Pick<AvailableModel, "providerId" | "modelId">;
+    },
+  ) => Promise<string>;
   abortPrompt: (sessionId: string) => Promise<void>;
   setHistoryMessages: (sessionId: string, messages: AgentMessage[]) => Promise<void>;
   setSessionId: (sessionId: string) => Promise<void>;

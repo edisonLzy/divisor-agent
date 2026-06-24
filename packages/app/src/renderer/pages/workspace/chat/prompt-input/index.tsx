@@ -4,6 +4,7 @@ import {
 } from "@renderer/components/richtext/extensions/slash-commands";
 import { Button } from "@renderer/components/ui/button";
 import { cn } from "@renderer/lib/utils";
+import type { AvailableModel } from "@shared/models-ipc";
 import { EditorContent } from "@tiptap/react";
 import { ArrowUp, Square } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
@@ -17,6 +18,7 @@ import { PermissionSelector, usePermissionSelector } from "./permission-selector
 interface PromptInputProps {
   disabled?: boolean;
   isRunning?: boolean;
+  initialModel?: AvailableModel | null;
   onSubmit: (submission: PromptSubmission) => Promise<void> | void;
   onStop?: () => Promise<void> | void;
   sessionId: string | null;
@@ -24,12 +26,13 @@ interface PromptInputProps {
 
 export function PromptInput({
   disabled = false,
+  initialModel = null,
   isRunning = false,
   onSubmit,
   onStop,
   sessionId,
 }: PromptInputProps) {
-  const modelSelectorProps = useModalSelector();
+  const modelSelectorProps = useModalSelector(initialModel);
 
   const permissionSelectorProps = usePermissionSelector(sessionId);
 
@@ -69,7 +72,7 @@ export function PromptInput({
     }
 
     await onSubmit({
-      text: submissionText,
+      content: submissionText,
       jsonContent,
       model: modelSelectorProps.value,
       skillIds: getSelectedCommandIds(editor),

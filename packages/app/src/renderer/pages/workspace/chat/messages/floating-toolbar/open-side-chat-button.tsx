@@ -1,6 +1,7 @@
+import type { AppUserMessage } from "@earendil-works/pi-agent-core";
 import { Button } from "@renderer/components/ui/button";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
-import { createAgentUserMessage, createTextDocument } from "@renderer/lib/agent-message";
+import { createTextDocument } from "@renderer/lib/rich-text";
 import { mainStore } from "@renderer/store/main";
 import { sideChatStore } from "@renderer/store/side-chat";
 import { PanelRightOpen } from "lucide-react";
@@ -47,19 +48,24 @@ export function OpenSideChatButton({
       createdAt: Date.now(),
     });
 
-    const userMessage = createAgentUserMessage(createTextDocument(initialPrompt), initialPrompt);
-    sideChatStore.getState().appendMessageEntry(sideChatId, userMessage);
-
     if (!model) return;
 
     try {
       await invoke("setSessionId", sideChatId);
       await invoke("setSessionScope", sideChatId, "side-chat");
       sideChatStore.getState().setStatus(sideChatId, "running");
-      void invoke("prompt", sideChatId, initialPrompt, {
-        model: { modelId: model.modelId, providerId: model.providerId },
-        skillIds: [],
-      });
+      const appUserMessage: AppUserMessage = {
+        role: "user",
+        content: initialPrompt,
+        timestamp: Date.now(),
+        kind: "prompt",
+        jsonContent: createTextDocument(initialPrompt),
+        metadata: {
+          model: { modelId: model.modelId, providerId: model.providerId },
+          skillIds: [],
+        },
+      };
+      void invoke("prompt", sideChatId, appUserMessage);
     } catch (error) {
       console.error("Failed to start side chat:", error);
       sideChatStore.getState().setStatus(sideChatId, "idle");

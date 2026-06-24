@@ -2,6 +2,7 @@ import { ErrorBoundary } from "@renderer/components/ui/error-boundary";
 import { mainStore } from "@renderer/store/main";
 import { useStore } from "zustand";
 
+import { useWindowFullScreen } from "../use-window-full-screen";
 import { ActiveSessionContent } from "./active-session-content";
 import { PendingSessionContent } from "./pending-session-content";
 
@@ -12,6 +13,8 @@ interface ChatProps {
 export function Chat({ isSidebarCollapsed }: ChatProps) {
   const activeSessionId = useStore(mainStore, (state) => state.activeSessionId);
   const shouldRenderPendingState = !activeSessionId;
+  const isWindowFullScreen = useWindowFullScreen();
+  const insetForWindowControls = isSidebarCollapsed && !isWindowFullScreen;
 
   return (
     <div
@@ -23,9 +26,9 @@ export function Chat({ isSidebarCollapsed }: ChatProps) {
     >
       <ErrorBoundary>
         {shouldRenderPendingState ? (
-          <PendingSessionContent isSidebarCollapsed={isSidebarCollapsed} />
+          <PendingSessionContent insetForWindowControls={insetForWindowControls} />
         ) : (
-          <ActiveSessionContent isSidebarCollapsed={isSidebarCollapsed} />
+          <ActiveSessionContent insetForWindowControls={insetForWindowControls} />
         )}
       </ErrorBoundary>
     </div>

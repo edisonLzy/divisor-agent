@@ -6,6 +6,7 @@ import type { FileSystemIPC } from "../shared/file-system-ipc";
 import type { AgentModelsIPC } from "../shared/models-ipc";
 import type { AgentSessionIPC } from "../shared/session-ipc";
 import type { AgentSkillsIPC } from "../shared/skills-ipc";
+import type { SystemIPC } from "../shared/system-ipc";
 import type { AgentPool } from "./agent-pool";
 
 function registerAgentRuntimeHandlers(agentPool: AgentPool, browserWindow: BrowserWindow) {
@@ -22,7 +23,7 @@ function registerAgentRuntimeHandlers(agentPool: AgentPool, browserWindow: Brows
   };
 }
 
-function registerIPCHandlers(agentPool: AgentPool) {
+function registerIPCHandlers(agentPool: AgentPool, browserWindow: BrowserWindow) {
   const typedIpcMain = createTypedIpcMain();
 
   typedIpcMain.handle("setModel", agentPool.setModel);
@@ -30,6 +31,7 @@ function registerIPCHandlers(agentPool: AgentPool) {
   typedIpcMain.handle("getModelConfig", agentPool.getModelConfig);
   typedIpcMain.handle("saveModelConfig", agentPool.saveModelConfig);
   typedIpcMain.handle("prompt", agentPool.prompt);
+  typedIpcMain.handle("runOneTimeAgent", agentPool.runOneTimeAgent);
   typedIpcMain.handle("abortPrompt", agentPool.abortPrompt);
   typedIpcMain.handle("setHistoryMessages", agentPool.setHistoryMessages);
   typedIpcMain.handle("setSessionId", agentPool.setSessionId);
@@ -40,6 +42,7 @@ function registerIPCHandlers(agentPool: AgentPool) {
   typedIpcMain.handle("listSkills", agentPool.listSkills);
   typedIpcMain.handle("setSkillEnabled", agentPool.setSkillEnabled);
   typedIpcMain.handle("fsReadTextFile", handleFsReadTextFile);
+  typedIpcMain.handle("isWindowFullScreen", async () => browserWindow.isFullScreen());
 
   return () => {
     typedIpcMain.removeAllListeners();
@@ -62,7 +65,7 @@ export function bindAgentRuntimeIPC(
   browserWindow: BrowserWindow,
 ): () => void {
   const unregisterAgentRuntimeHandlers = registerAgentRuntimeHandlers(agentPool, browserWindow);
-  const unregisterIPCHandlers = registerIPCHandlers(agentPool);
+  const unregisterIPCHandlers = registerIPCHandlers(agentPool, browserWindow);
 
   return () => {
     // Unbind logic here
@@ -72,7 +75,7 @@ export function bindAgentRuntimeIPC(
 }
 
 function createTypedIpcMain() {
-  type AgentIPC = AgentModelsIPC & AgentSessionIPC & AgentSkillsIPC & FileSystemIPC;
+  type AgentIPC = AgentModelsIPC & AgentSessionIPC & AgentSkillsIPC & FileSystemIPC & SystemIPC;
   return {
     ...ipcMain,
     handle<C extends keyof AgentIPC = keyof AgentIPC>(channel: C, listener: AgentIPC[C]) {
