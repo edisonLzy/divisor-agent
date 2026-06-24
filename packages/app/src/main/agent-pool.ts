@@ -138,6 +138,11 @@ export class AgentPool
     await runtime.prompt(message);
   };
 
+  public clearAllQueues: AgentSessionIPC["clearAllQueues"] = async (sessionId) => {
+    const runtime = this.getOrCreateRuntime(sessionId);
+    await runtime.clearAllQueues();
+  };
+
   public runOneTimeAgent: AgentSessionIPC["runOneTimeAgent"] = async (messages, options) => {
     const timeout = options.timeout ?? 30_000;
 

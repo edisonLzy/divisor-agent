@@ -246,7 +246,19 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
       typeof message.content === "string"
         ? this.skillService.expandSkillReferences(message.content, message.metadata?.skillIds ?? [])
         : message.content;
-    this.agent.prompt({ ...message, content });
+
+    const routedMessage = { ...message, content };
+    if (message.kind === "steering") {
+      this.agent.steer(routedMessage);
+    } else if (message.kind === "follow-up") {
+      this.agent.followUp(routedMessage);
+    } else {
+      this.agent.prompt(routedMessage);
+    }
+  };
+
+  public clearAllQueues: AgentRuntimeDelegate["clearAllQueues"] = async () => {
+    this.agent.clearAllQueues();
   };
 
   public abortPrompt: AgentRuntimeDelegate["abortPrompt"] = async () => {
