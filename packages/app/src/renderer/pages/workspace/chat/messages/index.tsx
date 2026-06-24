@@ -61,8 +61,12 @@ export function ChatMessages({
   }
 
   return (
-    <div className="relative h-full">
-      <div ref={scrollRef} className="h-full overflow-y-auto pr-2" onScroll={handleStickyScroll}>
+    <div className="relative h-full min-w-0 overflow-x-hidden">
+      <div
+        ref={scrollRef}
+        className="h-full min-w-0 overflow-x-hidden overflow-y-auto pr-2"
+        onScroll={handleStickyScroll}
+      >
         <div
           style={{
             height: `${virtualizer.getTotalSize()}px`,
@@ -80,12 +84,12 @@ export function ChatMessages({
                 key={virtualRow.index}
                 data-index={virtualRow.index}
                 ref={virtualizer.measureElement}
-                className="absolute left-0 top-0 w-full px-2"
+                className="absolute left-0 top-0 w-full min-w-0 px-2"
                 style={{
                   transform: `translateY(${virtualRow.start}px)`,
                 }}
               >
-                <div className="mx-auto w-full max-w-4xl">
+                <div className="mx-auto w-full max-w-4xl min-w-0">
                   {isAgentUserMessage(message) ? (
                     <UserMessage
                       message={message}

@@ -199,6 +199,10 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
 
     agent.subscribe((event) => {
       this.emit(event.type, event);
+
+      if (event.type === "agent_end" && this.agent.hasQueuedMessages()) {
+        this.scheduleQueuedContinue();
+      }
     });
 
     return agent;
@@ -253,7 +257,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
     } else if (message.kind === "follow-up") {
       this.agent.followUp(routedMessage);
     } else {
-      this.agent.prompt(routedMessage);
+      await this.agent.prompt(routedMessage);
     }
   };
 
@@ -311,6 +315,18 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
       modelId: model.id,
       providerId: model.provider,
     };
+  }
+
+  private scheduleQueuedContinue() {
+    setTimeout(() => {
+      if (this.agent.state.isStreaming || !this.agent.hasQueuedMessages()) {
+        return;
+      }
+
+      this.agent.continue().catch((error) => {
+        console.error("Failed to continue queued agent messages", error);
+      });
+    }, 0);
   }
 }
 

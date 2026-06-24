@@ -7,15 +7,13 @@ import {
 } from "@renderer/components/ui/resizable";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { isAgentMessageEntry, isAgentUserMessage } from "@renderer/lib/is";
-import { cn } from "@renderer/lib/utils";
 import type { ToolExecutionState } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
 import { useQueryClient } from "@tanstack/react-query";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { motion } from "motion/react";
 import type { CSSProperties } from "react";
-import { useCallback, useEffect } from "react";
-import { usePanelRef } from "react-resizable-panels";
+import { useCallback } from "react";
 import { useStore } from "zustand";
 
 import { ArtifactsPanel } from "./artifacts";
@@ -45,7 +43,10 @@ export function ActiveSessionContent({ insetForWindowControls }: ActiveSessionCo
   } = useActiveSessionChat();
 
   const activeSessionId = useStore(mainStore, (state) => state.activeSessionId!);
-  const { artifactPanelRef, isArtifactPanelOpen } = useArtifactPanel(activeSessionId);
+  const isArtifactPanelOpen = useStore(
+    mainStore,
+    (state) => state.getArtifactState(activeSessionId).isOpen,
+  );
 
   const activeSession = useStore(mainStore, (state) =>
     activeSessionId ? state.getSession(activeSessionId) : undefined,
@@ -62,15 +63,16 @@ export function ActiveSessionContent({ insetForWindowControls }: ActiveSessionCo
   return (
     <div className="relative isolate flex min-h-0 flex-1">
       <ResizablePanelGroup
+        key={isArtifactPanelOpen ? "with-artifacts" : "chat-only"}
         orientation="horizontal"
-        className="min-h-0 flex-1 [&>[data-panel]]:transition-[flex-grow] [&>[data-panel]]:duration-200 [&>[data-panel]]:ease-out"
+        className="min-h-0 flex-1"
       >
         <ResizablePanel defaultSize={isArtifactPanelOpen ? "68%" : "100%"} minSize="42%">
           <div className="flex h-full min-w-0 flex-col">
             <PanelHeader dragRegion insetForWindowControls={insetForWindowControls}>
               <h1 className="truncate text-sm font-medium text-foreground">{sessionName}</h1>
             </PanelHeader>
-            <section className="min-h-0 flex-1 px-6 pt-6">
+            <section className="min-h-0 min-w-0 flex-1 overflow-x-hidden px-6 pt-6">
               <ChatMessages
                 entries={entries}
                 isRunning={isRunning}
@@ -87,7 +89,7 @@ export function ActiveSessionContent({ insetForWindowControls }: ActiveSessionCo
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.22, ease: "easeOut" }}
             >
-              <div className="mx-auto flex w-full max-w-3xl flex-col gap-2">
+              <div className="mx-auto flex w-full max-w-4xl flex-col gap-2">
                 {activeSessionId ? <PendingMessagesPanel sessionId={activeSessionId} /> : null}
                 {activeSessionId && pendingPermissionRequest ? (
                   <PermissionApprovalPanel sessionId={activeSessionId} />
@@ -108,27 +110,14 @@ export function ActiveSessionContent({ insetForWindowControls }: ActiveSessionCo
           </div>
         </ResizablePanel>
 
-        <ResizableHandle
-          disabled={!isArtifactPanelOpen}
-          className={cn(
-            "transition-opacity duration-150",
-            !isArtifactPanelOpen && "pointer-events-none opacity-0",
-          )}
-        />
-        <ResizablePanel
-          panelRef={artifactPanelRef}
-          collapsible
-          collapsedSize="0%"
-          defaultSize={isArtifactPanelOpen ? "32%" : "0%"}
-          minSize="22%"
-          maxSize="48%"
-          className={cn(
-            "min-w-0 transition-opacity duration-150",
-            !isArtifactPanelOpen && "pointer-events-none opacity-0",
-          )}
-        >
-          <ArtifactsPanel sessionId={activeSessionId} />
-        </ResizablePanel>
+        {isArtifactPanelOpen ? (
+          <>
+            <ResizableHandle />
+            <ResizablePanel defaultSize="32%" minSize="22%" maxSize="48%" className="min-w-0">
+              <ArtifactsPanel sessionId={activeSessionId} />
+            </ResizablePanel>
+          </>
+        ) : null}
       </ResizablePanelGroup>
 
       <FixedActions>
@@ -139,30 +128,6 @@ export function ActiveSessionContent({ insetForWindowControls }: ActiveSessionCo
 }
 
 const EMPTY_TOOL_STATES = new Map<string, ToolExecutionState>();
-
-function useArtifactPanel(sessionId: string) {
-  const artifactPanelRef = usePanelRef();
-  const isArtifactPanelOpen = useStore(
-    mainStore,
-    (state) => state.getArtifactState(sessionId).isOpen,
-  );
-
-  useEffect(() => {
-    const panel = artifactPanelRef.current;
-    if (!panel) return;
-
-    if (isArtifactPanelOpen) {
-      panel.expand();
-    } else {
-      panel.collapse();
-    }
-  }, [artifactPanelRef, isArtifactPanelOpen]);
-
-  return {
-    artifactPanelRef,
-    isArtifactPanelOpen,
-  };
-}
 
 interface ToggleArtifactPanelButtonProps {
   sessionId: string;
@@ -260,11 +225,12 @@ function useActiveSessionChat() {
         return;
       }
 
+      const timestamp = Date.now();
       try {
         const appUserMessage: AppUserMessage = {
           role: "user",
           content: submission.content,
-          timestamp: Date.now(),
+          timestamp,
           kind: "steering",
           jsonContent: submission.jsonContent,
           metadata: {
@@ -279,6 +245,7 @@ function useActiveSessionChat() {
         await invoke("prompt", activeSessionId, appUserMessage);
       } catch (error) {
         console.error("Failed to steer prompt", error);
+        mainStore.getState().removePendingMessageByTimestamp(activeSessionId, timestamp);
       }
     },
     [activeSessionId, invoke],
@@ -290,11 +257,12 @@ function useActiveSessionChat() {
         return;
       }
 
+      const timestamp = Date.now();
       try {
         const appUserMessage: AppUserMessage = {
           role: "user",
           content: submission.content,
-          timestamp: Date.now(),
+          timestamp,
           kind: "follow-up",
           jsonContent: submission.jsonContent,
           metadata: {
@@ -309,6 +277,7 @@ function useActiveSessionChat() {
         await invoke("prompt", activeSessionId, appUserMessage);
       } catch (error) {
         console.error("Failed to queue follow-up prompt", error);
+        mainStore.getState().removePendingMessageByTimestamp(activeSessionId, timestamp);
       }
     },
     [activeSessionId, invoke],

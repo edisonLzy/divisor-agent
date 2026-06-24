@@ -88,11 +88,11 @@ export function PromptInput({
       };
 
       if (kind === "steering") {
-        await onSteer?.(submission);
+        onSteer?.(submission);
       } else if (kind === "follow-up" && onFollowUp) {
-        await onFollowUp(submission);
+        onFollowUp(submission);
       } else {
-        await onSubmit(submission);
+        onSubmit(submission);
       }
 
       editor.commands.clearContent();
@@ -160,7 +160,7 @@ export function PromptInput({
   return (
     <div
       className={cn(
-        "mx-auto flex w-full max-w-3xl flex-col rounded-[24px] border border-border bg-card shadow-[0_20px_48px_rgb(15_23_42/0.08)] transition-all duration-300 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20 dark:shadow-[0_20px_48px_rgb(0_0_0/0.28)]",
+        "mx-auto flex w-full max-w-4xl flex-col rounded-[24px] border border-border bg-card shadow-[0_20px_48px_rgb(15_23_42/0.08)] transition-all duration-300 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20 dark:shadow-[0_20px_48px_rgb(0_0_0/0.28)]",
         disabled && !isRunning && "opacity-80",
       )}
     >
