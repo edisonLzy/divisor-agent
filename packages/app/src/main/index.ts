@@ -5,9 +5,24 @@ import { app, BrowserWindow } from "electron";
 import { bindAgentRuntimeIPC } from "./agent-ipc.js";
 import { AgentPool } from "./agent-pool.js";
 
+/**
+ * Resolve the app icon path.
+ *
+ * - Dev mode: `__dirname` is `<pkg>/out/main`, so `../../resources/icon.png`
+ *   resolves to `<pkg>/resources/icon.png`.
+ * - Packaged mode: `asarUnpack: resources/**` puts the file at
+ *   `<process.resourcesPath>/resources/icon.png`.
+ */
+function resolveAppIconPath(): string {
+  if (app.isPackaged) {
+    return join(process.resourcesPath, "resources", "icon.png");
+  }
+  return join(__dirname, "../../resources/icon.png");
+}
+
 function createWindow() {
   const mainWindow = new BrowserWindow({
-    icon: join(__dirname, "../../resources/icon.png"),
+    icon: resolveAppIconPath(),
     frame: false,
     titleBarStyle: "hiddenInset",
     vibrancy: "under-window",
@@ -40,6 +55,12 @@ function createAgentRuntime() {
 }
 
 app.whenReady().then(async () => {
+  // On macOS the dock icon is independent of `BrowserWindow.icon` — without
+  // this call the launcher/dock keeps showing the default Electron icon.
+  if (process.platform === "darwin" && app.dock) {
+    app.dock.setIcon(resolveAppIconPath());
+  }
+
   const browserWindow = createWindow();
   const agentPool = createAgentRuntime();
 
