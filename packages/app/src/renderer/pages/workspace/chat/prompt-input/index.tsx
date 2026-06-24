@@ -1,3 +1,4 @@
+import type { AppUserMessage } from "@earendil-works/pi-agent-core";
 import {
   getSelectedCommandIds,
   slashCommandSuggestionPluginKey,
@@ -5,6 +6,7 @@ import {
 import { Button } from "@renderer/components/ui/button";
 import { cn } from "@renderer/lib/utils";
 import type { AvailableModel } from "@shared/models-ipc";
+import { matchesKeyboardEvent } from "@tanstack/react-hotkeys";
 import { EditorContent } from "@tiptap/react";
 import { ArrowUp, Square } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
@@ -20,6 +22,8 @@ interface PromptInputProps {
   isRunning?: boolean;
   initialModel?: AvailableModel | null;
   onSubmit: (submission: PromptSubmission) => Promise<void> | void;
+  onSteer?: (submission: PromptSubmission) => Promise<void> | void;
+  onFollowUp?: (submission: PromptSubmission) => Promise<void> | void;
   onStop?: () => Promise<void> | void;
   sessionId: string | null;
 }
@@ -29,6 +33,8 @@ export function PromptInput({
   initialModel = null,
   isRunning = false,
   onSubmit,
+  onSteer,
+  onFollowUp,
   onStop,
   sessionId,
 }: PromptInputProps) {
@@ -39,7 +45,9 @@ export function PromptInput({
   const editorContainerRef = useRef<HTMLDivElement | null>(null);
 
   const { editor, hasContent } = useChatEditor({
-    disabled: disabled || isRunning,
+    // Note: we intentionally do NOT include `isRunning` in `disabled` so the user
+    // can type steer/follow-up prompts while the agent is processing.
+    disabled,
     getFloatingReference: () => editorContainerRef.current,
   });
 
@@ -57,45 +65,62 @@ export function PromptInput({
     return () => window.removeEventListener(INSERT_PROMPT_TEXT_EVENT, handleInsertPromptText);
   }, [editor, sessionId]);
 
-  const canSubmit = !disabled && !isRunning && hasContent && modelSelectorProps.value !== null;
+  const hasModel = modelSelectorProps.value !== null;
   const isStopEnabled = isRunning && typeof onStop === "function";
 
-  const handleSubmit = useCallback(async () => {
-    if (!canSubmit || !modelSelectorProps.value || !editor) {
-      return;
-    }
+  const handleSubmit = useCallback(
+    async (kind: AppUserMessage["kind"] = "prompt") => {
+      if (disabled || !hasContent || !hasModel || !editor) {
+        return;
+      }
 
-    const jsonContent = editor.getJSON();
-    const submissionText = editor.getText({ blockSeparator: "\n" }).trim();
-    if (!submissionText) {
-      return;
-    }
+      const jsonContent = editor.getJSON();
+      const submissionText = editor.getText({ blockSeparator: "\n" }).trim();
+      if (!submissionText) {
+        return;
+      }
 
-    await onSubmit({
-      content: submissionText,
-      jsonContent,
-      model: modelSelectorProps.value,
-      skillIds: getSelectedCommandIds(editor),
-    });
+      const submission: PromptSubmission = {
+        content: submissionText,
+        jsonContent,
+        model: modelSelectorProps.value!,
+        skillIds: getSelectedCommandIds(editor),
+      };
 
-    editor.commands.clearContent();
-  }, [canSubmit, editor, modelSelectorProps.value, onSubmit]);
+      if (kind === "steering") {
+        await onSteer?.(submission);
+      } else if (kind === "follow-up" && onFollowUp) {
+        await onFollowUp(submission);
+      } else {
+        await onSubmit(submission);
+      }
 
+      editor.commands.clearContent();
+    },
+    [
+      disabled,
+      editor,
+      hasContent,
+      hasModel,
+      modelSelectorProps.value,
+      onFollowUp,
+      onSteer,
+      onSubmit,
+    ],
+  );
+
+  // Listen for Enter / Mod+Enter on the editor container with `capture: true`
+  // so the handler runs BEFORE TipTap's own Enter handler. This guarantees
+  // `event.preventDefault()` blocks the newline insertion.
   useEffect(() => {
     const container = editorContainerRef.current;
-    if (!editor || !container) {
-      return;
-    }
+    if (!editor || !container) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
         event.defaultPrevented ||
-        event.key !== "Enter" ||
-        event.shiftKey ||
-        event.altKey ||
-        event.ctrlKey ||
-        event.metaKey ||
-        event.isComposing
+        event.isComposing ||
+        (!matchesKeyboardEvent(event, "Enter") && !matchesKeyboardEvent(event, "Mod+Enter"))
       ) {
         return;
       }
@@ -103,21 +128,34 @@ export function PromptInput({
       const suggestionState = slashCommandSuggestionPluginKey.getState(editor.state) as
         | { active?: boolean }
         | undefined;
-
       if (suggestionState?.active) {
         return;
       }
 
+      if (isRunning) {
+        if (matchesKeyboardEvent(event, "Mod+Enter")) {
+          event.preventDefault();
+          void handleSubmit("follow-up");
+        }
+
+        if (matchesKeyboardEvent(event, "Enter")) {
+          event.preventDefault();
+          void handleSubmit("steering");
+        }
+        return;
+      }
+
       event.preventDefault();
-      void handleSubmit();
+      void handleSubmit("prompt");
     };
 
     container.addEventListener("keydown", handleKeyDown, { capture: true });
-
     return () => {
       container.removeEventListener("keydown", handleKeyDown, { capture: true });
     };
-  }, [editor, handleSubmit]);
+  }, [editor, handleSubmit, isRunning, onFollowUp]);
+
+  const canSubmit = !disabled && !isRunning && hasContent && hasModel;
 
   return (
     <div
@@ -142,7 +180,7 @@ export function PromptInput({
             type="button"
             onClick={() => {
               if (isRunning) {
-                void onStop?.();
+                if (isStopEnabled) void onStop?.();
                 return;
               }
 

@@ -21,6 +21,7 @@ import { useStore } from "zustand";
 import { ArtifactsPanel } from "./artifacts";
 import { ChatMessages } from "./messages";
 import { FixedActions, PanelHeader } from "./panel-header";
+import { PendingMessagesPanel } from "./pending-messages";
 import { PermissionApprovalPanel } from "./permission";
 import { PromptInput } from "./prompt-input";
 import type { PromptSubmission } from "./prompt-types";
@@ -39,6 +40,8 @@ export function ActiveSessionContent({ insetForWindowControls }: ActiveSessionCo
     stopPrompt,
     toolStates,
     submitPrompt,
+    steerPrompt,
+    followUpPrompt,
   } = useActiveSessionChat();
 
   const activeSessionId = useStore(mainStore, (state) => state.activeSessionId!);
@@ -84,18 +87,23 @@ export function ActiveSessionContent({ insetForWindowControls }: ActiveSessionCo
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.22, ease: "easeOut" }}
             >
-              {activeSessionId && pendingPermissionRequest ? (
-                <PermissionApprovalPanel sessionId={activeSessionId} />
-              ) : (
-                <PromptInput
-                  disabled={false}
-                  initialModel={activeSession?.model ?? null}
-                  isRunning={isRunning}
-                  onStop={stopPrompt}
-                  onSubmit={submitPrompt}
-                  sessionId={activeSessionId}
-                />
-              )}
+              <div className="mx-auto flex w-full max-w-3xl flex-col gap-2">
+                {activeSessionId ? <PendingMessagesPanel sessionId={activeSessionId} /> : null}
+                {activeSessionId && pendingPermissionRequest ? (
+                  <PermissionApprovalPanel sessionId={activeSessionId} />
+                ) : (
+                  <PromptInput
+                    disabled={false}
+                    initialModel={activeSession?.model ?? null}
+                    isRunning={isRunning}
+                    onFollowUp={followUpPrompt}
+                    onSteer={steerPrompt}
+                    onStop={stopPrompt}
+                    onSubmit={submitPrompt}
+                    sessionId={activeSessionId}
+                  />
+                )}
+              </div>
             </motion.section>
           </div>
         </ResizablePanel>
@@ -246,6 +254,66 @@ function useActiveSessionChat() {
     [activeSession?.name, activeSessionId, entries, invoke, queryClient],
   );
 
+  const steerPrompt = useCallback(
+    async (submission: PromptSubmission) => {
+      if (!activeSessionId) {
+        return;
+      }
+
+      try {
+        const appUserMessage: AppUserMessage = {
+          role: "user",
+          content: submission.content,
+          timestamp: Date.now(),
+          kind: "steering",
+          jsonContent: submission.jsonContent,
+          metadata: {
+            model: {
+              modelId: submission.model.modelId,
+              providerId: submission.model.providerId,
+            },
+            skillIds: submission.skillIds,
+          },
+        };
+        mainStore.getState().addPendingMessage(activeSessionId, appUserMessage);
+        await invoke("prompt", activeSessionId, appUserMessage);
+      } catch (error) {
+        console.error("Failed to steer prompt", error);
+      }
+    },
+    [activeSessionId, invoke],
+  );
+
+  const followUpPrompt = useCallback(
+    async (submission: PromptSubmission) => {
+      if (!activeSessionId) {
+        return;
+      }
+
+      try {
+        const appUserMessage: AppUserMessage = {
+          role: "user",
+          content: submission.content,
+          timestamp: Date.now(),
+          kind: "follow-up",
+          jsonContent: submission.jsonContent,
+          metadata: {
+            model: {
+              modelId: submission.model.modelId,
+              providerId: submission.model.providerId,
+            },
+            skillIds: submission.skillIds,
+          },
+        };
+        mainStore.getState().addPendingMessage(activeSessionId, appUserMessage);
+        await invoke("prompt", activeSessionId, appUserMessage);
+      } catch (error) {
+        console.error("Failed to queue follow-up prompt", error);
+      }
+    },
+    [activeSessionId, invoke],
+  );
+
   const stopPrompt = useCallback(async () => {
     if (!activeSessionId) {
       return;
@@ -268,5 +336,7 @@ function useActiveSessionChat() {
     stopPrompt,
     toolStates,
     submitPrompt,
+    steerPrompt,
+    followUpPrompt,
   };
 }

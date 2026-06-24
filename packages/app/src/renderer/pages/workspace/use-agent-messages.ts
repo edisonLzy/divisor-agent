@@ -113,6 +113,29 @@ export function useAgentMessages() {
         const { sessionId, message } = event;
 
         if (isAgentUserMessage(message)) {
+          // Always evict from the renderer pending queue on consumption.
+          mainStore.getState().removePendingMessageByTimestamp(sessionId, message.timestamp);
+
+          if (message.kind === "steering") {
+            return;
+          }
+
+          if (message.kind === "follow-up") {
+            // Steer / Follow-up: brand-new assistant turn. Close any in-flight
+            // streaming entry and reset the turn content start index so the
+            // next assistant message opens a fresh entry (rather than being
+            // appended to the previous assistant message — which would put the
+            // new content *after* the user bubble in the timeline, breaking
+            // the visual order).
+            turnContentStartIndicesRef.current[sessionId] = 0;
+            const streamingEntryId = mainStore.getState().streamingEntryIds.get(sessionId);
+            if (streamingEntryId) {
+              mainStore.getState().setStreamingEntryCompletedAt(sessionId, Date.now());
+              mainStore.getState().setStreamingEntryId(sessionId, undefined);
+            }
+          }
+
+          // follow-up / prompt: persist as a real user entry.
           mainStore.getState().appendMessageEntry(sessionId, message);
           return;
         }

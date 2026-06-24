@@ -6,6 +6,7 @@ import type { PermissionMode, PermissionResolution } from "./permissions-ipc";
 
 export interface AgentSessionIPC {
   prompt: (sessionId: string, message: AppUserMessage) => Promise<void>;
+  clearAllQueues: (sessionId: string) => Promise<void>;
   runOneTimeAgent: (
     messages: AgentMessage[],
     options: {
