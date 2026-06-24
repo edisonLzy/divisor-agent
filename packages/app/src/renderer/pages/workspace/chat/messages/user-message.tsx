@@ -83,12 +83,14 @@ interface UseStickyUserMessageOptions {
   messageEntries: MessageEntry[];
   scrollRef: RefObject<HTMLDivElement | null>;
   sessionId: string;
+  virtualizer: MessageVirtualizer;
 }
 
 export function useStickyUserMessage({
   messageEntries,
   scrollRef,
   sessionId,
+  virtualizer,
 }: UseStickyUserMessageOptions) {
   const [activeStickyIndex, setActiveStickyIndex] = useState<number | null>(null);
 
@@ -104,31 +106,46 @@ export function useStickyUserMessage({
     [messageEntries],
   );
 
-  const updateStickyUserMessage = useCallback(
-    (virtualizer: MessageVirtualizer) => {
-      const scrollOffset = virtualizer.scrollOffset ?? scrollRef.current?.scrollTop ?? 0;
-      const viewportTop = scrollOffset + STICKY_TRIGGER_OFFSET;
+  const updateStickyUserMessage = useCallback(() => {
+    const scrollOffset = virtualizer.scrollOffset ?? scrollRef.current?.scrollTop ?? 0;
+    const viewportTop = scrollOffset + STICKY_TRIGGER_OFFSET;
 
-      let nextStickyIndex: number | null = null;
-      for (const index of userMessageIndexes) {
-        const measurement = virtualizer.measurementsCache[index];
-        if (!measurement || measurement.end > viewportTop) {
-          break;
-        }
-
-        nextStickyIndex = index;
+    let nextStickyIndex: number | null = null;
+    for (const index of userMessageIndexes) {
+      const measurement = virtualizer.measurementsCache[index];
+      if (!measurement || measurement.end > viewportTop) {
+        break;
       }
 
-      setActiveStickyIndex((currentIndex) =>
-        currentIndex === nextStickyIndex ? currentIndex : nextStickyIndex,
-      );
-    },
-    [scrollRef, userMessageIndexes],
-  );
+      nextStickyIndex = index;
+    }
+
+    setActiveStickyIndex((currentIndex) =>
+      currentIndex === nextStickyIndex ? currentIndex : nextStickyIndex,
+    );
+  }, [scrollRef, userMessageIndexes, virtualizer]);
+
+  const handleStickyScroll = useCallback(() => {
+    updateStickyUserMessage();
+  }, [updateStickyUserMessage]);
+
+  const handleStickyJump = useCallback(() => {
+    if (activeStickyIndex === null) {
+      return;
+    }
+
+    virtualizer.scrollToIndex(activeStickyIndex, {
+      align: "start",
+    });
+  }, [activeStickyIndex, virtualizer]);
 
   useEffect(() => {
     setActiveStickyIndex(null);
   }, [sessionId]);
+
+  useEffect(() => {
+    updateStickyUserMessage();
+  }, [messageEntries, updateStickyUserMessage]);
 
   const activeStickyEntry =
     activeStickyIndex === null ? null : (messageEntries[activeStickyIndex] ?? null);
@@ -136,9 +153,9 @@ export function useStickyUserMessage({
     activeStickyEntry && isAgentUserMessage(activeStickyEntry.data) ? activeStickyEntry.data : null;
 
   return {
-    activeStickyIndex,
     activeStickyMessage,
-    updateStickyUserMessage,
+    handleStickyJump,
+    handleStickyScroll,
   };
 }
 
