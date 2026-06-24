@@ -1,5 +1,6 @@
 import type { AgentEvent } from "@earendil-works/pi-agent-core";
 
+import type { BrowserArtifactIPC } from "./browser-artifact-ipc";
 import type { FileSystemIPC } from "./file-system-ipc";
 import type { AgentModelsIPC } from "./models-ipc";
 import type { PermissionRequestedEvent } from "./permissions-ipc";
@@ -39,6 +40,7 @@ export type AllowedMainExposeEvents = {
 export type AgentRuntimeIPC = AgentModelsIPC &
   AgentSessionIPC &
   AgentSkillsIPC &
+  BrowserArtifactIPC &
   FileSystemIPC &
   SystemIPC;
 
@@ -59,6 +61,15 @@ export const ALLOWED_RENDER_INVOKE_EVENTS: (keyof AgentRuntimeIPC)[] = [
   "resolvePermissionRequest",
   "listSkills",
   "setSkillEnabled",
+  "browserCreate",
+  "browserDestroy",
+  "browserSetBounds",
+  "browserNavigate",
+  "browserGoBack",
+  "browserGoForward",
+  "browserReload",
+  "browserCaptureForAnnotation",
+  "browserSetVisible",
   "fsReadTextFile",
   "isWindowFullScreen",
 ];

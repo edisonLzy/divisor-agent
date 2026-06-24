@@ -19,7 +19,12 @@ import { PermissionService } from "./permissions/index.js";
 import { SystemPromptService } from "./prompt/index.js";
 import { SkillService } from "./skills/index.js";
 import type { AppTool } from "./tools/index.js";
-import { fsReadTextFileTool, fsWriteTextFileTool, terminalCreateTool } from "./tools/index.js";
+import {
+  browserOpenTool,
+  fsReadTextFileTool,
+  fsWriteTextFileTool,
+  terminalCreateTool,
+} from "./tools/index.js";
 
 // ── Derived runtime delegate type ──────────────────────────────────────────
 
@@ -110,9 +115,12 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
 
   private createInternalAgent() {
     const excludedToolNames = new Set(this.options.extensionTools?.excludeToolNames ?? []);
-    const builtinTools = [fsReadTextFileTool, fsWriteTextFileTool, terminalCreateTool].filter(
-      (tool) => !excludedToolNames.has(tool.name),
-    );
+    const builtinTools = [
+      browserOpenTool,
+      fsReadTextFileTool,
+      fsWriteTextFileTool,
+      terminalCreateTool,
+    ].filter((tool) => !excludedToolNames.has(tool.name));
 
     this.permissionService.setRequestCallback((request) => {
       this.emit("permission_requested", {

@@ -312,6 +312,10 @@ function upsertArtifactsFromToolDetails(
       name: typeof artifact.name === "string" ? artifact.name : artifact.type,
       content: isRecord(artifact.content) ? artifact.content : {},
     });
+
+    if (artifact.type === "browser") {
+      extensionsApi.openArtifact(sessionId, artifact.id);
+    }
   }
 }
 

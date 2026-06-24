@@ -1,0 +1,1898 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Browser Artifact 交互稿</title>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+      :root {
+        color-scheme: dark;
+        --background: #111111;
+        --foreground: #d4d4d4;
+        --card: #141414;
+        --muted: #222222;
+        --muted-2: #1a1a1a;
+        --muted-3: #191919;
+        --muted-foreground: #808080;
+        --border: #2c2c2c;
+        --border-soft: rgba(255, 255, 255, 0.08);
+        --primary: #efefef;
+        --primary-foreground: #111111;
+        --accent: #262626;
+        --accent-foreground: #efefef;
+        --success: #6ee7b7;
+        --warning: #facc15;
+        --danger: #fb7185;
+        --blue: #93c5fd;
+        --purple: #c4b5fd;
+        --surface: rgba(17, 17, 17, 0.88);
+        --glow: rgba(255, 255, 255, 0.06);
+        --radius: 10px;
+        --radius-sm: 8px;
+        --shadow: 0 18px 60px rgba(0, 0, 0, 0.34);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 14% 0%, var(--glow), transparent 34%),
+          linear-gradient(135deg, #101010 0%, #151515 48%, #0f0f0f 100%);
+        color: var(--foreground);
+        font-family:
+          "Geist Variable",
+          "Geist",
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        letter-spacing: 0;
+      }
+
+      button,
+      input,
+      textarea,
+      select {
+        font: inherit;
+      }
+
+      button {
+        border: 0;
+        cursor: pointer;
+      }
+
+      .app-shell {
+        display: grid;
+        grid-template-columns: minmax(210px, 23vw) 1fr;
+        width: 100vw;
+        height: 100vh;
+        min-width: 980px;
+        padding: 0;
+      }
+
+      .sidebar {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        padding-top: 38px;
+        border-right: 1px solid var(--border-soft);
+        background: rgba(20, 20, 20, 0.72);
+        color: rgba(212, 212, 212, 0.7);
+        backdrop-filter: blur(18px);
+      }
+
+      .traffic-lights {
+        position: fixed;
+        top: 14px;
+        left: 16px;
+        display: flex;
+        gap: 7px;
+        z-index: 10;
+      }
+
+      .traffic-lights span {
+        width: 11px;
+        height: 11px;
+        border-radius: 999px;
+        background: #3b3b3b;
+      }
+
+      .traffic-lights span:nth-child(1) {
+        background: #ff5f57;
+      }
+
+      .traffic-lights span:nth-child(2) {
+        background: #febc2e;
+      }
+
+      .traffic-lights span:nth-child(3) {
+        background: #28c840;
+      }
+
+      .sidebar-top {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px 12px;
+      }
+
+      .workspace-switch {
+        display: flex;
+        min-width: 0;
+        flex: 1;
+        align-items: center;
+        gap: 8px;
+        height: 30px;
+        padding: 0 9px;
+        border-radius: var(--radius-sm);
+        background: rgba(255, 255, 255, 0.045);
+        color: var(--foreground);
+        font-size: 13px;
+      }
+
+      .workspace-switch strong,
+      .thread-row span,
+      .tab-label,
+      .url-input span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .sidebar-section {
+        margin: 10px 8px 18px;
+      }
+
+      .section-heading {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px 7px;
+        color: rgba(212, 212, 212, 0.34);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+      }
+
+      .thread-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 30px;
+        padding: 0 10px;
+        border-radius: var(--radius-sm);
+        color: rgba(212, 212, 212, 0.58);
+        font-size: 13px;
+      }
+
+      .thread-row.active {
+        background: rgba(255, 255, 255, 0.07);
+        color: var(--foreground);
+      }
+
+      .thread-row.dim {
+        color: rgba(212, 212, 212, 0.32);
+      }
+
+      .main-panel {
+        display: grid;
+        grid-template-columns: minmax(360px, 43%) minmax(520px, 57%);
+        min-width: 0;
+        height: 100vh;
+        overflow: hidden;
+        border: 1px solid var(--border-soft);
+        border-left: 0;
+        border-top-left-radius: 20px;
+        background:
+          radial-gradient(circle at 10% 0%, rgba(255, 255, 255, 0.055), transparent 38%),
+          rgba(17, 17, 17, 0.88);
+        backdrop-filter: blur(20px);
+      }
+
+      .chat-panel {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        border-right: 1px solid var(--border-soft);
+      }
+
+      .panel-header {
+        display: flex;
+        min-height: 41px;
+        align-items: center;
+        gap: 8px;
+        padding: 0 14px;
+        border-bottom: 1px solid var(--border-soft);
+      }
+
+      .session-title {
+        min-width: 0;
+        flex: 1;
+        color: var(--foreground);
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .header-meta {
+        color: var(--muted-foreground);
+        font-size: 12px;
+      }
+
+      .chat-scroll {
+        min-height: 0;
+        flex: 1;
+        overflow: hidden;
+        padding: 22px 22px 10px;
+      }
+
+      .message {
+        max-width: 86%;
+        margin-bottom: 18px;
+        font-size: 13px;
+        line-height: 1.65;
+      }
+
+      .message.user {
+        margin-left: auto;
+        padding: 10px 12px;
+        border: 1px solid var(--border-soft);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.045);
+      }
+
+      .message.assistant {
+        color: rgba(212, 212, 212, 0.82);
+      }
+
+      .tool-line {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        margin: 6px 0 0;
+        padding: 5px 8px;
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-sm);
+        background: rgba(255, 255, 255, 0.035);
+        color: rgba(212, 212, 212, 0.68);
+        font-size: 12px;
+      }
+
+      .prompt-box {
+        margin: 0 18px 16px;
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        background: var(--card);
+        box-shadow: 0 20px 48px rgba(0, 0, 0, 0.28);
+      }
+
+      .prompt-text {
+        min-height: 58px;
+        padding: 14px 16px 8px;
+        color: rgba(212, 212, 212, 0.52);
+        font-size: 13px;
+      }
+
+      .prompt-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 9px 12px 12px;
+      }
+
+      .artifact-panel {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        background: rgba(17, 17, 17, 0.72);
+      }
+
+      .artifact-tabs {
+        display: flex;
+        min-width: 0;
+        flex: 1;
+        align-items: center;
+        gap: 4px;
+        overflow: hidden;
+      }
+
+      .artifact-tab {
+        display: flex;
+        min-width: 0;
+        max-width: 170px;
+        align-items: center;
+        gap: 6px;
+        height: 30px;
+        padding: 0 9px;
+        border-radius: var(--radius-sm);
+        background: transparent;
+        color: rgba(212, 212, 212, 0.62);
+        font-size: 12px;
+      }
+
+      .artifact-tab.active {
+        background: var(--muted);
+        color: var(--foreground);
+      }
+
+      .artifact-tab .close {
+        display: grid;
+        place-items: center;
+        width: 16px;
+        height: 16px;
+        margin-left: 2px;
+        border-radius: 5px;
+        color: rgba(212, 212, 212, 0.45);
+      }
+
+      .artifact-tab .close:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--foreground);
+      }
+
+      .browser-artifact {
+        display: flex;
+        min-height: 0;
+        flex: 1;
+        flex-direction: column;
+      }
+
+      .browser-toolbar {
+        display: grid;
+        grid-template-columns: auto minmax(180px, 1fr) auto;
+        align-items: center;
+        gap: 8px;
+        min-height: 42px;
+        padding: 6px 10px;
+        border-bottom: 1px solid var(--border-soft);
+        background: rgba(20, 20, 20, 0.72);
+      }
+
+      .toolbar-cluster {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        min-width: 0;
+      }
+
+      .icon-button,
+      .text-button,
+      .chip-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: 28px;
+        border-radius: var(--radius-sm);
+        color: rgba(212, 212, 212, 0.72);
+        background: transparent;
+        transition:
+          background 140ms ease,
+          color 140ms ease,
+          border-color 140ms ease,
+          transform 140ms ease;
+      }
+
+      .icon-button {
+        width: 28px;
+      }
+
+      .icon-button:hover,
+      .text-button:hover,
+      .chip-button:hover {
+        background: var(--muted);
+        color: var(--foreground);
+      }
+
+      .icon-button:active,
+      .text-button:active,
+      .chip-button:active {
+        transform: translateY(1px);
+      }
+
+      .text-button {
+        padding: 0 9px;
+        border: 1px solid transparent;
+        font-size: 12px;
+        font-weight: 550;
+      }
+
+      .text-button.primary {
+        background: var(--primary);
+        color: var(--primary-foreground);
+      }
+
+      .text-button.primary:hover {
+        background: #ffffff;
+        color: #0f0f0f;
+      }
+
+      .text-button.active {
+        border-color: rgba(147, 197, 253, 0.34);
+        background: rgba(147, 197, 253, 0.12);
+        color: #bfdbfe;
+      }
+
+      .text-button.sent {
+        border-color: rgba(110, 231, 183, 0.28);
+        background: rgba(110, 231, 183, 0.11);
+        color: var(--success);
+      }
+
+      .url-input {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 8px;
+        height: 30px;
+        padding: 0 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: #101010;
+        color: rgba(212, 212, 212, 0.84);
+        font-size: 12px;
+      }
+
+      .url-input input {
+        min-width: 0;
+        flex: 1;
+        border: 0;
+        outline: none;
+        background: transparent;
+        color: var(--foreground);
+        font-size: 12px;
+      }
+
+      .status-dot {
+        width: 7px;
+        height: 7px;
+        flex: 0 0 auto;
+        border-radius: 999px;
+        background: var(--success);
+        box-shadow: 0 0 0 3px rgba(110, 231, 183, 0.1);
+      }
+
+      .status-dot.loading {
+        background: var(--warning);
+        box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.11);
+      }
+
+      .status-dot.error,
+      .status-dot.blocked {
+        background: var(--danger);
+        box-shadow: 0 0 0 3px rgba(251, 113, 133, 0.11);
+      }
+
+      .browser-body {
+        display: block;
+        min-height: 0;
+        flex: 1;
+        height: 100%;
+      }
+
+      .page-stage {
+        position: relative;
+        min-width: 0;
+        min-height: 0;
+        height: 100%;
+        overflow: hidden;
+        background:
+          linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+          linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px), #0d0d0d;
+        background-size: 22px 22px;
+      }
+
+      .viewport-frame {
+        position: absolute;
+        inset: 14px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: #f8f8f8;
+        box-shadow: var(--shadow);
+      }
+
+      .mock-page {
+        height: 100%;
+        overflow: hidden;
+        background: #f7f7f5;
+        color: #1b1b1b;
+        font-family: "Geist Variable", "Geist", ui-sans-serif, system-ui, sans-serif;
+      }
+
+      .mock-nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 52px;
+        padding: 0 24px;
+        border-bottom: 1px solid #e1e1dc;
+        background: rgba(255, 255, 255, 0.86);
+      }
+
+      .mock-brand {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 14px;
+        font-weight: 760;
+      }
+
+      .brand-mark {
+        width: 22px;
+        height: 22px;
+        border-radius: 7px;
+        background: #171717;
+      }
+
+      .mock-nav-links {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        color: #66645e;
+        font-size: 12px;
+      }
+
+      .mock-hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 220px;
+        gap: 22px;
+        padding: 34px 28px 22px;
+      }
+
+      .mock-title {
+        margin: 0;
+        max-width: 520px;
+        font-size: clamp(27px, 3.2vw, 42px);
+        line-height: 1.04;
+        letter-spacing: 0;
+      }
+
+      .mock-copy {
+        max-width: 480px;
+        margin: 14px 0 0;
+        color: #625f58;
+        font-size: 13px;
+        line-height: 1.65;
+      }
+
+      .mock-actions {
+        display: flex;
+        gap: 9px;
+        margin-top: 18px;
+      }
+
+      .mock-button {
+        height: 32px;
+        padding: 0 13px;
+        border-radius: 9px;
+        border: 1px solid #d2d2cb;
+        background: #ffffff;
+        color: #171717;
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .mock-button.dark {
+        border-color: #171717;
+        background: #171717;
+        color: #ffffff;
+      }
+
+      .mock-stats {
+        display: grid;
+        gap: 10px;
+      }
+
+      .stat-card {
+        padding: 13px;
+        border: 1px solid #ddddd6;
+        border-radius: 10px;
+        background: #ffffff;
+      }
+
+      .stat-card strong {
+        display: block;
+        font-size: 23px;
+        line-height: 1;
+      }
+
+      .stat-card span {
+        display: block;
+        margin-top: 5px;
+        color: #74716b;
+        font-size: 11px;
+      }
+
+      .mock-table {
+        margin: 4px 28px 24px;
+        overflow: hidden;
+        border: 1px solid #ddddd6;
+        border-radius: 10px;
+        background: white;
+      }
+
+      .mock-table-header,
+      .mock-table-row {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr 0.8fr 0.8fr;
+        gap: 10px;
+        align-items: center;
+        min-height: 38px;
+        padding: 0 14px;
+        font-size: 12px;
+      }
+
+      .mock-table-header {
+        background: #f0f0ec;
+        color: #706d66;
+        font-weight: 650;
+      }
+
+      .mock-table-row {
+        border-top: 1px solid #ebebe7;
+      }
+
+      .mock-badge {
+        display: inline-flex;
+        width: max-content;
+        align-items: center;
+        height: 22px;
+        padding: 0 8px;
+        border-radius: 999px;
+        background: #e8f6ef;
+        color: #15734d;
+        font-size: 11px;
+        font-weight: 650;
+      }
+
+      .annotation-layer {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      .selection-overlay {
+        position: absolute;
+        inset: 0;
+        display: none;
+        pointer-events: none;
+        background:
+          linear-gradient(rgba(17, 17, 17, 0.18), rgba(17, 17, 17, 0.18)),
+          radial-gradient(circle at 32% 30%, transparent 0 18%, rgba(17, 17, 17, 0.2) 19% 100%);
+      }
+
+      .selection-marquee {
+        position: absolute;
+        left: 28px;
+        top: 84px;
+        width: 47%;
+        height: 132px;
+        border: 1px dashed rgba(147, 197, 253, 0.95);
+        border-radius: 10px;
+        background: rgba(147, 197, 253, 0.09);
+        box-shadow:
+          0 0 0 999px rgba(8, 8, 8, 0.18),
+          0 0 0 4px rgba(147, 197, 253, 0.14);
+      }
+
+      .selecting-mode .selection-overlay {
+        display: block;
+      }
+
+      .target-box {
+        position: absolute;
+        pointer-events: none;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        transition:
+          border-color 140ms ease,
+          background 140ms ease,
+          box-shadow 140ms ease;
+      }
+
+      .selecting-mode .target-box {
+        pointer-events: auto;
+        border-color: rgba(147, 197, 253, 0.72);
+        background: rgba(147, 197, 253, 0.08);
+        cursor: crosshair;
+      }
+
+      .selecting-mode .target-box:hover,
+      .commenting-mode .target-box.selected {
+        pointer-events: auto;
+        border-color: rgba(147, 197, 253, 1);
+        background: rgba(147, 197, 253, 0.12);
+        box-shadow: 0 0 0 4px rgba(147, 197, 253, 0.16);
+      }
+
+      .target-hero {
+        left: 28px;
+        top: 84px;
+        width: 47%;
+        height: 132px;
+      }
+
+      .target-button {
+        left: 28px;
+        top: 230px;
+        width: 118px;
+        height: 34px;
+      }
+
+      .target-table {
+        left: 28px;
+        right: 28px;
+        bottom: 24px;
+        height: 148px;
+      }
+
+      .annotation-pin {
+        position: absolute;
+        display: none;
+        place-items: center;
+        width: 22px;
+        height: 22px;
+        border: 1px solid rgba(147, 197, 253, 0.82);
+        border-radius: 999px;
+        background: #111111;
+        color: #bfdbfe;
+        font-size: 11px;
+        font-weight: 760;
+        pointer-events: auto;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+      }
+
+      .commenting-mode .annotation-pin.active {
+        display: grid;
+      }
+
+      .annotation-pin.active {
+        background: #bfdbfe;
+        color: #0f172a;
+      }
+
+      .pin-hero {
+        left: calc(28px + 47% - 7px);
+        top: 76px;
+      }
+
+      .pin-table {
+        right: 44px;
+        bottom: 166px;
+      }
+
+      .stage-hint {
+        position: absolute;
+        left: 24px;
+        bottom: 22px;
+        display: none;
+        align-items: center;
+        gap: 7px;
+        padding: 7px 9px;
+        border: 1px solid rgba(147, 197, 253, 0.22);
+        border-radius: var(--radius-sm);
+        background: rgba(17, 17, 17, 0.84);
+        color: #bfdbfe;
+        font-size: 12px;
+        box-shadow: 0 12px 34px rgba(0, 0, 0, 0.32);
+      }
+
+      .selecting-mode .stage-hint {
+        display: inline-flex;
+      }
+
+      .state-overlay {
+        position: absolute;
+        inset: 14px;
+        display: none;
+        place-items: center;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: rgba(14, 14, 14, 0.96);
+        text-align: center;
+        z-index: 4;
+      }
+
+      .state-overlay.active {
+        display: grid;
+      }
+
+      .state-card {
+        width: min(360px, 80%);
+        padding: 20px;
+      }
+
+      .state-card .state-icon {
+        display: grid;
+        width: 40px;
+        height: 40px;
+        margin: 0 auto 14px;
+        place-items: center;
+        border: 1px solid var(--border);
+        border-radius: 11px;
+        background: var(--muted);
+      }
+
+      .state-card h3 {
+        margin: 0;
+        color: var(--foreground);
+        font-size: 14px;
+      }
+
+      .state-card p {
+        margin: 8px 0 0;
+        color: var(--muted-foreground);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      .annotation-composer {
+        position: absolute;
+        left: 50%;
+        bottom: 18px;
+        z-index: 6;
+        width: min(590px, calc(100% - 52px));
+        transform: translateX(-50%);
+        transition:
+          width 180ms ease,
+          opacity 160ms ease,
+          transform 180ms ease;
+      }
+
+      .annotation-composer.hidden {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateX(-50%) translateY(12px);
+      }
+
+      .annotation-composer.expanded {
+        width: min(690px, calc(100% - 52px));
+      }
+
+      .annotation-composer.disabled {
+        opacity: 0.62;
+      }
+
+      .composer-shell {
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 30px;
+        background: rgba(45, 45, 45, 0.96);
+        box-shadow:
+          0 24px 70px rgba(0, 0, 0, 0.45),
+          inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        backdrop-filter: blur(18px);
+      }
+
+      .annotation-composer.expanded .composer-shell {
+        border-radius: 34px;
+      }
+
+      .composer-input-row {
+        display: grid;
+        grid-template-columns: 52px minmax(0, 1fr) 46px;
+        align-items: center;
+        min-height: 58px;
+        padding: 0 14px;
+      }
+
+      .composer-tool-button {
+        display: grid;
+        width: 42px;
+        height: 42px;
+        place-items: center;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(212, 212, 212, 0.82);
+      }
+
+      .composer-tool-button:hover,
+      .composer-icon-button:hover {
+        background: rgba(255, 255, 255, 0.12);
+        color: var(--foreground);
+      }
+
+      .composer-textarea {
+        width: 100%;
+        min-height: 28px;
+        max-height: 64px;
+        resize: none;
+        border: 0;
+        outline: none;
+        padding: 8px 0;
+        background: transparent;
+        color: var(--foreground);
+        font-size: 18px;
+        line-height: 1.35;
+      }
+
+      .composer-textarea::placeholder {
+        color: rgba(212, 212, 212, 0.36);
+      }
+
+      .composer-icon-button {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border-radius: 999px;
+        background: transparent;
+        color: rgba(212, 212, 212, 0.64);
+      }
+
+      .composer-expanded {
+        display: none;
+        max-height: 460px;
+        overflow: auto;
+        border-top: 1px solid rgba(255, 255, 255, 0.04);
+      }
+
+      .annotation-composer.expanded .composer-expanded {
+        display: block;
+      }
+
+      .composer-target-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 34px;
+        align-items: center;
+        min-height: 68px;
+        padding: 0 32px;
+        border-top: 1px solid rgba(255, 255, 255, 0.035);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.18);
+        background: rgba(255, 255, 255, 0.045);
+      }
+
+      .composer-target-name {
+        min-width: 0;
+        overflow: hidden;
+        color: var(--foreground);
+        font-size: 22px;
+        font-weight: 640;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .composer-drag-handle {
+        display: grid;
+        place-items: center;
+        color: rgba(212, 212, 212, 0.5);
+      }
+
+      .composer-fields {
+        padding: 16px 32px 10px;
+      }
+
+      .composer-field-grid {
+        display: grid;
+        grid-template-columns: 190px minmax(0, 1fr);
+        align-items: center;
+        gap: 16px;
+        min-height: 64px;
+      }
+
+      .composer-field-grid + .composer-field-grid {
+        border-top: 1px solid rgba(255, 255, 255, 0.055);
+      }
+
+      .composer-field-grid label {
+        color: rgba(212, 212, 212, 0.82);
+        font-size: 20px;
+        font-weight: 560;
+      }
+
+      .composer-value-box {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 13px;
+        min-height: 48px;
+        padding: 0 14px;
+        border: 1px solid rgba(0, 0, 0, 0.18);
+        border-radius: 17px;
+        background: rgba(35, 35, 35, 0.82);
+        color: rgba(212, 212, 212, 0.68);
+        font-size: 18px;
+      }
+
+      .composer-value-box span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .composer-swatch {
+        width: 36px;
+        height: 36px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 13px;
+        background: var(--swatch);
+      }
+
+      .composer-number-input {
+        min-height: 48px;
+        border: 1px solid rgba(0, 0, 0, 0.18);
+        border-radius: 17px;
+        outline: none;
+        padding: 0 18px;
+        background: rgba(35, 35, 35, 0.82);
+        color: rgba(212, 212, 212, 0.72);
+        font-size: 18px;
+      }
+
+      .composer-footer {
+        display: none;
+        align-items: center;
+        gap: 12px;
+        min-height: 76px;
+        padding: 12px 16px;
+        border-top: 1px solid rgba(255, 255, 255, 0.055);
+      }
+
+      .annotation-composer.expanded .composer-footer {
+        display: flex;
+      }
+
+      .composer-cancel {
+        height: 42px;
+        padding: 0 16px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--foreground);
+        font-size: 18px;
+        font-weight: 700;
+      }
+
+      .composer-spacer {
+        flex: 1;
+      }
+
+      .composer-submit {
+        display: grid;
+        width: 56px;
+        height: 56px;
+        place-items: center;
+        border-radius: 999px;
+        background: rgba(212, 212, 212, 0.72);
+        color: #171717;
+      }
+
+      .composer-submit.sent {
+        background: rgba(110, 231, 183, 0.82);
+        color: #052e1a;
+      }
+
+      .target-summary {
+        color: rgba(212, 212, 212, 0.62);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .field {
+        margin-top: 11px;
+      }
+
+      .field label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 6px;
+        color: rgba(212, 212, 212, 0.72);
+        font-size: 11px;
+        font-weight: 650;
+      }
+
+      .range-row {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+
+      input[type="range"] {
+        width: 100%;
+        accent-color: #d4d4d4;
+      }
+
+      .swatches {
+        display: flex;
+        gap: 7px;
+      }
+
+      .swatch {
+        width: 22px;
+        height: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 7px;
+        background: var(--swatch);
+      }
+
+      .swatch.active {
+        outline: 2px solid #d4d4d4;
+        outline-offset: 2px;
+      }
+
+      .composer-value-box .swatch {
+        width: 36px;
+        height: 36px;
+        border-radius: 13px;
+        outline: none;
+      }
+
+      .composer-value-box .swatch.active {
+        outline: none;
+      }
+
+      .segmented {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 4px;
+        padding: 3px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: #101010;
+      }
+
+      .segmented button {
+        height: 24px;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--muted-foreground);
+        font-size: 11px;
+      }
+
+      .segmented button.active {
+        background: var(--muted);
+        color: var(--foreground);
+      }
+
+      .sent-note {
+        display: none;
+        align-items: flex-start;
+        gap: 8px;
+        margin-top: 10px;
+        padding: 9px;
+        border: 1px solid rgba(110, 231, 183, 0.24);
+        border-radius: var(--radius-sm);
+        background: rgba(110, 231, 183, 0.08);
+        color: rgba(209, 250, 229, 0.88);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .sent-note.active {
+        display: flex;
+      }
+
+      .annotation-list {
+        display: grid;
+        gap: 7px;
+      }
+
+      .annotation-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 8px;
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-sm);
+        background: rgba(255, 255, 255, 0.025);
+        color: rgba(212, 212, 212, 0.72);
+        text-align: left;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .annotation-item.active {
+        border-color: rgba(147, 197, 253, 0.32);
+        background: rgba(147, 197, 253, 0.1);
+        color: var(--foreground);
+      }
+
+      .annotation-number {
+        display: grid;
+        width: 18px;
+        height: 18px;
+        flex: 0 0 auto;
+        place-items: center;
+        border-radius: 999px;
+        background: var(--muted);
+        color: #bfdbfe;
+        font-size: 10px;
+        font-weight: 760;
+      }
+
+      .prototype-controls {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+      }
+
+      .select-state {
+        height: 28px;
+        max-width: 150px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        outline: none;
+        background: #101010;
+        color: rgba(212, 212, 212, 0.8);
+        font-size: 12px;
+      }
+
+      .icon {
+        width: 15px;
+        height: 15px;
+        stroke-width: 1.8;
+      }
+
+      .icon.small {
+        width: 13px;
+        height: 13px;
+      }
+
+      .hide {
+        display: none !important;
+      }
+
+      @media (max-width: 1180px) {
+        .app-shell {
+          grid-template-columns: 210px 1fr;
+          min-width: 900px;
+        }
+
+        .main-panel {
+          grid-template-columns: minmax(310px, 38%) minmax(520px, 62%);
+        }
+
+        .toolbar-label {
+          display: none;
+        }
+
+        .annotation-composer {
+          width: min(560px, calc(100% - 32px));
+        }
+
+        .annotation-composer.expanded {
+          width: min(640px, calc(100% - 32px));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="traffic-lights" aria-hidden="true">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-top">
+          <div class="workspace-switch">
+            <i data-lucide="panel-left" class="icon small"></i>
+            <strong>divisor-agent</strong>
+          </div>
+          <button class="icon-button" title="新对话">
+            <i data-lucide="message-square-plus" class="icon small"></i>
+          </button>
+        </div>
+
+        <section class="sidebar-section">
+          <div class="section-heading">置顶</div>
+          <div class="thread-row active">
+            <i data-lucide="sparkles" class="icon small"></i>
+            <span>Browser artifact 交互稿</span>
+          </div>
+        </section>
+
+        <section class="sidebar-section">
+          <div class="section-heading">项目</div>
+          <div class="thread-row">
+            <i data-lucide="folder" class="icon small"></i>
+            <span>App runtime</span>
+          </div>
+          <div class="thread-row">
+            <i data-lucide="folder" class="icon small"></i>
+            <span>Extensions</span>
+          </div>
+        </section>
+
+        <section class="sidebar-section">
+          <div class="section-heading">对话</div>
+          <div class="thread-row">
+            <i data-lucide="message-square" class="icon small"></i>
+            <span>Artifact panel wiring</span>
+          </div>
+          <div class="thread-row dim">
+            <i data-lucide="message-square" class="icon small"></i>
+            <span>Session tree polish</span>
+          </div>
+        </section>
+      </aside>
+
+      <main class="main-panel">
+        <section class="chat-panel">
+          <header class="panel-header">
+            <div class="session-title">Browser artifact 交互稿</div>
+            <div class="header-meta">正在审阅</div>
+          </header>
+
+          <div class="chat-scroll">
+            <div class="message user">
+              把浏览器作为新的 artifact，加上页面注释、样式反馈和发送给 agent 的闭环。
+            </div>
+            <div class="message assistant">
+              已创建一个浏览器 artifact
+              原型。右侧可以切换普通浏览、注释、加载、错误和阻止状态；注释会绑定页面上的具体元素。
+              <br />
+              <span class="tool-line">
+                <i data-lucide="globe-2" class="icon small"></i>
+                Browser artifact: localhost:5173
+              </span>
+            </div>
+          </div>
+
+          <div class="prompt-box">
+            <div class="prompt-text">要求 agent 根据浏览器里的注释修改页面...</div>
+            <div class="prompt-actions">
+              <button class="text-button">
+                <i data-lucide="shield-check" class="icon small"></i>
+                Workspace
+              </button>
+              <button class="icon-button">
+                <i data-lucide="arrow-up" class="icon small"></i>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="artifact-panel">
+          <header class="panel-header">
+            <div class="artifact-tabs" aria-label="Artifacts">
+              <button class="artifact-tab">
+                <i data-lucide="message-square-text" class="icon small"></i>
+                <span class="tab-label">Side chat</span>
+                <span class="close"><i data-lucide="x" class="icon small"></i></span>
+              </button>
+              <button class="artifact-tab active">
+                <i data-lucide="globe-2" class="icon small"></i>
+                <span class="tab-label" id="artifactTitle">localhost:5173</span>
+                <span class="close"><i data-lucide="x" class="icon small"></i></span>
+              </button>
+              <button class="artifact-tab">
+                <i data-lucide="file-code-2" class="icon small"></i>
+                <span class="tab-label">preview.html</span>
+                <span class="close"><i data-lucide="x" class="icon small"></i></span>
+              </button>
+            </div>
+          </header>
+
+          <div class="browser-artifact">
+            <div class="browser-toolbar">
+              <div class="toolbar-cluster">
+                <button class="icon-button" id="backButton" title="后退">
+                  <i data-lucide="arrow-left" class="icon"></i>
+                </button>
+                <button class="icon-button" id="forwardButton" title="前进">
+                  <i data-lucide="arrow-right" class="icon"></i>
+                </button>
+                <button class="icon-button" id="refreshButton" title="刷新">
+                  <i data-lucide="refresh-cw" class="icon"></i>
+                </button>
+              </div>
+
+              <label class="url-input" for="urlField">
+                <span class="status-dot" id="statusDot"></span>
+                <i data-lucide="lock-keyhole" class="icon small"></i>
+                <input id="urlField" value="http://localhost:5173/dashboard" spellcheck="false" />
+              </label>
+
+              <div class="toolbar-cluster">
+                <div class="prototype-controls">
+                  <select class="select-state" id="stateSelect" title="切换原型状态">
+                    <option value="ready">页面就绪</option>
+                    <option value="loading">加载中</option>
+                    <option value="error">URL 错误</option>
+                    <option value="blocked">需要登录</option>
+                  </select>
+                </div>
+                <button class="text-button" id="annotationToggle">
+                  <i data-lucide="mouse-pointer-square-dashed" class="icon small"></i>
+                  <span class="toolbar-label">添加批注</span>
+                </button>
+                <button class="icon-button" title="外部打开">
+                  <i data-lucide="external-link" class="icon"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="browser-body">
+              <div class="page-stage" id="pageStage">
+                <div class="viewport-frame" id="viewportFrame">
+                  <div class="mock-page" id="mockPage">
+                    <nav class="mock-nav">
+                      <div class="mock-brand">
+                        <span class="brand-mark"></span>
+                        Launchdesk
+                      </div>
+                      <div class="mock-nav-links">
+                        <span>Dashboard</span>
+                        <span>Reports</span>
+                        <span>Settings</span>
+                      </div>
+                    </nav>
+
+                    <section class="mock-hero">
+                      <div>
+                        <h1 class="mock-title">
+                          Ship browser feedback without leaving the thread.
+                        </h1>
+                        <p class="mock-copy">
+                          Review local previews, pin comments to exact elements, and send targeted
+                          styling feedback back to the agent.
+                        </p>
+                        <div class="mock-actions">
+                          <button class="mock-button dark">Create review</button>
+                          <button class="mock-button">Open report</button>
+                        </div>
+                      </div>
+                      <div class="mock-stats">
+                        <div class="stat-card">
+                          <strong>18</strong>
+                          <span>Open comments</span>
+                        </div>
+                        <div class="stat-card">
+                          <strong>94%</strong>
+                          <span>Visual checks passed</span>
+                        </div>
+                      </div>
+                    </section>
+
+                    <div class="mock-table">
+                      <div class="mock-table-header">
+                        <span>Route</span>
+                        <span>Status</span>
+                        <span>Comments</span>
+                        <span>Owner</span>
+                      </div>
+                      <div class="mock-table-row">
+                        <span>/dashboard</span>
+                        <span><span class="mock-badge">Ready</span></span>
+                        <span>3</span>
+                        <span>Codex</span>
+                      </div>
+                      <div class="mock-table-row">
+                        <span>/settings</span>
+                        <span><span class="mock-badge">Ready</span></span>
+                        <span>1</span>
+                        <span>Design</span>
+                      </div>
+                      <div class="mock-table-row">
+                        <span>/empty</span>
+                        <span><span class="mock-badge">Ready</span></span>
+                        <span>0</span>
+                        <span>Product</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="selection-overlay" id="selectionOverlay">
+                    <div class="selection-marquee"></div>
+                  </div>
+
+                  <div class="annotation-layer" id="annotationLayer">
+                    <button
+                      class="target-box target-hero"
+                      data-target="hero"
+                      aria-label="选择 Hero 文案区域"
+                    ></button>
+                    <button
+                      class="target-box target-button"
+                      data-target="button"
+                      aria-label="选择主按钮"
+                    ></button>
+                    <button
+                      class="target-box target-table"
+                      data-target="table"
+                      aria-label="选择数据表格"
+                    ></button>
+                    <button class="annotation-pin pin-hero" data-target="hero">1</button>
+                    <button class="annotation-pin pin-table" data-target="table">2</button>
+                  </div>
+                </div>
+
+                <div class="stage-hint">
+                  <i data-lucide="scan-line" class="icon small"></i>
+                  点击元素添加注释；按住 Shift 可模拟区域选择
+                </div>
+
+                <div class="state-overlay" id="stateOverlay">
+                  <div class="state-card">
+                    <div class="state-icon" id="stateIconWrap">
+                      <i data-lucide="loader-circle" class="icon" id="stateIcon"></i>
+                    </div>
+                    <h3 id="stateTitle">正在加载页面</h3>
+                    <p id="stateCopy">Browser artifact 正在打开本地开发服务器预览。</p>
+                  </div>
+                </div>
+
+                <div class="annotation-composer hidden" id="annotationComposer">
+                  <div class="composer-shell">
+                    <div class="composer-input-row">
+                      <button
+                        class="composer-tool-button"
+                        id="composerExpandToggle"
+                        title="展开样式编辑"
+                      >
+                        <i data-lucide="sliders-horizontal" class="icon"></i>
+                      </button>
+                      <textarea
+                        class="composer-textarea"
+                        id="commentBox"
+                        rows="1"
+                        placeholder="添加评论..."
+                      ></textarea>
+                      <button class="composer-icon-button" title="语音输入">
+                        <i data-lucide="mic" class="icon"></i>
+                      </button>
+                    </div>
+
+                    <div class="composer-expanded" id="composerExpanded">
+                      <div class="composer-target-row">
+                        <div class="composer-target-name" id="targetKind">div</div>
+                        <button class="composer-drag-handle" title="拖动">
+                          <i data-lucide="grip-vertical" class="icon"></i>
+                        </button>
+                      </div>
+
+                      <div class="composer-fields">
+                        <div class="composer-field-grid">
+                          <label>目标</label>
+                          <div class="target-summary" id="targetSummary">
+                            页面首屏标题区域。反馈会附带目标位置、尺寸和当前样式。
+                          </div>
+                        </div>
+
+                        <div class="composer-field-grid">
+                          <label>文本颜色</label>
+                          <div class="composer-value-box">
+                            <button
+                              class="composer-swatch swatch active"
+                              style="--swatch: rgb(212, 212, 212)"
+                              data-color="#d4d4d4"
+                              title="文本颜色"
+                            ></button>
+                            <span>rgb(212, 212, 212)</span>
+                            <i data-lucide="chevron-down" class="icon small"></i>
+                          </div>
+                        </div>
+
+                        <div class="composer-field-grid">
+                          <label>背景</label>
+                          <div class="composer-value-box">
+                            <button
+                              class="composer-swatch swatch"
+                              style="--swatch: rgba(255, 255, 255, 0.86)"
+                              data-color="#171717"
+                              title="背景"
+                            ></button>
+                            <span>rgba(255, 255, 255, 0.86)</span>
+                            <i data-lucide="chevron-down" class="icon small"></i>
+                          </div>
+                        </div>
+
+                        <div class="composer-field-grid">
+                          <label>Opacity</label>
+                          <input class="composer-number-input" id="opacityInput" value="1" />
+                        </div>
+
+                        <div class="composer-field-grid">
+                          <label>字体</label>
+                          <div class="composer-value-box">
+                            <span>"Geist Variable", sans-serif</span>
+                            <i data-lucide="chevron-down" class="icon small"></i>
+                          </div>
+                        </div>
+
+                        <div class="composer-field-grid">
+                          <label>字号</label>
+                          <input class="composer-number-input" id="fontRange" value="32 px" />
+                        </div>
+
+                        <div class="composer-field-grid">
+                          <label>字重</label>
+                          <div class="composer-value-box">
+                            <span>600</span>
+                            <i data-lucide="chevron-down" class="icon small"></i>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="composer-footer">
+                      <button class="composer-cancel" id="composerCancel">取消</button>
+                      <div class="composer-spacer"></div>
+                      <button class="composer-icon-button" title="语音输入">
+                        <i data-lucide="mic" class="icon"></i>
+                      </button>
+                      <button class="composer-submit" id="sendButton" title="发送注释">
+                        <i data-lucide="check" class="icon"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const stateSelect = document.querySelector("#stateSelect");
+      const stateOverlay = document.querySelector("#stateOverlay");
+      const stateIcon = document.querySelector("#stateIcon");
+      const stateTitle = document.querySelector("#stateTitle");
+      const stateCopy = document.querySelector("#stateCopy");
+      const statusDot = document.querySelector("#statusDot");
+      const urlField = document.querySelector("#urlField");
+      const artifactTitle = document.querySelector("#artifactTitle");
+      const annotationToggle = document.querySelector("#annotationToggle");
+      const pageStage = document.querySelector("#pageStage");
+      const selectionMarquee = document.querySelector(".selection-marquee");
+      const annotationComposer = document.querySelector("#annotationComposer");
+      const composerExpandToggle = document.querySelector("#composerExpandToggle");
+      const composerCancel = document.querySelector("#composerCancel");
+      const targetKind = document.querySelector("#targetKind");
+      const targetSummary = document.querySelector("#targetSummary");
+      const commentBox = document.querySelector("#commentBox");
+      const sendButton = document.querySelector("#sendButton");
+      const fontRange = document.querySelector("#fontRange");
+      const mockTitle = document.querySelector(".mock-title");
+
+      const stateContent = {
+        ready: {
+          icon: "globe-2",
+          title: "",
+          copy: "",
+          url: "http://localhost:5173/dashboard",
+          titleLabel: "localhost:5173",
+        },
+        loading: {
+          icon: "loader-circle",
+          title: "正在加载页面",
+          copy: "Browser artifact 正在打开本地开发服务器预览。",
+          url: "http://localhost:5173/dashboard",
+          titleLabel: "loading...",
+        },
+        error: {
+          icon: "circle-alert",
+          title: "无法打开 URL",
+          copy: "检查本地开发服务器是否启动，或确认地址栏输入的是可访问页面。",
+          url: "http://localhost:5999/missing",
+          titleLabel: "URL error",
+        },
+        blocked: {
+          icon: "shield-alert",
+          title: "此网站需要登录或未获许可",
+          copy: "in-app browser 适合本地和公开页面；需要登录态的网站应切换到 Chrome 或请求站点权限。",
+          url: "https://internal.example.com",
+          titleLabel: "blocked site",
+        },
+      };
+
+      const targets = {
+        hero: {
+          kind: "div",
+          summary: "页面首屏标题区域。反馈会附带目标位置、尺寸和当前样式，方便 agent 按元素修改。",
+          comment: "标题稍微太大，压缩到更像当前应用的工具面板密度；同时保持第一屏可读。",
+          rect: {
+            left: "28px",
+            top: "84px",
+            width: "47%",
+            height: "132px",
+            right: "auto",
+            bottom: "auto",
+          },
+        },
+        button: {
+          kind: "button",
+          summary: "首屏主按钮。适合反馈按钮尺寸、对齐、文案和点击目标大小。",
+          comment: "主按钮高度可以保持 32px，但文案需要更明确地表达这是一次页面审阅。",
+          rect: {
+            left: "28px",
+            top: "230px",
+            width: "118px",
+            height: "34px",
+            right: "auto",
+            bottom: "auto",
+          },
+        },
+        table: {
+          kind: "table",
+          summary: "页面下方数据表。适合反馈表格密度、badge 对比度、行高和空状态。",
+          comment: "状态 badge 的绿色略抢眼，建议降低饱和度，让它更贴近 Divisor Agent 的中性视觉。",
+          rect: {
+            left: "28px",
+            top: "auto",
+            width: "auto",
+            height: "148px",
+            right: "28px",
+            bottom: "24px",
+          },
+        },
+      };
+
+      let annotationMode = false;
+      let selectionMode = false;
+      let activeTarget = "hero";
+      let composerExpanded = false;
+
+      function refreshIcons() {
+        if (window.lucide) {
+          window.lucide.createIcons();
+        }
+      }
+
+      function setState(state) {
+        const content = stateContent[state];
+        const isReady = state === "ready";
+        stateOverlay.classList.toggle("active", !isReady);
+        statusDot.className = `status-dot ${isReady ? "" : state}`;
+        urlField.value = content.url;
+        artifactTitle.textContent = content.titleLabel;
+
+        if (!isReady) {
+          stateIcon.setAttribute("data-lucide", content.icon);
+          stateTitle.textContent = content.title;
+          stateCopy.textContent = content.copy;
+        }
+
+        refreshIcons();
+      }
+
+      function setAnnotationMode(nextValue) {
+        annotationMode = nextValue;
+        annotationToggle.classList.toggle("active", annotationMode);
+        if (!annotationMode) {
+          selectionMode = false;
+          pageStage.classList.remove("selecting-mode", "commenting-mode");
+          annotationComposer.classList.add("hidden");
+          setComposerExpanded(false);
+          document
+            .querySelectorAll(".target-box, .annotation-pin")
+            .forEach((item) => item.classList.remove("active", "selected"));
+        }
+      }
+
+      function startSelectionMode() {
+        annotationMode = true;
+        selectionMode = true;
+        annotationToggle.classList.add("active");
+        pageStage.classList.add("selecting-mode");
+        pageStage.classList.remove("commenting-mode");
+        annotationComposer.classList.add("hidden");
+        setComposerExpanded(false);
+        sendButton.classList.remove("sent");
+        sendButton.innerHTML = '<i data-lucide="check" class="icon"></i>';
+        updateSelectionMarquee("hero");
+        refreshIcons();
+      }
+
+      function updateSelectionMarquee(target) {
+        const rect = targets[target]?.rect;
+        if (!rect) return;
+        Object.assign(selectionMarquee.style, rect);
+      }
+
+      function setComposerExpanded(nextValue) {
+        composerExpanded = nextValue;
+        annotationComposer.classList.toggle("expanded", composerExpanded);
+        commentBox.placeholder = composerExpanded ? "描述这些更改..." : "添加评论...";
+      }
+
+      function setTarget(target) {
+        activeTarget = target;
+        selectionMode = false;
+        annotationMode = true;
+        annotationToggle.classList.add("active");
+        pageStage.classList.remove("selecting-mode");
+        pageStage.classList.add("commenting-mode");
+        annotationComposer.classList.remove("hidden");
+        setComposerExpanded(false);
+        document
+          .querySelectorAll(".target-box, .annotation-pin")
+          .forEach((item) => item.classList.toggle("active", item.dataset.target === target));
+
+        document
+          .querySelectorAll(".target-box")
+          .forEach((item) => item.classList.toggle("selected", item.dataset.target === target));
+
+        const data = targets[target];
+        targetKind.textContent = data.kind;
+        targetSummary.textContent = data.summary;
+        commentBox.value = "";
+        commentBox.placeholder = "添加评论...";
+        sendButton.classList.remove("sent");
+        sendButton.innerHTML = '<i data-lucide="check" class="icon"></i>';
+        refreshIcons();
+      }
+
+      stateSelect.addEventListener("change", () => setState(stateSelect.value));
+      annotationToggle.addEventListener("click", () => {
+        if (annotationMode) {
+          setAnnotationMode(false);
+          return;
+        }
+        startSelectionMode();
+      });
+      composerExpandToggle.addEventListener("click", () => setComposerExpanded(!composerExpanded));
+      composerCancel.addEventListener("click", () => setAnnotationMode(false));
+
+      document.querySelectorAll("[data-target]").forEach((item) => {
+        item.addEventListener("pointerenter", () => {
+          if (!selectionMode) return;
+          updateSelectionMarquee(item.dataset.target);
+        });
+        item.addEventListener("click", () => {
+          if (!selectionMode) return;
+          setTarget(item.dataset.target);
+        });
+      });
+
+      document.querySelector("#refreshButton").addEventListener("click", () => {
+        stateSelect.value = "loading";
+        setState("loading");
+        window.setTimeout(() => {
+          stateSelect.value = "ready";
+          setState("ready");
+        }, 850);
+      });
+
+      document.querySelector("#backButton").addEventListener("click", () => {
+        urlField.value = "http://localhost:5173/";
+        artifactTitle.textContent = "localhost:5173";
+      });
+
+      document.querySelector("#forwardButton").addEventListener("click", () => {
+        urlField.value = "http://localhost:5173/dashboard";
+        artifactTitle.textContent = "localhost:5173";
+      });
+
+      sendButton.addEventListener("click", () => {
+        const parsedFontSize = parseInt(fontRange.value, 10);
+        if (!Number.isNaN(parsedFontSize)) {
+          mockTitle.style.fontSize = `${parsedFontSize}px`;
+        }
+        const activeColor = document.querySelector(".swatch.active")?.dataset.color;
+        if (activeColor) {
+          mockTitle.style.color = activeColor;
+        }
+        sendButton.classList.add("sent");
+        sendButton.innerHTML = '<i data-lucide="check-check" class="icon"></i>';
+        refreshIcons();
+      });
+
+      document.querySelectorAll(".swatch").forEach((swatch) => {
+        swatch.addEventListener("click", () => {
+          document.querySelectorAll(".swatch").forEach((item) => item.classList.remove("active"));
+          swatch.classList.add("active");
+        });
+      });
+
+      setAnnotationMode(false);
+      setComposerExpanded(false);
+      setState("ready");
+      refreshIcons();
+    </script>
+  </body>
+</html>

@@ -2,12 +2,14 @@ import { readFile } from "node:fs/promises";
 
 import { BrowserWindow, ipcMain } from "electron";
 
+import type { BrowserArtifactIPC } from "../shared/browser-artifact-ipc";
 import type { FileSystemIPC } from "../shared/file-system-ipc";
 import type { AgentModelsIPC } from "../shared/models-ipc";
 import type { AgentSessionIPC } from "../shared/session-ipc";
 import type { AgentSkillsIPC } from "../shared/skills-ipc";
 import type { SystemIPC } from "../shared/system-ipc";
 import type { AgentPool } from "./agent-pool";
+import { BrowserManager } from "./browser-manager.js";
 
 function registerAgentRuntimeHandlers(agentPool: AgentPool, browserWindow: BrowserWindow) {
   const offAny = agentPool.onAny(({ name, data }) => {
@@ -25,6 +27,7 @@ function registerAgentRuntimeHandlers(agentPool: AgentPool, browserWindow: Brows
 
 function registerIPCHandlers(agentPool: AgentPool, browserWindow: BrowserWindow) {
   const typedIpcMain = createTypedIpcMain();
+  const browserManager = new BrowserManager(browserWindow);
 
   typedIpcMain.handle("setModel", agentPool.setModel);
   typedIpcMain.handle("getAvailableModels", agentPool.getAvailableModels);
@@ -36,11 +39,63 @@ function registerIPCHandlers(agentPool: AgentPool, browserWindow: BrowserWindow)
   typedIpcMain.handle("setHistoryMessages", agentPool.setHistoryMessages);
   typedIpcMain.handle("setSessionId", agentPool.setSessionId);
   typedIpcMain.handle("setSessionScope", agentPool.setSessionScope);
-  typedIpcMain.handle("destroySession", agentPool.destroySession);
+  typedIpcMain.handle("destroySession", async (sessionId) => {
+    await browserManager.destroySession(sessionId);
+    await agentPool.destroySession(sessionId);
+  });
   typedIpcMain.handle("setPermissionMode", agentPool.setPermissionMode);
   typedIpcMain.handle("resolvePermissionRequest", agentPool.resolvePermissionRequest);
   typedIpcMain.handle("listSkills", agentPool.listSkills);
   typedIpcMain.handle("setSkillEnabled", agentPool.setSkillEnabled);
+  typedIpcMain.handle("browserCreate", async (...args) => {
+    try {
+      return await browserManager.create(...args);
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  typedIpcMain.handle("browserDestroy", browserManager.destroy.bind(browserManager));
+  typedIpcMain.handle("browserSetBounds", async (...args) => {
+    browserManager.setBounds(...args);
+  });
+  typedIpcMain.handle("browserNavigate", async (...args) => {
+    try {
+      return await browserManager.navigate(...args);
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  typedIpcMain.handle("browserGoBack", async (...args) => {
+    try {
+      return await browserManager.goBack(...args);
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  typedIpcMain.handle("browserGoForward", async (...args) => {
+    try {
+      return await browserManager.goForward(...args);
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  typedIpcMain.handle("browserReload", async (...args) => {
+    try {
+      return await browserManager.reload(...args);
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  typedIpcMain.handle("browserCaptureForAnnotation", async (...args) => {
+    try {
+      return await browserManager.captureForAnnotation(...args);
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  typedIpcMain.handle("browserSetVisible", async (...args) => {
+    browserManager.setVisible(...args);
+  });
   typedIpcMain.handle("fsReadTextFile", handleFsReadTextFile);
   typedIpcMain.handle("isWindowFullScreen", async () => browserWindow.isFullScreen());
 
@@ -75,7 +130,12 @@ export function bindAgentRuntimeIPC(
 }
 
 function createTypedIpcMain() {
-  type AgentIPC = AgentModelsIPC & AgentSessionIPC & AgentSkillsIPC & FileSystemIPC & SystemIPC;
+  type AgentIPC = AgentModelsIPC &
+    AgentSessionIPC &
+    AgentSkillsIPC &
+    BrowserArtifactIPC &
+    FileSystemIPC &
+    SystemIPC;
   return {
     ...ipcMain,
     handle<C extends keyof AgentIPC = keyof AgentIPC>(channel: C, listener: AgentIPC[C]) {

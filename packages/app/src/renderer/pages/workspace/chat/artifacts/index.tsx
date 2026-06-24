@@ -26,6 +26,7 @@ import {
   Braces,
   FileCode2,
   FileText,
+  Globe2,
   Image,
   MessageSquareText,
   PackageOpen,
@@ -38,6 +39,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
 
 import { PanelHeader } from "../panel-header";
+import { BrowserArtifact } from "./browser-artifact";
 import { SideChatArtifact } from "./side-chat-artifact";
 
 interface ArtifactsPanelProps {
@@ -232,6 +234,16 @@ function ArtifactContent({ artifact, sessionId }: { artifact: ArtifactRecord; se
     return <SideChatArtifact artifact={artifact as SideChatArtifactRecord} />;
   }
 
+  if (artifact.type === "browser") {
+    return (
+      <BrowserArtifact
+        artifactId={artifact.id}
+        content={artifact.content as { title?: string; url: string }}
+        sessionId={sessionId}
+      />
+    );
+  }
+
   return (
     <div className="h-full overflow-hidden bg-background p-3">
       <ArtifactPreview artifact={artifact} sessionId={sessionId} />
@@ -243,6 +255,7 @@ function getArtifactIcon(type: string): LucideIcon {
   const normalizedType = type.toLowerCase();
 
   if (normalizedType === "side-chat") return MessageSquareText;
+  if (normalizedType === "browser") return Globe2;
   if (normalizedType.includes("code")) return FileCode2;
   if (normalizedType.includes("html") || normalizedType.includes("json")) return Braces;
   if (normalizedType.includes("table") || normalizedType.includes("csv")) return TableProperties;
