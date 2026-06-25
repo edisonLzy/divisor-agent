@@ -8,6 +8,7 @@ import type {
   BrowserAnnotationTarget,
   BrowserArtifactContent,
   BrowserState,
+  BrowserStateChangedEvent,
 } from "@shared/browser-artifact-ipc";
 import {
   ArrowLeft,
@@ -43,7 +44,7 @@ const DEFAULT_BROWSER_STATE: BrowserState = {
 };
 
 export function BrowserArtifact({ artifactId, content, sessionId }: BrowserArtifactProps) {
-  const { invoke } = useElectronIPC();
+  const { invoke, on } = useElectronIPC();
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [browserState, setBrowserState] = useState<BrowserState>({
     ...DEFAULT_BROWSER_STATE,
@@ -78,11 +79,34 @@ export function BrowserArtifact({ artifactId, content, sessionId }: BrowserArtif
     };
   }, [artifactId, content, invoke, sessionId]);
 
+  // Subscribe to browser state changes pushed from the main process. The
+  // invoke() calls above only return the state snapshot *before* the new
+  // navigation/reload actually finishes — `did-stop-loading` /
+  // `did-navigate` / `did-fail-load` happen later and the only path for
+  // those to reach the renderer is via this event. Without it, the local
+  // `browserState.status` would stay "loading" forever after refresh.
+  useEffect(() => {
+    const off = on("browser_state_changed", (event: BrowserStateChangedEvent) => {
+      if (event.sessionId !== sessionId || event.artifactId !== artifactId) return;
+      setBrowserState({
+        canGoBack: event.canGoBack,
+        canGoForward: event.canGoForward,
+        status: event.status,
+        title: event.title,
+        url: event.url,
+      });
+      setAddress((current) => (current === event.url ? current : event.url));
+    });
+    return off;
+  }, [artifactId, on, sessionId]);
+
   useLayoutEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
 
+    let frame = 0;
     const updateBounds = () => {
+      frame = 0;
       const rect = stage.getBoundingClientRect();
       void invoke("browserSetBounds", sessionId, artifactId, {
         height: rect.height,
@@ -91,15 +115,42 @@ export function BrowserArtifact({ artifactId, content, sessionId }: BrowserArtif
         y: rect.top,
       });
     };
+    const scheduleUpdateBounds = () => {
+      // Coalesce multiple layout signals (ResizeObserver fires in a burst,
+      // window resize + scroll can fire in the same tick) into one IPC round
+      // trip per animation frame. Without this, the bounds reported to the
+      // native WebContentsView can lag behind sibling panel resizes, leaving
+      // the view drawn at the previous position after a layout change.
+      if (frame !== 0) return;
+      frame = requestAnimationFrame(updateBounds);
+    };
 
     updateBounds();
-    const resizeObserver = new ResizeObserver(updateBounds);
+    const resizeObserver = new ResizeObserver(scheduleUpdateBounds);
     resizeObserver.observe(stage);
-    window.addEventListener("resize", updateBounds);
+    // Observe the offsetParent (and ancestors up to the layout root) so that
+    // sibling-driven layout shifts — toggling the artifact panel, resizing
+    // the sidebar, opening a different artifact tab — also trigger a bounds
+    // recompute. ResizeObserver only fires on the observed element's own
+    // box; when only its position changes, we need explicit ancestor
+    // observers to catch that.
+    const observedElements: Element[] = [stage];
+    let parent: HTMLElement | null = stage.offsetParent as HTMLElement | null;
+    while (parent && parent !== document.body) {
+      observedElements.push(parent);
+      parent = parent.offsetParent as HTMLElement | null;
+    }
+    for (const el of observedElements) {
+      resizeObserver.observe(el);
+    }
+    window.addEventListener("resize", scheduleUpdateBounds);
+    window.addEventListener("scroll", scheduleUpdateBounds, { passive: true });
 
     return () => {
+      if (frame !== 0) cancelAnimationFrame(frame);
       resizeObserver.disconnect();
-      window.removeEventListener("resize", updateBounds);
+      window.removeEventListener("resize", scheduleUpdateBounds);
+      window.removeEventListener("scroll", scheduleUpdateBounds);
     };
   }, [artifactId, invoke, sessionId]);
 

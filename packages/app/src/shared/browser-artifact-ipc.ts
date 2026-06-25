@@ -33,6 +33,7 @@ export interface BrowserState {
 
 export interface BrowserStateChangedEvent extends BrowserState {
   artifactId: string;
+  sessionId: string;
   type: "browser_state_changed";
 }
 

@@ -140,6 +140,13 @@ export function useAgentMessages() {
           return;
         }
 
+        // Skip non-user, non-assistant roles (e.g. toolResult) — they should
+        // not occupy a row in the chat timeline. pi-agent-core's
+        // `emitToolResultMessage` still fires `message_start`/`message_end` for
+        // tool results; without this guard, every tool call would add an empty
+        // entry between the assistant turn and the next user prompt.
+        if (!isAgentAssistantMessage(message)) return;
+
         const turnStartIdx = turnContentStartIndicesRef.current[sessionId] ?? 0;
         if (turnStartIdx !== 0) return;
 

@@ -1,4 +1,5 @@
 import { BrowserWindow, WebContentsView } from "electron";
+import Emittery from "emittery";
 
 import type {
   BrowserAnnotationTarget,
@@ -6,6 +7,7 @@ import type {
   BrowserArtifactContent,
   BrowserCaptureResult,
   BrowserState,
+  BrowserStateChangedEvent,
 } from "../shared/browser-artifact-ipc.js";
 
 interface BrowserRecord {
@@ -25,10 +27,16 @@ const DEFAULT_STATE: BrowserState = {
   url: "about:blank",
 };
 
-export class BrowserManager {
+interface BrowserManagerEvents {
+  browser_state_changed: BrowserStateChangedEvent;
+}
+
+export class BrowserManager extends Emittery<BrowserManagerEvents> {
   private records = new Map<string, BrowserRecord>();
 
-  constructor(private window: BrowserWindow) {}
+  constructor(private window: BrowserWindow) {
+    super();
+  }
 
   async create(sessionId: string, artifactId: string, content: BrowserArtifactContent) {
     const key = getBrowserKey(sessionId, artifactId);
@@ -211,6 +219,16 @@ export class BrowserManager {
       title: patch.title ?? (record.view.webContents.getTitle() || record.state.title),
       url: patch.url ?? (record.view.webContents.getURL() || record.state.url),
     };
+    // Notify the renderer so it can transition out of the loading state once
+    // did-stop-loading / did-navigate / did-fail-load / page-title-updated
+    // fire — otherwise the renderer's optimistic "loading" status from
+    // invoke() never resolves.
+    void this.emit("browser_state_changed", {
+      ...record.state,
+      artifactId: record.artifactId,
+      sessionId: record.sessionId,
+      type: "browser_state_changed",
+    });
     return record.state;
   }
 }
