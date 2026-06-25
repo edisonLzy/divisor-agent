@@ -20,6 +20,8 @@ import { SystemPromptService } from "./prompt/index.js";
 import { SkillService } from "./skills/index.js";
 import type { AppTool } from "./tools/index.js";
 import {
+  browserGotoTool,
+  browserObserveTool,
   browserOpenTool,
   fsReadTextFileTool,
   fsWriteTextFileTool,
@@ -117,6 +119,8 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
     const excludedToolNames = new Set(this.options.extensionTools?.excludeToolNames ?? []);
     const builtinTools = [
       browserOpenTool,
+      browserGotoTool,
+      browserObserveTool,
       fsReadTextFileTool,
       fsWriteTextFileTool,
       terminalCreateTool,

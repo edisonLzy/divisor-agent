@@ -322,6 +322,9 @@ function upsertArtifactsFromToolDetails(
 
     if (artifact.type === "browser") {
       extensionsApi.openArtifact(sessionId, artifact.id);
+      // Register the (artifactId, sessionId) mapping so the new
+      // `browser/goto` and `browser/observe` tools can resolve their context.
+      void window.electronAPI.invoke("browserRegisterArtifact", artifact.id, sessionId);
     }
   }
 }

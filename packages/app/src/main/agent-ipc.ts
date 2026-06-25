@@ -10,33 +10,12 @@ import type { AgentSkillsIPC } from "../shared/skills-ipc";
 import type { SystemIPC } from "../shared/system-ipc";
 import type { AgentPool } from "./agent-pool";
 import { BrowserManager } from "./browser-manager.js";
-
-function registerAgentRuntimeHandlers(
-  agentPool: AgentPool,
-  browserManager: BrowserManager,
-  browserWindow: BrowserWindow,
-) {
-  const offAgentAny = agentPool.onAny(({ name, data }) => {
-    if (browserWindow.isDestroyed() || typeof name !== "string") {
-      return;
-    }
-
-    browserWindow.webContents.send(name, data);
-  });
-
-  const offBrowserAny = browserManager.onAny(({ name, data }) => {
-    if (browserWindow.isDestroyed() || typeof name !== "string") {
-      return;
-    }
-
-    browserWindow.webContents.send(name, data);
-  });
-
-  return () => {
-    offAgentAny();
-    offBrowserAny();
-  };
-}
+import { BrowserSessionManager } from "./browser/browser-session-manager.js";
+import {
+  registerBrowserArtifact,
+  unregisterBrowserArtifact,
+} from "./browser/artifact-registry.js";
+import { setBrowserSessionManager } from "./browser/ipc/register.js";
 
 async function handleFsReadTextFile(
   path: string,
@@ -59,14 +38,19 @@ export function bindAgentRuntimeIPC(
   // to a single instance.
   const typedIpcMain = createTypedIpcMain();
   const browserManager = new BrowserManager(browserWindow);
+  const browserSessionManager = new BrowserSessionManager(browserManager, browserWindow);
+  setBrowserSessionManager(browserSessionManager);
+
   const unregisterAgentRuntimeHandlers = registerAgentRuntimeHandlers(
     agentPool,
     browserManager,
+    browserSessionManager,
     browserWindow,
   );
   const unregisterIPCHandlers = registerIPCHandlersWithManager(
     agentPool,
     browserManager,
+    browserSessionManager,
     browserWindow,
     typedIpcMain,
   );
@@ -78,9 +62,47 @@ export function bindAgentRuntimeIPC(
   };
 }
 
+function registerAgentRuntimeHandlers(
+  agentPool: AgentPool,
+  browserManager: BrowserManager,
+  browserSessionManager: BrowserSessionManager,
+  browserWindow: BrowserWindow,
+) {
+  const offAgentAny = agentPool.onAny(({ name, data }) => {
+    if (browserWindow.isDestroyed() || typeof name !== "string") {
+      return;
+    }
+
+    browserWindow.webContents.send(name, data);
+  });
+
+  const offBrowserAny = browserManager.onAny(({ name, data }) => {
+    if (browserWindow.isDestroyed() || typeof name !== "string") {
+      return;
+    }
+
+    browserWindow.webContents.send(name, data);
+  });
+
+  const offBrowserSessionAny = browserSessionManager.onAny(({ name, data }) => {
+    if (browserWindow.isDestroyed() || typeof name !== "string") {
+      return;
+    }
+
+    browserWindow.webContents.send(name, data);
+  });
+
+  return () => {
+    offAgentAny();
+    offBrowserAny();
+    offBrowserSessionAny();
+  };
+}
+
 function registerIPCHandlersWithManager(
   agentPool: AgentPool,
   browserManager: BrowserManager,
+  browserSessionManager: BrowserSessionManager,
   browserWindow: BrowserWindow,
   typedIpcMain: ReturnType<typeof createTypedIpcMain>,
 ): () => void {
@@ -95,6 +117,7 @@ function registerIPCHandlersWithManager(
   typedIpcMain.handle("setSessionId", agentPool.setSessionId);
   typedIpcMain.handle("setSessionScope", agentPool.setSessionScope);
   typedIpcMain.handle("destroySession", async (sessionId) => {
+    await browserSessionManager.destroySession(sessionId);
     await browserManager.destroySession(sessionId);
     await agentPool.destroySession(sessionId);
   });
@@ -151,6 +174,66 @@ function registerIPCHandlersWithManager(
   typedIpcMain.handle("browserSetVisible", async (...args) => {
     browserManager.setVisible(...args);
   });
+
+  // ── Phase A+: BrowserSessionManager handlers ───────────────────────────
+  typedIpcMain.handle("browserSetMode", async (...args) => {
+    try {
+      await browserSessionManager.setMode(...args);
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  typedIpcMain.handle("browserObserve", async (...args) => {
+    try {
+      return await browserSessionManager.observe(...args);
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  typedIpcMain.handle("browserDispatch", async (...args) => {
+    try {
+      return await browserSessionManager.dispatch(...args);
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  typedIpcMain.handle("browserOpenTab", async (...args) => {
+    try {
+      return await browserSessionManager.openTab(...args);
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  typedIpcMain.handle("browserSwitchTab", async (...args) => {
+    try {
+      await browserSessionManager.switchTab(...args);
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  typedIpcMain.handle("browserCloseTab", async (...args) => {
+    try {
+      await browserSessionManager.closeTab(...args);
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  typedIpcMain.handle("browserListTabs", async (...args) => {
+    try {
+      return await browserSessionManager.listTabs(...args);
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  // ── Phase A: artifact → sessionId registry (renderer → main) ───────────
+  typedIpcMain.handle("browserRegisterArtifact", (artifactId, sessionId) => {
+    registerBrowserArtifact(artifactId, sessionId);
+  });
+  typedIpcMain.handle("browserUnregisterArtifact", (artifactId) => {
+    unregisterBrowserArtifact(artifactId);
+  });
+
   typedIpcMain.handle("fsReadTextFile", handleFsReadTextFile);
   typedIpcMain.handle("isWindowFullScreen", async () => browserWindow.isFullScreen());
 
