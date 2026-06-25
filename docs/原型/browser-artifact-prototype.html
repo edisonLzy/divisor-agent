@@ -659,6 +659,12 @@
         pointer-events: none;
       }
 
+      .annotation-badges {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
       .selection-overlay {
         position: absolute;
         inset: 0;
@@ -736,7 +742,7 @@
 
       .annotation-pin {
         position: absolute;
-        display: none;
+        display: grid;
         place-items: center;
         width: 22px;
         height: 22px;
@@ -750,23 +756,9 @@
         box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
       }
 
-      .commenting-mode .annotation-pin.active {
-        display: grid;
-      }
-
       .annotation-pin.active {
         background: #bfdbfe;
         color: #0f172a;
-      }
-
-      .pin-hero {
-        left: calc(28px + 47% - 7px);
-        top: 76px;
-      }
-
-      .pin-table {
-        right: 44px;
-        bottom: 166px;
       }
 
       .stage-hint {
@@ -836,11 +828,10 @@
 
       .annotation-composer {
         position: absolute;
-        left: 50%;
-        bottom: 18px;
+        left: var(--composer-x, 28px);
+        top: var(--composer-y, 18px);
         z-index: 6;
-        width: min(590px, calc(100% - 52px));
-        transform: translateX(-50%);
+        width: min(360px, calc(100% - 36px));
         transition:
           width 180ms ease,
           opacity 160ms ease,
@@ -850,11 +841,11 @@
       .annotation-composer.hidden {
         opacity: 0;
         pointer-events: none;
-        transform: translateX(-50%) translateY(12px);
+        transform: translateY(8px);
       }
 
       .annotation-composer.expanded {
-        width: min(690px, calc(100% - 52px));
+        width: min(460px, calc(100% - 36px));
       }
 
       .annotation-composer.disabled {
@@ -864,30 +855,31 @@
       .composer-shell {
         overflow: hidden;
         border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 30px;
+        border-radius: 24px;
         background: rgba(45, 45, 45, 0.96);
         box-shadow:
-          0 24px 70px rgba(0, 0, 0, 0.45),
+          0 18px 46px rgba(0, 0, 0, 0.4),
           inset 0 1px 0 rgba(255, 255, 255, 0.04);
         backdrop-filter: blur(18px);
       }
 
       .annotation-composer.expanded .composer-shell {
-        border-radius: 34px;
+        border-radius: 26px;
       }
 
       .composer-input-row {
         display: grid;
-        grid-template-columns: 52px minmax(0, 1fr) 46px;
+        grid-template-columns: 34px minmax(0, 1fr) auto auto;
         align-items: center;
-        min-height: 58px;
-        padding: 0 14px;
+        gap: 6px;
+        min-height: 46px;
+        padding: 5px 7px;
       }
 
       .composer-tool-button {
         display: grid;
-        width: 42px;
-        height: 42px;
+        width: 32px;
+        height: 32px;
         place-items: center;
         border-radius: 999px;
         background: rgba(255, 255, 255, 0.08);
@@ -902,16 +894,16 @@
 
       .composer-textarea {
         width: 100%;
-        min-height: 28px;
-        max-height: 64px;
+        min-height: 22px;
+        max-height: 48px;
         resize: none;
         border: 0;
         outline: none;
-        padding: 8px 0;
+        padding: 4px 0;
         background: transparent;
         color: var(--foreground);
-        font-size: 18px;
-        line-height: 1.35;
+        font-size: 13px;
+        line-height: 1.4;
       }
 
       .composer-textarea::placeholder {
@@ -920,17 +912,31 @@
 
       .composer-icon-button {
         display: grid;
-        width: 34px;
-        height: 34px;
+        width: 32px;
+        height: 32px;
         place-items: center;
         border-radius: 999px;
         background: transparent;
         color: rgba(212, 212, 212, 0.64);
       }
 
+      .composer-row-delete {
+        display: none;
+        color: #fda4af;
+      }
+
+      .annotation-composer.editing-existing .composer-row-delete {
+        display: grid;
+      }
+
+      .composer-row-submit {
+        background: rgba(212, 212, 212, 0.78);
+        color: #171717;
+      }
+
       .composer-expanded {
         display: none;
-        max-height: 460px;
+        max-height: 330px;
         overflow: auto;
         border-top: 1px solid rgba(255, 255, 255, 0.04);
       }
@@ -943,8 +949,8 @@
         display: grid;
         grid-template-columns: minmax(0, 1fr) 34px;
         align-items: center;
-        min-height: 68px;
-        padding: 0 32px;
+        min-height: 48px;
+        padding: 0 18px;
         border-top: 1px solid rgba(255, 255, 255, 0.035);
         border-bottom: 1px solid rgba(0, 0, 0, 0.18);
         background: rgba(255, 255, 255, 0.045);
@@ -954,7 +960,7 @@
         min-width: 0;
         overflow: hidden;
         color: var(--foreground);
-        font-size: 22px;
+        font-size: 15px;
         font-weight: 640;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -967,15 +973,15 @@
       }
 
       .composer-fields {
-        padding: 16px 32px 10px;
+        padding: 10px 18px 6px;
       }
 
       .composer-field-grid {
         display: grid;
-        grid-template-columns: 190px minmax(0, 1fr);
+        grid-template-columns: 112px minmax(0, 1fr);
         align-items: center;
-        gap: 16px;
-        min-height: 64px;
+        gap: 12px;
+        min-height: 44px;
       }
 
       .composer-field-grid + .composer-field-grid {
@@ -984,7 +990,7 @@
 
       .composer-field-grid label {
         color: rgba(212, 212, 212, 0.82);
-        font-size: 20px;
+        font-size: 13px;
         font-weight: 560;
       }
 
@@ -992,14 +998,14 @@
         display: grid;
         grid-template-columns: auto minmax(0, 1fr) auto;
         align-items: center;
-        gap: 13px;
-        min-height: 48px;
-        padding: 0 14px;
+        gap: 8px;
+        min-height: 34px;
+        padding: 0 10px;
         border: 1px solid rgba(0, 0, 0, 0.18);
-        border-radius: 17px;
+        border-radius: 12px;
         background: rgba(35, 35, 35, 0.82);
         color: rgba(212, 212, 212, 0.68);
-        font-size: 18px;
+        font-size: 13px;
       }
 
       .composer-value-box span {
@@ -1010,30 +1016,30 @@
       }
 
       .composer-swatch {
-        width: 36px;
-        height: 36px;
+        width: 24px;
+        height: 24px;
         border: 1px solid rgba(255, 255, 255, 0.18);
-        border-radius: 13px;
+        border-radius: 9px;
         background: var(--swatch);
       }
 
       .composer-number-input {
-        min-height: 48px;
+        min-height: 34px;
         border: 1px solid rgba(0, 0, 0, 0.18);
-        border-radius: 17px;
+        border-radius: 12px;
         outline: none;
-        padding: 0 18px;
+        padding: 0 10px;
         background: rgba(35, 35, 35, 0.82);
         color: rgba(212, 212, 212, 0.72);
-        font-size: 18px;
+        font-size: 13px;
       }
 
       .composer-footer {
         display: none;
         align-items: center;
-        gap: 12px;
-        min-height: 76px;
-        padding: 12px 16px;
+        gap: 8px;
+        min-height: 52px;
+        padding: 8px 10px;
         border-top: 1px solid rgba(255, 255, 255, 0.055);
       }
 
@@ -1042,14 +1048,31 @@
       }
 
       .composer-cancel {
-        height: 42px;
-        padding: 0 16px;
+        height: 32px;
+        padding: 0 12px;
         border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 999px;
         background: rgba(255, 255, 255, 0.05);
         color: var(--foreground);
-        font-size: 18px;
+        font-size: 13px;
         font-weight: 700;
+      }
+
+      .composer-delete {
+        display: none;
+        height: 32px;
+        padding: 0 12px;
+        border: 1px solid rgba(251, 113, 133, 0.24);
+        border-radius: 999px;
+        background: rgba(251, 113, 133, 0.1);
+        color: #fda4af;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .annotation-composer.editing-existing .composer-delete {
+        display: inline-flex;
+        align-items: center;
       }
 
       .composer-spacer {
@@ -1058,8 +1081,8 @@
 
       .composer-submit {
         display: grid;
-        width: 56px;
-        height: 56px;
+        width: 36px;
+        height: 36px;
         place-items: center;
         border-radius: 999px;
         background: rgba(212, 212, 212, 0.72);
@@ -1258,11 +1281,11 @@
         }
 
         .annotation-composer {
-          width: min(560px, calc(100% - 32px));
+          width: min(340px, calc(100% - 32px));
         }
 
         .annotation-composer.expanded {
-          width: min(640px, calc(100% - 32px));
+          width: min(440px, calc(100% - 32px));
         }
       }
     </style>
@@ -1505,9 +1528,8 @@
                       data-target="table"
                       aria-label="选择数据表格"
                     ></button>
-                    <button class="annotation-pin pin-hero" data-target="hero">1</button>
-                    <button class="annotation-pin pin-table" data-target="table">2</button>
                   </div>
+                  <div class="annotation-badges" id="annotationBadges"></div>
                 </div>
 
                 <div class="stage-hint">
@@ -1541,8 +1563,19 @@
                         rows="1"
                         placeholder="添加评论..."
                       ></textarea>
-                      <button class="composer-icon-button" title="语音输入">
-                        <i data-lucide="mic" class="icon"></i>
+                      <button
+                        class="composer-icon-button composer-row-delete"
+                        id="composerCompactDelete"
+                        title="删除批注"
+                      >
+                        <i data-lucide="trash-2" class="icon"></i>
+                      </button>
+                      <button
+                        class="composer-icon-button composer-row-submit"
+                        id="composerQuickSubmit"
+                        title="确认批注"
+                      >
+                        <i data-lucide="check" class="icon"></i>
                       </button>
                     </div>
 
@@ -1620,6 +1653,7 @@
 
                     <div class="composer-footer">
                       <button class="composer-cancel" id="composerCancel">取消</button>
+                      <button class="composer-delete" id="composerDelete">删除</button>
                       <div class="composer-spacer"></div>
                       <button class="composer-icon-button" title="语音输入">
                         <i data-lucide="mic" class="icon"></i>
@@ -1650,8 +1684,12 @@
       const pageStage = document.querySelector("#pageStage");
       const selectionMarquee = document.querySelector(".selection-marquee");
       const annotationComposer = document.querySelector("#annotationComposer");
+      const annotationBadges = document.querySelector("#annotationBadges");
       const composerExpandToggle = document.querySelector("#composerExpandToggle");
       const composerCancel = document.querySelector("#composerCancel");
+      const composerDelete = document.querySelector("#composerDelete");
+      const composerCompactDelete = document.querySelector("#composerCompactDelete");
+      const composerQuickSubmit = document.querySelector("#composerQuickSubmit");
       const targetKind = document.querySelector("#targetKind");
       const targetSummary = document.querySelector("#targetSummary");
       const commentBox = document.querySelector("#commentBox");
@@ -1735,7 +1773,10 @@
       let annotationMode = false;
       let selectionMode = false;
       let activeTarget = "hero";
+      let editingAnnotationId = null;
       let composerExpanded = false;
+      let composerAnchor = { x: 320, y: 180 };
+      let annotations = [];
 
       function refreshIcons() {
         if (window.lucide) {
@@ -1765,12 +1806,15 @@
         annotationToggle.classList.toggle("active", annotationMode);
         if (!annotationMode) {
           selectionMode = false;
+          editingAnnotationId = null;
           pageStage.classList.remove("selecting-mode", "commenting-mode");
           annotationComposer.classList.add("hidden");
+          annotationComposer.classList.remove("editing-existing");
           setComposerExpanded(false);
           document
-            .querySelectorAll(".target-box, .annotation-pin")
+            .querySelectorAll(".target-box")
             .forEach((item) => item.classList.remove("active", "selected"));
+          renderAnnotationBadges();
         }
       }
 
@@ -1781,6 +1825,8 @@
         pageStage.classList.add("selecting-mode");
         pageStage.classList.remove("commenting-mode");
         annotationComposer.classList.add("hidden");
+        annotationComposer.classList.remove("editing-existing");
+        editingAnnotationId = null;
         setComposerExpanded(false);
         sendButton.classList.remove("sent");
         sendButton.innerHTML = '<i data-lucide="check" class="icon"></i>';
@@ -1798,19 +1844,51 @@
         composerExpanded = nextValue;
         annotationComposer.classList.toggle("expanded", composerExpanded);
         commentBox.placeholder = composerExpanded ? "描述这些更改..." : "添加评论...";
+        window.requestAnimationFrame(() => positionComposer(composerAnchor));
       }
 
-      function setTarget(target) {
+      function getPointerAnchor(event) {
+        const stageRect = pageStage.getBoundingClientRect();
+        return {
+          x: event.clientX - stageRect.left,
+          y: event.clientY - stageRect.top,
+        };
+      }
+
+      function positionComposer(anchor = composerAnchor) {
+        composerAnchor = anchor;
+        const stageRect = pageStage.getBoundingClientRect();
+        const margin = 14;
+        const gap = 14;
+        const width = annotationComposer.offsetWidth || (composerExpanded ? 460 : 360);
+        const height = annotationComposer.offsetHeight || (composerExpanded ? 330 : 46);
+        const maxX = Math.max(margin, stageRect.width - width - margin);
+        const maxY = Math.max(margin, stageRect.height - height - margin);
+        const rightX = anchor.x + gap;
+        const leftX = anchor.x - width - gap;
+        const rawX = rightX <= maxX ? rightX : leftX;
+        const rawY = composerExpanded ? anchor.y - 16 : anchor.y - height / 2;
+        const x = Math.min(Math.max(rawX, margin), maxX);
+        const y = Math.min(Math.max(rawY, margin), maxY);
+
+        annotationComposer.style.setProperty("--composer-x", `${Math.round(x)}px`);
+        annotationComposer.style.setProperty("--composer-y", `${Math.round(y)}px`);
+      }
+
+      function setTarget(target, event) {
         activeTarget = target;
+        editingAnnotationId = null;
+        composerAnchor = event ? getPointerAnchor(event) : composerAnchor;
         selectionMode = false;
         annotationMode = true;
         annotationToggle.classList.add("active");
         pageStage.classList.remove("selecting-mode");
         pageStage.classList.add("commenting-mode");
         annotationComposer.classList.remove("hidden");
+        annotationComposer.classList.remove("editing-existing");
         setComposerExpanded(false);
         document
-          .querySelectorAll(".target-box, .annotation-pin")
+          .querySelectorAll(".target-box")
           .forEach((item) => item.classList.toggle("active", item.dataset.target === target));
 
         document
@@ -1824,7 +1902,119 @@
         commentBox.placeholder = "添加评论...";
         sendButton.classList.remove("sent");
         sendButton.innerHTML = '<i data-lucide="check" class="icon"></i>';
+        positionComposer(composerAnchor);
+        renderAnnotationBadges();
         refreshIcons();
+      }
+
+      function openAnnotation(annotationId) {
+        const annotation = annotations.find((item) => item.id === annotationId);
+        if (!annotation) return;
+
+        activeTarget = annotation.target;
+        editingAnnotationId = annotation.id;
+        composerAnchor = annotation.anchor || composerAnchor;
+        selectionMode = false;
+        annotationMode = true;
+        annotationToggle.classList.add("active");
+        pageStage.classList.remove("selecting-mode");
+        pageStage.classList.add("commenting-mode");
+        annotationComposer.classList.remove("hidden");
+        annotationComposer.classList.add("editing-existing");
+        setComposerExpanded(false);
+
+        document
+          .querySelectorAll(".target-box")
+          .forEach((item) => item.classList.toggle("active", item.dataset.target === annotation.target));
+        document
+          .querySelectorAll(".target-box")
+          .forEach((item) => item.classList.toggle("selected", item.dataset.target === annotation.target));
+
+        const data = targets[annotation.target];
+        targetKind.textContent = data.kind;
+        targetSummary.textContent = data.summary;
+        commentBox.value = annotation.comment;
+        commentBox.placeholder = "添加评论...";
+        sendButton.classList.remove("sent");
+        sendButton.innerHTML = '<i data-lucide="check" class="icon"></i>';
+        positionComposer(composerAnchor);
+        renderAnnotationBadges();
+        refreshIcons();
+      }
+
+      function saveAnnotation() {
+        const comment = commentBox.value.trim();
+        if (editingAnnotationId) {
+          annotations = annotations.map((annotation) =>
+            annotation.id === editingAnnotationId ? { ...annotation, comment, anchor: composerAnchor } : annotation,
+          );
+        } else {
+          annotations = [
+            ...annotations,
+            {
+              id: `annotation-${Date.now()}`,
+              target: activeTarget,
+              anchor: composerAnchor,
+              comment,
+            },
+          ];
+        }
+
+        setAnnotationMode(false);
+        renderAnnotationBadges();
+      }
+
+      function deleteAnnotation() {
+        if (!editingAnnotationId) return;
+        annotations = annotations.filter((annotation) => annotation.id !== editingAnnotationId);
+        setAnnotationMode(false);
+        renderAnnotationBadges();
+      }
+
+      function renderAnnotationBadges() {
+        annotationBadges.innerHTML = "";
+        annotations.forEach((annotation, index) => {
+          const data = targets[annotation.target];
+          if (!data) return;
+          const badge = document.createElement("button");
+          badge.type = "button";
+          badge.className = `annotation-pin ${editingAnnotationId === annotation.id ? "active" : ""}`;
+          badge.dataset.annotationId = annotation.id;
+          badge.textContent = String(index + 1);
+          badge.title = annotation.comment || "打开批注";
+
+          Object.assign(badge.style, getBadgePosition(annotation, data));
+          badge.addEventListener("click", () => openAnnotation(annotation.id));
+          annotationBadges.appendChild(badge);
+        });
+      }
+
+      function getBadgePosition(annotation, data) {
+        if (annotation.anchor) {
+          return {
+            left: `${Math.round(annotation.anchor.x - 11)}px`,
+            top: `${Math.round(annotation.anchor.y - 11)}px`,
+          };
+        }
+
+        return getBadgeRect(data.rect);
+      }
+
+      function getBadgeRect(rect) {
+        if (rect.right !== "auto" && rect.right !== undefined) {
+          return {
+            right: `calc(${rect.right} - 10px)`,
+            bottom:
+              rect.bottom !== "auto" && rect.bottom !== undefined
+                ? `calc(${rect.bottom} + ${rect.height} - 10px)`
+                : "auto",
+          };
+        }
+
+        return {
+          left: `calc(${rect.left} + ${rect.width} - 10px)`,
+          top: `calc(${rect.top} - 10px)`,
+        };
       }
 
       stateSelect.addEventListener("change", () => setState(stateSelect.value));
@@ -1837,15 +2027,18 @@
       });
       composerExpandToggle.addEventListener("click", () => setComposerExpanded(!composerExpanded));
       composerCancel.addEventListener("click", () => setAnnotationMode(false));
+      composerDelete.addEventListener("click", deleteAnnotation);
+      composerCompactDelete.addEventListener("click", deleteAnnotation);
+      composerQuickSubmit.addEventListener("click", saveAnnotation);
 
       document.querySelectorAll("[data-target]").forEach((item) => {
         item.addEventListener("pointerenter", () => {
           if (!selectionMode) return;
           updateSelectionMarquee(item.dataset.target);
         });
-        item.addEventListener("click", () => {
+        item.addEventListener("click", (event) => {
           if (!selectionMode) return;
-          setTarget(item.dataset.target);
+          setTarget(item.dataset.target, event);
         });
       });
 
@@ -1877,9 +2070,7 @@
         if (activeColor) {
           mockTitle.style.color = activeColor;
         }
-        sendButton.classList.add("sent");
-        sendButton.innerHTML = '<i data-lucide="check-check" class="icon"></i>';
-        refreshIcons();
+        saveAnnotation();
       });
 
       document.querySelectorAll(".swatch").forEach((swatch) => {
@@ -1892,6 +2083,7 @@
       setAnnotationMode(false);
       setComposerExpanded(false);
       setState("ready");
+      renderAnnotationBadges();
       refreshIcons();
     </script>
   </body>

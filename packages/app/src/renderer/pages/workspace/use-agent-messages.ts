@@ -140,6 +140,8 @@ export function useAgentMessages() {
           return;
         }
 
+        if (!isAgentAssistantMessage(message)) return;
+
         const turnStartIdx = turnContentStartIndicesRef.current[sessionId] ?? 0;
         if (turnStartIdx !== 0) return;
 

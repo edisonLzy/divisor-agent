@@ -211,6 +211,23 @@ export class BrowserManager {
       title: patch.title ?? (record.view.webContents.getTitle() || record.state.title),
       url: patch.url ?? (record.view.webContents.getURL() || record.state.url),
     };
+
+    // Push the new state to the renderer. The IPC handlers (reload, navigate,
+    // ...) only return a snapshot taken at the time of the call, but the
+    // actual loading → ready / error / blocked transitions happen
+    // asynchronously from `did-stop-loading` / `did-fail-load` / `will-navigate`.
+    // Without this push, the UI would stay stuck in whatever status the
+    // snapshot returned.
+    if (!this.window.isDestroyed()) {
+      this.window.webContents.send("browser_state_changed", {
+        type: "browser_state_changed",
+        scope: "main",
+        sessionId: record.sessionId,
+        artifactId: record.artifactId,
+        ...record.state,
+      });
+    }
+
     return record.state;
   }
 }

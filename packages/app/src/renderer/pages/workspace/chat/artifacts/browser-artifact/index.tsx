@@ -43,7 +43,7 @@ const DEFAULT_BROWSER_STATE: BrowserState = {
 };
 
 export function BrowserArtifact({ artifactId, content, sessionId }: BrowserArtifactProps) {
-  const { invoke } = useElectronIPC();
+  const { invoke, on } = useElectronIPC();
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [browserState, setBrowserState] = useState<BrowserState>({
     ...DEFAULT_BROWSER_STATE,
@@ -77,6 +77,27 @@ export function BrowserArtifact({ artifactId, content, sessionId }: BrowserArtif
       void invoke("browserDestroy", sessionId, artifactId);
     };
   }, [artifactId, content, invoke, sessionId]);
+
+  useEffect(() => {
+    // The main process emits `browser_state_changed` on every
+    // did-start-loading / did-stop-loading / did-fail-load / page-title-updated
+    // / did-navigate transition. The IPC handlers (reload, navigate, ...)
+    // only return a snapshot taken at call time, so without this subscription
+    // the status indicator would stay stuck on whatever the snapshot said
+    // (typically "loading" after a refresh).
+    const unsubscribe = on("browser_state_changed", (event) => {
+      if (event.sessionId !== sessionId || event.artifactId !== artifactId) return;
+      setBrowserState({
+        canGoBack: event.canGoBack,
+        canGoForward: event.canGoForward,
+        status: event.status,
+        title: event.title,
+        url: event.url,
+      });
+      setAddress(event.url);
+    });
+    return unsubscribe;
+  }, [artifactId, on, sessionId]);
 
   useLayoutEffect(() => {
     const stage = stageRef.current;
