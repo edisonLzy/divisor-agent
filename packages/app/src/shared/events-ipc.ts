@@ -92,6 +92,7 @@ export const ALLOWED_RENDER_INVOKE_EVENTS: (keyof AgentRuntimeIPC)[] = [
   "browserListTabs",
   "browserRegisterArtifact",
   "browserUnregisterArtifact",
+  "browserUpdateAllowlist",
   "fsReadTextFile",
   "isWindowFullScreen",
 ];

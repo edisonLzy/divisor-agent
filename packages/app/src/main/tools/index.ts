@@ -1,8 +1,20 @@
 export { browserOpenTool } from "./browser-tool.js";
 
 export {
+  browserBackTool,
+  browserClickTool,
+  browserCloseTabTool,
+  browserExtractTool,
+  browserForwardTool,
   browserGotoTool,
+  browserListTabsTool,
   browserObserveTool,
+  browserOpenTabTool,
+  browserPressTool,
+  browserScrollTool,
+  browserSwitchTabTool,
+  browserTypeTool,
+  browserWaitTool,
   registerBrowserArtifact,
   resolveBrowserArtifact,
   unregisterBrowserArtifact,

@@ -163,4 +163,10 @@ export interface BrowserArtifactIPC {
   // ── Phase A: artifact → sessionId registry (renderer → main) ───────────
   browserRegisterArtifact: (artifactId: string, sessionId: string) => Promise<void>;
   browserUnregisterArtifact: (artifactId: string) => Promise<void>;
+
+  // ── Phase C: allow-list mutation ───────────────────────────────────────
+  browserUpdateAllowlist: (patch: {
+    allow?: string[];
+    deny?: string[];
+  }) => Promise<{ allow: string[]; deny: string[] } | { error: string }>;
 }

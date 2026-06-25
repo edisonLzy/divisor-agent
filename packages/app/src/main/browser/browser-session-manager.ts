@@ -1,4 +1,4 @@
-import type { BrowserWindow } from "electron";
+import type { BrowserWindow, WebContentsView } from "electron";
 import Emittery from "emittery";
 
 import type { BrowserManager } from "../browser-manager.js";
@@ -11,6 +11,7 @@ import type {
 } from "@shared/browser-artifact-ipc";
 
 import { CDPClient } from "./cdp/cdp-client.js";
+import { captureJpegScreenshot } from "./cdp/screenshot.js";
 import { waitForLoad } from "./cdp/navigation.js";
 import { BrowserObserver } from "./observer/observer.js";
 import { ObservationStore } from "./observer/observation-store.js";
@@ -45,11 +46,15 @@ function getKey(sessionId: string, artifactId: string): BrowserKey {
 /**
  * Orchestration layer on top of the existing `BrowserManager`. Owns per-artifact
  * session state (control mode, multi-tab registry, latest observation) and the
- * CDP automation. Reuses `BrowserManager` for WebContentsView lifecycle and
- * the navigation primitives that Phase 1 already wired up.
+ * CDP automation. Reuses `BrowserManager` for the first tab's WebContentsView
+ * lifecycle (URL allow-list, navigation primitives, state events).
+ *
+ * Phase C: multi-tab. The first tab lives on BrowserManager's view; subsequent
+ * tabs spawn dedicated WebContentsViews that share the artifact's bounds.
  */
 export class BrowserSessionManager extends Emittery<BrowserSessionManagerEvents> {
   private sessions = new Map<BrowserKey, BrowserSession>();
+  private extraViews = new Map<BrowserKey, Map<string, WebContentsView>>();
   private observer = new BrowserObserver();
   private store = new ObservationStore();
   private allowlist = new BrowserAllowlist();
@@ -71,7 +76,6 @@ export class BrowserSessionManager extends Emittery<BrowserSessionManagerEvents>
   ): Promise<BrowserState> {
     const existing = this.sessions.get(getKey(sessionId, artifactId));
     if (existing) {
-      // Already attached; if URL differs, navigate.
       const currentUrl = existing.activeTab.url();
       if (currentUrl !== content.url) {
         await this.browserManager.navigate(sessionId, artifactId, content.url);
@@ -79,7 +83,6 @@ export class BrowserSessionManager extends Emittery<BrowserSessionManagerEvents>
       return this.snapshotState(sessionId, artifactId);
     }
 
-    // Phase A: reuse the existing BrowserManager flow for the first view.
     const state = await this.browserManager.create(sessionId, artifactId, {
       title: undefined,
       url: content.url,
@@ -97,9 +100,13 @@ export class BrowserSessionManager extends Emittery<BrowserSessionManagerEvents>
       guard,
     );
     this.sessions.set(getKey(sessionId, artifactId), session);
+    this.extraViews.set(getKey(sessionId, artifactId), new Map());
 
-    // Wait for the initial load to settle so the first observation is meaningful.
     await waitForLoad(session.activeTab.webContents, 5000);
+
+    // Sensitive domain auto-pause.
+    await this.checkSensitiveAndPause(sessionId, artifactId);
+
     void this.broadcastScreenshot(sessionId, artifactId);
 
     return this.snapshotState(sessionId, artifactId);
@@ -107,8 +114,15 @@ export class BrowserSessionManager extends Emittery<BrowserSessionManagerEvents>
 
   async detachArtifact(sessionId: string, artifactId: string): Promise<void> {
     const session = this.sessions.get(getKey(sessionId, artifactId));
+    const extras = this.extraViews.get(getKey(sessionId, artifactId));
+    if (extras) {
+      for (const view of extras.values()) {
+        this.browserWindow.contentView.removeChildView(view);
+        view.webContents.close();
+      }
+      this.extraViews.delete(getKey(sessionId, artifactId));
+    }
     if (!session) {
-      // Nothing on our side; let BrowserManager tear down the view.
       await this.browserManager.destroy(sessionId, artifactId);
       return;
     }
@@ -134,10 +148,10 @@ export class BrowserSessionManager extends Emittery<BrowserSessionManagerEvents>
   async observe(
     sessionId: string,
     artifactId: string,
-    _opts?: { selector?: string; maxRefs?: number },
+    opts?: { selector?: string; maxRefs?: number },
   ): Promise<Observation> {
     const session = this.requireSession(sessionId, artifactId);
-    const observation = await this.observer.refresh(session.activeTab);
+    const observation = await this.observer.refresh(session.activeTab, opts ?? {});
     this.store.set(session.activeTab.id, observation);
     void this.broadcastScreenshot(sessionId, artifactId, observation.screenshotDataUrl);
     return observation;
@@ -151,7 +165,6 @@ export class BrowserSessionManager extends Emittery<BrowserSessionManagerEvents>
     const session = this.requireSession(sessionId, artifactId);
     const observation = await session.operator.dispatch(session.activeTab, action);
     this.store.set(session.activeTab.id, observation);
-    session.activeTab.refMap = new Map(Object.entries(observation.refMap));
     void this.broadcastScreenshot(sessionId, artifactId, observation.screenshotDataUrl);
     return {
       observation,
@@ -170,16 +183,78 @@ export class BrowserSessionManager extends Emittery<BrowserSessionManagerEvents>
     });
   }
 
-  // ── Multi-tab (Phase C — minimal Phase A stub) ─────────────────────────
+  // ── Multi-tab ──────────────────────────────────────────────────────────
 
-  async openTab(_sessionId: string, _artifactId: string, _url: string): Promise<TabInfo> {
-    // Phase A: only single tab. Phase C will create new WebContentsViews.
-    throw new Error("browser/open_tab is not implemented yet (Phase C)");
+  async openTab(sessionId: string, artifactId: string, url: string): Promise<TabInfo> {
+    const session = this.requireSession(sessionId, artifactId);
+
+    const view = new WebContentsView({
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+        webSecurity: true,
+      },
+    });
+    this.browserWindow.contentView.addChildView(view);
+    view.setBounds({ height: 0, width: 0, x: 0, y: 0 });
+
+    view.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+
+    const cdp = new CDPClient(view.webContents);
+    await cdp.attach();
+    await cdp.enableDomains();
+
+    const tab = new Tab(view.webContents, cdp);
+    session.tabs.set(tab.id, tab);
+    this.extraViews.get(getKey(sessionId, artifactId))?.set(tab.id, view);
+
+    await view.webContents.loadURL(url);
+    await waitForLoad(view.webContents, 5000);
+    session.activeTabId = tab.id;
+
+    await this.emit("browser_tab_changed", {
+      activeTabId: session.activeTabId,
+      artifactId,
+      sessionId,
+      tabs: session.tabInfos(),
+    });
+    void this.broadcastScreenshot(sessionId, artifactId);
+
+    return {
+      active: true,
+      id: tab.id,
+      title: tab.title(),
+      url: tab.url(),
+    };
   }
 
   async switchTab(sessionId: string, artifactId: string, tabId: string): Promise<void> {
     const session = this.requireSession(sessionId, artifactId);
     if (!session.tabs.has(tabId)) throw new Error(`Unknown tab: ${tabId}`);
+
+    // Hide all non-active tabs (set 0 bounds). The BrowserArtifact renderer is
+    // responsible for pushing bounds via browserSetBounds; we mirror them here
+    // for the *active* tab. For the first tab the BrowserManager owns the
+    // view; for additional tabs we read the bounds from its records.
+    const firstTabBounds = (this.browserManager as unknown as {
+      records: Map<string, { bounds: { height: number; width: number; x: number; y: number } }>;
+    }).records.get(getKey(sessionId, artifactId))?.bounds ?? {
+      height: 0,
+      width: 0,
+      x: 0,
+      y: 0,
+    };
+    for (const [id, tab] of session.tabs) {
+      const view = this.viewForTab(sessionId, artifactId, id);
+      if (!view) continue;
+      if (id === tabId) {
+        view.setBounds(firstTabBounds);
+        tab.setMode(tab.controlMode || "agent");
+      } else {
+        view.setBounds({ height: 0, width: 0, x: 0, y: 0 });
+      }
+    }
     session.activeTabId = tabId;
     await this.emit("browser_tab_changed", {
       activeTabId: tabId,
@@ -194,10 +269,20 @@ export class BrowserSessionManager extends Emittery<BrowserSessionManagerEvents>
     const target = tabId ?? session.activeTabId;
     const tab = session.tabs.get(target);
     if (!tab) return;
+    const view = this.viewForTab(sessionId, artifactId, target);
+    if (view) {
+      this.browserWindow.contentView.removeChildView(view);
+      this.extraViews.get(getKey(sessionId, artifactId))?.delete(target);
+    }
     await tab.dispose();
     session.tabs.delete(target);
     if (session.activeTabId === target) {
-      session.activeTabId = session.tabs.keys().next().value ?? "";
+      const next = session.tabs.keys().next().value ?? "";
+      session.activeTabId = next;
+      if (next) {
+        await this.switchTab(sessionId, artifactId, next);
+        return;
+      }
     }
     await this.emit("browser_tab_changed", {
       activeTabId: session.activeTabId,
@@ -210,6 +295,20 @@ export class BrowserSessionManager extends Emittery<BrowserSessionManagerEvents>
   async listTabs(sessionId: string, artifactId: string): Promise<TabInfo[]> {
     const session = this.sessions.get(getKey(sessionId, artifactId));
     return session ? session.tabInfos() : [];
+  }
+
+  /**
+   * Returns the active tab for a session/artifact pair. Throws if no session
+   * exists. Used by tools that need direct WebContents access (e.g. wait).
+   */
+  requireActiveTab(sessionId: string, artifactId: string): Tab {
+    return this.requireSession(sessionId, artifactId).activeTab;
+  }
+
+  // ── Allow-list mutation (Phase C) ──────────────────────────────────────
+
+  async updateAllowlist(patch: { allow?: string[]; deny?: string[] }): Promise<void> {
+    await this.allowlist.update(patch);
   }
 
   // ── Internals ──────────────────────────────────────────────────────────
@@ -232,18 +331,26 @@ export class BrowserSessionManager extends Emittery<BrowserSessionManagerEvents>
         }
       >;
     }).records.get(getKey(sessionId, artifactId));
-    if (!record) {
-      return {
-        canGoBack: false,
-        canGoForward: false,
-        status: "loading",
-        title: "Browser",
-        url: "about:blank",
-      };
-    }
+    const baseState: BrowserState = record
+      ? record.state
+      : {
+          canGoBack: false,
+          canGoForward: false,
+          status: "loading",
+          title: "Browser",
+          url: "about:blank",
+        };
     const session = this.sessions.get(getKey(sessionId, artifactId));
     const mode: ControlMode | undefined = session?.activeTab.controlMode;
-    return { ...record.state, mode };
+    return { ...baseState, mode };
+  }
+
+  private viewForTab(
+    sessionId: string,
+    artifactId: string,
+    tabId: string,
+  ): WebContentsView | undefined {
+    return this.extraViews.get(getKey(sessionId, artifactId))?.get(tabId);
   }
 
   private async broadcastScreenshot(
@@ -256,8 +363,11 @@ export class BrowserSessionManager extends Emittery<BrowserSessionManagerEvents>
     const tab = session.activeTab;
     let screenshotDataUrl = preset;
     if (!screenshotDataUrl) {
-      screenshotDataUrl = await session.refreshAndBroadcastScreenshot();
-      if (!screenshotDataUrl) return;
+      try {
+        screenshotDataUrl = await captureJpegScreenshot(tab.cdp, 70);
+      } catch {
+        return;
+      }
     }
     await this.emit("browser_screenshot_updated", {
       artifactId,
@@ -267,9 +377,10 @@ export class BrowserSessionManager extends Emittery<BrowserSessionManagerEvents>
     });
   }
 
-  // ── Sensitive-domain auto-pause ────────────────────────────────────────
-
-  async checkSensitiveAndPause(sessionId: string, artifactId: string): Promise<boolean> {
+  private async checkSensitiveAndPause(
+    sessionId: string,
+    artifactId: string,
+  ): Promise<boolean> {
     const session = this.sessions.get(getKey(sessionId, artifactId));
     if (!session) return false;
     const url = session.activeTab.url();

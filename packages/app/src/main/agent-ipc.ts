@@ -234,6 +234,15 @@ function registerIPCHandlersWithManager(
     unregisterBrowserArtifact(artifactId);
   });
 
+  // ── Phase C: allow-list mutation ───────────────────────────────────────
+  typedIpcMain.handle("browserUpdateAllowlist", async (patch) => {
+    try {
+      return await browserSessionManager.updateAllowlist(patch);
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
   typedIpcMain.handle("fsReadTextFile", handleFsReadTextFile);
   typedIpcMain.handle("isWindowFullScreen", async () => browserWindow.isFullScreen());
 

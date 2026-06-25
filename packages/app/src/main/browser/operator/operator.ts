@@ -1,17 +1,18 @@
 import type { Observation, ToolAction } from "@shared/browser-artifact-ipc";
 
+import { resolveRef } from "../cdp/ref-map.js";
+import { waitForLoad } from "../cdp/navigation.js";
+import { ControlModeError } from "../control-mode.js";
 import type { BrowserObserver } from "../observer/observer.js";
 import type { ObservationStore } from "../observer/observation-store.js";
 import type { Tab } from "../tab.js";
-import { waitForLoad } from "../cdp/navigation.js";
 import type { ActionGuard } from "./action-guard.js";
-import { RefExpiredError } from "../control-mode.js";
 
-export interface OperatorResult {
-  state: Observation["url"] extends string ? { url: string; title: string } : never;
-  observation: Observation;
-}
-
+/**
+ * Dispatches a `ToolAction` against a Tab's WebContents via the CDP client.
+ * After every action we refresh the observation (screenshot + a11y) so the
+ * next LLM turn sees the latest state.
+ */
 export class BrowserOperator {
   constructor(
     private observer: BrowserObserver,
@@ -25,6 +26,7 @@ export class BrowserOperator {
     if ("error" in urlCheck) {
       throw new Error(urlCheck.error);
     }
+
     switch (action.kind) {
       case "goto":
         await tab.cdp.navigate(action.url);
@@ -44,77 +46,107 @@ export class BrowserOperator {
         break;
       case "click":
         await this.clickByRef(tab, action.ref);
+        await waitForLoad(tab.webContents, 1500);
         break;
       case "type":
         await this.typeByRef(tab, action.ref, action.text);
+        if (action.submit) {
+          await tab.cdp.dispatchKeyEvent("keyDown", 0, { key: "Enter", code: "Enter" });
+          await tab.cdp.dispatchKeyEvent("keyUp", 0, { key: "Enter", code: "Enter" });
+          await waitForLoad(tab.webContents, 1500);
+        }
         break;
       case "press":
-        await tab.cdp.dispatchKeyEvent("keyDown", 0, { key: action.key, code: codeForKey(action.key) });
-        await tab.cdp.dispatchKeyEvent("keyUp", 0, { key: action.key, code: codeForKey(action.key) });
+        await tab.cdp.dispatchKeyEvent("keyDown", 0, {
+          code: codeForKey(action.key),
+          key: action.key,
+        });
+        await tab.cdp.dispatchKeyEvent("keyUp", 0, {
+          code: codeForKey(action.key),
+          key: action.key,
+        });
+        await waitForLoad(tab.webContents, 1000);
         break;
       case "scroll":
         await tab.cdp.evaluate(`window.scrollBy(0, ${action.dy})`);
+        if (action.ref) {
+          const { objectId } = await resolveRef(tab.cdp, tab.refMap, action.ref);
+          await tab.cdp.callFunctionOn(objectId, "function() { this.scrollIntoView({block: 'center'}); }");
+        }
         break;
-      case "wait":
-        await waitForLoad(tab.webContents, action.timeoutMs ?? 5000);
+      case "wait": {
+        const timeoutMs = action.timeoutMs ?? 5000;
+        if (action.selector) {
+          await this.waitForSelector(tab, action.selector, timeoutMs);
+        } else {
+          await waitForLoad(tab.webContents, timeoutMs);
+        }
         break;
+      }
       case "extract":
       case "observe":
-        // These are handled directly by BrowserObserver.refresh + return.
+        // No-op: handled by the caller (Observer.refresh).
         break;
       default: {
         const _exhaustive: never = action;
         throw new Error(`Unknown action: ${JSON.stringify(_exhaustive)}`);
       }
     }
+
     const observation = await this.observer.refresh(tab);
     this.store.set(tab.id, observation);
     return observation;
   }
 
   private async clickByRef(tab: Tab, ref: string): Promise<void> {
-    const entry = tab.refMap.get(ref);
-    if (!entry) throw new RefExpiredError(ref);
-    const { object } = await tab.cdp.resolveNode(entry.backendNodeId);
-    if (!object?.objectId) throw new RefExpiredError(ref);
-    const { result } = await tab.cdp.callFunctionOn<[number, number, number, number]>(
-      object.objectId,
-      "function() { const r = this.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; }",
-    );
-    const [x, y, w, h] = result.value;
-    const cx = x + w / 2;
-    const cy = y + h / 2;
+    const { cx, cy } = await resolveRef(tab.cdp, tab.refMap, ref);
     await tab.cdp.dispatchMouseEvent("mouseMoved", cx, cy);
     await tab.cdp.dispatchMouseEvent("mousePressed", cx, cy, "left", 1);
     await tab.cdp.dispatchMouseEvent("mouseReleased", cx, cy, "left", 1);
   }
 
   private async typeByRef(tab: Tab, ref: string, text: string): Promise<void> {
-    const entry = tab.refMap.get(ref);
-    if (!entry) throw new RefExpiredError(ref);
-    const { object } = await tab.cdp.resolveNode(entry.backendNodeId);
-    if (!object?.objectId) throw new RefExpiredError(ref);
-    await tab.cdp.callFunctionOn(object.objectId, "function() { this.focus(); }");
+    const { objectId } = await resolveRef(tab.cdp, tab.refMap, ref);
+    await tab.cdp.callFunctionOn(objectId, "function() { this.focus(); }");
     for (const ch of text) {
       await tab.cdp.dispatchKeyEvent("char", 0, { text: ch });
     }
   }
+
+  private async waitForSelector(tab: Tab, selector: string, timeoutMs: number): Promise<void> {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const { result } = await tab.cdp.evaluate<boolean>(
+        `Boolean(document.querySelector(${JSON.stringify(selector)}))`,
+      );
+      if (result.value) return;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    throw new Error(`Selector "${selector}" did not appear within ${timeoutMs}ms`);
+  }
 }
 
 function codeForKey(key: string): string | undefined {
-  if (key === "Enter") return "Enter";
-  if (key === "Tab") return "Tab";
-  if (key === "Escape") return "Escape";
-  if (key === "Backspace") return "Backspace";
-  if (key === "Delete") return "Delete";
-  if (key === "ArrowUp") return "ArrowUp";
-  if (key === "ArrowDown") return "ArrowDown";
-  if (key === "ArrowLeft") return "ArrowLeft";
-  if (key === "ArrowRight") return "ArrowRight";
-  if (key === "Home") return "Home";
-  if (key === "End") return "End";
-  if (key === "PageUp") return "PageUp";
-  if (key === "PageDown") return "PageDown";
-  if (key === "Space") return "Space";
-  return undefined;
+  switch (key) {
+    case "Enter":
+    case "Tab":
+    case "Escape":
+    case "Backspace":
+    case "Delete":
+    case "ArrowUp":
+    case "ArrowDown":
+    case "ArrowLeft":
+    case "ArrowRight":
+    case "Home":
+    case "End":
+    case "PageUp":
+    case "PageDown":
+    case "Space":
+      return key;
+    default:
+      return undefined;
+  }
 }
+
+// Re-export to silence unused-import warnings if any consumer imports from here.
+export { ControlModeError };
