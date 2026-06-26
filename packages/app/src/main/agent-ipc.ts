@@ -11,8 +11,20 @@ import type { SystemIPC } from "../shared/system-ipc";
 import type { AgentPool } from "./agent-pool";
 import { BrowserManager } from "./browser-manager.js";
 
-function registerAgentRuntimeHandlers(agentPool: AgentPool, browserWindow: BrowserWindow) {
-  const offAny = agentPool.onAny(({ name, data }) => {
+function registerAgentRuntimeHandlers(
+  agentPool: AgentPool,
+  browserManager: BrowserManager,
+  browserWindow: BrowserWindow,
+) {
+  const offAgentAny = agentPool.onAny(({ name, data }) => {
+    if (browserWindow.isDestroyed() || typeof name !== "string") {
+      return;
+    }
+
+    browserWindow.webContents.send(name, data);
+  });
+
+  const offBrowserAny = browserManager.onAny(({ name, data }) => {
     if (browserWindow.isDestroyed() || typeof name !== "string") {
       return;
     }
@@ -21,14 +33,57 @@ function registerAgentRuntimeHandlers(agentPool: AgentPool, browserWindow: Brows
   });
 
   return () => {
-    offAny();
+    offAgentAny();
+    offBrowserAny();
   };
 }
 
-function registerIPCHandlers(agentPool: AgentPool, browserWindow: BrowserWindow) {
+async function handleFsReadTextFile(
+  path: string,
+): Promise<{ content: string; bytes: number } | { error: string }> {
+  try {
+    const content = await readFile(path, "utf-8");
+    return { content, bytes: Buffer.byteLength(content, "utf-8") };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export function bindAgentRuntimeIPC(
+  agentPool: AgentPool,
+  browserWindow: BrowserWindow,
+): () => void {
+  // We register the agent event forwarder separately from the IPC handlers so
+  // it can also tap into the BrowserManager that the IPC handlers create.
+  // Sharing one BrowserManager between the two paths keeps the lifecycle tied
+  // to a single instance.
   const typedIpcMain = createTypedIpcMain();
   const browserManager = new BrowserManager(browserWindow);
+  const unregisterAgentRuntimeHandlers = registerAgentRuntimeHandlers(
+    agentPool,
+    browserManager,
+    browserWindow,
+  );
+  const unregisterIPCHandlers = registerIPCHandlersWithManager(
+    agentPool,
+    browserManager,
+    browserWindow,
+    typedIpcMain,
+  );
 
+  return () => {
+    // Unbind logic here
+    unregisterAgentRuntimeHandlers();
+    unregisterIPCHandlers();
+  };
+}
+
+function registerIPCHandlersWithManager(
+  agentPool: AgentPool,
+  browserManager: BrowserManager,
+  browserWindow: BrowserWindow,
+  typedIpcMain: ReturnType<typeof createTypedIpcMain>,
+): () => void {
   typedIpcMain.handle("setModel", agentPool.setModel);
   typedIpcMain.handle("getAvailableModels", agentPool.getAvailableModels);
   typedIpcMain.handle("getModelConfig", agentPool.getModelConfig);
@@ -101,31 +156,6 @@ function registerIPCHandlers(agentPool: AgentPool, browserWindow: BrowserWindow)
 
   return () => {
     typedIpcMain.removeAllListeners();
-  };
-}
-
-async function handleFsReadTextFile(
-  path: string,
-): Promise<{ content: string; bytes: number } | { error: string }> {
-  try {
-    const content = await readFile(path, "utf-8");
-    return { content, bytes: Buffer.byteLength(content, "utf-8") };
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : String(err) };
-  }
-}
-
-export function bindAgentRuntimeIPC(
-  agentPool: AgentPool,
-  browserWindow: BrowserWindow,
-): () => void {
-  const unregisterAgentRuntimeHandlers = registerAgentRuntimeHandlers(agentPool, browserWindow);
-  const unregisterIPCHandlers = registerIPCHandlers(agentPool, browserWindow);
-
-  return () => {
-    // Unbind logic here
-    unregisterAgentRuntimeHandlers();
-    unregisterIPCHandlers();
   };
 }
 
