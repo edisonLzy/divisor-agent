@@ -2,8 +2,9 @@ import { join } from "path";
 
 import { app, BrowserWindow } from "electron";
 
-import { bindAgentRuntimeIPC } from "./agent-ipc.js";
 import { AgentPool } from "./agent-pool.js";
+import { BrowserManager } from "./browser/index.js";
+import { FileSystem } from "./file-system/index.js";
 
 /**
  * Resolve the app icon path.
@@ -49,9 +50,19 @@ function createWindow() {
   return mainWindow;
 }
 
-function createAgentRuntime() {
+function createAgentPool() {
   const agentPool = new AgentPool();
   return agentPool;
+}
+
+function createBrowserManager() {
+  const browserManager = new BrowserManager();
+  return browserManager;
+}
+
+function createFileSystem() {
+  const fileSystem = new FileSystem();
+  return fileSystem;
 }
 
 app.whenReady().then(async () => {
@@ -62,17 +73,34 @@ app.whenReady().then(async () => {
   }
 
   const browserWindow = createWindow();
-  const agentPool = createAgentRuntime();
+  const browserManager = createBrowserManager();
+  const fileSystem = createFileSystem();
+  const agentPool = createAgentPool();
 
-  const unbind = bindAgentRuntimeIPC(agentPool, browserWindow);
+  // Each module binds its own Emittery events and IPC handlers via
+  // `bindEvents(browserWindow)`. AgentPool additionally receives the
+  // BrowserManager so it can coordinate the cross-module `destroySession`
+  // handler (browser artifacts must be torn down alongside the runtime).
+  const unbindAgentPool = agentPool.bindEvents(browserWindow);
+  const unbindBrowserManager = browserManager.bindEvents(browserWindow);
+  const unbindFileSystem = fileSystem.bindEvents(browserWindow);
+
+  // intersection module event bind
+  agentPool.on("session_destroyed", async ({ data }) => {
+    const { sessionId } = data;
+    await browserManager.destroySession(sessionId);
+  });
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 
   app.on("quit", () => {
-    unbind();
+    unbindAgentPool();
+    unbindBrowserManager();
+    unbindFileSystem();
     agentPool.destroyAll();
+    browserManager.destroyAll();
   });
 });
 

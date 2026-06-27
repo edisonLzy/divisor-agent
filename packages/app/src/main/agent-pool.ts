@@ -1,6 +1,7 @@
 import { Agent } from "@earendil-works/pi-agent-core";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { Message } from "@earendil-works/pi-ai";
+import type { BrowserWindow } from "electron/main";
 import Emittery from "emittery";
 
 import { AllowedMainExposeEvents } from "../shared/events-ipc.js";
@@ -10,8 +11,18 @@ import { AgentSkillsIPC } from "../shared/skills-ipc.js";
 import { AgentRuntime } from "./agent-runtime.js";
 import { ExtensionService } from "./extensions/index.js";
 import { ExtensionRuntimeService } from "./extensions/runtime-service.js";
+import { createTypedIpcMain } from "./helper.js";
 import { ModelRegistry } from "./models/index.js";
 import { SkillService } from "./skills/index.js";
+import { AgentEventsBinder } from "./types.js";
+
+type AgentPoolInternalEvents = {
+  session_destroyed: {
+    sessionId: string;
+  };
+};
+
+type AgentPoolIPC = AgentSessionIPC & AgentModelsIPC & AgentSkillsIPC;
 
 /**
  * Manages multiple AgentRuntime instances, keyed by sessionId.
@@ -19,8 +30,8 @@ import { SkillService } from "./skills/index.js";
  * All methods accept an explicit sessionId — no internal "current session" state.
  */
 export class AgentPool
-  extends Emittery<AllowedMainExposeEvents>
-  implements AgentSessionIPC, AgentModelsIPC, AgentSkillsIPC
+  extends Emittery<AllowedMainExposeEvents & AgentPoolInternalEvents>
+  implements AgentPoolIPC, AgentEventsBinder
 {
   private modelRegistry: ModelRegistry;
   private runtimes: Map<string, AgentRuntime>;
@@ -109,6 +120,9 @@ export class AgentPool
 
   public destroySession: AgentSessionIPC["destroySession"] = async (sessionId) => {
     this.destroyAgent(sessionId);
+    await this.emit("session_destroyed", {
+      sessionId,
+    });
   };
 
   public setHistoryMessages: AgentSessionIPC["setHistoryMessages"] = async (
@@ -248,6 +262,46 @@ export class AgentPool
   public setSkillEnabled: AgentSkillsIPC["setSkillEnabled"] = async (skillId, enabled) => {
     return this.skillService.setSkillEnabled(skillId, enabled);
   };
+
+  // -- bindEvents: Binds the AgentPool to a BrowserWindow, so that events can be emitted to the renderer process.
+  bindEvents(browserWindow: BrowserWindow) {
+    // forward all events to the renderer process
+    const offAgentAny = this.onAny(({ name, data }) => {
+      if (browserWindow.isDestroyed() || typeof name !== "string") {
+        return;
+      }
+
+      browserWindow.webContents.send(name, data);
+    });
+
+    // bind the IPC handlers to the AgentPool
+    const typedAgentPoolIPC = createTypedIpcMain<AgentPoolIPC>();
+    typedAgentPoolIPC.handle("setSessionId", this.setSessionId);
+    typedAgentPoolIPC.handle("setSessionScope", this.setSessionScope);
+    // destroySession is a cross-module operation: tear down the browser
+    // artifacts tied to the session before disposing the runtime that owns it.
+    typedAgentPoolIPC.handle("destroySession", this.destroySession);
+    typedAgentPoolIPC.handle("setHistoryMessages", this.setHistoryMessages);
+    typedAgentPoolIPC.handle("setPermissionMode", this.setPermissionMode);
+    typedAgentPoolIPC.handle("resolvePermissionRequest", this.resolvePermissionRequest);
+    typedAgentPoolIPC.handle("prompt", this.prompt);
+    typedAgentPoolIPC.handle("clearAllQueues", this.clearAllQueues);
+    typedAgentPoolIPC.handle("runOneTimeAgent", this.runOneTimeAgent);
+    typedAgentPoolIPC.handle("abortPrompt", this.abortPrompt);
+
+    typedAgentPoolIPC.handle("setModel", this.setModel);
+    typedAgentPoolIPC.handle("getAvailableModels", this.getAvailableModels);
+    typedAgentPoolIPC.handle("getModelConfig", this.getModelConfig);
+    typedAgentPoolIPC.handle("saveModelConfig", this.saveModelConfig);
+
+    typedAgentPoolIPC.handle("listSkills", this.listSkills);
+    typedAgentPoolIPC.handle("setSkillEnabled", this.setSkillEnabled);
+
+    return () => {
+      offAgentAny();
+      typedAgentPoolIPC.removeAllListeners();
+    };
+  }
 }
 
 function convertAgentMessagesToLlmMessages(messages: AgentMessage[]): Message[] {
