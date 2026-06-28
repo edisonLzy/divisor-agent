@@ -2,6 +2,7 @@ import { defineMainExtension } from "@divisor-agent/extension-core/main";
 import type { ExtensionAgentEvent } from "@divisor-agent/extension-core/main";
 import { Type } from "@earendil-works/pi-ai";
 
+import { SUBAGENTS_EXTENSION } from "./extension";
 import {
   SUBAGENTS_LIST_BLOCK_TYPE,
   SUBAGENTS_TOOL_NAME,
@@ -12,110 +13,113 @@ import {
 
 const MAX_SUBAGENTS = 4;
 
-export default defineMainExtension((ctx) => {
-  ctx.systemPrompt.register({
-    id: "subagents.prompt",
-    content: `When a task benefits from parallel focused investigation, call ${SUBAGENTS_TOOL_NAME}. Give each subagent a short descriptive name and a specific task. Do not call ${SUBAGENTS_TOOL_NAME} recursively from a subagent.`,
-  });
+export default defineMainExtension({
+  ...SUBAGENTS_EXTENSION,
+  setup(ctx) {
+    ctx.systemPrompt.register({
+      id: "subagents.prompt",
+      content: `When a task benefits from parallel focused investigation, call ${SUBAGENTS_TOOL_NAME}. Give each subagent a short descriptive name and a specific task. Do not call ${SUBAGENTS_TOOL_NAME} recursively from a subagent.`,
+    });
 
-  ctx.tools.register({
-    name: SUBAGENTS_TOOL_NAME,
-    label: "Run Subagents",
-    description: "Run one or more focused subagents in parallel and return their findings.",
-    executionMode: "sequential",
-    parameters: Type.Object({
-      tasks: Type.Array(
-        Type.Object({
-          name: Type.String({ description: "Short human-readable subagent name." }),
-          task: Type.String({ description: "Specific task for this subagent." }),
-        }),
-        {
-          maxItems: MAX_SUBAGENTS,
-          minItems: 1,
-        },
-      ),
-    }),
-    async execute(toolCallId, args, signal, onUpdate) {
-      const tasks = normalizeTasks(args.tasks);
-      const currentContext = ctx.runtime.getCurrentAgentContext();
-      const parentSessionId = currentContext?.sessionId ?? "unknown-session";
-      const runId = `subagents-${toolCallId}`;
-      const snapshots = tasks.map((task, index) => createQueuedSnapshot(runId, index, task));
-      for (const subagent of snapshots) {
-        subagent.model = currentContext?.model;
-      }
-      let snapshot = createRuntimeSnapshot(parentSessionId, runId, snapshots);
+    ctx.tools.register({
+      name: SUBAGENTS_TOOL_NAME,
+      label: "Run Subagents",
+      description: "Run one or more focused subagents in parallel and return their findings.",
+      executionMode: "sequential",
+      parameters: Type.Object({
+        tasks: Type.Array(
+          Type.Object({
+            name: Type.String({ description: "Short human-readable subagent name." }),
+            task: Type.String({ description: "Specific task for this subagent." }),
+          }),
+          {
+            maxItems: MAX_SUBAGENTS,
+            minItems: 1,
+          },
+        ),
+      }),
+      async execute(toolCallId, args, signal, onUpdate) {
+        const tasks = normalizeTasks(args.tasks);
+        const currentContext = ctx.runtime.getCurrentAgentContext();
+        const parentSessionId = currentContext?.sessionId ?? "unknown-session";
+        const runId = `subagents-${toolCallId}`;
+        const snapshots = tasks.map((task, index) => createQueuedSnapshot(runId, index, task));
+        for (const subagent of snapshots) {
+          subagent.model = currentContext?.model;
+        }
+        let snapshot = createRuntimeSnapshot(parentSessionId, runId, snapshots);
 
-      const publish = () => {
-        snapshot = createRuntimeSnapshot(parentSessionId, runId, snapshots);
-        onUpdate?.({
-          content: [{ type: "text", text: summarizeProgress(snapshots) }],
-          details: snapshot,
-        });
-      };
-
-      publish();
-
-      await Promise.all(
-        snapshots.map(async (subagent) => {
-          const agent = await ctx.runtime.createAgent({
-            id: subagent.id,
-            label: subagent.name,
-            mode: "inherit-model",
-            scope: "side-chat",
-            systemPrompt: buildSubagentSystemPrompt(subagent),
-            tools: {
-              excludeToolNames: [SUBAGENTS_TOOL_NAME, "fs/write_text_file", "terminal/create"],
-              includeBuiltins: true,
-              includeExtensions: true,
-            },
+        const publish = () => {
+          snapshot = createRuntimeSnapshot(parentSessionId, runId, snapshots);
+          onUpdate?.({
+            content: [{ type: "text", text: summarizeProgress(snapshots) }],
+            details: snapshot,
           });
+        };
 
-          const unsubscribe = ctx.runtime.subscribeAgentEvents(agent.id, (event) => {
-            applyRuntimeEvent(subagent, event);
-            publish();
-          });
-          const abort = () => void ctx.runtime.abortAgent(agent.id);
+        publish();
 
-          signal?.addEventListener("abort", abort, { once: true });
-
-          try {
-            const appUserMessage: Parameters<typeof ctx.runtime.promptAgent>[1] = {
-              role: "user",
-              content: subagent.task,
-              timestamp: Date.now(),
-              kind: "prompt",
-              jsonContent: {
-                type: "doc",
-                content: [
-                  {
-                    type: "paragraph",
-                    content: [{ type: "text", text: subagent.task }],
-                  },
-                ],
+        await Promise.all(
+          snapshots.map(async (subagent) => {
+            const agent = await ctx.runtime.createAgent({
+              id: subagent.id,
+              label: subagent.name,
+              mode: "inherit-model",
+              scope: "side-chat",
+              systemPrompt: buildSubagentSystemPrompt(subagent),
+              tools: {
+                excludeToolNames: [SUBAGENTS_TOOL_NAME, "fs/write_text_file", "terminal/create"],
+                includeBuiltins: true,
+                includeExtensions: true,
               },
-            };
-            await ctx.runtime.promptAgent(agent.id, appUserMessage);
-          } catch (error) {
-            subagent.status = "failed";
-            subagent.completedAt = Date.now();
-            subagent.error = error instanceof Error ? error.message : String(error);
-            publish();
-          } finally {
-            signal?.removeEventListener("abort", abort);
-            unsubscribe();
-            await ctx.runtime.destroyAgent(agent.id);
-          }
-        }),
-      );
+            });
 
-      snapshot = createRuntimeSnapshot(parentSessionId, runId, snapshots);
-      return {
-        content: [{ type: "text", text: summarizeFinal(snapshots) }],
-        details: snapshot,
-      };
-    },
-  });
+            const unsubscribe = ctx.runtime.subscribeAgentEvents(agent.id, (event) => {
+              applyRuntimeEvent(subagent, event);
+              publish();
+            });
+            const abort = () => void ctx.runtime.abortAgent(agent.id);
+
+            signal?.addEventListener("abort", abort, { once: true });
+
+            try {
+              const appUserMessage: Parameters<typeof ctx.runtime.promptAgent>[1] = {
+                role: "user",
+                content: subagent.task,
+                timestamp: Date.now(),
+                kind: "prompt",
+                jsonContent: {
+                  type: "doc",
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: subagent.task }],
+                    },
+                  ],
+                },
+              };
+              await ctx.runtime.promptAgent(agent.id, appUserMessage);
+            } catch (error) {
+              subagent.status = "failed";
+              subagent.completedAt = Date.now();
+              subagent.error = error instanceof Error ? error.message : String(error);
+              publish();
+            } finally {
+              signal?.removeEventListener("abort", abort);
+              unsubscribe();
+              await ctx.runtime.destroyAgent(agent.id);
+            }
+          }),
+        );
+
+        snapshot = createRuntimeSnapshot(parentSessionId, runId, snapshots);
+        return {
+          content: [{ type: "text", text: summarizeFinal(snapshots) }],
+          details: snapshot,
+        };
+      },
+    });
+  },
 });
 
 function normalizeTasks(value: unknown): SubagentTaskInput[] {

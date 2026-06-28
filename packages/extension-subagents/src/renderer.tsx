@@ -10,6 +10,7 @@ import {
   XCircleIcon,
 } from "lucide-react";
 
+import { SUBAGENTS_EXTENSION } from "./extension";
 import {
   SUBAGENTS_LIST_BLOCK_TYPE,
   type SubagentsListBlockProps,
@@ -88,29 +89,32 @@ function SubagentsListBlock({ props }: { props: Record<string, unknown> }) {
   );
 }
 
-export default defineRendererExtension((ctx) => {
-  ctx.slashCommands.register({
-    id: "subagents.run",
-    group: "Skills",
-    name: "subagent",
-    description: "Use subagents to run focused tasks in parallel",
-    extra: "Parallel agents",
-    run({ editor, range }) {
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertContent(
-          "Use subagents to run this in parallel. Split the work into focused subagents, call subagents/run, then merge their findings into one final answer.\n\nTask: ",
-        )
-        .run();
-    },
-  });
+export default defineRendererExtension({
+  ...SUBAGENTS_EXTENSION,
+  setup(ctx) {
+    ctx.slashCommands.register({
+      id: "subagents.run",
+      group: "Skills",
+      name: "subagent",
+      description: "Use subagents to run focused tasks in parallel",
+      extra: "Parallel agents",
+      run({ editor, range }) {
+        editor
+          .chain()
+          .focus()
+          .deleteRange(range)
+          .insertContent(
+            "Use subagents to run this in parallel. Split the work into focused subagents, call subagents/run, then merge their findings into one final answer.\n\nTask: ",
+          )
+          .run();
+      },
+    });
 
-  ctx.assistantBlocks.register({
-    type: SUBAGENTS_LIST_BLOCK_TYPE,
-    render: SubagentsListBlock,
-  });
+    ctx.assistantBlocks.register({
+      type: SUBAGENTS_LIST_BLOCK_TYPE,
+      render: SubagentsListBlock,
+    });
+  },
 });
 
 function parseListBlockProps(value: Record<string, unknown>): SubagentsListBlockProps | null {

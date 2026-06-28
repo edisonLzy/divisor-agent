@@ -7,6 +7,8 @@ import type { AnchorHTMLAttributes } from "react";
 import { defaultRehypePlugins } from "streamdown";
 
 import {
+  EXTENSION_ID,
+  EXTENSION_NAME,
   FILE_HREF_DATA_ATTR,
   FILE_HREF_PREFIX,
   FILE_HREF_PROTOCOL,
@@ -20,64 +22,68 @@ interface FileAnchorProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
   href?: string;
 }
 
-export default defineRendererExtension((ctx) => {
-  // Intercept custom file links in assistant messages. The renderer is
-  // responsible for two things only:
-  //   1. Mark the anchor with `data-file-href` so the click is identifiable.
-  //   2. On click, call `addOrActivateFile` against the active session.
-  // Everything else (parsing, state mutation, opening the panel) is handled
-  // by the helpers next to `FilesArtifact`.
-  ctx.streamdown.registerComponents({
-    a:
-      (Base) =>
-      ({ href, children, ...rest }: FileAnchorProps) => {
-        if (typeof href !== "string" || !href.startsWith(FILE_HREF_PREFIX)) {
-          const Component = Base;
-          return (
-            <Component href={href} {...rest}>
-              {children}
-            </Component>
-          );
-        }
-        return <FileLink href={href}>{children}</FileLink>;
-      },
-  });
-  ctx.streamdown.registerRehypePlugins(
-    (plugins) =>
-      plugins.map((plugin) => {
-        if (plugin === defaultRehypePlugins.sanitize) {
-          const [sanitize, options] = plugin as unknown as RehypePluginTuple;
-          return [
-            sanitize,
-            {
-              ...options,
-              protocols: {
-                ...options.protocols,
-                href: [...(options.protocols?.href ?? []), FILE_HREF_SCHEME],
+export default defineRendererExtension({
+  id: EXTENSION_ID,
+  name: EXTENSION_NAME,
+  setup(ctx) {
+    // Intercept custom file links in assistant messages. The renderer is
+    // responsible for two things only:
+    //   1. Mark the anchor with `data-file-href` so the click is identifiable.
+    //   2. On click, call `addOrActivateFile` against the active session.
+    // Everything else (parsing, state mutation, opening the panel) is handled
+    // by the helpers next to `FilesArtifact`.
+    ctx.streamdown.registerComponents({
+      a:
+        (Base) =>
+        ({ href, children, ...rest }: FileAnchorProps) => {
+          if (typeof href !== "string" || !href.startsWith(FILE_HREF_PREFIX)) {
+            const Component = Base;
+            return (
+              <Component href={href} {...rest}>
+                {children}
+              </Component>
+            );
+          }
+          return <FileLink href={href}>{children}</FileLink>;
+        },
+    });
+    ctx.streamdown.registerRehypePlugins(
+      (plugins) =>
+        plugins.map((plugin) => {
+          if (plugin === defaultRehypePlugins.sanitize) {
+            const [sanitize, options] = plugin as unknown as RehypePluginTuple;
+            return [
+              sanitize,
+              {
+                ...options,
+                protocols: {
+                  ...options.protocols,
+                  href: [...(options.protocols?.href ?? []), FILE_HREF_SCHEME],
+                },
               },
-            },
-          ];
-        }
+            ];
+          }
 
-        if (plugin === defaultRehypePlugins.harden) {
-          const [harden, options] = plugin as unknown as RehypePluginTuple;
-          return [
-            harden,
-            {
-              ...options,
-              allowedProtocols: [...(options.allowedProtocols ?? []), FILE_HREF_PROTOCOL],
-            },
-          ];
-        }
+          if (plugin === defaultRehypePlugins.harden) {
+            const [harden, options] = plugin as unknown as RehypePluginTuple;
+            return [
+              harden,
+              {
+                ...options,
+                allowedProtocols: [...(options.allowedProtocols ?? []), FILE_HREF_PROTOCOL],
+              },
+            ];
+          }
 
-        return plugin;
-      }) as StreamdownRehypePlugins,
-  );
+          return plugin;
+        }) as StreamdownRehypePlugins,
+    );
 
-  ctx.artifacts.register({
-    type: FILES_ARTIFACT_TYPE,
-    render: FilesArtifact,
-  });
+    ctx.artifacts.register({
+      type: FILES_ARTIFACT_TYPE,
+      render: FilesArtifact,
+    });
+  },
 });
 
 type RehypePluginTuple = [

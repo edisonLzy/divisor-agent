@@ -32,7 +32,16 @@ export default defineConfig({
       },
     },
   },
-  preload: {},
+  preload: {
+    build: {
+      // extension-core is source-only, so its preload adapter must be bundled.
+      // Leaving it external produces a runtime preloadRequire/module-not-found error
+      // inside Electron's sandbox.
+      externalizeDeps: {
+        exclude: ["@divisor-agent/extension-core"],
+      },
+    },
+  },
   renderer: {
     root: "src/renderer",
     resolve: {

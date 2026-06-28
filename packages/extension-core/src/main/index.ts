@@ -2,8 +2,9 @@ export { MainExtensionBridge } from "./bridge";
 export { defineMainExtension } from "./define";
 export { MainExtensionRegistry } from "./registry";
 
-export type { InstalledMainExtension, MainExtensionBridgeServices } from "./bridge";
+export type { MainExtensionBridgeServices } from "./bridge";
 export type {
+  AnyMainExtensionDefinition,
   CreateExtensionAgentInput,
   ExtensionCurrentAgentContext,
   ExtensionAgentEvent,
@@ -12,7 +13,10 @@ export type {
   ExtensionAgentScope,
   ExtensionAgentToolOptions,
   MainExtensionContext,
+  MainExtensionAgentAPI,
+  MainExtensionAgentEvents,
   MainExtensionDefinition,
+  MainExtensionIPC,
   MainExtensionRuntimeAPI,
   MainSystemPromptRegistration,
 } from "./define";

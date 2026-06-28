@@ -1,6 +1,8 @@
+import type { ExtensionIPCEventEnvelope } from "@divisor-agent/extension-core/common";
 import { Agent } from "@earendil-works/pi-agent-core";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { Message } from "@earendil-works/pi-ai";
+import type { BrowserWindow } from "electron";
 import Emittery from "emittery";
 
 import { AllowedMainExposeEvents } from "../shared/events-ipc.js";
@@ -12,6 +14,11 @@ import { ExtensionService } from "./extensions/index.js";
 import { ExtensionRuntimeService } from "./extensions/runtime-service.js";
 import { ModelRegistry } from "./models/index.js";
 import { SkillService } from "./skills/index.js";
+
+export interface AgentPoolOptions {
+  emitExtensionIPCEvent?: (envelope: ExtensionIPCEventEnvelope) => void;
+  getBrowserWindow?: () => BrowserWindow | null;
+}
 
 /**
  * Manages multiple AgentRuntime instances, keyed by sessionId.
@@ -28,7 +35,7 @@ export class AgentPool
   private extensionService: ExtensionService;
   private extensionRuntimeService: ExtensionRuntimeService;
 
-  constructor() {
+  constructor(options: AgentPoolOptions = {}) {
     super();
     this.modelRegistry = new ModelRegistry();
     this.runtimes = new Map();
@@ -42,7 +49,10 @@ export class AgentPool
 
       (this.emit as (...args: unknown[]) => Promise<void>)(name, data);
     });
-    this.extensionService = new ExtensionService(this.extensionRuntimeService);
+    this.extensionService = new ExtensionService(this.extensionRuntimeService, {
+      emitIPCEvent: options.emitExtensionIPCEvent,
+      getBrowserWindow: options.getBrowserWindow,
+    });
     this.extensionRuntimeService.setExtensionService(this.extensionService);
   }
 
@@ -74,21 +84,30 @@ export class AgentPool
     return runtime;
   }
 
-  destroyAgent(sessionId: string) {
+  async destroyAgent(sessionId: string) {
     const runtime = this.runtimes.get(sessionId);
-    if (runtime) {
-      runtime.destroy();
-      this.runtimes.delete(sessionId);
+    if (!runtime) return;
+
+    const notifyExtensions = runtime.getScope() === "main";
+    runtime.destroy();
+    this.runtimes.delete(sessionId);
+
+    if (notifyExtensions) {
+      await this.extensionService.emitSessionDestroyed(sessionId);
     }
   }
 
-  destroyAll() {
-    for (const runtime of this.runtimes.values()) {
-      runtime.destroy();
+  async destroyAll() {
+    for (const sessionId of [...this.runtimes.keys()]) {
+      await this.destroyAgent(sessionId);
     }
-    this.runtimes.clear();
     this.extensionRuntimeService.destroyAll();
+    this.extensionService.dispose();
     this.clearListeners();
+  }
+
+  invokeExtensionIPC(extensionId: string, method: string, args: unknown[]) {
+    return this.extensionService.invokeIPC(extensionId, method, args);
   }
 
   activeCount(): number {
@@ -108,7 +127,7 @@ export class AgentPool
   };
 
   public destroySession: AgentSessionIPC["destroySession"] = async (sessionId) => {
-    this.destroyAgent(sessionId);
+    await this.destroyAgent(sessionId);
   };
 
   public setHistoryMessages: AgentSessionIPC["setHistoryMessages"] = async (

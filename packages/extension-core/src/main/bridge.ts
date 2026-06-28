@@ -1,45 +1,73 @@
-import type { ExtensionManifest } from "../manifest.js";
-import type { MainExtensionDefinition, MainExtensionRuntimeAPI } from "./define";
-import { MainExtensionRegistry } from "./registry";
+import type { BrowserWindow } from "electron";
 
-export interface InstalledMainExtension {
-  manifest: ExtensionManifest;
-  extension: MainExtensionDefinition;
-}
+import type { ExtensionDisposer, ExtensionIPCEventEnvelope } from "../common/ipc/index.js";
+import type { AnyMainExtensionDefinition, MainExtensionRuntimeAPI } from "./define.js";
+import { MainExtensionRegistry } from "./registry.js";
+import type { UntypedExtensionIPCHandler } from "./registry.js";
 
 export interface MainExtensionBridgeServices {
+  emitIPCEvent?: (envelope: ExtensionIPCEventEnvelope) => void;
+  getBrowserWindow?: () => BrowserWindow | null;
   runtime?: MainExtensionRuntimeAPI;
 }
 
 export class MainExtensionBridge {
-  private registry = new MainExtensionRegistry();
+  private disposers: ExtensionDisposer[] = [];
   private initialized = false;
+  private registry = new MainExtensionRegistry();
 
   constructor(
-    private extensions: InstalledMainExtension[],
+    private extensions: AnyMainExtensionDefinition[],
     private services: MainExtensionBridgeServices = {},
   ) {}
 
   initialize() {
-    if (this.initialized) {
-      return;
-    }
+    if (this.initialized) return;
 
-    for (const item of this.extensions) {
-      this.registry.registerExtension(item.manifest);
-      item.extension.setup({
-        manifest: item.manifest,
+    for (const extension of this.extensions) {
+      this.registry.registerExtension(extension);
+      const metadata = { id: extension.id, name: extension.name };
+      const disposer = extension.setup({
+        agent: {
+          on: (_event, listener) => this.registry.onSessionDestroyed(listener),
+        },
+        extension: metadata,
+        getBrowserWindow: this.services.getBrowserWindow ?? (() => null),
+        ipc: {
+          emit: (event, ...args) => {
+            this.services.emitIPCEvent?.({
+              args,
+              event,
+              extensionId: extension.id,
+            });
+          },
+          handle: (method, handler) =>
+            this.registry.registerIPCHandler(
+              extension.id,
+              method,
+              handler as UntypedExtensionIPCHandler,
+            ),
+        },
         runtime: this.services.runtime ?? createUnavailableRuntimeAPI(),
         systemPrompt: {
-          register: (prompt) => this.registry.registerSystemPrompt(item.manifest, prompt),
+          register: (prompt) => this.registry.registerSystemPrompt(extension, prompt),
         },
         tools: {
           register: (tool) => this.registry.registerTool(tool),
         },
       });
+      if (disposer) this.disposers.push(disposer);
     }
 
     this.initialized = true;
+  }
+
+  invokeIPC(extensionId: string, method: string, args: unknown[]) {
+    return this.registry.invokeIPC(extensionId, method, args);
+  }
+
+  emitSessionDestroyed(sessionId: string) {
+    return this.registry.emitSessionDestroyed(sessionId);
   }
 
   listExtensions() {
@@ -52,6 +80,19 @@ export class MainExtensionBridge {
 
   getTools() {
     return this.registry.getTools();
+  }
+
+  dispose() {
+    for (const disposer of this.disposers.reverse()) {
+      try {
+        disposer();
+      } catch (error) {
+        console.error("Failed to dispose main extension", error);
+      }
+    }
+    this.disposers = [];
+    this.registry.dispose();
+    this.initialized = false;
   }
 }
 

@@ -2,6 +2,7 @@ import { MainExtensionBridge } from "@divisor-agent/extension-core/main";
 import type {
   ExtensionAgentModel,
   ExtensionAgentToolOptions,
+  MainExtensionBridgeServices,
 } from "@divisor-agent/extension-core/main";
 
 import type { SystemPromptBuilder } from "../prompt/index.js";
@@ -15,8 +16,11 @@ export interface ExtensionToolRuntimeContext {
 }
 
 export class ExtensionService extends MainExtensionBridge implements SystemPromptBuilder {
-  constructor(private runtimeService?: ExtensionRuntimeService) {
-    super(installedMainExtensions, { runtime: runtimeService });
+  constructor(
+    private runtimeService?: ExtensionRuntimeService,
+    services: Omit<MainExtensionBridgeServices, "runtime"> = {},
+  ) {
+    super(installedMainExtensions, { ...services, runtime: runtimeService });
     this.initialize();
   }
 

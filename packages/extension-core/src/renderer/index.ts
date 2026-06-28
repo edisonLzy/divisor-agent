@@ -1,4 +1,5 @@
 export { RendererExtensionBridge } from "./bridge";
+export { createUseExtensionIPC } from "./ipc";
 export { ExtensionsContextAPIProvider, useExtensionsContextAPI } from "./contextAPI";
 export { defineRendererExtension } from "./define";
 export { useArtifact, useAssistantBlock, useExtensions, usePluginSlashCommands } from "./hooks";
@@ -13,7 +14,6 @@ export type {
   ExtensionsContextAPIProviderProps,
   InsertSideChatUserMessageEntryInput,
 } from "./contextAPI";
-export type { InstalledRendererExtension } from "./bridge";
 export type {
   ArtifactRegistration,
   ArtifactRenderProps,
@@ -26,4 +26,5 @@ export type {
   StreamdownRehypePluginComposer,
   StreamdownRehypePlugins,
 } from "./define";
+export type { RendererExtensionIPC } from "./ipc";
 export type { ParsedExtensionPart } from "./parser";

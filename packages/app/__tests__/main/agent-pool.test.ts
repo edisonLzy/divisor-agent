@@ -187,6 +187,29 @@ describe("AgentPool", () => {
     await expect(resultPromise).resolves.toBe("");
     expect(agentMockState.instances[0].abort).toHaveBeenCalledOnce();
   });
+
+  it("notifies extensions only when a main session is destroyed", async () => {
+    const pool = new AgentPool();
+    const extensionService = (
+      pool as unknown as {
+        extensionService: { emitSessionDestroyed(sessionId: string): Promise<void> };
+      }
+    ).extensionService;
+    const emitSessionDestroyed = vi
+      .spyOn(extensionService, "emitSessionDestroyed")
+      .mockResolvedValue(undefined);
+
+    await pool.setSessionId("main-session");
+    await pool.destroySession("main-session");
+    await pool.destroySession("main-session");
+
+    await pool.setSessionId("side-session");
+    await pool.setSessionScope("side-session", "side-chat");
+    await pool.destroySession("side-session");
+
+    expect(emitSessionDestroyed).toHaveBeenCalledOnce();
+    expect(emitSessionDestroyed).toHaveBeenCalledWith("main-session");
+  });
 });
 
 function createUserMessage(content: string): AppUserMessage {

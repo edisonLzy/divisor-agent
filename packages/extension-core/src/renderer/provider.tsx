@@ -2,13 +2,13 @@ import { createContext, useContext, useMemo } from "react";
 import type { ReactNode } from "react";
 
 import { RendererExtensionBridge } from "./bridge";
-import type { InstalledRendererExtension } from "./bridge";
+import type { RendererExtensionDefinition } from "./define";
 import type { RendererExtensionRegistry } from "./registry";
 
 const ExtensionRegistryContext = createContext<RendererExtensionRegistry | null>(null);
 
 export interface ExtensionProviderProps {
-  extensions: InstalledRendererExtension[];
+  extensions: RendererExtensionDefinition[];
   children: ReactNode;
 }
 

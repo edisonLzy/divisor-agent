@@ -1,12 +1,26 @@
 import { join } from "path";
 
+import {
+  EXTENSION_EVENT_CHANNEL,
+  type ExtensionIPCEventEnvelope,
+} from "@divisor-agent/extension-core/common";
 import { app, BrowserWindow } from "electron";
 
 import { bindAgentRuntimeIPC } from "./agent-ipc.js";
 import { AgentPool } from "./agent-pool.js";
 
+let agentPool: AgentPool | undefined;
+let allowQuit = false;
+let mainWindow: BrowserWindow | null = null;
+let unbindAgentRuntimeIPC: (() => void) | undefined;
+
+function getBrowserWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return null;
+  return mainWindow;
+}
+
 function createWindow() {
-  const mainWindow = new BrowserWindow({
+  const browserWindow = new BrowserWindow({
     icon: join(__dirname, "../../resources/icon.png"),
     frame: false,
     titleBarStyle: "hiddenInset",
@@ -25,33 +39,45 @@ function createWindow() {
     },
   });
 
-  if (process.env.ELECTRON_RENDERER_URL) {
-    mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
-  } else {
-    mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
-  }
-
-  return mainWindow;
-}
-
-function createAgentRuntime() {
-  const agentPool = new AgentPool();
-  return agentPool;
-}
-
-app.whenReady().then(async () => {
-  const browserWindow = createWindow();
-  const agentPool = createAgentRuntime();
-
-  const unbind = bindAgentRuntimeIPC(agentPool, browserWindow);
-
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  mainWindow = browserWindow;
+  browserWindow.on("closed", () => {
+    if (mainWindow === browserWindow) mainWindow = null;
   });
 
-  app.on("quit", () => {
-    unbind();
-    agentPool.destroyAll();
+  if (process.env.ELECTRON_RENDERER_URL) {
+    void browserWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
+  } else {
+    void browserWindow.loadFile(join(__dirname, "../renderer/index.html"));
+  }
+
+  return browserWindow;
+}
+
+function emitExtensionIPCEvent(envelope: ExtensionIPCEventEnvelope) {
+  const browserWindow = getBrowserWindow();
+  if (!browserWindow || browserWindow.webContents.isDestroyed()) return;
+  browserWindow.webContents.send(EXTENSION_EVENT_CHANNEL, envelope);
+}
+
+app.whenReady().then(() => {
+  createWindow();
+  agentPool = new AgentPool({ emitExtensionIPCEvent, getBrowserWindow });
+  unbindAgentRuntimeIPC = bindAgentRuntimeIPC(agentPool, getBrowserWindow);
+
+  app.on("activate", () => {
+    if (!getBrowserWindow()) createWindow();
+  });
+});
+
+app.on("before-quit", (event) => {
+  if (allowQuit || !agentPool) return;
+
+  event.preventDefault();
+  allowQuit = true;
+  unbindAgentRuntimeIPC?.();
+
+  void agentPool.destroyAll().finally(() => {
+    app.quit();
   });
 });
 

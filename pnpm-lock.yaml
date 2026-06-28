@@ -27,6 +27,9 @@ catalogs:
     clsx:
       specifier: ^2.1.1
       version: 2.1.1
+    electron:
+      specifier: ^39.2.6
+      version: 39.8.9
     lucide-react:
       specifier: ^1.8.0
       version: 1.11.0
@@ -333,6 +336,9 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.14
+      electron:
+        specifier: 'catalog:'
+        version: 39.8.9
       react:
         specifier: 'catalog:'
         version: 19.2.5
@@ -3821,6 +3827,7 @@ packages:
   git-raw-commits@5.0.1:
     resolution: {integrity: sha512-Y+csSm2GD/PCSh6Isd/WiMjNAydu0VBiG9J7EdQsNA5P9uXvLayqjmTsNlK5Gs9IhblFZqOU0yid5Il5JPoLiQ==}
     engines: {node: '>=18'}
+    deprecated: Deprecated and no longer maintained. Use @conventional-changelog/git-client instead.
     hasBin: true
 
   glob@7.2.3:

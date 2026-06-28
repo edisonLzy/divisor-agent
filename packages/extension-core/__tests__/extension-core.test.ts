@@ -4,31 +4,34 @@ import {
   parseArtifactPayload,
   parseAssistantBlockPayload,
 } from "@divisor-agent/extension-core/common";
+import { defineMainExtension, MainExtensionBridge } from "@divisor-agent/extension-core/main";
 import {
-  defineMainExtension,
-  MainExtensionBridge,
-  type InstalledMainExtension,
-} from "@divisor-agent/extension-core/main";
-import {
-  defineExtensionManifest,
-  type ExtensionManifest,
-} from "@divisor-agent/extension-core/manifest";
-import {
+  createUseExtensionIPC,
   defineRendererExtension,
   parseExtensionParts,
   RendererExtensionBridge,
-  type InstalledRendererExtension,
 } from "@divisor-agent/extension-core/renderer";
 import { describe, expect, it, vi } from "vitest";
 
 describe("extension-core", () => {
-  const manifest = defineExtensionManifest({
+  const metadata = {
     id: "test-extension",
     name: "Test Extension",
-  });
+  } as const;
 
-  it("initializes main extensions once and exposes registered capabilities", () => {
+  it("initializes main extensions once and exposes registered capabilities", async () => {
+    interface InvokeEvents {
+      getState(prefix: string): string;
+    }
+    interface OnEvents {
+      stateChanged(value: string): void;
+    }
+
+    const emitIPCEvent = vi.fn();
+    const getBrowserWindow = vi.fn(() => null);
+    const sessionDestroyed = vi.fn();
     const setup = vi.fn((ctx) => {
+      ctx.getBrowserWindow();
       ctx.systemPrompt.register({
         id: "test.prompt",
         content: "Use test extension behavior.",
@@ -44,22 +47,40 @@ describe("extension-core", () => {
           };
         },
       } as never);
+      ctx.ipc.handle("getState", (prefix) => `${prefix}:ready`);
+      ctx.ipc.emit("stateChanged", "ready");
+      return ctx.agent.on("session_destroyed", sessionDestroyed);
     });
-    const extensions: InstalledMainExtension[] = [
-      {
-        manifest,
-        extension: defineMainExtension(setup),
-      },
-    ];
-    const bridge = new MainExtensionBridge(extensions);
+    const extension = defineMainExtension<InvokeEvents, OnEvents>({
+      ...metadata,
+      setup,
+    });
+    const bridge = new MainExtensionBridge([extension], {
+      emitIPCEvent,
+      getBrowserWindow,
+    });
 
     bridge.initialize();
     bridge.initialize();
 
     expect(setup).toHaveBeenCalledTimes(1);
-    expect(bridge.listExtensions()).toEqual<ExtensionManifest[]>([manifest]);
+    expect(getBrowserWindow).toHaveBeenCalledOnce();
+    expect(bridge.listExtensions()).toEqual([metadata]);
     expect(bridge.getSystemPrompts()).toEqual(["Use test extension behavior."]);
     expect(bridge.getTools()).toHaveLength(1);
+    await expect(bridge.invokeIPC(metadata.id, "getState", ["test"])).resolves.toBe("test:ready");
+    expect(emitIPCEvent).toHaveBeenCalledWith({
+      args: ["ready"],
+      event: "stateChanged",
+      extensionId: metadata.id,
+    });
+
+    await bridge.emitSessionDestroyed("session-1");
+    expect(sessionDestroyed).toHaveBeenCalledWith({ sessionId: "session-1" });
+
+    bridge.dispose();
+    await bridge.emitSessionDestroyed("session-2");
+    expect(sessionDestroyed).toHaveBeenCalledTimes(1);
   });
 
   it("initializes renderer extensions once and exposes UI registrations", () => {
@@ -87,24 +108,63 @@ describe("extension-core", () => {
       });
       ctx.streamdown.registerRehypePlugins((plugins) => [...plugins, testRehypePlugin]);
     });
-    const extensions: InstalledRendererExtension[] = [
-      {
-        manifest,
-        extension: defineRendererExtension(setup),
-      },
-    ];
-    const bridge = new RendererExtensionBridge(extensions);
+    const extension = defineRendererExtension({ ...metadata, setup });
+    const bridge = new RendererExtensionBridge([extension]);
 
     bridge.initialize();
     bridge.initialize();
 
     const registry = bridge.getRegistry();
     expect(setup).toHaveBeenCalledTimes(1);
-    expect(registry.listExtensions()).toEqual([manifest]);
+    expect(registry.listExtensions()).toEqual([metadata]);
     expect(registry.getSlashCommands()).toHaveLength(1);
     expect(registry.getAssistantBlock("test.block")).toBeDefined();
     expect(registry.getArtifact("test.artifact")).toBeDefined();
     expect(registry.getStreamdownRehypePlugins([])).toEqual([testRehypePlugin]);
+  });
+
+  it("binds renderer IPC clients to an extension id", async () => {
+    interface InvokeEvents {
+      getState(prefix: string): string;
+    }
+    interface OnEvents {
+      stateChanged(value: string): void;
+    }
+
+    const invoke = vi.fn(async () => "test:ready");
+    const unsubscribe = vi.fn();
+    const on = vi.fn(() => unsubscribe);
+    vi.stubGlobal("window", { extensionsAPI: { invoke, on } });
+
+    const useExtensionIPC = createUseExtensionIPC<InvokeEvents, OnEvents>(metadata.id);
+    const ipc = useExtensionIPC();
+    const listener = vi.fn();
+
+    await expect(ipc.invoke("getState", "test")).resolves.toBe("test:ready");
+    expect(invoke).toHaveBeenCalledWith(metadata.id, "getState", ["test"]);
+    expect(ipc.on("stateChanged", listener)).toBe(unsubscribe);
+    expect(on).toHaveBeenCalledWith(metadata.id, "stateChanged", listener);
+
+    vi.unstubAllGlobals();
+  });
+
+  it("rejects duplicate extension ids and IPC handlers", () => {
+    const duplicateHandler = defineMainExtension<{ ping(): void }>({
+      ...metadata,
+      setup(ctx) {
+        ctx.ipc.handle("ping", () => undefined);
+        ctx.ipc.handle("ping", () => undefined);
+      },
+    });
+    expect(() => new MainExtensionBridge([duplicateHandler]).initialize()).toThrow(
+      "Duplicate extension IPC handler",
+    );
+
+    const first = defineRendererExtension({ ...metadata, setup() {} });
+    const second = defineRendererExtension({ ...metadata, setup() {} });
+    expect(() => new RendererExtensionBridge([first, second]).initialize()).toThrow(
+      "Duplicate extension id",
+    );
   });
 
   it("parses extension blocks and artifacts while preserving markdown text", () => {

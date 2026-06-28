@@ -1,3 +1,5 @@
+export * from "./ipc/index.js";
+
 export const DIVISOR_BLOCK_LANGUAGE = "divisor-block";
 export const DIVISOR_ARTIFACT_LANGUAGE = "divisor-artifact";
 

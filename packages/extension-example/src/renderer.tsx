@@ -1,9 +1,33 @@
-import { defineRendererExtension } from "@divisor-agent/extension-core/renderer";
+import {
+  createUseExtensionIPC,
+  defineRendererExtension,
+} from "@divisor-agent/extension-core/renderer";
+import { useEffect, useState } from "react";
+
+import {
+  EXAMPLE_EXTENSION,
+  type ExampleInvokeEvents,
+  type ExampleOnEvents,
+  type ExampleState,
+} from "./extension";
+
+const useExampleIPC = createUseExtensionIPC<ExampleInvokeEvents, ExampleOnEvents>(
+  EXAMPLE_EXTENSION.id,
+);
 
 function ExampleCard({ props }: { props: Record<string, unknown> }) {
+  const ipc = useExampleIPC();
+  const [state, setState] = useState<ExampleState>();
+
+  useEffect(() => {
+    void ipc.invoke("getState").then(setState);
+    return ipc.on("stateChanged", setState);
+  }, [ipc]);
+
   return (
     <div className="rounded-md border bg-card p-3 text-sm text-card-foreground">
-      {String(props.title ?? "")}
+      <div>{String(props.title ?? "")}</div>
+      <div className="text-muted-foreground">Greetings: {state?.greetingCount ?? 0}</div>
     </div>
   );
 }
@@ -27,29 +51,32 @@ function ExampleArtifact({
   );
 }
 
-export default defineRendererExtension((ctx) => {
-  ctx.slashCommands.register({
-    id: "example.insert-card",
-    group: "Example",
-    name: "Insert example card",
-    description: "Insert a prompt asking for an example card",
-    run({ editor, range }) {
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertContent("Create an example.card divisor-block with title Hello.")
-        .run();
-    },
-  });
+export default defineRendererExtension({
+  ...EXAMPLE_EXTENSION,
+  setup(ctx) {
+    ctx.slashCommands.register({
+      id: "example.insert-card",
+      group: "Example",
+      name: "Insert example card",
+      description: "Insert a prompt asking for an example card",
+      run({ editor, range }) {
+        editor
+          .chain()
+          .focus()
+          .deleteRange(range)
+          .insertContent("Create an example.card divisor-block with title Hello.")
+          .run();
+      },
+    });
 
-  ctx.assistantBlocks.register({
-    type: "example.card",
-    render: ExampleCard,
-  });
+    ctx.assistantBlocks.register({
+      type: "example.card",
+      render: ExampleCard,
+    });
 
-  ctx.artifacts.register({
-    type: "example.artifact",
-    render: ExampleArtifact,
-  });
+    ctx.artifacts.register({
+      type: "example.artifact",
+      render: ExampleArtifact,
+    });
+  },
 });

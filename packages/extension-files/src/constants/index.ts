@@ -11,9 +11,9 @@
  * This file deliberately uses simple `export const` literals — no factories.
  */
 
-// --- Extension manifest ----------------------------------------------------
+// --- Extension metadata ----------------------------------------------------
 
-/** Extension id, used by the manifest and any cross-extension references. */
+/** Extension id, shared by the main and renderer definitions. */
 export const EXTENSION_ID = "files";
 
 /** Human-readable extension name (shown in UI, artifact panel title, etc.). */

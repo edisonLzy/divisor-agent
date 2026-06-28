@@ -3,10 +3,8 @@
   "version": "0.1.0",
   "type": "module",
   "exports": {
-    "./manifest": "./src/manifest.ts",
     "./main": "./src/main.ts",
-    "./renderer": "./src/renderer.tsx",
-    "./types": "./src/types.ts"
+    "./renderer": "./src/renderer.tsx"
   },
   "dependencies": {
     "@divisor-agent/extension-core": "workspace:*",

@@ -1,6 +1,11 @@
 import { readFile } from "node:fs/promises";
 
-import { BrowserWindow, ipcMain } from "electron";
+import {
+  EXTENSION_INVOKE_CHANNEL,
+  type ExtensionIPCInvokeRequest,
+} from "@divisor-agent/extension-core/common";
+import { ipcMain } from "electron";
+import type { BrowserWindow } from "electron";
 
 import type { FileSystemIPC } from "../shared/file-system-ipc";
 import type { AgentModelsIPC } from "../shared/models-ipc";
@@ -9,9 +14,12 @@ import type { AgentSkillsIPC } from "../shared/skills-ipc";
 import type { SystemIPC } from "../shared/system-ipc";
 import type { AgentPool } from "./agent-pool";
 
-function registerAgentRuntimeHandlers(agentPool: AgentPool, browserWindow: BrowserWindow) {
+type BrowserWindowGetter = () => BrowserWindow | null;
+
+function registerAgentRuntimeHandlers(agentPool: AgentPool, getBrowserWindow: BrowserWindowGetter) {
   const offAny = agentPool.onAny(({ name, data }) => {
-    if (browserWindow.isDestroyed() || typeof name !== "string") {
+    const browserWindow = getBrowserWindow();
+    if (!browserWindow || browserWindow.isDestroyed() || typeof name !== "string") {
       return;
     }
 
@@ -23,7 +31,7 @@ function registerAgentRuntimeHandlers(agentPool: AgentPool, browserWindow: Brows
   };
 }
 
-function registerIPCHandlers(agentPool: AgentPool, browserWindow: BrowserWindow) {
+function registerIPCHandlers(agentPool: AgentPool, getBrowserWindow: BrowserWindowGetter) {
   const typedIpcMain = createTypedIpcMain();
 
   typedIpcMain.handle("setModel", agentPool.setModel);
@@ -42,10 +50,18 @@ function registerIPCHandlers(agentPool: AgentPool, browserWindow: BrowserWindow)
   typedIpcMain.handle("listSkills", agentPool.listSkills);
   typedIpcMain.handle("setSkillEnabled", agentPool.setSkillEnabled);
   typedIpcMain.handle("fsReadTextFile", handleFsReadTextFile);
-  typedIpcMain.handle("isWindowFullScreen", async () => browserWindow.isFullScreen());
+  typedIpcMain.handle(
+    "isWindowFullScreen",
+    async () => getBrowserWindow()?.isFullScreen() ?? false,
+  );
+  ipcMain.handle(EXTENSION_INVOKE_CHANNEL, (_event, input: unknown) => {
+    const request = parseExtensionIPCRequest(input);
+    return agentPool.invokeExtensionIPC(request.extensionId, request.method, request.args);
+  });
 
   return () => {
     typedIpcMain.removeAllListeners();
+    ipcMain.removeHandler(EXTENSION_INVOKE_CHANNEL);
   };
 }
 
@@ -62,15 +78,38 @@ async function handleFsReadTextFile(
 
 export function bindAgentRuntimeIPC(
   agentPool: AgentPool,
-  browserWindow: BrowserWindow,
+  getBrowserWindow: BrowserWindowGetter,
 ): () => void {
-  const unregisterAgentRuntimeHandlers = registerAgentRuntimeHandlers(agentPool, browserWindow);
-  const unregisterIPCHandlers = registerIPCHandlers(agentPool, browserWindow);
+  const unregisterAgentRuntimeHandlers = registerAgentRuntimeHandlers(agentPool, getBrowserWindow);
+  const unregisterIPCHandlers = registerIPCHandlers(agentPool, getBrowserWindow);
 
   return () => {
     // Unbind logic here
     unregisterAgentRuntimeHandlers();
     unregisterIPCHandlers();
+  };
+}
+
+function parseExtensionIPCRequest(input: unknown): ExtensionIPCInvokeRequest {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error("Invalid extension IPC request");
+  }
+
+  const request = input as Partial<ExtensionIPCInvokeRequest>;
+  if (
+    typeof request.extensionId !== "string" ||
+    !request.extensionId.trim() ||
+    typeof request.method !== "string" ||
+    !request.method.trim() ||
+    !Array.isArray(request.args)
+  ) {
+    throw new Error("Invalid extension IPC request");
+  }
+
+  return {
+    args: request.args,
+    extensionId: request.extensionId,
+    method: request.method,
   };
 }
 
