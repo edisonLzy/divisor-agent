@@ -25,6 +25,7 @@ interface UseChatEditorOptions {
 
 export function useChatEditor({ content, disabled, getFloatingReference }: UseChatEditorOptions) {
   const [hasContent, setHasContent] = useState(false);
+  const [text, setText] = useState("");
 
   const skillItems = useSkillsCommandItems();
   const pluginCommands = usePluginSlashCommands();
@@ -100,10 +101,14 @@ export function useChatEditor({ content, disabled, getFloatingReference }: UseCh
       },
       editable: !disabled,
       onCreate: ({ editor: nextEditor }) => {
-        setHasContent(nextEditor.getText().trim().length > 0);
+        const nextText = nextEditor.getText({ blockSeparator: "\n" });
+        setHasContent(nextText.trim().length > 0);
+        setText(nextText);
       },
       onUpdate: ({ editor: nextEditor }) => {
-        setHasContent(nextEditor.getText().trim().length > 0);
+        const nextText = nextEditor.getText({ blockSeparator: "\n" });
+        setHasContent(nextText.trim().length > 0);
+        setText(nextText);
       },
     },
     [content],
@@ -113,7 +118,7 @@ export function useChatEditor({ content, disabled, getFloatingReference }: UseCh
     editor?.setEditable(!disabled);
   }, [disabled, editor]);
 
-  return { editor, hasContent };
+  return { editor, hasContent, text };
 }
 
 function useSkillsCommandItems() {

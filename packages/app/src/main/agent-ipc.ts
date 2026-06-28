@@ -34,6 +34,7 @@ function registerIPCHandlers(agentPool: AgentPool, browserWindow: BrowserWindow)
   typedIpcMain.handle("runOneTimeAgent", agentPool.runOneTimeAgent);
   typedIpcMain.handle("abortPrompt", agentPool.abortPrompt);
   typedIpcMain.handle("setHistoryMessages", agentPool.setHistoryMessages);
+  typedIpcMain.handle("getContextUsage", agentPool.getContextUsage);
   typedIpcMain.handle("setSessionId", agentPool.setSessionId);
   typedIpcMain.handle("setSessionScope", agentPool.setSessionScope);
   typedIpcMain.handle("destroySession", agentPool.destroySession);
