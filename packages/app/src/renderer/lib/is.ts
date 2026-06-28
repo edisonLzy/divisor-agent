@@ -6,6 +6,7 @@ import type {
   ModelChangedEntry,
   SessionEntry,
 } from "@renderer/store/entries-slice";
+import type { AppAssistantMessage } from "@shared/token-usage";
 
 export function isAgentMessageEntry(entry: SessionEntry): entry is MessageEntry {
   return entry.type === "message";
@@ -19,11 +20,11 @@ export function isAgentUserMessage(message: AgentMessageData): message is AppUse
   return message.role === "user";
 }
 
-export function isAgentAssistantMessage(message: AgentMessageData): message is AssistantMessage {
+export function isAgentAssistantMessage(message: AgentMessageData): message is AppAssistantMessage {
   return message.role === "assistant";
 }
 
-export function isFailedAssistantMessage(message: unknown): message is AssistantMessage {
+export function isFailedAssistantMessage(message: unknown): message is AppAssistantMessage {
   if (typeof message !== "object" || message === null) {
     return false;
   }

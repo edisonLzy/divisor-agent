@@ -111,6 +111,11 @@ export class AgentPool
     this.destroyAgent(sessionId);
   };
 
+  public getContextUsage: AgentSessionIPC["getContextUsage"] = async (sessionId) => {
+    const runtime = this.getOrCreateRuntime(sessionId);
+    return runtime.getContextUsage();
+  };
+
   public setHistoryMessages: AgentSessionIPC["setHistoryMessages"] = async (
     sessionId,
     messages,
@@ -227,6 +232,8 @@ export class AgentPool
         providerId: m.provider,
         providerName: m.provider,
         modelName: m.name ?? m.id,
+        contextWindow: m.contextWindow,
+        maxTokens: m.maxTokens,
       };
     });
   };

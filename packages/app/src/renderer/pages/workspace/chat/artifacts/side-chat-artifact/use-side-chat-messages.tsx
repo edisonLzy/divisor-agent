@@ -1,4 +1,4 @@
-import type { AssistantMessage, ToolCall } from "@earendil-works/pi-ai";
+import type { AssistantMessage, ToolCall, Usage } from "@earendil-works/pi-ai";
 import { useSubscribeAgentEvents } from "@renderer/hooks/use-subscribe-agent-events";
 import { extractToolResultText, formatToolArgs } from "@renderer/lib/agent-tool";
 import {
@@ -7,7 +7,9 @@ import {
   isAgentUserMessage,
   isFailedAssistantMessage,
 } from "@renderer/lib/is";
+import { withTurnUsage } from "@renderer/lib/token-usage";
 import { sideChatStore } from "@renderer/store/side-chat";
+import { createEmptyUsage } from "@shared/token-usage";
 import { useRef } from "react";
 
 function getSideChatToolState(sessionId: string, toolCallId: string) {
@@ -21,11 +23,13 @@ function ensureSideChatSessionExist(sessionId: string) {
 
 export function useSideChatMessages() {
   const turnContentStartIndicesRef = useRef<Record<string, number>>({});
+  const turnUsageBaseRef = useRef<Record<string, Usage>>({});
 
   useSubscribeAgentEvents(
     {
       agent_start: (event) => {
         ensureSideChatSessionExist(event.sessionId);
+        turnUsageBaseRef.current[event.sessionId] = createEmptyUsage();
         sideChatStore.getState().setStatus(event.sessionId, "running");
       },
 
@@ -34,17 +38,23 @@ export function useSideChatMessages() {
         sideChatStore.getState().setStatus(event.sessionId, status);
         sideChatStore.getState().setStreamingEntryCompletedAt(event.sessionId, Date.now());
         turnContentStartIndicesRef.current[event.sessionId] = 0;
+        turnUsageBaseRef.current[event.sessionId] = createEmptyUsage();
         sideChatStore.getState().setStreamingEntryId(event.sessionId, undefined);
       },
 
       turn_start: (event) => {
         const streamingEntryId = sideChatStore.getState().streamingEntryIds.get(event.sessionId);
-        if (!streamingEntryId) return;
+        if (!streamingEntryId) {
+          turnContentStartIndicesRef.current[event.sessionId] = 0;
+          turnUsageBaseRef.current[event.sessionId] = createEmptyUsage();
+          return;
+        }
 
         const entryState = sideChatStore.getState().getEntryState(event.sessionId);
         const entry = entryState.entries.find((item) => item.id === streamingEntryId);
         if (entry && isAgentMessageEntry(entry) && entry.data.role === "assistant") {
           turnContentStartIndicesRef.current[event.sessionId] = (entry.data.content ?? []).length;
+          turnUsageBaseRef.current[event.sessionId] = entry.data.turnUsage ?? entry.data.usage;
         }
       },
 
@@ -75,12 +85,18 @@ export function useSideChatMessages() {
         if (!entry || !isAgentMessageEntry(entry) || entry.data.role !== "assistant") return;
 
         const turnStartIdx = turnContentStartIndicesRef.current[sessionId] ?? 0;
+        const messageWithTurnUsage = withTurnUsage(
+          message,
+          turnUsageBaseRef.current[sessionId] ?? createEmptyUsage(),
+        );
         if (turnStartIdx === 0) {
-          sideChatStore.getState().updateMessageEntry(sessionId, streamingEntryId, message);
+          sideChatStore
+            .getState()
+            .updateMessageEntry(sessionId, streamingEntryId, messageWithTurnUsage);
         } else {
           const existingContent = entry.data.content ?? [];
           sideChatStore.getState().updateMessageEntry(sessionId, streamingEntryId, {
-            ...message,
+            ...messageWithTurnUsage,
             content: [
               ...existingContent.slice(0, turnStartIdx),
               ...message.content,
@@ -117,7 +133,10 @@ export function useSideChatMessages() {
         if (!entry || !isAgentMessageEntry(entry) || entry.data.role !== "assistant") return;
 
         const turnStartIdx = turnContentStartIndicesRef.current[sessionId] ?? 0;
-        const assistantMsg = message as AssistantMessage;
+        const assistantMsg = withTurnUsage(
+          message,
+          turnUsageBaseRef.current[sessionId] ?? createEmptyUsage(),
+        );
         if (turnStartIdx === 0) {
           sideChatStore.getState().updateMessageEntry(sessionId, streamingEntryId, assistantMsg);
         } else {

@@ -5,6 +5,7 @@ import type {
   ExtensionAgentToolOptions,
 } from "@divisor-agent/extension-core/main";
 import { Agent } from "@earendil-works/pi-agent-core";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { Message } from "@earendil-works/pi-ai";
 import Emittery from "emittery";
 
@@ -13,6 +14,11 @@ import type { AgentModelsIPC } from "../shared/models-ipc.js";
 import type { PermissionMode } from "../shared/permissions-ipc.js";
 import type { AgentSessionIPC } from "../shared/session-ipc.js";
 import type { AgentSkillsIPC } from "../shared/skills-ipc.js";
+import type {
+  AppAssistantMessage,
+  ContextUsageBreakdown,
+  ContextUsageSnapshot,
+} from "../shared/token-usage.js";
 import { ExtensionService } from "./extensions/extension-service.js";
 import { ModelRegistry } from "./models/index.js";
 import { PermissionService } from "./permissions/index.js";
@@ -224,7 +230,11 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
   }
 
   public setHistoryMessages: AgentRuntimeDelegate["setHistoryMessages"] = async (messages) => {
-    this.agent.state.messages = messages;
+    this.agent.state.messages = messages.map(stripAssistantUiMetadata);
+  };
+
+  public getContextUsage: AgentRuntimeDelegate["getContextUsage"] = async () => {
+    return createContextUsageSnapshot(this.agent.state);
   };
 
   public setModel: AgentRuntimeDelegate["setModel"] = async (model) => {
@@ -328,6 +338,107 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
       });
     }, 0);
   }
+}
+
+function stripAssistantUiMetadata(message: AgentMessage): AgentMessage {
+  if (message.role !== "assistant") return message;
+
+  const { turnUsage: _turnUsage, ...assistantMessage } = message as AppAssistantMessage;
+  return assistantMessage;
+}
+
+function createContextUsageSnapshot(state: Agent["state"]): ContextUsageSnapshot {
+  const breakdown: ContextUsageBreakdown = {
+    systemPrompt: estimateTokens(state.systemPrompt),
+    toolDefinitions: estimateTokens(
+      JSON.stringify(
+        (state.tools ?? []).map((tool) => ({
+          description: tool.description,
+          name: tool.name,
+          parameters: tool.parameters,
+        })),
+      ),
+    ),
+    conversation: 0,
+    toolResults: 0,
+  };
+
+  let latestAssistant: AppAssistantMessage | undefined;
+  for (const message of state.messages) {
+    const estimatedTokens = estimateTokens(JSON.stringify(message.content));
+    if (message.role === "toolResult") {
+      breakdown.toolResults += estimatedTokens;
+      continue;
+    }
+
+    breakdown.conversation += estimatedTokens;
+    if (message.role === "assistant") {
+      latestAssistant = message as AppAssistantMessage;
+    }
+  }
+
+  const estimatedTotal = sumContextBreakdown(breakdown);
+  const measuredTotal = latestAssistant?.usage.totalTokens ?? 0;
+  const usedTokens = measuredTotal > 0 ? measuredTotal : estimatedTotal;
+
+  return {
+    breakdown: scaleContextBreakdown(breakdown, usedTokens),
+    contextWindow: state.model?.contextWindow ?? 128_000,
+    estimated: true,
+    usedTokens,
+  };
+}
+
+function estimateTokens(value: string): number {
+  if (!value) return 0;
+
+  let cjkCharacters = 0;
+  for (const character of value) {
+    if (
+      /\p{Script=Han}|\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Hangul}/u.test(character)
+    ) {
+      cjkCharacters += 1;
+    }
+  }
+
+  const nonCjkCharacters = Math.max(0, value.length - cjkCharacters);
+  return Math.ceil(cjkCharacters + nonCjkCharacters / 4);
+}
+
+function sumContextBreakdown(breakdown: ContextUsageBreakdown): number {
+  return (
+    breakdown.systemPrompt +
+    breakdown.toolDefinitions +
+    breakdown.conversation +
+    breakdown.toolResults
+  );
+}
+
+function scaleContextBreakdown(
+  breakdown: ContextUsageBreakdown,
+  targetTotal: number,
+): ContextUsageBreakdown {
+  const estimatedTotal = sumContextBreakdown(breakdown);
+  if (estimatedTotal === 0 || targetTotal === 0) {
+    return {
+      systemPrompt: 0,
+      toolDefinitions: 0,
+      conversation: 0,
+      toolResults: 0,
+    };
+  }
+
+  const scale = targetTotal / estimatedTotal;
+  const systemPrompt = Math.round(breakdown.systemPrompt * scale);
+  const toolDefinitions = Math.round(breakdown.toolDefinitions * scale);
+  const conversation = Math.round(breakdown.conversation * scale);
+
+  return {
+    systemPrompt,
+    toolDefinitions,
+    conversation,
+    toolResults: Math.max(0, targetTotal - systemPrompt - toolDefinitions - conversation),
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

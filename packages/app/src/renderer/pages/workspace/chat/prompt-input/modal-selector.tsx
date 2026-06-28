@@ -71,7 +71,7 @@ export function ModalSelector({ value, onChange }: ModalSelectorProps) {
 
     return models.filter((model) => {
       return [model.modelName, model.providerName, model.providerId, model.modelId].some((field) =>
-        field.toLowerCase().includes(normalizedQuery),
+        field?.toLowerCase().includes(normalizedQuery),
       );
     });
   }, [models, normalizedQuery]);
@@ -100,7 +100,7 @@ export function ModalSelector({ value, onChange }: ModalSelectorProps) {
         <SelectValue className="pointer-events-none min-w-0">
           {value ? (
             <div className="flex min-w-0 items-center gap-1.5 text-left text-xs font-normal text-muted-foreground">
-              <span className="block truncate">{value.modelName}</span>
+              <span className="block truncate">{value.modelName ?? value.modelId}</span>
             </div>
           ) : (
             <span className="truncate text-xs text-muted-foreground">
@@ -151,7 +151,7 @@ export function ModalSelector({ value, onChange }: ModalSelectorProps) {
                       </span>
                       <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
                         <span className="block min-w-0 truncate text-[13px] font-medium leading-none text-current">
-                          {model.modelName}
+                          {model.modelName ?? model.modelId}
                         </span>
                         <Tooltip>
                           <TooltipTrigger
@@ -169,7 +169,7 @@ export function ModalSelector({ value, onChange }: ModalSelectorProps) {
                             <CircleHelp className="size-3.25" />
                           </TooltipTrigger>
                           <TooltipContent side="top" className="text-[11px]">
-                            {model.providerName}
+                            {model.providerName ?? model.providerId}
                           </TooltipContent>
                         </Tooltip>
                       </div>

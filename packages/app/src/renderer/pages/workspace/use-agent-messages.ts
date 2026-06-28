@@ -1,5 +1,5 @@
 import { useExtensionsContextAPI } from "@divisor-agent/extension-core/renderer";
-import type { AssistantMessage, ToolCall } from "@earendil-works/pi-ai";
+import type { AssistantMessage, ToolCall, Usage } from "@earendil-works/pi-ai";
 import { appendEntries } from "@renderer/apis/sessions";
 import { useSubscribeAgentEvents } from "@renderer/hooks/use-subscribe-agent-events";
 import { extractToolResultText, formatToolArgs } from "@renderer/lib/agent-tool";
@@ -9,8 +9,10 @@ import {
   isAgentUserMessage,
   isFailedAssistantMessage,
 } from "@renderer/lib/is";
+import { withTurnUsage } from "@renderer/lib/token-usage";
 import { EntryStatus, type SessionEntry } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
+import { createEmptyUsage } from "@shared/token-usage";
 import { useRef } from "react";
 
 function getToolState(sessionId: string, toolCallId: string) {
@@ -36,6 +38,7 @@ function findMissingFailureMessage(
 export function useAgentMessages() {
   const extensionsApi = useExtensionsContextAPI();
   const turnContentStartIndicesRef = useRef<Record<string, number>>({});
+  const turnUsageBaseRef = useRef<Record<string, Usage>>({});
   const hasPersistedRef = useRef<Record<string, boolean>>({});
 
   useSubscribeAgentEvents(
@@ -44,6 +47,7 @@ export function useAgentMessages() {
         const { sessionId } = event;
 
         hasPersistedRef.current[sessionId] = false;
+        turnUsageBaseRef.current[sessionId] = createEmptyUsage();
         mainStore.getState().setStatus(sessionId, "running");
       },
 
@@ -92,6 +96,7 @@ export function useAgentMessages() {
         }
 
         turnContentStartIndicesRef.current[sessionId] = 0;
+        turnUsageBaseRef.current[sessionId] = createEmptyUsage();
         mainStore.getState().setStreamingEntryCompletedAt(sessionId, Date.now());
         mainStore.getState().setStreamingEntryId(sessionId, undefined);
       },
@@ -100,12 +105,17 @@ export function useAgentMessages() {
         const { sessionId } = event;
 
         const streamingEntryId = mainStore.getState().streamingEntryIds.get(sessionId);
-        if (!streamingEntryId) return;
+        if (!streamingEntryId) {
+          turnContentStartIndicesRef.current[sessionId] = 0;
+          turnUsageBaseRef.current[sessionId] = createEmptyUsage();
+          return;
+        }
 
         const entries = mainStore.getState().getEntryState(sessionId).entries;
         const entry = entries.find((item) => item.id === streamingEntryId);
         if (entry && isAgentMessageEntry(entry) && entry.data.role === "assistant") {
           turnContentStartIndicesRef.current[sessionId] = (entry.data.content ?? []).length;
+          turnUsageBaseRef.current[sessionId] = entry.data.turnUsage ?? entry.data.usage;
         }
       },
 
@@ -128,6 +138,7 @@ export function useAgentMessages() {
             // new content *after* the user bubble in the timeline, breaking
             // the visual order).
             turnContentStartIndicesRef.current[sessionId] = 0;
+            turnUsageBaseRef.current[sessionId] = createEmptyUsage();
             const streamingEntryId = mainStore.getState().streamingEntryIds.get(sessionId);
             if (streamingEntryId) {
               mainStore.getState().setStreamingEntryCompletedAt(sessionId, Date.now());
@@ -159,12 +170,18 @@ export function useAgentMessages() {
         if (!entry || !isAgentMessageEntry(entry) || entry.data.role !== "assistant") return;
 
         const turnStartIdx = turnContentStartIndicesRef.current[sessionId] ?? 0;
+        const messageWithTurnUsage = withTurnUsage(
+          message,
+          turnUsageBaseRef.current[sessionId] ?? createEmptyUsage(),
+        );
         if (turnStartIdx === 0) {
-          mainStore.getState().updateMessageEntry(sessionId, streamingEntryId, message);
+          mainStore
+            .getState()
+            .updateMessageEntry(sessionId, streamingEntryId, messageWithTurnUsage);
         } else {
           const existingContent = entry.data.content ?? [];
           mainStore.getState().updateMessageEntry(sessionId, streamingEntryId, {
-            ...message,
+            ...messageWithTurnUsage,
             content: [
               ...existingContent.slice(0, turnStartIdx),
               ...message.content,
@@ -201,7 +218,10 @@ export function useAgentMessages() {
         if (!entry || !isAgentMessageEntry(entry) || entry.data.role !== "assistant") return;
 
         const turnStartIdx = turnContentStartIndicesRef.current[sessionId] ?? 0;
-        const assistantMsg = message as AssistantMessage;
+        const assistantMsg = withTurnUsage(
+          message,
+          turnUsageBaseRef.current[sessionId] ?? createEmptyUsage(),
+        );
         if (turnStartIdx === 0) {
           mainStore.getState().updateMessageEntry(sessionId, streamingEntryId, assistantMsg);
         } else {
