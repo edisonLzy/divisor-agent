@@ -8,7 +8,7 @@ import { Agent } from "@earendil-works/pi-agent-core";
 import type { Message } from "@earendil-works/pi-ai";
 import Emittery from "emittery";
 
-import type { AgentSessionScope, AllowedMainExposeEvents } from "../shared/events-ipc.js";
+import type { AgentSessionScope, AllowedAgentExposeEvents } from "../shared/events-ipc.js";
 import type { AgentModelsIPC } from "../shared/models-ipc.js";
 import type { PermissionMode } from "../shared/permissions-ipc.js";
 import type { AgentSessionIPC } from "../shared/session-ipc.js";
@@ -54,6 +54,7 @@ export type AgentRuntimeDelegate = {
     | "setSessionId"
     | "setSessionScope"
     | "destroySession"
+    | "getSessionRuntimeSnapshot"
     | "runOneTimeAgent"
     | "listSkills"
     | "setSkillEnabled"
@@ -75,7 +76,7 @@ export interface AgentRuntimeOptions {
 
 /** Derive base events from session-tagged events by stripping sessionId. */
 type AgentRuntimeEvents = {
-  [K in keyof AllowedMainExposeEvents]: Omit<AllowedMainExposeEvents[K], "scope" | "sessionId">;
+  [K in keyof AllowedAgentExposeEvents]: Omit<AllowedAgentExposeEvents[K], "scope" | "sessionId">;
 };
 
 /**
@@ -303,6 +304,13 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
 
   public waitForIdle() {
     return this.agent.waitForIdle();
+  }
+
+  public getSnapshot() {
+    return {
+      isRunning: this.agent.state.isStreaming,
+      messages: [...this.agent.state.messages],
+    };
   }
 
   private getCurrentModel(): ExtensionAgentModel | undefined {

@@ -12,12 +12,15 @@ import { sideChatStore } from "@renderer/store/side-chat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { RouterProvider } from "react-router-dom";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 
 import { ThemeProvider } from "./components/theme-provider";
 import { ElectronIPCProvider } from "./context/ElectronIPCProvider";
 import { installedRendererExtensions } from "./extensions/installed-extensions";
+import { useSubscribeAgentEvents } from "./hooks/use-subscribe-agent-events";
+import { activateSession } from "./lib/activate-session";
+import { CompanionPage } from "./pages/companion";
 import { router } from "./router";
 
 const queryClient = new QueryClient({
@@ -55,7 +58,13 @@ export function App() {
           sideChat.appendSideChatMeta(sideChatId, {
             mainSessionId: input.mainSessionId,
             context: input.context ?? {},
-            model: input.model,
+            model: input.model
+              ? {
+                  ...input.model,
+                  modelName: input.model.modelId,
+                  providerName: input.model.providerId,
+                }
+              : undefined,
             pendingPrompt: input.pendingPrompt,
             createdAt: Date.now(),
             inputDisabled: input.inputDisabled,
@@ -129,7 +138,7 @@ export function App() {
         <ExtensionProvider extensions={installedRendererExtensions}>
           <ExtensionsContextAPIProvider api={extensionsContextAPI}>
             <ThemeProvider defaultTheme="system" storageKey="divisor-agent.theme">
-              <RouterProvider router={router} />
+              <AppContent />
               <Toaster richColors closeButton />
             </ThemeProvider>
           </ExtensionsContextAPIProvider>
@@ -137,6 +146,22 @@ export function App() {
       </ElectronIPCProvider>
     </QueryClientProvider>
   );
+}
+
+function AppContent() {
+  const isCompanionWindow =
+    new URLSearchParams(window.location.search).get("window") === "companion";
+
+  useSubscribeAgentEvents({
+    open_session_in_main: ({ sessionId }) => {
+      void activateSession(sessionId).catch((error) => {
+        console.error("Failed to open companion session in main window", error);
+        toast.error("无法在主窗口中打开该会话");
+      });
+    },
+  });
+
+  return isCompanionWindow ? <CompanionPage /> : <RouterProvider router={router} />;
 }
 
 function clampEntryPosition(position: number, length: number) {

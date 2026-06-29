@@ -1,16 +1,9 @@
 import type { Session } from "@renderer/apis/sessions";
-import { pinSession, deleteSession, getSessionEntries } from "@renderer/apis/sessions";
-import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
+import { pinSession, deleteSession } from "@renderer/apis/sessions";
+import { activateSession } from "@renderer/lib/activate-session";
 import { formatRelativeTime } from "@renderer/lib/date";
 import { cn } from "@renderer/lib/utils";
-import {
-  EntryStatus,
-  type AgentMessageData,
-  type MessageEntry,
-  type ModelChangedData,
-  type SessionEntry,
-  type SessionStatus,
-} from "@renderer/store/entries-slice";
+import type { SessionStatus } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
 import { useQueryClient } from "@tanstack/react-query";
 import { Pin, PinOff, Trash2, Loader2 } from "lucide-react";
@@ -27,61 +20,16 @@ interface SessionItemProps {
 
 export function SessionItem({ session }: SessionItemProps) {
   const { activeSessionId } = useStore(mainStore);
-  const { invoke } = useElectronIPC();
   const queryClient = useQueryClient();
   const isActive = session.id === activeSessionId;
 
   const handleSelectSession = useCallback(async () => {
-    const entryState = mainStore.getState().getEntryState(session.id);
-    if (entryState.entries.length === 0) {
-      try {
-        const entries = await getSessionEntries(session.id);
-        if (mainStore.getState().getSession(session.id)) {
-          mainStore.getState().setSessionEntries(
-            session.id,
-            entries.map((e): SessionEntry => {
-              if (e.type === "message") {
-                return {
-                  ...e,
-                  type: "message" as const,
-                  data: e.data as unknown as AgentMessageData,
-                  status: EntryStatus.Synced,
-                };
-              }
-              return {
-                ...e,
-                type: "model_change" as const,
-                data: e.data as unknown as ModelChangedData,
-                status: EntryStatus.Synced,
-              };
-            }),
-          );
-        }
-      } catch (error) {
-        console.error("Failed to fetch session entries:", error);
-      }
-    }
-
     try {
-      await invoke("setSessionId", session.id);
+      await activateSession(session.id);
     } catch (error) {
-      console.error("Failed to set session ID:", error);
+      console.error("Failed to activate session:", error);
     }
-
-    const updatedEntries = mainStore.getState().getEntryState(session.id).entries;
-    if (updatedEntries.length > 0) {
-      const messages = updatedEntries
-        .filter((e): e is MessageEntry => e.type === "message")
-        .map((e) => e.data);
-      try {
-        await invoke("setHistoryMessages", session.id, messages);
-      } catch (error) {
-        console.error("Failed to set history messages:", error);
-      }
-    }
-
-    mainStore.getState().setActiveSessionId(session.id);
-  }, [session.id, invoke]);
+  }, [session.id]);
 
   const handleTogglePin = useCallback(
     async (e: React.MouseEvent) => {
