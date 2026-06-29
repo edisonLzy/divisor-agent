@@ -19,7 +19,13 @@ import { PermissionService } from "./permissions/index.js";
 import { SystemPromptService } from "./prompt/index.js";
 import { SkillService } from "./skills/index.js";
 import type { AppTool } from "./tools/index.js";
-import { fsReadTextFileTool, fsWriteTextFileTool, terminalCreateTool } from "./tools/index.js";
+import {
+  createAskUserQuestionTool,
+  fsReadTextFileTool,
+  fsWriteTextFileTool,
+  terminalCreateTool,
+} from "./tools/index.js";
+import { UserInteractionService } from "./user-interactions/index.js";
 
 // ── Derived runtime delegate type ──────────────────────────────────────────
 
@@ -90,6 +96,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
   private permissionService: PermissionService;
   private scope: AgentSessionScope = "main";
   private systemPromptService: SystemPromptService;
+  private userInteractionService: UserInteractionService;
   private sessionId: string | undefined;
 
   constructor(
@@ -101,6 +108,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
     super();
     this.permissionMode = "default";
     this.permissionService = new PermissionService();
+    this.userInteractionService = new UserInteractionService();
     this.systemPromptService = new SystemPromptService();
     this.systemPromptService.addBuilder(this.skillService);
     this.systemPromptService.addBuilder(this.extensionService);
@@ -110,13 +118,16 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
 
   private createInternalAgent() {
     const excludedToolNames = new Set(this.options.extensionTools?.excludeToolNames ?? []);
-    const builtinTools = [fsReadTextFileTool, fsWriteTextFileTool, terminalCreateTool].filter(
-      (tool) => !excludedToolNames.has(tool.name),
-    );
+    const builtinTools = [
+      fsReadTextFileTool,
+      fsWriteTextFileTool,
+      terminalCreateTool,
+      createAskUserQuestionTool(this.userInteractionService),
+    ].filter((tool) => !excludedToolNames.has(tool.name));
 
-    this.permissionService.setRequestCallback((request) => {
-      this.emit("permission_requested", {
-        type: "permission_requested",
+    this.userInteractionService.setRequestCallback((request) => {
+      this.emit("user_interaction_requested", {
+        type: "user_interaction_requested",
         ...request,
       });
     });
@@ -168,9 +179,18 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
           return undefined;
         }
 
-        const resolution = await this.permissionService.requestPermission(permissionRequest);
+        const outcome = await this.userInteractionService.request(
+          this.permissionService.createInteractionRequest(permissionRequest),
+        );
+        const resolution = this.permissionService.resolveInteraction(permissionRequest, outcome);
 
         if (resolution.approved) {
+          if (resolution.rememberCommandPrefix) {
+            this.permissionService.rememberApproval(
+              permissionRequest.toolName,
+              resolution.rememberCommandPrefix,
+            );
+          }
           return undefined;
         }
 
@@ -228,6 +248,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
   };
 
   public setModel: AgentRuntimeDelegate["setModel"] = async (model) => {
+    await this.modelRegistry.getAvailableModels();
     const modelInfo = this.modelRegistry.resolveModel(model.providerId, model.modelId);
     if (!modelInfo) {
       console.warn(`Model not found: ${model.providerId}/${model.modelId}`);
@@ -266,6 +287,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
   };
 
   public abortPrompt: AgentRuntimeDelegate["abortPrompt"] = async () => {
+    this.userInteractionService.cancelAll("Agent prompt aborted");
     this.agent.abort();
   };
 
@@ -281,23 +303,17 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
     this.permissionMode = mode;
   };
 
-  public resolvePermissionRequest: AgentRuntimeDelegate["resolvePermissionRequest"] = async (
+  public resolveUserInteraction: AgentRuntimeDelegate["resolveUserInteraction"] = async (
     requestId,
-    resolution,
+    submission,
   ) => {
-    if (resolution.approved) {
-      if (resolution.rememberCommandPrefix) {
-        this.permissionService.rememberApproval(requestId, resolution.rememberCommandPrefix);
-      }
-
-      this.permissionService.approve(requestId);
-      return;
+    if (!this.userInteractionService.resolve(requestId, submission)) {
+      throw new Error(`User interaction not found or already resolved: ${requestId}`);
     }
-
-    this.permissionService.reject(requestId, resolution.reason);
   };
 
   public destroy() {
+    this.userInteractionService.cancelAll("Agent runtime destroyed");
     this.clearListeners();
   }
 

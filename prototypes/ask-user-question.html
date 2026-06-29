@@ -1,0 +1,932 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ask User Question — Divisor</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family:
+          "Geist Variable",
+          "SF Pro Text",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        --bg: #111;
+        --sidebar: #141414;
+        --surface: #202020;
+        --surface-2: #292929;
+        --border: #343434;
+        --text: #e7e7e7;
+        --muted: #777;
+        --subtle: #555;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-width: 320px;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+      }
+      button,
+      textarea {
+        font: inherit;
+      }
+      button {
+        color: inherit;
+      }
+      button:focus-visible,
+      textarea:focus-visible {
+        outline: 2px solid #888;
+        outline-offset: 2px;
+      }
+
+      .app {
+        display: grid;
+        grid-template-columns: 272px minmax(0, 1fr);
+        min-height: 100vh;
+        overflow: hidden;
+      }
+
+      .sidebar {
+        display: flex;
+        min-height: 100vh;
+        flex-direction: column;
+        gap: 5px;
+        border-right: 1px solid #252525;
+        background: var(--sidebar);
+        padding: 48px 10px 12px;
+      }
+
+      .side-actions {
+        display: flex;
+        justify-content: space-between;
+        padding: 0 6px 12px;
+      }
+      .icon-button {
+        display: grid;
+        width: 29px;
+        height: 29px;
+        place-items: center;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: #777;
+        cursor: pointer;
+      }
+      .icon-button:hover {
+        background: #222;
+        color: #ccc;
+      }
+
+      .group {
+        margin-top: 13px;
+      }
+      .group-title {
+        margin: 0;
+        padding: 5px 10px;
+        color: #555;
+        font-size: 10px;
+        letter-spacing: 0.13em;
+      }
+      .side-link {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        gap: 9px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        padding: 7px 10px;
+        color: #858585;
+        font-size: 12px;
+        text-align: left;
+        cursor: pointer;
+      }
+      .side-link:hover,
+      .side-link.active {
+        background: #202020;
+        color: #d0d0d0;
+      }
+      .side-link.active {
+        box-shadow: inset 0 0 0 1px #292929;
+      }
+      .side-link .mark {
+        width: 16px;
+        color: #696969;
+        text-align: center;
+      }
+      .side-link .chevron {
+        margin-left: auto;
+        color: #555;
+      }
+
+      .profile {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin-top: auto;
+        border-top: 1px solid #252525;
+        padding: 12px 6px 2px;
+        color: #777;
+        font-size: 11px;
+      }
+      .avatar {
+        display: grid;
+        width: 28px;
+        height: 28px;
+        place-items: center;
+        border: 1px solid #333;
+        border-radius: 8px;
+        background: #202020;
+      }
+      .profile-copy {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+      }
+      .profile-copy strong {
+        color: #bbb;
+        font-weight: 550;
+      }
+      .profile-copy small {
+        color: #555;
+      }
+
+      .workspace {
+        display: flex;
+        min-width: 0;
+        min-height: 100vh;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid #2b2b2b;
+        border-right: 0;
+        border-radius: 20px 0 0 20px;
+        background:
+          radial-gradient(circle at 10% 0%, rgba(255, 255, 255, 0.035), transparent 38%), #111;
+      }
+
+      .topbar {
+        display: flex;
+        min-height: 54px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid #242424;
+        padding: 0 22px;
+      }
+      .title-row {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+      .title-row h1 {
+        margin: 0;
+        color: #ccc;
+        font-size: 12px;
+        font-weight: 560;
+      }
+      .status {
+        color: #5d5d5d;
+        font-size: 10px;
+      }
+      .status::before {
+        content: "";
+        display: inline-block;
+        width: 5px;
+        height: 5px;
+        margin-right: 5px;
+        border-radius: 50%;
+        background: #888;
+      }
+
+      .scenario-tabs {
+        display: flex;
+        gap: 2px;
+        border: 1px solid #2a2a2a;
+        border-radius: 10px;
+        background: #171717;
+        padding: 3px;
+      }
+      .scenario-tabs button {
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        padding: 6px 10px;
+        color: #666;
+        font-size: 10px;
+        cursor: pointer;
+      }
+      .scenario-tabs button.active {
+        background: #292929;
+        color: #d0d0d0;
+      }
+
+      .conversation {
+        width: min(100% - 48px, 896px);
+        flex: 1;
+        margin: auto;
+        padding: 43px 0 20px;
+      }
+      .user-message {
+        width: fit-content;
+        max-width: 74%;
+        margin-left: auto;
+        border: 1px solid #2c2c2c;
+        border-radius: 17px;
+        background: #1d1d1d;
+        padding: 10px 14px;
+        color: #bdbdbd;
+        font-size: 13px;
+        line-height: 1.65;
+      }
+      .assistant-message {
+        display: flex;
+        gap: 12px;
+        max-width: 780px;
+        margin-top: 34px;
+        color: #b4b4b4;
+        font-size: 13px;
+        line-height: 1.75;
+      }
+      .assistant-badge {
+        display: grid;
+        width: 26px;
+        height: 26px;
+        flex: 0 0 auto;
+        place-items: center;
+        border: 1px solid #303030;
+        border-radius: 8px;
+        background: #1b1b1b;
+        color: #888;
+      }
+      .assistant-message p {
+        margin: 0 0 8px;
+      }
+
+      .question-wrap {
+        width: min(100% - 48px, 896px);
+        margin: 0 auto;
+        padding: 12px 0 22px;
+      }
+      .card {
+        overflow: hidden;
+        border: 1px solid #393939;
+        border-radius: 20px;
+        background: var(--surface);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
+      }
+      .card-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 18px 20px 14px;
+      }
+      .eyebrow {
+        display: block;
+        margin-bottom: 5px;
+        color: #666;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+      }
+      .card h2 {
+        margin: 0;
+        color: #ededed;
+        font-size: 15px;
+        font-weight: 590;
+        line-height: 1.45;
+      }
+      .hint {
+        margin: 4px 0 0;
+        color: #727272;
+        font-size: 11px;
+      }
+      .pager {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        color: #747474;
+        font-size: 11px;
+        white-space: nowrap;
+      }
+      .pager button {
+        width: 26px;
+        height: 26px;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        color: #777;
+        cursor: pointer;
+      }
+      .pager button:disabled {
+        opacity: 0.25;
+        cursor: default;
+      }
+
+      .details {
+        margin: 0 14px 8px;
+        overflow: hidden;
+        border: 1px solid #313131;
+        border-radius: 12px;
+        background: #191919;
+      }
+      .details-toggle {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        gap: 10px;
+        border: 0;
+        background: transparent;
+        padding: 10px 12px;
+        text-align: left;
+        cursor: pointer;
+      }
+      .command-mark {
+        display: grid;
+        width: 28px;
+        height: 28px;
+        place-items: center;
+        border-radius: 8px;
+        background: #252525;
+        color: #888;
+        font-family: monospace;
+      }
+      .command-summary {
+        display: flex;
+        min-width: 0;
+        flex: 1;
+        flex-direction: column;
+      }
+      .command-summary small,
+      .detail-grid small {
+        color: #606060;
+        font-size: 9px;
+      }
+      code {
+        color: #bbb;
+        font-family: "SFMono-Regular", Consolas, monospace;
+        font-size: 10px;
+      }
+      .detail-grid {
+        display: none;
+        grid-template-columns: 1fr 1fr;
+        gap: 1px;
+        border-top: 1px solid #2e2e2e;
+        background: #2e2e2e;
+      }
+      .detail-grid.open {
+        display: grid;
+      }
+      .detail-grid div {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        background: #181818;
+        padding: 10px 12px;
+      }
+
+      .options {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 0 12px;
+      }
+      .option {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        gap: 11px;
+        border: 1px solid transparent;
+        border-radius: 12px;
+        background: transparent;
+        padding: 10px 12px;
+        text-align: left;
+        cursor: pointer;
+      }
+      .option:hover {
+        background: #262626;
+      }
+      .option.selected {
+        border-color: #404040;
+        background: #2b2b2b;
+      }
+      .option-number {
+        display: grid;
+        width: 25px;
+        height: 25px;
+        flex: 0 0 auto;
+        place-items: center;
+        border: 1px solid #444;
+        border-radius: 50%;
+        color: #777;
+        font-size: 11px;
+      }
+      .multi .option-number {
+        border-radius: 7px;
+      }
+      .option.selected .option-number {
+        border-color: #e5e5e5;
+        background: #eee;
+        color: #151515;
+      }
+      .option-copy {
+        display: flex;
+        min-width: 0;
+        flex: 1;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 2px 10px;
+      }
+      .option-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        color: #bbb;
+        font-size: 12px;
+        font-weight: 560;
+      }
+      .option.selected .option-title {
+        color: #f0f0f0;
+      }
+      .badge {
+        border: 1px solid #454545;
+        border-radius: 999px;
+        padding: 1px 6px;
+        color: #888;
+        font-size: 8px;
+      }
+      .option-description {
+        min-width: 240px;
+        flex: 1;
+        color: #707070;
+        font-size: 11px;
+        line-height: 1.45;
+      }
+      .check {
+        color: #aaa;
+      }
+
+      .text-answer {
+        position: relative;
+        padding: 0 14px;
+      }
+      textarea {
+        display: block;
+        width: 100%;
+        min-height: 122px;
+        resize: none;
+        border: 1px solid #353535;
+        border-radius: 13px;
+        background: #191919;
+        padding: 12px 13px 28px;
+        color: #ddd;
+        font-size: 12px;
+        line-height: 1.6;
+      }
+      textarea::placeholder {
+        color: #555;
+      }
+      .counter {
+        position: absolute;
+        right: 27px;
+        bottom: 10px;
+        color: #505050;
+        font-size: 9px;
+      }
+
+      .card-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 16px 18px;
+      }
+      .keys {
+        display: flex;
+        gap: 12px;
+        color: #555;
+        font-size: 9px;
+      }
+      kbd {
+        display: inline-grid;
+        min-width: 20px;
+        height: 19px;
+        place-items: center;
+        border: 1px solid #3a3a3a;
+        border-bottom-color: #484848;
+        border-radius: 5px;
+        background: #292929;
+        padding: 0 5px;
+        color: #888;
+        font-family: inherit;
+        box-shadow: 0 1px #111;
+      }
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .skip {
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        padding: 8px 10px;
+        color: #737373;
+        font-size: 11px;
+        cursor: pointer;
+      }
+      .skip:hover {
+        background: #292929;
+        color: #aaa;
+      }
+      .continue {
+        border: 0;
+        border-radius: 999px;
+        background: #ededed;
+        padding: 8px 14px;
+        color: #141414;
+        font-size: 11px;
+        font-weight: 650;
+        cursor: pointer;
+      }
+      .continue:disabled {
+        background: #333;
+        color: #666;
+        cursor: not-allowed;
+      }
+
+      .complete {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        border: 1px solid #393939;
+        border-radius: 18px;
+        background: #202020;
+        padding: 18px;
+      }
+      .complete-mark {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border: 1px solid #454545;
+        border-radius: 10px;
+        background: #292929;
+      }
+      .complete-copy {
+        flex: 1;
+      }
+      .complete h2 {
+        margin: 0 0 3px;
+        font-size: 13px;
+      }
+      .complete p {
+        margin: 0;
+        color: #707070;
+        font-size: 10px;
+      }
+      .complete button {
+        border: 0;
+        border-radius: 999px;
+        background: #eee;
+        padding: 8px 12px;
+        color: #151515;
+        font-size: 10px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      @media (max-width: 820px) {
+        .app {
+          grid-template-columns: 1fr;
+        }
+        .sidebar {
+          display: none;
+        }
+        .workspace {
+          border-left: 0;
+          border-radius: 0;
+        }
+        .conversation,
+        .question-wrap {
+          width: min(100% - 24px, 896px);
+        }
+      }
+      @media (max-width: 560px) {
+        .topbar {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 7px;
+          padding: 10px 14px;
+        }
+        .conversation {
+          padding-top: 24px;
+        }
+        .user-message {
+          max-width: 92%;
+        }
+        .card-header {
+          padding: 15px;
+        }
+        .card h2 {
+          font-size: 14px;
+        }
+        .option {
+          align-items: flex-start;
+          padding: 10px 8px;
+        }
+        .option-copy {
+          flex-direction: column;
+        }
+        .option-description {
+          min-width: 0;
+        }
+        .keys .select-hint {
+          display: none;
+        }
+        .detail-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <aside class="sidebar">
+        <div class="side-actions">
+          <button class="icon-button" title="收起侧边栏">‹</button
+          ><button class="icon-button" title="新建对话">＋</button>
+        </div>
+        <button class="side-link"><span class="mark">⌕</span>搜索</button>
+        <button class="side-link"><span class="mark">✦</span>新对话</button>
+        <section class="group">
+          <p class="group-title">置顶</p>
+          <button class="side-link active">
+            <span class="mark">□</span>Ask User Question 设计
+          </button>
+        </section>
+        <section class="group">
+          <p class="group-title">项目</p>
+          <button class="side-link">
+            <span class="mark">▢</span>divisor-agent <span class="chevron">›</span></button
+          ><button class="side-link"><span class="mark">◇</span>agent-runtime 重构</button>
+        </section>
+        <section class="group">
+          <p class="group-title">对话</p>
+          <button class="side-link"><span class="mark">□</span>Permission Request 抽象</button
+          ><button class="side-link"><span class="mark">□</span>IPC extension 设计</button>
+        </section>
+        <div class="profile">
+          <span class="avatar">人</span
+          ><span class="profile-copy"><strong>zhiyu</strong><small>本地工作区</small></span
+          ><span>•••</span>
+        </div>
+      </aside>
+
+      <section class="workspace">
+        <header class="topbar">
+          <div class="title-row">
+            <h1>Ask User Question 设计</h1>
+            <span class="status">等待回答</span>
+          </div>
+          <div class="scenario-tabs" aria-label="切换原型场景">
+            <button id="generalTab" class="active" type="button">通用问题</button>
+            <button id="permissionTab" type="button">权限请求</button>
+          </div>
+        </header>
+
+        <div class="conversation">
+          <div class="user-message">
+            请把 Permission Request 抽象成可复用的 Ask User Question 能力，并给出交互方案。
+          </div>
+          <article class="assistant-message">
+            <span class="assistant-badge">✦</span>
+            <div>
+              <p>
+                可以。两种请求共享同一个问题模型、答案状态与提交流程；Permission
+                只是带有操作详情和预设语义的一类问题。
+              </p>
+              <p>我先确认三个会影响公共类型与 UI 边界的决策。</p>
+            </div>
+          </article>
+        </div>
+
+        <section id="questionRoot" class="question-wrap" aria-live="polite"></section>
+      </section>
+    </main>
+
+    <script>
+      const generalQuestions = [
+        {
+          id: "contract",
+          eyebrow: "架构决策",
+          title: "Ask User Question 的 IPC 类型契约采用哪种写法？",
+          hint: "选择一个方案；你仍可在下一步返回修改。",
+          type: "single",
+          options: [
+            ["双函数映射", "分别定义 InvokeEvents 与 OnEvents，调用方向和返回值都更明确。", "推荐"],
+            ["统一 Contract", "使用包含 invokes / events 字段的统一类型，结构紧凑但层级更深。"],
+            ["Payload 映射", "只映射 payload，再额外定义返回值规则；简单但复杂参数表达较弱。"],
+          ],
+        },
+        {
+          id: "capabilities",
+          eyebrow: "能力范围",
+          title: "第一版需要支持哪些提问形式？",
+          hint: "可多选，至少选择一项。",
+          type: "multiple",
+          options: [
+            ["单选", "适合确认方向、权限选择和互斥决策。"],
+            ["多选", "适合范围确认、功能勾选和批量偏好。"],
+            ["自由输入", "用户可补充原因、约束或未覆盖的答案。"],
+          ],
+        },
+        {
+          id: "followup",
+          eyebrow: "补充说明",
+          title: "还有哪些行为需要在通用能力中提前保留？",
+          hint: "可选；留空也可以直接提交。",
+          type: "text",
+          placeholder: "例如：支持超时、默认选项，或允许 agent 动态追加问题…",
+        },
+      ];
+
+      const permissionQuestion = {
+        id: "permission",
+        eyebrow: "权限确认",
+        title: "允许 Agent 执行这条终端命令吗？",
+        hint: "该请求会修改当前工作区的依赖锁文件。",
+        type: "single",
+        details: true,
+        options: [
+          ["允许一次", "仅批准本次操作。", "推荐"],
+          ["允许并记住", "以后以 pnpm install 开头的命令不再询问。"],
+          ["拒绝", "停止执行，并让 Agent 调整方案。"],
+        ],
+      };
+
+      const state = {
+        scenario: "general",
+        index: 0,
+        answers: { contract: [0], capabilities: [0, 2] },
+        text: "",
+        detailsOpen: false,
+        dismissed: false,
+        submitted: false,
+      };
+
+      const root = document.querySelector("#questionRoot");
+      const generalTab = document.querySelector("#generalTab");
+      const permissionTab = document.querySelector("#permissionTab");
+
+      function questions() {
+        return state.scenario === "general" ? generalQuestions : [permissionQuestion];
+      }
+      function question() {
+        return questions()[state.index];
+      }
+      function selected() {
+        return state.answers[question().id] || [];
+      }
+      function canSubmit() {
+        return question().type === "text" || selected().length > 0;
+      }
+
+      function switchScenario(next) {
+        state.scenario = next;
+        state.index = 0;
+        state.detailsOpen = false;
+        state.dismissed = false;
+        state.submitted = false;
+        generalTab.classList.toggle("active", next === "general");
+        permissionTab.classList.toggle("active", next === "permission");
+        render();
+      }
+
+      function choose(index) {
+        const current = selected();
+        state.answers[question().id] =
+          question().type === "multiple"
+            ? current.includes(index)
+              ? current.filter((item) => item !== index)
+              : [...current, index]
+            : [index];
+        render();
+      }
+
+      function go(nextIndex) {
+        state.index = Math.max(0, Math.min(questions().length - 1, nextIndex));
+        render();
+      }
+
+      function finishOrContinue() {
+        if (!canSubmit()) return;
+        if (state.index < questions().length - 1) go(state.index + 1);
+        else {
+          state.submitted = true;
+          render();
+        }
+      }
+
+      function skip() {
+        state.dismissed = true;
+        state.submitted = true;
+        render();
+      }
+
+      function renderDetails() {
+        if (!question().details) return "";
+        return `<div class="details"><button class="details-toggle" type="button" data-action="details" aria-expanded="${state.detailsOpen}"><span class="command-mark">&gt;_</span><span class="command-summary"><small>将要执行</small><code>pnpm install --frozen-lockfile</code></span><span>${state.detailsOpen ? "⌃" : "⌄"}</span></button><div class="detail-grid ${state.detailsOpen ? "open" : ""}"><div><small>命令</small><code>pnpm install --frozen-lockfile</code></div><div><small>位置</small><code>~/Projects/divisor-agent</code></div></div></div>`;
+      }
+
+      function renderAnswers() {
+        const item = question();
+        if (item.type === "text") {
+          return `<div class="text-answer"><textarea id="freeText" maxlength="500" placeholder="${item.placeholder}">${state.text}</textarea><span class="counter">${state.text.length} / 500</span></div>`;
+        }
+        return `<div class="options ${item.type === "multiple" ? "multi" : ""}" role="${item.type === "multiple" ? "group" : "radiogroup"}">${item.options
+          .map((option, index) => {
+            const active = selected().includes(index);
+            return `<button class="option ${active ? "selected" : ""}" type="button" data-option="${index}" role="${item.type === "multiple" ? "checkbox" : "radio"}" aria-checked="${active}"><span class="option-number">${active && item.type === "multiple" ? "✓" : index + 1}</span><span class="option-copy"><span class="option-title">${option[0]}${option[2] ? `<span class="badge">${option[2]}</span>` : ""}</span><span class="option-description">${option[1]}</span></span>${active ? `<span class="check">✓</span>` : ""}</button>`;
+          })
+          .join("")}</div>`;
+      }
+
+      function render() {
+        if (state.submitted) {
+          root.innerHTML = `<div class="complete"><span class="complete-mark">✓</span><div class="complete-copy"><h2>${state.dismissed ? "已忽略本次请求" : state.scenario === "permission" ? "权限选择已提交" : "已回答 3 个问题"}</h2><p>${state.dismissed ? "Agent 会收到 dismissed 状态并自行决定下一步。" : state.scenario === "permission" ? "Agent 将根据你的选择继续执行。" : "Agent 已收到回答，并会据此继续完善方案。"}</p></div><button type="button" data-action="reset">重新查看</button></div>`;
+          return;
+        }
+        const item = question();
+        const total = questions().length;
+        root.innerHTML = `<div class="card"><div class="card-header"><div><span class="eyebrow">${item.eyebrow}</span><h2>${item.title}</h2><p class="hint">${item.hint}</p></div><div class="pager"><button type="button" data-action="previous" ${state.index === 0 ? "disabled" : ""}>←</button><span>${state.index + 1} / ${total}</span><button type="button" data-action="next" ${state.index === total - 1 ? "disabled" : ""}>→</button></div></div>${renderDetails()}${renderAnswers()}<div class="card-footer"><div class="keys">${item.type !== "text" ? `<span class="select-hint"><kbd>↑</kbd><kbd>↓</kbd> 选择</span>` : ""}<span><kbd>Esc</kbd> ${state.scenario === "permission" ? "拒绝" : "忽略"}</span></div><div class="actions"><button class="skip" type="button" data-action="skip">${state.scenario === "permission" ? "拒绝" : "忽略"}</button><button class="continue" type="button" data-action="continue" ${canSubmit() ? "" : "disabled"}>${state.index === total - 1 ? (state.scenario === "permission" ? "确认 ↵" : "提交回答 ↵") : "继续 ↵"}</button></div></div></div>`;
+        const text = document.querySelector("#freeText");
+        if (text) {
+          text.focus();
+          text.addEventListener("input", (event) => {
+            state.text = event.target.value;
+            document.querySelector(".counter").textContent = `${state.text.length} / 500`;
+          });
+        }
+      }
+
+      root.addEventListener("click", (event) => {
+        const option = event.target.closest("[data-option]");
+        const action = event.target.closest("[data-action]");
+        if (option) choose(Number(option.dataset.option));
+        if (!action) return;
+        if (action.dataset.action === "previous") go(state.index - 1);
+        if (action.dataset.action === "next") go(state.index + 1);
+        if (action.dataset.action === "skip") skip();
+        if (action.dataset.action === "continue") finishOrContinue();
+        if (action.dataset.action === "details") {
+          state.detailsOpen = !state.detailsOpen;
+          render();
+        }
+        if (action.dataset.action === "reset") {
+          state.dismissed = false;
+          state.submitted = false;
+          render();
+        }
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (state.submitted) return;
+        const typing = event.target.tagName === "TEXTAREA";
+        if (event.key === "Escape") {
+          event.preventDefault();
+          skip();
+          return;
+        }
+        if (event.key === "Enter" && (!typing || event.metaKey || event.ctrlKey)) {
+          event.preventDefault();
+          finishOrContinue();
+          return;
+        }
+        if (typing || question().type === "text") return;
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          event.preventDefault();
+          const direction = event.key === "ArrowDown" ? 1 : -1;
+          choose(
+            ((selected()[0] || 0) + direction + question().options.length) %
+              question().options.length,
+          );
+        }
+        const number = Number(event.key) - 1;
+        if (number >= 0 && number < question().options.length) choose(number);
+      });
+
+      generalTab.addEventListener("click", () => switchScenario("general"));
+      permissionTab.addEventListener("click", () => switchScenario("permission"));
+      render();
+    </script>
+  </body>
+</html>

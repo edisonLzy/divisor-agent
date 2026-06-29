@@ -3,12 +3,14 @@ import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { isAgentMessageEntry } from "@renderer/lib/is";
 import { sideChatStore } from "@renderer/store/side-chat";
 import type { SideChatArtifactRecord } from "@renderer/store/side-chat/side-chat-slice";
+import type { UserInteractionRequest } from "@shared/user-interaction-ipc";
 import { useCallback, useMemo } from "react";
 import { useStore } from "zustand";
 
 import { ChatMessages } from "../../messages";
 import { PromptInput } from "../../prompt-input";
 import type { PromptSubmission } from "../../prompt-types";
+import { UserInteractionPanel } from "../../user-interaction";
 
 interface SideChatArtifactProps {
   artifact: SideChatArtifactRecord;
@@ -27,6 +29,10 @@ export function SideChatArtifact({ artifact }: SideChatArtifactProps) {
   );
   const isRunning = entryState.status === "running";
   const inputDisabled = meta?.inputDisabled ?? false;
+  const pendingUserInteraction = useStore(
+    sideChatStore,
+    (state) => state.getUserInteractionState(artifact.id).requests[0] ?? null,
+  );
 
   const submitPrompt = useCallback(
     async (submission: PromptSubmission) => {
@@ -81,15 +87,50 @@ export function SideChatArtifact({ artifact }: SideChatArtifactProps) {
       </div>
 
       <div className="shrink-0 px-2 pb-2 pt-2">
-        <PromptInput
-          disabled={inputDisabled}
-          initialModel={meta?.model ?? null}
-          isRunning={isRunning}
-          onStop={stopPrompt}
-          onSubmit={submitPrompt}
-          sessionId={artifact.id}
-        />
+        {pendingUserInteraction ? (
+          <SideChatUserInteractionPanel request={pendingUserInteraction} sessionId={artifact.id} />
+        ) : (
+          <PromptInput
+            disabled={inputDisabled}
+            initialModel={meta?.model ?? null}
+            isRunning={isRunning}
+            onStop={stopPrompt}
+            onSubmit={submitPrompt}
+            sessionId={artifact.id}
+          />
+        )}
       </div>
     </div>
+  );
+}
+
+function SideChatUserInteractionPanel({
+  request,
+  sessionId,
+}: {
+  request: UserInteractionRequest;
+  sessionId: string;
+}) {
+  return (
+    <UserInteractionPanel
+      request={request}
+      sessionId={sessionId}
+      onResolved={(submission) => {
+        const store = sideChatStore.getState();
+        store.resolveUserInteraction(sessionId, request.requestId, submission);
+        if (!request.toolCallId) return;
+
+        const existing = store.getEntryState(sessionId).toolStates.get(request.toolCallId);
+        if (!existing || existing.status === "done" || existing.status === "error") return;
+        store.setToolState(sessionId, request.toolCallId, {
+          ...existing,
+          status: "running",
+          output:
+            submission.status === "dismissed"
+              ? "User dismissed the request."
+              : "User response submitted.",
+        });
+      }}
+    />
   );
 }

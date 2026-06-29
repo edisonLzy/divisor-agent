@@ -52,10 +52,21 @@ export function App() {
       appendSideChatMeta(sideChatId, input) {
         const sideChat = sideChatStore.getState();
         if (!sideChat.getSideChatMeta(sideChatId)) {
+          const mainSessionModel = mainStore.getState().getSession(input.mainSessionId)?.model;
+          const model = input.model
+            ? mainSessionModel?.modelId === input.model.modelId &&
+              mainSessionModel.providerId === input.model.providerId
+              ? mainSessionModel
+              : {
+                  ...input.model,
+                  modelName: input.model.modelId,
+                  providerName: input.model.providerId,
+                }
+            : undefined;
           sideChat.appendSideChatMeta(sideChatId, {
             mainSessionId: input.mainSessionId,
             context: input.context ?? {},
-            model: input.model,
+            model,
             pendingPrompt: input.pendingPrompt,
             createdAt: Date.now(),
             inputDisabled: input.inputDisabled,

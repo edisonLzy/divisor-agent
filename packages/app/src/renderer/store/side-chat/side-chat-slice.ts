@@ -69,8 +69,10 @@ export const createSideChatSlice: StateCreator<SideChatStoreState, [], [], SideC
   removeSideChatMeta: (sideChatId) => {
     set((prev) => {
       const sideChatMeta = new Map(prev.sideChatMeta);
+      const userInteractionStates = new Map(prev.userInteractionStates);
       sideChatMeta.delete(sideChatId);
-      return { sideChatMeta };
+      userInteractionStates.delete(sideChatId);
+      return { sideChatMeta, userInteractionStates };
     });
   },
 });

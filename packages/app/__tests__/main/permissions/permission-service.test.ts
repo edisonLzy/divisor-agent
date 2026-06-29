@@ -1,68 +1,56 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { PermissionService } from "../../../src/main/permissions/permission-service.js";
+import type { PermissionRequest } from "../../../src/shared/permissions-ipc.js";
 
 describe("PermissionService", () => {
-  it("forwards requests to the callback and resolves approved permissions", async () => {
+  it("adapts terminal permissions to a generic user interaction", () => {
     const service = new PermissionService();
-    const handleRequest = vi.fn();
-    const request = {
-      requestId: "request-1",
-      toolCallId: "tool-call-1",
-      toolName: "fs/write_text_file",
-      toolLabel: "Write File",
-      operation: "fs/write_text_file",
-      args: { path: "/tmp/demo.txt", content: "hello" },
-      createdAt: Date.now(),
-    };
+    const request = createPermissionRequest();
 
-    service.setRequestCallback(handleRequest);
+    const interaction = service.createInteractionRequest(request);
 
-    const permissionPromise = service.requestPermission(request);
-    service.approve(request.requestId);
-
-    await expect(permissionPromise).resolves.toEqual({ approved: true });
-    expect(handleRequest).toHaveBeenCalledWith(request);
+    expect(interaction).toMatchObject({
+      requestId: request.requestId,
+      source: "permission",
+      toolCallId: request.toolCallId,
+      questions: [
+        {
+          id: "permission_decision",
+          type: "single",
+          options: [{ id: "approve_once" }, { id: "approve_remember" }, { id: "deny" }],
+        },
+      ],
+    });
+    expect(interaction.details?.summary).toBe("pnpm lint packages/app");
   });
 
-  it("returns the denial reason when a request is rejected", async () => {
+  it("maps approve, remember, deny, and dismiss outcomes", () => {
     const service = new PermissionService();
-    const request = {
-      requestId: "request-2",
-      toolCallId: "tool-call-2",
-      toolName: "terminal/create",
-      toolLabel: "Run Terminal Command",
-      operation: "terminal/create",
-      args: { command: "touch /tmp/demo.txt" },
-      createdAt: Date.now(),
-    };
+    const request = createPermissionRequest();
 
-    const permissionPromise = service.requestPermission(request);
-    service.reject(request.requestId, "Please explain the change first.");
-
-    await expect(permissionPromise).resolves.toEqual({
+    expect(service.resolveInteraction(request, submitted("approve_once"))).toEqual({
+      approved: true,
+    });
+    expect(service.resolveInteraction(request, submitted("approve_remember"))).toEqual({
+      approved: true,
+      rememberCommandPrefix: "pnpm lint packages/app",
+    });
+    expect(
+      service.resolveInteraction(request, submitted("deny", "Please use a read-only command.")),
+    ).toEqual({
       approved: false,
-      reason: "Please explain the change first.",
+      reason: "Please use a read-only command.",
+    });
+    expect(service.resolveInteraction(request, { status: "dismissed" })).toEqual({
+      approved: false,
+      reason: "Permission request dismissed by user",
     });
   });
 
-  it("auto-approves future commands after remembering a command prefix", async () => {
+  it("auto-approves future commands after remembering a command prefix", () => {
     const service = new PermissionService();
-    const request = {
-      requestId: "request-3",
-      toolCallId: "tool-call-3",
-      toolName: "terminal/create",
-      toolLabel: "Run Terminal Command",
-      operation: "terminal/create",
-      args: { command: "pnpm lint packages/app" },
-      createdAt: Date.now(),
-    };
-
-    const permissionPromise = service.requestPermission(request);
-    service.rememberApproval(request.requestId, "pnpm lint");
-    service.approve(request.requestId);
-
-    await expect(permissionPromise).resolves.toEqual({ approved: true });
+    service.rememberApproval("terminal/create", "pnpm lint");
 
     expect(
       service.shouldAutoApprove({
@@ -71,7 +59,6 @@ describe("PermissionService", () => {
         args: { command: "pnpm lint packages/app/src" },
       }),
     ).toBe(true);
-
     expect(
       service.shouldAutoApprove({
         toolName: "terminal/create",
@@ -81,3 +68,28 @@ describe("PermissionService", () => {
     ).toBe(false);
   });
 });
+
+function createPermissionRequest(): PermissionRequest {
+  return {
+    requestId: "request-1",
+    toolCallId: "tool-call-1",
+    toolName: "terminal/create",
+    toolLabel: "Run Terminal Command",
+    operation: "terminal/create",
+    args: { command: "pnpm lint packages/app" },
+    createdAt: 1,
+  };
+}
+
+function submitted(optionId: string, followUp?: string) {
+  return {
+    status: "submitted" as const,
+    answers: [
+      {
+        questionId: "permission_decision",
+        selectedOptionIds: [optionId],
+        optionInputs: followUp ? { [optionId]: followUp } : undefined,
+      },
+    ],
+  };
+}

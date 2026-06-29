@@ -49,6 +49,7 @@ export function useAgentMessages() {
 
       agent_end: async (event) => {
         const { sessionId } = event;
+        mainStore.getState().clearUserInteractionState(sessionId);
 
         const entries = mainStore.getState().getEntryState(sessionId).entries;
         const missingFailureMessage = findMissingFailureMessage(entries, event.messages);
@@ -244,8 +245,7 @@ export function useAgentMessages() {
           args,
           details,
           output: existing.output ?? "",
-          requestId: existing.requestId,
-          approvalStatus: existing.approvalStatus,
+          interactionRequestId: existing.interactionRequestId,
         });
       },
 
@@ -265,26 +265,27 @@ export function useAgentMessages() {
           args: existing?.args ?? {},
           details: result?.details ?? existing?.details,
           output,
-          requestId: existing?.requestId,
-          approvalStatus: existing?.approvalStatus,
+          interactionRequestId: existing?.interactionRequestId,
         });
       },
 
-      permission_requested: (event) => {
+      user_interaction_requested: (event) => {
         const { sessionId, type: _type, ...request } = event;
 
-        const existing = getToolState(sessionId, request.toolCallId);
-        mainStore.getState().enqueuePermissionRequest(sessionId, request);
-        mainStore.getState().setToolState(sessionId, request.toolCallId, {
-          toolCallId: request.toolCallId,
-          toolName: request.toolName,
-          status: "awaiting_approval",
-          args: existing?.args ?? request.args,
-          details: existing?.details,
-          output: existing?.output ?? "Waiting for permission approval...",
-          requestId: request.requestId,
-          approvalStatus: "pending",
-        });
+        mainStore.getState().enqueueUserInteraction(sessionId, request);
+        if (request.toolCallId) {
+          const existing = getToolState(sessionId, request.toolCallId);
+          mainStore.getState().setToolState(sessionId, request.toolCallId, {
+            toolCallId: request.toolCallId,
+            toolName:
+              existing?.toolName ?? (request.source === "permission" ? "permission" : "ask_user"),
+            status: "awaiting_user",
+            args: existing?.args ?? {},
+            details: existing?.details,
+            output: existing?.output ?? "Waiting for user response...",
+            interactionRequestId: request.requestId,
+          });
+        }
       },
     },
     {

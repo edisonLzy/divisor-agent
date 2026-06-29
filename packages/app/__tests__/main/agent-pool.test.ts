@@ -99,6 +99,17 @@ describe("AgentPool", () => {
     vi.useRealTimers();
   });
 
+  it("does not create a runtime for stale user interaction responses", async () => {
+    const pool = new AgentPool();
+
+    await expect(
+      pool.resolveUserInteraction("missing-session", "missing-request", {
+        status: "dismissed",
+      }),
+    ).rejects.toThrow("Agent runtime not found: missing-session");
+    expect(pool.activeCount()).toBe(0);
+  });
+
   it("runs a one-time agent with the provided system prompt, model, and no tools", async () => {
     const pool = new AgentPool();
     const userMessage = createUserMessage("Name this session");

@@ -51,7 +51,3 @@ export interface PermissionResolution {
   reason?: string;
   rememberCommandPrefix?: string;
 }
-
-export interface PermissionRequestedEvent extends PermissionRequest {
-  type: "permission_requested";
-}

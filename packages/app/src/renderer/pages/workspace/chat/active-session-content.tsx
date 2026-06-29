@@ -9,6 +9,7 @@ import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { isAgentMessageEntry, isAgentUserMessage } from "@renderer/lib/is";
 import type { ToolExecutionState } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
+import type { UserInteractionRequest } from "@shared/user-interaction-ipc";
 import { useQueryClient } from "@tanstack/react-query";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { motion } from "motion/react";
@@ -20,10 +21,10 @@ import { ArtifactsPanel } from "./artifacts";
 import { ChatMessages } from "./messages";
 import { FixedActions, PanelHeader } from "./panel-header";
 import { PendingMessagesPanel } from "./pending-messages";
-import { PermissionApprovalPanel } from "./permission";
 import { PromptInput } from "./prompt-input";
 import type { PromptSubmission } from "./prompt-types";
 import { createSessionTitleFromPrompt, shouldAutoRenameSession } from "./session-title";
+import { UserInteractionPanel } from "./user-interaction";
 
 interface ActiveSessionContentProps {
   insetForWindowControls: boolean;
@@ -51,12 +52,12 @@ export function ActiveSessionContent({ insetForWindowControls }: ActiveSessionCo
   const activeSession = useStore(mainStore, (state) =>
     activeSessionId ? state.getSession(activeSessionId) : undefined,
   );
-  const pendingPermissionRequest = useStore(mainStore, (state) => {
+  const pendingUserInteraction = useStore(mainStore, (state) => {
     if (!activeSessionId) {
       return null;
     }
 
-    return state.getPermissionState(activeSessionId).requests[0] ?? null;
+    return state.getUserInteractionState(activeSessionId).requests[0] ?? null;
   });
   const sessionName = activeSession?.name.trim() || "untitled";
 
@@ -91,8 +92,11 @@ export function ActiveSessionContent({ insetForWindowControls }: ActiveSessionCo
             >
               <div className="mx-auto flex w-full max-w-4xl flex-col gap-2">
                 {activeSessionId ? <PendingMessagesPanel sessionId={activeSessionId} /> : null}
-                {activeSessionId && pendingPermissionRequest ? (
-                  <PermissionApprovalPanel sessionId={activeSessionId} />
+                {activeSessionId && pendingUserInteraction ? (
+                  <MainUserInteractionPanel
+                    request={pendingUserInteraction}
+                    sessionId={activeSessionId}
+                  />
                 ) : (
                   <PromptInput
                     disabled={false}
@@ -124,6 +128,37 @@ export function ActiveSessionContent({ insetForWindowControls }: ActiveSessionCo
         <ToggleArtifactPanelButton sessionId={activeSessionId} />
       </FixedActions>
     </div>
+  );
+}
+
+function MainUserInteractionPanel({
+  request,
+  sessionId,
+}: {
+  request: UserInteractionRequest;
+  sessionId: string;
+}) {
+  return (
+    <UserInteractionPanel
+      request={request}
+      sessionId={sessionId}
+      onResolved={(submission) => {
+        const store = mainStore.getState();
+        store.resolveUserInteraction(sessionId, request.requestId, submission);
+        if (!request.toolCallId) return;
+
+        const existing = store.getEntryState(sessionId).toolStates.get(request.toolCallId);
+        if (!existing || existing.status === "done" || existing.status === "error") return;
+        store.setToolState(sessionId, request.toolCallId, {
+          ...existing,
+          status: "running",
+          output:
+            submission.status === "dismissed"
+              ? "User dismissed the request."
+              : "User response submitted.",
+        });
+      }}
+    />
   );
 }
 

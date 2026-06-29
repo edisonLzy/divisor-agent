@@ -12,6 +12,7 @@ import Emittery from "emittery";
 import { v4 as uuidv4 } from "uuid";
 
 import type { AllowedMainExposeEvents } from "../../shared/events-ipc.js";
+import type { UserInteractionSubmission } from "../../shared/user-interaction-ipc.js";
 import { AgentRuntime } from "../agent-runtime.js";
 import { ModelRegistry } from "../models/index.js";
 import { SkillService } from "../skills/index.js";
@@ -102,6 +103,19 @@ export class ExtensionRuntimeService
     const runtime = this.runtimes.get(agentId);
     if (!runtime) return;
     await runtime.abortPrompt();
+  }
+
+  hasRuntime(agentId: string) {
+    return this.runtimes.has(agentId);
+  }
+
+  async resolveUserInteraction(
+    agentId: string,
+    requestId: string,
+    submission: UserInteractionSubmission,
+  ) {
+    const runtime = this.getRuntime(agentId);
+    await runtime.resolveUserInteraction(requestId, submission);
   }
 
   async destroyAgent(agentId: string) {

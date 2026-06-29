@@ -18,8 +18,8 @@ interface AssistantToolMessageProps {
 
 function statusLabel(status?: ToolExecutionState["status"]): string {
   switch (status) {
-    case "awaiting_approval":
-      return "等待确认";
+    case "awaiting_user":
+      return "等待回答";
     case "done":
       return "已处理";
     case "error":
@@ -41,7 +41,7 @@ export function AssistantToolMessage({
   const isRunning = toolState?.status === "running";
   const output =
     toolState?.output ||
-    (toolState?.status === "awaiting_approval" ? "Waiting for permission approval…" : "");
+    (toolState?.status === "awaiting_user" ? "Waiting for user response…" : "");
   const assistantBlock = getAssistantBlockDescriptor(toolState?.details);
   const blockRegistration = assistantBlock ? registry.getAssistantBlock(assistantBlock.type) : null;
   const Block = blockRegistration?.render;
