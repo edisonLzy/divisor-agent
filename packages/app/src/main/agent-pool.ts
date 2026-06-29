@@ -49,11 +49,10 @@ export class AgentPool
 
       (this.events.emit as (...args: unknown[]) => Promise<void>)(name, data);
     });
-    this.extensionService = new ExtensionService({
-      agentRuntime: this.extensionRuntimeService,
-      getBrowserWindow: () => this.currentBrowserWindow,
-    });
-    this.extensionRuntimeService.setExtensionService(this.extensionService);
+    this.extensionService = new ExtensionService(
+      this.extensionRuntimeService,
+      () => this.currentBrowserWindow,
+    );
 
     // Bind IPC channels + Emittery forwarding last, after all internal state is ready.
     this.unbind = this.bind();

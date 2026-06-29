@@ -6,11 +6,9 @@ import type { AnyMainExtensionDefinition, MainExtensionRuntimeAPI } from "./defi
 import { MainExtensionRegistry } from "./registry.js";
 import type { UntypedExtensionIPCHandler } from "./registry.js";
 
-export interface MainExtensionContextValues<
-  TAgentRuntime extends MainExtensionRuntimeAPI = MainExtensionRuntimeAPI,
-> {
+export interface MainExtensionContextValues {
   getBrowserWindow(): BrowserWindow | null;
-  agentRuntime: TAgentRuntime;
+  extensionRuntime: MainExtensionRuntimeAPI;
 }
 
 export class MainExtensionBridge {
@@ -59,7 +57,7 @@ export class MainExtensionBridge {
               handler as UntypedExtensionIPCHandler,
             ),
         },
-        runtime: this.contextValues.agentRuntime,
+        runtime: this.contextValues.extensionRuntime,
         systemPrompt: {
           register: (prompt) => this.registry.registerSystemPrompt(extension, prompt),
         },

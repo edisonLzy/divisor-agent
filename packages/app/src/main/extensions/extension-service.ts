@@ -2,13 +2,13 @@ import { MainExtensionBridge } from "@divisor-agent/extension-core/main";
 import type {
   ExtensionAgentModel,
   ExtensionAgentToolOptions,
-  MainExtensionContextValues,
 } from "@divisor-agent/extension-core/main";
+import type { BrowserWindow } from "electron";
 
 import type { SystemPromptBuilder } from "../prompt/index.js";
 import type { AppTool } from "../tools/index.js";
 import { installedMainExtensions } from "./installed-extensions.js";
-import type { ExtensionRuntimeService } from "./runtime-service.js";
+import { ExtensionRuntimeService } from "./runtime-service.js";
 
 export interface ExtensionToolRuntimeContext {
   getModel(): ExtensionAgentModel | undefined;
@@ -16,11 +16,18 @@ export interface ExtensionToolRuntimeContext {
 }
 
 export class ExtensionService extends MainExtensionBridge implements SystemPromptBuilder {
-  private runtimeService: ExtensionRuntimeService;
+  private readonly runtimeService: ExtensionRuntimeService;
 
-  constructor(contextValues: MainExtensionContextValues<ExtensionRuntimeService>) {
-    super(installedMainExtensions, contextValues);
-    this.runtimeService = contextValues.agentRuntime;
+  constructor(
+    runtimeService: ExtensionRuntimeService,
+    getBrowserWindow: () => BrowserWindow | null,
+  ) {
+    super(installedMainExtensions, {
+      extensionRuntime: runtimeService,
+      getBrowserWindow,
+    });
+    this.runtimeService = runtimeService;
+    runtimeService.setExtensionService(this);
     this.initialize();
   }
 

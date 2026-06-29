@@ -16,6 +16,7 @@ import {
   parseExtensionParts,
   RendererExtensionBridge,
 } from "@divisor-agent/extension-core/renderer";
+import type { BrowserWindow } from "electron";
 import { describe, expect, it, vi } from "vitest";
 
 describe("extension-core", () => {
@@ -33,13 +34,16 @@ describe("extension-core", () => {
     }
 
     const send = vi.fn();
-    const getBrowserWindow = vi.fn(() => ({
-      isDestroyed: () => false,
-      webContents: {
-        isDestroyed: () => false,
-        send,
-      },
-    }));
+    const getBrowserWindow = vi.fn(
+      () =>
+        ({
+          isDestroyed: () => false,
+          webContents: {
+            isDestroyed: () => false,
+            send,
+          },
+        }) as unknown as BrowserWindow,
+    );
     const sessionDestroyed = vi.fn();
     const setup = vi.fn((ctx) => {
       ctx.getBrowserWindow();
@@ -67,7 +71,7 @@ describe("extension-core", () => {
       setup,
     });
     const bridge = new MainExtensionBridge([extension], {
-      agentRuntime: createAgentRuntime(),
+      extensionRuntime: createAgentRuntime(),
       getBrowserWindow,
     });
 
@@ -298,7 +302,7 @@ after`);
 
 function createContextValues(): MainExtensionContextValues {
   return {
-    agentRuntime: createAgentRuntime(),
+    extensionRuntime: createAgentRuntime(),
     getBrowserWindow: () => null,
   };
 }
