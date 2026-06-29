@@ -4,24 +4,32 @@ import { app, BrowserWindow } from "electron";
 
 import { bindAgentRuntimeIPC } from "./agent-ipc.js";
 import { AgentPool } from "./agent-pool.js";
-
-let browserWindow: BrowserWindow | null = null;
+import { BrowserWindowManager } from "./browser-window/index.js";
+import { FileSystemManager } from "./file-system/index.js";
 
 app.whenReady().then(() => {
-  browserWindow = createWindow();
+  let browserWindow: BrowserWindow | null = createWindow();
 
-  const agentPool = new AgentPool({ getBrowserWindow });
+  const agentPool = new AgentPool(browserWindow);
 
-  const unbind = bindAgentRuntimeIPC(agentPool, getBrowserWindow);
+  const fsManager = new FileSystemManager(browserWindow);
+  const browserWindowManager = new BrowserWindowManager(browserWindow);
+
+  const unbindExtensionIPC = bindAgentRuntimeIPC(agentPool);
 
   app.on("activate", () => {
-    if (!getBrowserWindow()) {
+    if (!browserWindow || browserWindow.isDestroyed()) {
       browserWindow = createWindow();
+      agentPool.updateBrowserWindow(browserWindow);
+      fsManager.updateBrowserWindow(browserWindow);
+      browserWindowManager.updateBrowserWindow(browserWindow);
     }
   });
 
   app.on("quit", () => {
-    unbind();
+    unbindExtensionIPC();
+    void fsManager.destroy();
+    void browserWindowManager.destroy();
     void agentPool.destroyAll();
   });
 });
@@ -59,9 +67,4 @@ function createWindow() {
   }
 
   return mainWindow;
-}
-
-function getBrowserWindow() {
-  if (!browserWindow || browserWindow.isDestroyed()) return null;
-  return browserWindow;
 }

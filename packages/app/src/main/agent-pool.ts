@@ -1,22 +1,19 @@
 import { Agent } from "@earendil-works/pi-agent-core";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { Message } from "@earendil-works/pi-ai";
-import { BrowserWindow } from "electron";
+import type { BrowserWindow } from "electron";
 import Emittery from "emittery";
 
 import { AllowedMainExposeEvents } from "../shared/events-ipc.js";
 import { AgentModelsIPC } from "../shared/models-ipc.js";
 import { AgentSessionIPC } from "../shared/session-ipc.js";
 import { AgentSkillsIPC } from "../shared/skills-ipc.js";
+import { AbstractAgentIPCHandler } from "./agent-ipc.js";
 import { AgentRuntime } from "./agent-runtime.js";
 import { ExtensionService } from "./extensions/index.js";
 import { ExtensionRuntimeService } from "./extensions/runtime-service.js";
 import { ModelRegistry } from "./models/index.js";
 import { SkillService } from "./skills/index.js";
-
-interface AgentPoolOptions {
-  getBrowserWindow: () => BrowserWindow | null;
-}
 
 /**
  * Manages multiple AgentRuntime instances, keyed by sessionId.
@@ -24,17 +21,22 @@ interface AgentPoolOptions {
  * All methods accept an explicit sessionId — no internal "current session" state.
  */
 export class AgentPool
-  extends Emittery<AllowedMainExposeEvents>
+  extends AbstractAgentIPCHandler<AgentSessionIPC & AgentModelsIPC & AgentSkillsIPC>
   implements AgentSessionIPC, AgentModelsIPC, AgentSkillsIPC
 {
+  // Internal Emittery (composition, since we already extend AbstractAgentIPCHandler
+  // and TS class can only single-inherit). All event traffic goes through `this.events`.
+  private events = new Emittery<AllowedMainExposeEvents>();
+
   private modelRegistry: ModelRegistry;
   private runtimes: Map<string, AgentRuntime>;
   private skillService: SkillService;
   private extensionService: ExtensionService;
   private extensionRuntimeService: ExtensionRuntimeService;
 
-  constructor(options: AgentPoolOptions) {
-    super();
+  constructor(browserWindow: BrowserWindow) {
+    super(browserWindow);
+
     this.modelRegistry = new ModelRegistry();
     this.runtimes = new Map();
     this.skillService = new SkillService();
@@ -45,13 +47,16 @@ export class AgentPool
     this.extensionRuntimeService.onAny(({ name, data }) => {
       if (typeof name !== "string") return;
 
-      (this.emit as (...args: unknown[]) => Promise<void>)(name, data);
+      (this.events.emit as (...args: unknown[]) => Promise<void>)(name, data);
     });
     this.extensionService = new ExtensionService({
       agentRuntime: this.extensionRuntimeService,
-      getBrowserWindow: options.getBrowserWindow,
+      getBrowserWindow: () => this.currentBrowserWindow,
     });
     this.extensionRuntimeService.setExtensionService(this.extensionService);
+
+    // Bind IPC channels + Emittery forwarding last, after all internal state is ready.
+    this.unbind = this.bind();
   }
 
   // ── Runtime lifecycle ────────────────────────────────────────────────────
@@ -72,7 +77,7 @@ export class AgentPool
     runtime.onAny(({ name, data }) => {
       if (typeof name !== "string") return;
 
-      (this.emit as (...args: unknown[]) => Promise<void>)(name, {
+      (this.events.emit as (...args: unknown[]) => Promise<void>)(name, {
         scope: runtime.getScope(),
         sessionId,
         ...(data as object),
@@ -101,7 +106,8 @@ export class AgentPool
     }
     this.extensionRuntimeService.destroyAll();
     this.extensionService.dispose();
-    this.clearListeners();
+    this.events.clearListeners();
+    this.unbind?.();
   }
 
   invokeExtensionIPC(extensionId: string, method: string, args: unknown[]) {
@@ -110,6 +116,47 @@ export class AgentPool
 
   activeCount(): number {
     return this.runtimes.size;
+  }
+
+  // ── IPC binding (template method) ────────────────────────────────────────
+
+  protected override bind(): VoidFunction {
+    const channels = [
+      "setModel",
+      "getAvailableModels",
+      "getModelConfig",
+      "saveModelConfig",
+      "prompt",
+      "runOneTimeAgent",
+      "abortPrompt",
+      "setHistoryMessages",
+      "setSessionId",
+      "setSessionScope",
+      "destroySession",
+      "setPermissionMode",
+      "resolvePermissionRequest",
+      "listSkills",
+      "setSkillEnabled",
+    ] as const;
+
+    for (const channel of channels) {
+      this.typedIpcMain.handle(
+        channel,
+        (this as unknown as Record<string, unknown>)[channel] as never,
+      );
+    }
+
+    // Forward Emittery events to the renderer.
+    const offAny = this.events.onAny(({ name, data }) => {
+      this.sendMessageToRenderer(name, data);
+    });
+
+    return () => {
+      for (const channel of channels) {
+        this.typedIpcMain.removeHandler(channel);
+      }
+      offAny();
+    };
   }
 
   // ── Implements AgentSessionIPC ───────────────────────────────────────────
