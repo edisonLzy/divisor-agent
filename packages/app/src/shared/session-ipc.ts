@@ -17,6 +17,9 @@ export interface AgentSessionIPC {
   ) => Promise<string>;
   abortPrompt: (sessionId: string) => Promise<void>;
   setHistoryMessages: (sessionId: string, messages: AgentMessage[]) => Promise<void>;
+  getSessionRuntimeSnapshot: (
+    sessionId: string,
+  ) => Promise<{ isRunning: boolean; messages: AgentMessage[] } | null>;
   setSessionId: (sessionId: string) => Promise<void>;
   setSessionScope: (sessionId: string, scope: AgentSessionScope) => Promise<void>;
   destroySession: (sessionId: string) => Promise<void>;

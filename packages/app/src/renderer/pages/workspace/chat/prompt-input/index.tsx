@@ -19,6 +19,7 @@ import { PermissionSelector, usePermissionSelector } from "./permission-selector
 
 interface PromptInputProps {
   disabled?: boolean;
+  focusRequest?: number;
   isRunning?: boolean;
   initialModel?: AvailableModel | null;
   onSubmit: (submission: PromptSubmission) => Promise<void> | void;
@@ -30,6 +31,7 @@ interface PromptInputProps {
 
 export function PromptInput({
   disabled = false,
+  focusRequest,
   initialModel = null,
   isRunning = false,
   onSubmit,
@@ -50,6 +52,11 @@ export function PromptInput({
     disabled,
     getFloatingReference: () => editorContainerRef.current,
   });
+
+  useEffect(() => {
+    if (focusRequest === undefined) return;
+    editor?.commands.focus("end");
+  }, [editor, focusRequest]);
 
   useEffect(() => {
     if (!editor || !sessionId) return;

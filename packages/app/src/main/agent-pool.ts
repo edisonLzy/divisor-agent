@@ -3,7 +3,7 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { Message } from "@earendil-works/pi-ai";
 import Emittery from "emittery";
 
-import { AllowedMainExposeEvents } from "../shared/events-ipc.js";
+import type { AllowedAgentExposeEvents } from "../shared/events-ipc.js";
 import { AgentModelsIPC } from "../shared/models-ipc.js";
 import { AgentSessionIPC } from "../shared/session-ipc.js";
 import { AgentSkillsIPC } from "../shared/skills-ipc.js";
@@ -19,7 +19,7 @@ import { SkillService } from "./skills/index.js";
  * All methods accept an explicit sessionId — no internal "current session" state.
  */
 export class AgentPool
-  extends Emittery<AllowedMainExposeEvents>
+  extends Emittery<AllowedAgentExposeEvents>
   implements AgentSessionIPC, AgentModelsIPC, AgentSkillsIPC
 {
   private modelRegistry: ModelRegistry;
@@ -117,6 +117,13 @@ export class AgentPool
   ) => {
     const runtime = this.getOrCreateRuntime(sessionId);
     runtime.setHistoryMessages(messages);
+  };
+
+  public getSessionRuntimeSnapshot: AgentSessionIPC["getSessionRuntimeSnapshot"] = async (
+    sessionId,
+  ) => {
+    const runtime = this.runtimes.get(sessionId);
+    return runtime?.getSnapshot() ?? null;
   };
 
   public setPermissionMode: AgentSessionIPC["setPermissionMode"] = async (sessionId, mode) => {
