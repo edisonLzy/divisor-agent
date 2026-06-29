@@ -83,12 +83,14 @@ export const createSessionsSlice: StateCreator<MainStoreState, [], [], SessionsS
       const sessions = prev.sessions.filter((session) => session.id !== sessionId);
       const activeSessionId = prev.activeSessionId === sessionId ? null : prev.activeSessionId;
       const streamingEntryIds = new Map(prev.streamingEntryIds);
-      const permissionStates = new Map(prev.permissionStates);
+      const userInteractionStates = new Map(prev.userInteractionStates);
+      const permissionModes = new Map(prev.permissionModes);
       const artifactStates = new Map(prev.artifactStates);
       const entryStates = new Map(prev.entryStates);
 
       streamingEntryIds.delete(sessionId);
-      permissionStates.delete(sessionId);
+      userInteractionStates.delete(sessionId);
+      permissionModes.delete(sessionId);
       artifactStates.delete(sessionId);
       entryStates.delete(sessionId);
 
@@ -96,7 +98,8 @@ export const createSessionsSlice: StateCreator<MainStoreState, [], [], SessionsS
         sessions,
         activeSessionId,
         streamingEntryIds,
-        permissionStates,
+        userInteractionStates,
+        permissionModes,
         artifactStates,
         entryStates,
       };

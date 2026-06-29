@@ -7,9 +7,7 @@ import type { StateCreator } from "zustand/vanilla";
 
 export type SessionStatus = "idle" | "running" | "completed" | "failed";
 
-export type ToolExecutionStatus = "running" | "awaiting_approval" | "done" | "error";
-
-export type ToolApprovalStatus = "pending" | "approved" | "denied";
+export type ToolExecutionStatus = "running" | "awaiting_user" | "done" | "error";
 
 export enum EntryStatus {
   Local,
@@ -25,8 +23,7 @@ export interface ToolExecutionState {
   args: unknown;
   details?: unknown;
   output: string;
-  requestId?: string;
-  approvalStatus?: ToolApprovalStatus;
+  interactionRequestId?: string;
 }
 
 export type AgentMessageData = AgentMessage;

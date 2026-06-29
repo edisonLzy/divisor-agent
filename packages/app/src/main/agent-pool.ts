@@ -124,13 +124,23 @@ export class AgentPool
     await runtime.setPermissionMode(mode);
   };
 
-  public resolvePermissionRequest: AgentSessionIPC["resolvePermissionRequest"] = async (
+  public resolveUserInteraction: AgentSessionIPC["resolveUserInteraction"] = async (
     sessionId,
     requestId,
-    resolution,
+    submission,
   ) => {
-    const runtime = this.getOrCreateRuntime(sessionId);
-    await runtime.resolvePermissionRequest(requestId, resolution);
+    const runtime = this.runtimes.get(sessionId);
+    if (runtime) {
+      await runtime.resolveUserInteraction(requestId, submission);
+      return;
+    }
+
+    if (this.extensionRuntimeService.hasRuntime(sessionId)) {
+      await this.extensionRuntimeService.resolveUserInteraction(sessionId, requestId, submission);
+      return;
+    }
+
+    throw new Error(`Agent runtime not found: ${sessionId}`);
   };
 
   public prompt: AgentSessionIPC["prompt"] = async (sessionId, message) => {

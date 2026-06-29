@@ -38,7 +38,7 @@ function registerIPCHandlers(agentPool: AgentPool, browserWindow: BrowserWindow)
   typedIpcMain.handle("setSessionScope", agentPool.setSessionScope);
   typedIpcMain.handle("destroySession", agentPool.destroySession);
   typedIpcMain.handle("setPermissionMode", agentPool.setPermissionMode);
-  typedIpcMain.handle("resolvePermissionRequest", agentPool.resolvePermissionRequest);
+  typedIpcMain.handle("resolveUserInteraction", agentPool.resolveUserInteraction);
   typedIpcMain.handle("listSkills", agentPool.listSkills);
   typedIpcMain.handle("setSkillEnabled", agentPool.setSkillEnabled);
   typedIpcMain.handle("fsReadTextFile", handleFsReadTextFile);
