@@ -18,9 +18,8 @@ pnpm dev:app          # Start Electron app with electron-vite
 pnpm build            # Build all packages
 pnpm type-check       # Type-check all packages
 pnpm test             # Run all tests (Vitest workspace)
-pnpm lint             # oxlint check (NOT ESLint)
-pnpm format           # oxfmt auto-format
-pnpm format:check     # oxfmt format check
+# Format/lint run automatically via lint-staged on commit; do NOT add
+# a repo-wide pnpm format/lint — staged-only is the contract.
 ```
 
 Single package commands:

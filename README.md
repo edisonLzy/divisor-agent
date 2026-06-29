@@ -299,10 +299,8 @@ pnpm vitest run packages/app/__tests__/xxx.test.ts
 ```bash
 pnpm build              # Build all packages
 pnpm type-check         # Type-check all packages
-pnpm lint               # Lint (oxlint)
-pnpm format             # Auto-format (oxfmt)
-pnpm format:check       # Check formatting
 pnpm clean              # Clean all node_modules
+# Format/lint run via lint-staged on commit — staged-only by design.
 ```
 
 ---
