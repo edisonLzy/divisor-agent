@@ -2,7 +2,7 @@ import { MainExtensionBridge } from "@divisor-agent/extension-core/main";
 import type {
   ExtensionAgentModel,
   ExtensionAgentToolOptions,
-  MainExtensionBridgeServices,
+  MainExtensionContextValues,
 } from "@divisor-agent/extension-core/main";
 
 import type { SystemPromptBuilder } from "../prompt/index.js";
@@ -16,16 +16,12 @@ export interface ExtensionToolRuntimeContext {
 }
 
 export class ExtensionService extends MainExtensionBridge implements SystemPromptBuilder {
-  constructor(
-    private runtimeService?: ExtensionRuntimeService,
-    services: Omit<MainExtensionBridgeServices, "runtime"> = {},
-  ) {
-    super(installedMainExtensions, { ...services, runtime: runtimeService });
-    this.initialize();
-  }
+  private runtimeService: ExtensionRuntimeService;
 
-  setRuntimeService(runtimeService: ExtensionRuntimeService) {
-    this.runtimeService = runtimeService;
+  constructor(contextValues: MainExtensionContextValues<ExtensionRuntimeService>) {
+    super(installedMainExtensions, contextValues);
+    this.runtimeService = contextValues.agentRuntime;
+    this.initialize();
   }
 
   buildSystemPrompt(raw: string): string {
@@ -53,10 +49,6 @@ export class ExtensionService extends MainExtensionBridge implements SystemPromp
     return {
       ...tool,
       execute: async (...args: Parameters<AppTool["execute"]>) => {
-        if (!this.runtimeService) {
-          return tool.execute(...args);
-        }
-
         return this.runtimeService.runWithContext(context, () => tool.execute(...args));
       },
     };

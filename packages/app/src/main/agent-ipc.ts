@@ -19,7 +19,12 @@ type BrowserWindowGetter = () => BrowserWindow | null;
 function registerAgentRuntimeHandlers(agentPool: AgentPool, getBrowserWindow: BrowserWindowGetter) {
   const offAny = agentPool.onAny(({ name, data }) => {
     const browserWindow = getBrowserWindow();
-    if (!browserWindow || browserWindow.isDestroyed() || typeof name !== "string") {
+    if (
+      !browserWindow ||
+      browserWindow.isDestroyed() ||
+      browserWindow.webContents.isDestroyed() ||
+      typeof name !== "string"
+    ) {
       return;
     }
 

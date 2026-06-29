@@ -2,7 +2,7 @@ export { MainExtensionBridge } from "./bridge";
 export { defineMainExtension } from "./define";
 export { MainExtensionRegistry } from "./registry";
 
-export type { MainExtensionBridgeServices } from "./bridge";
+export type { MainExtensionContextValues } from "./bridge";
 export type {
   AnyMainExtensionDefinition,
   CreateExtensionAgentInput,

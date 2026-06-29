@@ -100,7 +100,7 @@ describe("AgentPool", () => {
   });
 
   it("runs a one-time agent with the provided system prompt, model, and no tools", async () => {
-    const pool = new AgentPool();
+    const pool = new AgentPool(() => null);
     const userMessage = createUserMessage("Name this session");
 
     const result = await pool.runOneTimeAgent([userMessage], {
@@ -128,7 +128,7 @@ describe("AgentPool", () => {
   });
 
   it("uses all messages as the one-time agent transcript", async () => {
-    const pool = new AgentPool();
+    const pool = new AgentPool(() => null);
     const firstUser = createUserMessage("Earlier request");
     const assistantMessage = {
       role: "assistant",
@@ -155,7 +155,7 @@ describe("AgentPool", () => {
   });
 
   it("throws when the requested model cannot be resolved", async () => {
-    const pool = new AgentPool();
+    const pool = new AgentPool(() => null);
 
     await expect(
       pool.runOneTimeAgent([createUserMessage("Hello")], {
@@ -171,7 +171,7 @@ describe("AgentPool", () => {
   it("aborts and returns partial output on timeout", async () => {
     vi.useFakeTimers();
     agentMockState.promptBehavior = "pending";
-    const pool = new AgentPool();
+    const pool = new AgentPool(() => null);
 
     const resultPromise = pool.runOneTimeAgent([createUserMessage("Hello")], {
       systemPrompt: "Only output text.",
@@ -189,7 +189,7 @@ describe("AgentPool", () => {
   });
 
   it("notifies extensions only when a main session is destroyed", async () => {
-    const pool = new AgentPool();
+    const pool = new AgentPool(() => null);
     const extensionService = (
       pool as unknown as {
         extensionService: { emitSessionDestroyed(sessionId: string): Promise<void> };

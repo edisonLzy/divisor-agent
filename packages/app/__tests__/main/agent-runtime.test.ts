@@ -67,13 +67,19 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
 // ── Import after mock registration ───────────────────────────────────────────
 
 import { AgentRuntime } from "../../src/main/agent-runtime.js";
+import type { ExtensionService } from "../../src/main/extensions/index.js";
 import { SkillService } from "../../src/main/skills/index.js";
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 describe("AgentRuntime", () => {
   function createRuntime() {
-    return new AgentRuntime(undefined, new SkillService());
+    const extensionService = {
+      buildSystemPrompt: (raw: string) => raw,
+      getToolsForRuntime: () => [],
+    } as unknown as ExtensionService;
+
+    return new AgentRuntime(undefined, new SkillService(), extensionService);
   }
 
   function emitAgentEvent(event: unknown) {

@@ -1,10 +1,15 @@
 import {
+  EXTENSION_EVENT_CHANNEL,
   formatArtifactFence,
   formatAssistantBlockFence,
   parseArtifactPayload,
   parseAssistantBlockPayload,
 } from "@divisor-agent/extension-core/common";
 import { defineMainExtension, MainExtensionBridge } from "@divisor-agent/extension-core/main";
+import type {
+  MainExtensionContextValues,
+  MainExtensionRuntimeAPI,
+} from "@divisor-agent/extension-core/main";
 import {
   createUseExtensionIPC,
   defineRendererExtension,
@@ -27,8 +32,14 @@ describe("extension-core", () => {
       stateChanged(value: string): void;
     }
 
-    const emitIPCEvent = vi.fn();
-    const getBrowserWindow = vi.fn(() => null);
+    const send = vi.fn();
+    const getBrowserWindow = vi.fn(() => ({
+      isDestroyed: () => false,
+      webContents: {
+        isDestroyed: () => false,
+        send,
+      },
+    }));
     const sessionDestroyed = vi.fn();
     const setup = vi.fn((ctx) => {
       ctx.getBrowserWindow();
@@ -56,7 +67,7 @@ describe("extension-core", () => {
       setup,
     });
     const bridge = new MainExtensionBridge([extension], {
-      emitIPCEvent,
+      agentRuntime: createAgentRuntime(),
       getBrowserWindow,
     });
 
@@ -64,12 +75,12 @@ describe("extension-core", () => {
     bridge.initialize();
 
     expect(setup).toHaveBeenCalledTimes(1);
-    expect(getBrowserWindow).toHaveBeenCalledOnce();
+    expect(getBrowserWindow).toHaveBeenCalledTimes(2);
     expect(bridge.listExtensions()).toEqual([metadata]);
     expect(bridge.getSystemPrompts()).toEqual(["Use test extension behavior."]);
     expect(bridge.getTools()).toHaveLength(1);
     await expect(bridge.invokeIPC(metadata.id, "getState", ["test"])).resolves.toBe("test:ready");
-    expect(emitIPCEvent).toHaveBeenCalledWith({
+    expect(send).toHaveBeenCalledWith(EXTENSION_EVENT_CHANNEL, {
       args: ["ready"],
       event: "stateChanged",
       extensionId: metadata.id,
@@ -156,9 +167,9 @@ describe("extension-core", () => {
         ctx.ipc.handle("ping", () => undefined);
       },
     });
-    expect(() => new MainExtensionBridge([duplicateHandler]).initialize()).toThrow(
-      "Duplicate extension IPC handler",
-    );
+    expect(() =>
+      new MainExtensionBridge([duplicateHandler], createContextValues()).initialize(),
+    ).toThrow("Duplicate extension IPC handler");
 
     const first = defineRendererExtension({ ...metadata, setup() {} });
     const second = defineRendererExtension({ ...metadata, setup() {} });
@@ -284,3 +295,21 @@ after`);
     });
   });
 });
+
+function createContextValues(): MainExtensionContextValues {
+  return {
+    agentRuntime: createAgentRuntime(),
+    getBrowserWindow: () => null,
+  };
+}
+
+function createAgentRuntime(): MainExtensionRuntimeAPI {
+  return {
+    abortAgent: vi.fn(),
+    createAgent: vi.fn(),
+    destroyAgent: vi.fn(),
+    getCurrentAgentContext: vi.fn(),
+    promptAgent: vi.fn(),
+    subscribeAgentEvents: vi.fn(() => vi.fn()),
+  };
+}

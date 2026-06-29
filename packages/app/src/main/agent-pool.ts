@@ -1,8 +1,7 @@
-import type { ExtensionIPCEventEnvelope } from "@divisor-agent/extension-core/common";
 import { Agent } from "@earendil-works/pi-agent-core";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { Message } from "@earendil-works/pi-ai";
-import type { BrowserWindow } from "electron";
+import { BrowserWindow } from "electron";
 import Emittery from "emittery";
 
 import { AllowedMainExposeEvents } from "../shared/events-ipc.js";
@@ -15,9 +14,8 @@ import { ExtensionRuntimeService } from "./extensions/runtime-service.js";
 import { ModelRegistry } from "./models/index.js";
 import { SkillService } from "./skills/index.js";
 
-export interface AgentPoolOptions {
-  emitExtensionIPCEvent?: (envelope: ExtensionIPCEventEnvelope) => void;
-  getBrowserWindow?: () => BrowserWindow | null;
+interface AgentPoolOptions {
+  getBrowserWindow: () => BrowserWindow | null;
 }
 
 /**
@@ -35,7 +33,7 @@ export class AgentPool
   private extensionService: ExtensionService;
   private extensionRuntimeService: ExtensionRuntimeService;
 
-  constructor(options: AgentPoolOptions = {}) {
+  constructor(options: AgentPoolOptions) {
     super();
     this.modelRegistry = new ModelRegistry();
     this.runtimes = new Map();
@@ -49,8 +47,8 @@ export class AgentPool
 
       (this.emit as (...args: unknown[]) => Promise<void>)(name, data);
     });
-    this.extensionService = new ExtensionService(this.extensionRuntimeService, {
-      emitIPCEvent: options.emitExtensionIPCEvent,
+    this.extensionService = new ExtensionService({
+      agentRuntime: this.extensionRuntimeService,
       getBrowserWindow: options.getBrowserWindow,
     });
     this.extensionRuntimeService.setExtensionService(this.extensionService);

@@ -1,14 +1,16 @@
 import type { BrowserWindow } from "electron";
 
-import type { ExtensionDisposer, ExtensionIPCEventEnvelope } from "../common/ipc/index.js";
+import { EXTENSION_EVENT_CHANNEL } from "../common/ipc/index.js";
+import type { ExtensionDisposer } from "../common/ipc/index.js";
 import type { AnyMainExtensionDefinition, MainExtensionRuntimeAPI } from "./define.js";
 import { MainExtensionRegistry } from "./registry.js";
 import type { UntypedExtensionIPCHandler } from "./registry.js";
 
-export interface MainExtensionBridgeServices {
-  emitIPCEvent?: (envelope: ExtensionIPCEventEnvelope) => void;
-  getBrowserWindow?: () => BrowserWindow | null;
-  runtime?: MainExtensionRuntimeAPI;
+export interface MainExtensionContextValues<
+  TAgentRuntime extends MainExtensionRuntimeAPI = MainExtensionRuntimeAPI,
+> {
+  getBrowserWindow(): BrowserWindow | null;
+  agentRuntime: TAgentRuntime;
 }
 
 export class MainExtensionBridge {
@@ -18,7 +20,7 @@ export class MainExtensionBridge {
 
   constructor(
     private extensions: AnyMainExtensionDefinition[],
-    private services: MainExtensionBridgeServices = {},
+    private contextValues: MainExtensionContextValues,
   ) {}
 
   initialize() {
@@ -32,10 +34,19 @@ export class MainExtensionBridge {
           on: (_event, listener) => this.registry.onSessionDestroyed(listener),
         },
         extension: metadata,
-        getBrowserWindow: this.services.getBrowserWindow ?? (() => null),
+        getBrowserWindow: this.contextValues.getBrowserWindow,
         ipc: {
           emit: (event, ...args) => {
-            this.services.emitIPCEvent?.({
+            const browserWindow = this.contextValues.getBrowserWindow();
+            if (
+              !browserWindow ||
+              browserWindow.isDestroyed() ||
+              browserWindow.webContents.isDestroyed()
+            ) {
+              return;
+            }
+
+            browserWindow.webContents.send(EXTENSION_EVENT_CHANNEL, {
               args,
               event,
               extensionId: extension.id,
@@ -48,7 +59,7 @@ export class MainExtensionBridge {
               handler as UntypedExtensionIPCHandler,
             ),
         },
-        runtime: this.services.runtime ?? createUnavailableRuntimeAPI(),
+        runtime: this.contextValues.agentRuntime,
         systemPrompt: {
           register: (prompt) => this.registry.registerSystemPrompt(extension, prompt),
         },
@@ -94,19 +105,4 @@ export class MainExtensionBridge {
     this.registry.dispose();
     this.initialized = false;
   }
-}
-
-function createUnavailableRuntimeAPI(): MainExtensionRuntimeAPI {
-  const reject = () => {
-    throw new Error("Main extension runtime API is not available");
-  };
-
-  return {
-    abortAgent: reject,
-    createAgent: reject,
-    destroyAgent: reject,
-    getCurrentAgentContext: reject,
-    promptAgent: reject,
-    subscribeAgentEvents: reject,
-  };
 }
