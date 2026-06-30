@@ -25,6 +25,29 @@ function createWindow() {
     },
   });
 
+  mainWindow.webContents.session.setPermissionCheckHandler(
+    (webContents, permission, _requestingOrigin, details) => {
+      return (
+        webContents === mainWindow.webContents &&
+        permission === "media" &&
+        details.mediaType === "audio"
+      );
+    },
+  );
+
+  mainWindow.webContents.session.setPermissionRequestHandler(
+    (webContents, permission, callback, details) => {
+      const mediaTypes = "mediaTypes" in details ? details.mediaTypes : undefined;
+      const allowMicrophone =
+        webContents === mainWindow.webContents &&
+        permission === "media" &&
+        mediaTypes?.includes("audio") === true &&
+        !mediaTypes.includes("video");
+
+      callback(allowMicrophone);
+    },
+  );
+
   if (process.env.ELECTRON_RENDERER_URL) {
     mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {
