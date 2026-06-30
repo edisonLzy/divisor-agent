@@ -2,7 +2,6 @@ import { join } from "path";
 
 import { app, BrowserWindow } from "electron";
 
-import { bindAgentRuntimeIPC } from "./agent-ipc.js";
 import { AgentPool } from "./agent-pool.js";
 import { BrowserWindowManager } from "./browser-window/index.js";
 import { FileSystemManager } from "./file-system/index.js";
@@ -13,9 +12,8 @@ app.whenReady().then(() => {
   const agentPool = new AgentPool(browserWindow);
 
   const fsManager = new FileSystemManager(browserWindow);
-  const browserWindowManager = new BrowserWindowManager(browserWindow);
 
-  const unbindExtensionIPC = bindAgentRuntimeIPC(agentPool);
+  const browserWindowManager = new BrowserWindowManager(browserWindow);
 
   app.on("activate", () => {
     if (!browserWindow || browserWindow.isDestroyed()) {
@@ -27,7 +25,6 @@ app.whenReady().then(() => {
   });
 
   app.on("quit", () => {
-    unbindExtensionIPC();
     void fsManager.destroy();
     void browserWindowManager.destroy();
     void agentPool.destroyAll();

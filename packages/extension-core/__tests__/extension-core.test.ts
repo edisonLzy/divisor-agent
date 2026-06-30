@@ -1,3 +1,7 @@
+vi.mock("electron", () => ({
+  ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },
+}));
+
 import {
   EXTENSION_EVENT_CHANNEL,
   formatArtifactFence,
@@ -7,7 +11,7 @@ import {
 } from "@divisor-agent/extension-core/common";
 import { defineMainExtension, MainExtensionBridge } from "@divisor-agent/extension-core/main";
 import type {
-  MainExtensionContextValues,
+  HostMainExtensionContextValues,
   MainExtensionRuntimeAPI,
 } from "@divisor-agent/extension-core/main";
 import {
@@ -26,13 +30,6 @@ describe("extension-core", () => {
   } as const;
 
   it("initializes main extensions once and exposes registered capabilities", async () => {
-    interface InvokeEvents {
-      getState(prefix: string): string;
-    }
-    interface OnEvents {
-      stateChanged(value: string): void;
-    }
-
     const send = vi.fn();
     const getBrowserWindow = vi.fn(
       () =>
@@ -44,7 +41,6 @@ describe("extension-core", () => {
           },
         }) as unknown as BrowserWindow,
     );
-    const sessionDestroyed = vi.fn();
     const setup = vi.fn((ctx) => {
       ctx.getBrowserWindow();
       ctx.systemPrompt.register({
@@ -62,11 +58,10 @@ describe("extension-core", () => {
           };
         },
       } as never);
-      ctx.ipc.handle("getState", (prefix) => `${prefix}:ready`);
-      ctx.ipc.emit("stateChanged", "ready");
-      return ctx.agent.on("session_destroyed", sessionDestroyed);
+      ctx.ipc.handle(metadata.id, "getState", (prefix: string) => `${prefix}:ready`);
+      ctx.ipc.emit(metadata.id, "stateChanged", "ready");
     });
-    const extension = defineMainExtension<InvokeEvents, OnEvents>({
+    const extension = defineMainExtension({
       ...metadata,
       setup,
     });
@@ -90,12 +85,7 @@ describe("extension-core", () => {
       extensionId: metadata.id,
     });
 
-    await bridge.emitSessionDestroyed("session-1");
-    expect(sessionDestroyed).toHaveBeenCalledWith({ sessionId: "session-1" });
-
     bridge.dispose();
-    await bridge.emitSessionDestroyed("session-2");
-    expect(sessionDestroyed).toHaveBeenCalledTimes(1);
   });
 
   it("initializes renderer extensions once and exposes UI registrations", () => {
@@ -164,11 +154,11 @@ describe("extension-core", () => {
   });
 
   it("rejects duplicate extension ids and IPC handlers", () => {
-    const duplicateHandler = defineMainExtension<{ ping(): void }>({
+    const duplicateHandler = defineMainExtension({
       ...metadata,
       setup(ctx) {
-        ctx.ipc.handle("ping", () => undefined);
-        ctx.ipc.handle("ping", () => undefined);
+        ctx.ipc.handle(metadata.id, "ping", () => undefined);
+        ctx.ipc.handle(metadata.id, "ping", () => undefined);
       },
     });
     expect(() =>
@@ -300,7 +290,7 @@ after`);
   });
 });
 
-function createContextValues(): MainExtensionContextValues {
+function createContextValues(): HostMainExtensionContextValues {
   return {
     extensionRuntime: createAgentRuntime(),
     getBrowserWindow: () => null,

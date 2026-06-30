@@ -1,8 +1,9 @@
 export { MainExtensionBridge } from "./bridge";
 export { defineMainExtension } from "./define";
+export { MainExtensionIPC } from "./ipc";
 export { MainExtensionRegistry } from "./registry";
 
-export type { MainExtensionContextValues } from "./bridge";
+export type { UntypedExtensionIPCHandler } from "./ipc";
 export type {
   AnyMainExtensionDefinition,
   CreateExtensionAgentInput,
@@ -12,11 +13,9 @@ export type {
   ExtensionAgentModel,
   ExtensionAgentScope,
   ExtensionAgentToolOptions,
+  HostMainExtensionContextValues,
   MainExtensionContext,
-  MainExtensionAgentAPI,
-  MainExtensionAgentEvents,
   MainExtensionDefinition,
-  MainExtensionIPC,
   MainExtensionRuntimeAPI,
   MainSystemPromptRegistration,
 } from "./define";

@@ -5,18 +5,13 @@ import {
 import { defineMainExtension } from "@divisor-agent/extension-core/main";
 import { Type } from "@earendil-works/pi-ai";
 
-import {
-  EXAMPLE_EXTENSION,
-  type ExampleInvokeEvents,
-  type ExampleOnEvents,
-  type ExampleState,
-} from "./extension";
+import { EXAMPLE_EXTENSION, type ExampleState } from "./extension";
 
-export default defineMainExtension<ExampleInvokeEvents, ExampleOnEvents>({
+export default defineMainExtension({
   ...EXAMPLE_EXTENSION,
   setup(ctx) {
     const state: ExampleState = { greetingCount: 0 };
-    ctx.ipc.handle("getState", () => ({ ...state }));
+    ctx.ipc.handle(EXAMPLE_EXTENSION.id, "getState", () => ({ ...state }));
 
     ctx.systemPrompt.register({
       id: "example.prompt",
@@ -42,7 +37,7 @@ ${formatArtifactFence({
       }),
       async execute(_toolCallId, args) {
         state.greetingCount += 1;
-        ctx.ipc.emit("stateChanged", { ...state });
+        ctx.ipc.emit(EXAMPLE_EXTENSION.id, "stateChanged", { ...state });
         return {
           content: [{ type: "text", text: `Hello, ${String(args.name)}` }],
           details: {},

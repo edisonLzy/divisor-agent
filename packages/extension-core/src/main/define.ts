@@ -2,14 +2,8 @@ import type { AgentEvent, AgentTool, AppUserMessage } from "@earendil-works/pi-a
 import type { TSchema } from "@earendil-works/pi-ai";
 import type { BrowserWindow } from "electron";
 
-import type {
-  AnyExtensionIPCFunction,
-  ExtensionDisposer,
-  ExtensionIPCArgs,
-  ExtensionIPCKey,
-  ExtensionIPCResult,
-  ExtensionMetadata,
-} from "../common/ipc/index.js";
+import type { ExtensionDisposer, ExtensionMetadata } from "../common/ipc/index.js";
+import type { MainExtensionIPC } from "./ipc.js";
 
 export interface MainSystemPromptRegistration {
   id: string;
@@ -63,37 +57,13 @@ export interface MainExtensionRuntimeAPI {
   ): () => void;
 }
 
-export interface MainExtensionAgentEvents {
-  session_destroyed: {
-    sessionId: string;
-  };
-}
-
-export interface MainExtensionAgentAPI {
-  on<K extends keyof MainExtensionAgentEvents>(
-    event: K,
-    listener: (payload: MainExtensionAgentEvents[K]) => void | Promise<void>,
-  ): ExtensionDisposer;
-}
-
-export interface MainExtensionIPC<InvokeEvents, OnEvents> {
-  handle<K extends ExtensionIPCKey<InvokeEvents>>(
-    method: K,
-    handler: (
-      ...args: ExtensionIPCArgs<InvokeEvents, K>
-    ) =>
-      | Awaited<ExtensionIPCResult<InvokeEvents, K>>
-      | PromiseLike<Awaited<ExtensionIPCResult<InvokeEvents, K>>>,
-  ): ExtensionDisposer;
-  emit<K extends ExtensionIPCKey<OnEvents>>(event: K, ...args: ExtensionIPCArgs<OnEvents, K>): void;
-}
-
-export interface MainExtensionContext<InvokeEvents = {}, OnEvents = {}> {
-  readonly agent: MainExtensionAgentAPI;
-  readonly extension: ExtensionMetadata;
+export interface HostMainExtensionContextValues {
   getBrowserWindow(): BrowserWindow | null;
-  readonly ipc: MainExtensionIPC<InvokeEvents, OnEvents>;
-  readonly runtime: MainExtensionRuntimeAPI;
+  extensionRuntime: MainExtensionRuntimeAPI;
+}
+
+export interface MainExtensionContext extends HostMainExtensionContextValues {
+  readonly ipc: MainExtensionIPC;
   readonly systemPrompt: {
     register(prompt: MainSystemPromptRegistration): void;
   };
@@ -102,24 +72,14 @@ export interface MainExtensionContext<InvokeEvents = {}, OnEvents = {}> {
   };
 }
 
-export type MainExtensionSetup<InvokeEvents = {}, OnEvents = {}> = (
-  ctx: MainExtensionContext<InvokeEvents, OnEvents>,
-) => void | ExtensionDisposer;
+export type MainExtensionSetup = (ctx: MainExtensionContext) => void | ExtensionDisposer;
 
-export interface MainExtensionDefinition<
-  InvokeEvents = {},
-  OnEvents = {},
-> extends ExtensionMetadata {
-  setup: MainExtensionSetup<InvokeEvents, OnEvents>;
+export interface MainExtensionDefinition extends ExtensionMetadata {
+  setup: MainExtensionSetup;
 }
 
-export type AnyMainExtensionDefinition = MainExtensionDefinition<any, any>;
+export type AnyMainExtensionDefinition = MainExtensionDefinition;
 
-export function defineMainExtension<
-  InvokeEvents extends Record<keyof InvokeEvents, AnyExtensionIPCFunction> = {},
-  OnEvents extends Record<keyof OnEvents, AnyExtensionIPCFunction> = {},
->(
-  definition: MainExtensionDefinition<InvokeEvents, OnEvents>,
-): MainExtensionDefinition<InvokeEvents, OnEvents> {
+export function defineMainExtension(definition: MainExtensionDefinition): MainExtensionDefinition {
   return definition;
 }

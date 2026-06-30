@@ -40,7 +40,7 @@ export default defineMainExtension({
       }),
       async execute(toolCallId, args, signal, onUpdate) {
         const tasks = normalizeTasks(args.tasks);
-        const currentContext = ctx.runtime.getCurrentAgentContext();
+        const currentContext = ctx.extensionRuntime.getCurrentAgentContext();
         const parentSessionId = currentContext?.sessionId ?? "unknown-session";
         const runId = `subagents-${toolCallId}`;
         const snapshots = tasks.map((task, index) => createQueuedSnapshot(runId, index, task));
@@ -61,7 +61,7 @@ export default defineMainExtension({
 
         await Promise.all(
           snapshots.map(async (subagent) => {
-            const agent = await ctx.runtime.createAgent({
+            const agent = await ctx.extensionRuntime.createAgent({
               id: subagent.id,
               label: subagent.name,
               mode: "inherit-model",
@@ -74,16 +74,16 @@ export default defineMainExtension({
               },
             });
 
-            const unsubscribe = ctx.runtime.subscribeAgentEvents(agent.id, (event) => {
+            const unsubscribe = ctx.extensionRuntime.subscribeAgentEvents(agent.id, (event) => {
               applyRuntimeEvent(subagent, event);
               publish();
             });
-            const abort = () => void ctx.runtime.abortAgent(agent.id);
+            const abort = () => void ctx.extensionRuntime.abortAgent(agent.id);
 
             signal?.addEventListener("abort", abort, { once: true });
 
             try {
-              const appUserMessage: Parameters<typeof ctx.runtime.promptAgent>[1] = {
+              const appUserMessage: Parameters<typeof ctx.extensionRuntime.promptAgent>[1] = {
                 role: "user",
                 content: subagent.task,
                 timestamp: Date.now(),
@@ -98,7 +98,7 @@ export default defineMainExtension({
                   ],
                 },
               };
-              await ctx.runtime.promptAgent(agent.id, appUserMessage);
+              await ctx.extensionRuntime.promptAgent(agent.id, appUserMessage);
             } catch (error) {
               subagent.status = "failed";
               subagent.completedAt = Date.now();
@@ -107,7 +107,7 @@ export default defineMainExtension({
             } finally {
               signal?.removeEventListener("abort", abort);
               unsubscribe();
-              await ctx.runtime.destroyAgent(agent.id);
+              await ctx.extensionRuntime.destroyAgent(agent.id);
             }
           }),
         );

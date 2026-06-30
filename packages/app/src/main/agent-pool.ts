@@ -90,13 +90,8 @@ export class AgentPool
     const runtime = this.runtimes.get(sessionId);
     if (!runtime) return;
 
-    const notifyExtensions = runtime.getScope() === "main";
     runtime.destroy();
     this.runtimes.delete(sessionId);
-
-    if (notifyExtensions) {
-      await this.extensionService.emitSessionDestroyed(sessionId);
-    }
   }
 
   async destroyAll() {
@@ -107,10 +102,6 @@ export class AgentPool
     this.extensionService.dispose();
     this.events.clearListeners();
     this.unbind?.();
-  }
-
-  invokeExtensionIPC(extensionId: string, method: string, args: unknown[]) {
-    return this.extensionService.invokeIPC(extensionId, method, args);
   }
 
   activeCount(): number {
