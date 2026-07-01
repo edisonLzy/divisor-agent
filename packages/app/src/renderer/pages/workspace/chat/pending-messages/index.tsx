@@ -15,6 +15,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { AppUserMessage } from "@earendil-works/pi-agent-core";
+import { Badge } from "@renderer/components/ui/badge";
 import { Button } from "@renderer/components/ui/button";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { cn } from "@renderer/lib/utils";
@@ -82,10 +83,12 @@ export function PendingMessagesPanel({ sessionId }: PendingMessagesPanelProps) {
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-card/95 shadow-[0_18px_44px_rgb(0_0_0/0.16)]">
-      <div className="flex items-center justify-between border-b border-border/70 px-3 py-2">
-        <div className="text-xs font-medium text-foreground">Pending Messages</div>
-        <div className="text-[11px] text-muted-foreground">{messages.length} pending</div>
+    <div className="overflow-hidden rounded-md border-2 border-border bg-card shadow-[var(--hard-shadow)]">
+      <div className="flex items-center justify-between border-b-2 border-border bg-signal-yellow px-3 py-2 text-signal-yellow-foreground">
+        <div className="font-mono text-[10px] font-bold tracking-[0.08em] uppercase">
+          Pending Messages
+        </div>
+        <Badge variant="outline">{messages.length} pending</Badge>
       </div>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
@@ -130,11 +133,6 @@ function PendingMessageRow({
 }: PendingMessageRowProps) {
   const kind = message.kind;
   const kindLabel = kind === "steering" ? "Steer" : kind === "follow-up" ? "Follow-up" : "Prompt";
-  const kindClass =
-    kind === "steering"
-      ? "border-blue-400/40 bg-blue-400/10 text-blue-300"
-      : "border-emerald-400/40 bg-emerald-400/10 text-emerald-300";
-
   const preview = typeof message.content === "string" ? message.content : "";
   const {
     attributes,
@@ -150,8 +148,8 @@ function PendingMessageRow({
     <div
       ref={setNodeRef}
       className={cn(
-        "flex items-start gap-2 rounded-lg border border-border/60 bg-background/60 p-2 text-[12px]",
-        isDragging && "z-10 opacity-80 shadow-md",
+        "flex items-start gap-2 rounded-sm border-2 border-border bg-background p-2 text-[12px]",
+        isDragging && "z-10 opacity-80 shadow-[var(--hard-shadow-sm)]",
       )}
       style={{
         transform: CSS.Transform.toString(transform),
@@ -170,11 +168,7 @@ function PendingMessageRow({
       >
         <GripVertical className="size-3.5" />
       </Button>
-      <span
-        className={`shrink-0 rounded-md border px-1.5 py-0.5 font-medium text-[10px] tracking-wide uppercase ${kindClass}`}
-      >
-        {kindLabel}
-      </span>
+      <Badge variant={kind === "steering" ? "default" : "secondary"}>{kindLabel}</Badge>
       <div className="min-w-0 flex-1 whitespace-pre-wrap text-foreground/80">{preview}</div>
       <div className="flex shrink-0 items-center gap-0.5">
         <Button

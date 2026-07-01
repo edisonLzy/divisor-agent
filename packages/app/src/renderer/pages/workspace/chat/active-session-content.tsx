@@ -12,7 +12,7 @@ import { mainStore } from "@renderer/store/main";
 import { useQueryClient } from "@tanstack/react-query";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { motion } from "motion/react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useCallback } from "react";
 import { useStore } from "zustand";
 
@@ -27,9 +27,13 @@ import { createSessionTitleFromPrompt, shouldAutoRenameSession } from "./session
 
 interface ActiveSessionContentProps {
   insetForWindowControls: boolean;
+  sidebarControl: ReactNode;
 }
 
-export function ActiveSessionContent({ insetForWindowControls }: ActiveSessionContentProps) {
+export function ActiveSessionContent({
+  insetForWindowControls,
+  sidebarControl,
+}: ActiveSessionContentProps) {
   const {
     entries,
     isRunning,
@@ -69,7 +73,19 @@ export function ActiveSessionContent({ insetForWindowControls }: ActiveSessionCo
       >
         <ResizablePanel defaultSize={isArtifactPanelOpen ? "68%" : "100%"} minSize="42%">
           <div className="flex h-full min-w-0 flex-col">
-            <PanelHeader dragRegion insetForWindowControls={insetForWindowControls}>
+            <PanelHeader
+              dragRegion
+              windowControls={
+                insetForWindowControls
+                  ? isArtifactPanelOpen
+                    ? "left"
+                    : "both"
+                  : isArtifactPanelOpen
+                    ? "none"
+                    : "right"
+              }
+            >
+              {sidebarControl}
               <h1 className="truncate text-sm font-bold tracking-tight text-foreground">
                 {sessionName}
               </h1>
@@ -122,7 +138,7 @@ export function ActiveSessionContent({ insetForWindowControls }: ActiveSessionCo
         ) : null}
       </ResizablePanelGroup>
 
-      <FixedActions>
+      <FixedActions reserveWindowControls={!isArtifactPanelOpen}>
         <ToggleArtifactPanelButton sessionId={activeSessionId} />
       </FixedActions>
     </div>

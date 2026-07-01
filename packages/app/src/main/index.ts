@@ -38,10 +38,20 @@ app.on("window-all-closed", () => {
 console.log("Divisor Agent main process started!");
 
 function createWindow() {
+  const isMac = process.platform === "darwin";
   const mainWindow = new BrowserWindow({
     icon: join(__dirname, "../../resources/icon.png"),
     frame: false,
-    titleBarStyle: "hiddenInset",
+    titleBarStyle: isMac ? "hiddenInset" : "hidden",
+    ...(isMac
+      ? { trafficLightPosition: { x: 14, y: 18 } }
+      : {
+          titleBarOverlay: {
+            color: "#00000000",
+            symbolColor: "#141111",
+            height: 48,
+          },
+        }),
     vibrancy: "under-window",
     visualEffectState: "active",
     backgroundColor: "#00000000",

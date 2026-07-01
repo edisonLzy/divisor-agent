@@ -77,7 +77,7 @@ export function SuggestionsPanel({
 
   if (filteredItems.length === 0) {
     return (
-      <div className="rounded-[18px] border border-border/80 bg-popover/95 px-3 py-2.5 text-[12px] text-muted-foreground shadow-[0_24px_64px_rgb(15_23_42/0.18)] backdrop-blur-xl dark:shadow-[0_24px_64px_rgb(0_0_0/0.45)]">
+      <div className="rounded-md border-2 border-border bg-popover px-3 py-2.5 text-[12px] text-muted-foreground shadow-[var(--hard-shadow)]">
         No slash commands found
       </div>
     );
@@ -86,7 +86,7 @@ export function SuggestionsPanel({
   return (
     <div
       ref={scrollContainerRef}
-      className="overflow-y-auto rounded-[18px] border border-border/80 bg-popover/95 p-1.5 shadow-[0_24px_64px_rgb(15_23_42/0.18)] backdrop-blur-xl dark:shadow-[0_24px_64px_rgb(0_0_0/0.45)]"
+      className="overflow-y-auto rounded-md border-2 border-border bg-popover p-1.5 shadow-[var(--hard-shadow)]"
       style={{ maxHeight }}
     >
       {groups.map((group, groupIndex) => (
@@ -105,16 +105,16 @@ export function SuggestionsPanel({
               type="button"
               data-command-index={index}
               className={cn(
-                "flex w-full items-center gap-2.5 rounded-[14px] px-2.5 py-2 text-left transition-colors",
+                "flex w-full items-center gap-2.5 rounded-sm border-2 px-2.5 py-2 text-left transition-colors",
                 index === selectedIndex
-                  ? "bg-accent text-accent-foreground"
-                  : "text-popover-foreground hover:bg-muted",
+                  ? "border-border bg-accent text-accent-foreground"
+                  : "border-transparent text-popover-foreground hover:bg-muted",
               )}
               onClick={() => onSelect(item)}
               onMouseDown={(event) => event.preventDefault()}
               onMouseEnter={() => onHighlight(index)}
             >
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-[10px] border border-border/70 bg-background/70 text-muted-foreground [&_svg]:size-3.5">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-sm border-2 border-border bg-background text-muted-foreground [&_svg]:size-3.5">
                 <BoxIcon />
               </span>
               <span className="min-w-0 flex flex-1 items-baseline gap-1.5">

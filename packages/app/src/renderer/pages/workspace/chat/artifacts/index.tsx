@@ -123,7 +123,7 @@ export function ArtifactsPanel({ className, sessionId }: ArtifactsPanelProps) {
         onValueChange={(value) => setActiveArtifactId(sessionId, value)}
         className="min-h-0 flex-1 gap-0"
       >
-        <PanelHeader dragRegion className="bg-signal-purple pl-2">
+        <PanelHeader dragRegion windowControls="right" className="bg-signal-purple pl-2">
           <div className="relative min-w-0 flex-1">
             <DndContext
               sensors={sensors}

@@ -145,12 +145,12 @@ export function PermissionApprovalPanel({ sessionId }: PermissionApprovalPanelPr
   }, [handleReject, handleSubmit, options.length]);
 
   return (
-    <div className="mx-auto w-full max-w-180 overflow-hidden rounded-[18px] bg-[#262626] p-4 font-sans shadow-lg">
-      <div className="mb-3 text-[14px] font-medium leading-6 text-[#f2f2f2]">
+    <div className="mx-auto w-full max-w-180 overflow-hidden rounded-md border-2 border-border bg-card p-4 font-sans text-card-foreground shadow-[var(--hard-shadow)]">
+      <div className="mb-3 text-[14px] leading-6 font-bold">
         Do you want to perform {request.toolLabel || request.toolName} ?
       </div>
 
-      <section className="mb-3 overflow-hidden rounded-xl border border-[#343434] bg-[#202020]">
+      <section className="mb-3 overflow-hidden rounded-md border-2 border-border bg-background">
         <button
           type="button"
           aria-expanded={isDetailsOpen}
@@ -160,13 +160,13 @@ export function PermissionApprovalPanel({ sessionId }: PermissionApprovalPanelPr
           }}
         >
           <div className="min-w-0">
-            <div className="text-[10px] font-medium tracking-[0.16em] text-[#737373] uppercase">
+            <div className="font-mono text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase">
               Tool Info
             </div>
-            <div className="truncate text-[12px] text-[#cfcfcf]">{commandSnippet}</div>
+            <div className="truncate font-mono text-[12px] text-foreground">{commandSnippet}</div>
           </div>
 
-          <span className="shrink-0 text-[#777777]">
+          <span className="shrink-0 text-muted-foreground">
             {isDetailsOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
           </span>
         </button>
@@ -177,22 +177,22 @@ export function PermissionApprovalPanel({ sessionId }: PermissionApprovalPanelPr
             isDetailsOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
           )}
         >
-          <div className="min-h-0 overflow-hidden border-t border-[#343434]">
-            <div className="space-y-2 p-3">
-              <div className="rounded-lg border border-[#303030] bg-[#171717] p-2.5">
-                <div className="mb-1 text-[10px] font-medium tracking-[0.14em] text-[#6f6f6f] uppercase">
+          <div className="min-h-0 overflow-hidden border-t-2 border-border">
+            <div className="flex flex-col gap-2 p-3">
+              <div className="rounded-sm border-2 border-border bg-[var(--code-surface)] p-2.5 text-[var(--code-foreground)]">
+                <div className="mb-1 font-mono text-[10px] font-bold tracking-[0.12em] text-[var(--code-muted)] uppercase">
                   Command
                 </div>
-                <pre className="max-h-28 overflow-auto whitespace-pre-wrap break-all font-mono text-[12px] leading-5 text-[#d6d6d6]">
+                <pre className="max-h-28 overflow-auto whitespace-pre-wrap break-all font-mono text-[12px] leading-5">
                   {commandSnippet}
                 </pre>
               </div>
 
-              <div className="rounded-lg border border-[#303030] bg-[#171717] p-2.5">
-                <div className="mb-1 text-[10px] font-medium tracking-[0.14em] text-[#6f6f6f] uppercase">
+              <div className="rounded-sm border-2 border-border bg-[var(--code-surface)] p-2.5 text-[var(--code-foreground)]">
+                <div className="mb-1 font-mono text-[10px] font-bold tracking-[0.12em] text-[var(--code-muted)] uppercase">
                   Payload
                 </div>
-                <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all font-mono text-[12px] leading-5 text-[#b8b8b8]">
+                <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all font-mono text-[12px] leading-5">
                   {formattedArgs}
                 </pre>
               </div>
@@ -210,19 +210,14 @@ export function PermissionApprovalPanel({ sessionId }: PermissionApprovalPanelPr
               key={option.key}
               onClick={() => setSelectedIndex(idx)}
               className={cn(
-                "cursor-pointer rounded-xl border px-3 py-2.5 transition-colors",
+                "cursor-pointer rounded-sm border-2 px-3 py-2.5 transition-colors",
                 isSelected
-                  ? "border-[#4a4a4a] bg-[#313131]"
-                  : "border-[#343434] bg-[#2a2a2a] hover:border-[#454545] hover:bg-[#2f2f2f]",
+                  ? "border-border bg-accent text-accent-foreground shadow-[var(--hard-shadow-sm)]"
+                  : "border-border bg-background text-foreground hover:bg-muted",
               )}
             >
               <div className="flex items-start gap-2.5">
-                <span
-                  className={cn(
-                    "pt-0.5 font-mono text-[12px]",
-                    isSelected ? "text-[#a7a7a7]" : "text-[#707070]",
-                  )}
-                >
+                <span className={cn("pt-0.5 font-mono text-[12px] text-muted-foreground")}>
                   {idx + 1}.
                 </span>
 
@@ -230,13 +225,13 @@ export function PermissionApprovalPanel({ sessionId }: PermissionApprovalPanelPr
                   <div
                     className={cn(
                       "text-[13px] leading-5",
-                      isSelected ? "font-medium text-[#ececec]" : "text-[#9d9d9d]",
+                      isSelected ? "font-bold text-accent-foreground" : "text-foreground",
                     )}
                   >
                     {option.key === "approve-prefix" ? (
                       <>
                         {option.label}{" "}
-                        <code className="rounded-md border border-[#2e2e2e] bg-[#1b1b1b] px-1.5 py-0.5 font-mono text-[12px] text-[#d1d1d1]">
+                        <code className="rounded-sm border-2 border-border bg-[var(--code-surface)] px-1.5 py-0.5 font-mono text-[12px] text-[var(--code-foreground)]">
                           {rememberCommandPrefix}
                         </code>
                       </>
@@ -250,7 +245,7 @@ export function PermissionApprovalPanel({ sessionId }: PermissionApprovalPanelPr
                       value={denyReason}
                       disabled={isSubmitting}
                       placeholder="输入 reject reason，可选"
-                      className="mt-2 h-8 border-[#454545] bg-[#1b1b1b] px-2.5 text-[12px] text-[#e5e5e5] placeholder:text-[#6d6d6d] focus-visible:border-[#676767] focus-visible:ring-0"
+                      className="mt-2 h-8 px-2.5 text-[12px]"
                       onChange={(event) => {
                         setDenyReason(event.target.value);
                       }}
@@ -272,11 +267,11 @@ export function PermissionApprovalPanel({ sessionId }: PermissionApprovalPanelPr
           variant="destructive"
           size="sm"
           disabled={isSubmitting}
-          className="rounded-full px-3 text-[12px]"
+          className="px-3 text-[12px]"
           onClick={handleReject}
         >
           Reject
-          <span className="ml-1 rounded-full border border-current/30 px-1.5 py-0 text-[10px] leading-4">
+          <span className="ml-1 rounded-sm border border-current px-1.5 py-0 font-mono text-[10px] leading-4">
             Esc
           </span>
         </Button>
@@ -285,9 +280,9 @@ export function PermissionApprovalPanel({ sessionId }: PermissionApprovalPanelPr
           size="sm"
           disabled={isSubmitting}
           onClick={handleSubmit}
-          className="rounded-full bg-[#f3f4f6] px-4 text-[12px] font-semibold text-[#111827] hover:bg-[#e5e7eb] shadow-sm"
+          className="px-4 text-[12px]"
         >
-          提交 <CornerDownLeft className="h-4 w-4 stroke-[2.5]" />
+          提交 <CornerDownLeft data-icon="inline-end" />
         </Button>
       </div>
     </div>

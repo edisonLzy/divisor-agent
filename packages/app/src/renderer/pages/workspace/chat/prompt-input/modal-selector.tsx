@@ -158,7 +158,7 @@ export function ModalSelector({ value, onChange }: ModalSelectorProps) {
                             render={
                               <button
                                 type="button"
-                                className="flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground/75 transition-colors hover:text-foreground"
+                                className="flex size-4 shrink-0 items-center justify-center rounded-sm text-muted-foreground/75 transition-colors hover:bg-muted hover:text-foreground"
                                 onClick={(event) => {
                                   event.preventDefault();
                                   event.stopPropagation();

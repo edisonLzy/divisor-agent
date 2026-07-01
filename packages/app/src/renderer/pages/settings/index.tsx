@@ -34,7 +34,7 @@ export function SettingsPage() {
       <ResizablePanelGroup orientation="horizontal" className="h-full">
         <ResizablePanel defaultSize="20%" minSize="16%" maxSize="24%">
           <div className="flex h-full min-w-0 flex-col bg-sidebar">
-            <Titlebar className="bg-sidebar text-sidebar-foreground">
+            <Titlebar windowControls="left" className="bg-sidebar text-sidebar-foreground">
               <Button
                 variant="outline"
                 size="sm"
@@ -75,7 +75,7 @@ export function SettingsPage() {
 
         <ResizablePanel defaultSize="80%" minSize="60%">
           <div className="flex h-full w-full flex-col bg-background">
-            <Titlebar className="bg-background pl-4 text-foreground">
+            <Titlebar windowControls="right" className="bg-background pl-4 text-foreground">
               <h1 className="truncate text-sm font-bold tracking-tight">{activeSectionLabel}</h1>
             </Titlebar>
             <main

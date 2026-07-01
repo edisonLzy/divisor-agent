@@ -41,7 +41,7 @@ export function FloatingToolbar({ children, entryId, sessionId }: FloatingToolba
       {isOpen ? (
         <div
           ref={setFloating}
-          className="z-50 rounded-lg border border-border/70 bg-background/95 p-1 shadow-md supports-backdrop-filter:backdrop-blur-xl"
+          className="z-50 rounded-sm border-2 border-border bg-background p-1 shadow-[var(--hard-shadow-sm)]"
           style={floatingStyles}
           {...getFloatingProps({
             onClick: () => {

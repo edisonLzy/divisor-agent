@@ -175,9 +175,9 @@ export function SessionItem({ session }: SessionItemProps) {
 
 const STATUS_CONFIG: Record<SessionStatus, { label: string; dotClass: string }> = {
   idle: { label: "", dotClass: "bg-muted-foreground/30" },
-  running: { label: "执行中", dotClass: "bg-green-500 animate-pulse" },
-  completed: { label: "已完成", dotClass: "bg-blue-500" },
-  failed: { label: "失败", dotClass: "bg-red-500" },
+  running: { label: "执行中", dotClass: "bg-signal-green animate-pulse" },
+  completed: { label: "已完成", dotClass: "bg-signal-cyan" },
+  failed: { label: "失败", dotClass: "bg-destructive" },
 };
 
 function SessionStatusDot({ status }: { status: SessionStatus }) {
@@ -194,7 +194,7 @@ function SessionStatusDot({ status }: { status: SessionStatus }) {
   const config = STATUS_CONFIG[status];
   return (
     <span className="ml-1.5 flex items-center gap-1" title={config?.label}>
-      <span className={cn("size-1.5 rounded-full shrink-0", config?.dotClass)} />
+      <span className={cn("size-1.5 shrink-0 border border-sidebar-border", config?.dotClass)} />
       <span className="text-[11px] text-sidebar-foreground/45">{config?.label}</span>
     </span>
   );

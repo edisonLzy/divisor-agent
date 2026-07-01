@@ -1,20 +1,26 @@
 import { ErrorBoundary } from "@renderer/components/ui/error-boundary";
 import { mainStore } from "@renderer/store/main";
+import type { ComponentProps } from "react";
 import { useStore } from "zustand";
 
+import { ToggleSidebarButton } from "../toggle-sidebar-button";
 import { useWindowFullScreen } from "../use-window-full-screen";
 import { ActiveSessionContent } from "./active-session-content";
 import { PendingSessionContent } from "./pending-session-content";
 
 interface ChatProps {
   isSidebarCollapsed: boolean;
+  onToggleSidebar: ComponentProps<typeof ToggleSidebarButton>["onToggle"];
 }
 
-export function Chat({ isSidebarCollapsed }: ChatProps) {
+export function Chat({ isSidebarCollapsed, onToggleSidebar }: ChatProps) {
   const activeSessionId = useStore(mainStore, (state) => state.activeSessionId);
   const shouldRenderPendingState = !activeSessionId;
   const isWindowFullScreen = useWindowFullScreen();
   const insetForWindowControls = isSidebarCollapsed && !isWindowFullScreen;
+  const sidebarControl = (
+    <ToggleSidebarButton isCollapsed={isSidebarCollapsed} onToggle={onToggleSidebar} />
+  );
 
   return (
     <div
@@ -26,9 +32,15 @@ export function Chat({ isSidebarCollapsed }: ChatProps) {
     >
       <ErrorBoundary>
         {shouldRenderPendingState ? (
-          <PendingSessionContent insetForWindowControls={insetForWindowControls} />
+          <PendingSessionContent
+            insetForWindowControls={insetForWindowControls}
+            sidebarControl={sidebarControl}
+          />
         ) : (
-          <ActiveSessionContent insetForWindowControls={insetForWindowControls} />
+          <ActiveSessionContent
+            insetForWindowControls={insetForWindowControls}
+            sidebarControl={sidebarControl}
+          />
         )}
       </ErrorBoundary>
     </div>

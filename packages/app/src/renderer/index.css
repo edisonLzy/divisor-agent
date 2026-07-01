@@ -182,6 +182,20 @@
 
   --hard-shadow: 3px 3px 0 #141111;
   --hard-shadow-sm: 2px 2px 0 #141111;
+  --code-surface: #171615;
+  --code-foreground: #eee8de;
+  --code-muted: #817b73;
+  --window-controls-left: 0px;
+  --window-controls-right: 0px;
+}
+
+[data-platform="darwin"] {
+  --window-controls-left: 72px;
+}
+
+[data-platform="win32"],
+[data-platform="linux"] {
+  --window-controls-right: 138px;
 }
 
 [data-theme="dark"] {
@@ -254,6 +268,9 @@
 
   --hard-shadow: 3px 3px 0 #000;
   --hard-shadow-sm: 2px 2px 0 #000;
+  --code-surface: #0d0c0b;
+  --code-foreground: #f3eee5;
+  --code-muted: #8e877e;
 }
 
 @layer base {
@@ -338,4 +355,66 @@
 .prompt-editor .ProseMirror .prompt-ghost-suggestion {
   color: color-mix(in oklch, var(--muted-foreground) 58%, transparent);
   pointer-events: none;
+}
+
+/* Sonner is part of the product surface: keep every toast inside the same hard-edged system. */
+[data-sonner-toaster] {
+  --width: 360px;
+  font-family: var(--font-sans);
+}
+
+[data-sonner-toast] {
+  border: 2px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  background: var(--card) !important;
+  color: var(--card-foreground) !important;
+  box-shadow: var(--hard-shadow) !important;
+}
+
+[data-sonner-toast][data-type="success"] {
+  background: var(--signal-green) !important;
+  color: #141111 !important;
+}
+
+[data-sonner-toast][data-type="error"] {
+  background: color-mix(in srgb, var(--destructive) 18%, var(--card)) !important;
+  color: var(--foreground) !important;
+}
+
+[data-sonner-toast][data-type="warning"] {
+  background: var(--signal-yellow) !important;
+  color: #141111 !important;
+}
+
+[data-sonner-toast][data-type="info"] {
+  background: var(--signal-cyan) !important;
+  color: #141111 !important;
+}
+
+[data-sonner-toast] [data-title] {
+  font-weight: 700 !important;
+}
+
+[data-sonner-toast] [data-description] {
+  color: currentColor !important;
+  opacity: 0.72;
+}
+
+[data-sonner-toast] [data-button],
+[data-sonner-toast] [data-cancel] {
+  height: 28px !important;
+  border: 2px solid currentColor !important;
+  border-radius: calc(var(--radius) * 0.8) !important;
+  background: var(--card) !important;
+  color: var(--card-foreground) !important;
+  box-shadow: 2px 2px 0 currentColor !important;
+  font-weight: 700 !important;
+}
+
+[data-sonner-toast] [data-close-button] {
+  border: 2px solid var(--border) !important;
+  border-radius: calc(var(--radius) * 0.8) !important;
+  background: var(--card) !important;
+  color: var(--card-foreground) !important;
+  box-shadow: 1px 1px 0 var(--border) !important;
 }

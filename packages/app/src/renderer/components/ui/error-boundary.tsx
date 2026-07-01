@@ -40,8 +40,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
       return (
         <div className="flex h-full flex-col items-center justify-center gap-4 px-6">
-          <Card className="flex max-w-md flex-col items-center gap-3 p-8 text-center shadow-lg">
-            <div className="flex size-12 items-center justify-center rounded-full bg-destructive/10">
+          <Card className="flex max-w-md flex-col items-center gap-3 p-8 text-center">
+            <div className="flex size-12 items-center justify-center rounded-md border-2 border-border bg-signal-pink shadow-[var(--hard-shadow-sm)]">
               <AlertTriangleIcon className="size-6 text-destructive" />
             </div>
 
@@ -53,7 +53,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             </p>
 
             {this.state.error.message && (
-              <p className="max-w-full truncate rounded-md bg-muted px-3 py-1.5 font-mono text-xs text-muted-foreground">
+              <p className="max-w-full truncate rounded-sm border-2 border-border bg-muted px-3 py-1.5 font-mono text-xs text-muted-foreground">
                 {this.state.error.message}
               </p>
             )}

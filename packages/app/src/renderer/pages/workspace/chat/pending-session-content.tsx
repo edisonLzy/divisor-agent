@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@renderer/components/ui
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { mainStore } from "@renderer/store/main";
 import { Check, ChevronDown, Folder, X } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useStore } from "zustand";
 
 import { useInvalidateStandaloneSessions } from "../sessions/use-standalone-sessions";
@@ -25,9 +25,13 @@ import { createSessionTitleFromPrompt } from "./session-title";
 
 interface PendingSessionContentProps {
   insetForWindowControls: boolean;
+  sidebarControl: ReactNode;
 }
 
-export function PendingSessionContent({ insetForWindowControls }: PendingSessionContentProps) {
+export function PendingSessionContent({
+  insetForWindowControls,
+  sidebarControl,
+}: PendingSessionContentProps) {
   const { invoke } = useElectronIPC();
   const invalidateStandalone = useInvalidateStandaloneSessions();
   const invalidateWorkspaceSessions = useInvalidateWorkspaceSessions();
@@ -92,7 +96,8 @@ export function PendingSessionContent({ insetForWindowControls }: PendingSession
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <PanelHeader dragRegion insetForWindowControls={insetForWindowControls}>
+      <PanelHeader dragRegion windowControls={insetForWindowControls ? "both" : "right"}>
+        {sidebarControl}
         <h1 className="truncate text-sm font-bold tracking-tight text-foreground">新对话</h1>
       </PanelHeader>
       <section className="min-h-0 flex-1 px-6 pt-6">

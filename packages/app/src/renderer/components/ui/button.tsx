@@ -12,11 +12,11 @@ const buttonVariants = cva(
         outline:
           "border-border bg-background text-foreground shadow-[var(--hard-shadow-sm)] hover:translate-x-px hover:translate-y-px hover:bg-accent hover:text-accent-foreground hover:shadow-none aria-expanded:bg-accent aria-expanded:text-accent-foreground",
         secondary:
-          "border-border bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground aria-expanded:bg-accent aria-expanded:text-accent-foreground",
+          "border-border bg-secondary text-secondary-foreground shadow-[var(--hard-shadow-sm)] hover:translate-x-px hover:translate-y-px hover:bg-accent hover:text-accent-foreground hover:shadow-none aria-expanded:bg-accent aria-expanded:text-accent-foreground",
         ghost:
           "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
         destructive:
-          "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
+          "border-border bg-destructive text-white shadow-[var(--hard-shadow-sm)] hover:translate-x-px hover:translate-y-px hover:shadow-none focus-visible:border-destructive focus-visible:ring-destructive/30",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {

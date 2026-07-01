@@ -1,4 +1,3 @@
-import { Titlebar } from "@renderer/components/titlebar";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -8,7 +7,7 @@ import {
 import { Chat } from "./chat";
 import { useSideChatMessages } from "./chat/artifacts/side-chat-artifact/use-side-chat-messages";
 import { Sessions } from "./sessions";
-import { ToggleSidebarButton, useToggleSidebarButton } from "./toggle-sidebar-button";
+import { useToggleSidebarButton } from "./toggle-sidebar-button";
 import { useAgentMessages } from "./use-agent-messages";
 import { useAgentSessions } from "./use-agent-sessions";
 
@@ -36,29 +35,15 @@ export function WorkspacePage() {
             setIsCollapsed(size.asPercentage < 0.5);
           }}
         >
-          <div className="flex h-full min-w-0 flex-col">
-            <Titlebar className="bg-sidebar text-sidebar-foreground">
-              {!isCollapsed ? (
-                <ToggleSidebarButton isCollapsed={isCollapsed} onToggle={toggle} />
-              ) : null}
-            </Titlebar>
-            <div className="min-h-0 flex-1">
-              <Sessions />
-            </div>
-          </div>
+          <Sessions />
         </ResizablePanel>
 
         <ResizableHandle className="w-0.5 bg-border" />
 
         <ResizablePanel defaultSize="78%" minSize="60%">
-          <div className="relative flex h-full w-full bg-background">
-            {isCollapsed ? (
-              <div className="app-no-drag absolute top-2 left-24 z-50">
-                <ToggleSidebarButton isCollapsed={isCollapsed} onToggle={toggle} />
-              </div>
-            ) : null}
+          <div className="flex h-full w-full bg-background">
             <div className="min-w-0 flex-1">
-              <Chat isSidebarCollapsed={isCollapsed} />
+              <Chat isSidebarCollapsed={isCollapsed} onToggleSidebar={toggle} />
             </div>
           </div>
         </ResizablePanel>

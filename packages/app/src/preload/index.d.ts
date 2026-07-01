@@ -5,6 +5,7 @@ import type { AllowedMainExposeEvents, AgentRuntimeIPC } from "../shared/events-
 type InvokeArgs<C extends keyof AgentRuntimeIPC> = Parameters<AgentRuntimeIPC[C]>;
 
 interface ElectronAPI {
+  platform: NodeJS.Platform;
   invoke<C extends keyof AgentRuntimeIPC>(
     channel: C,
     ...args: InvokeArgs<C>

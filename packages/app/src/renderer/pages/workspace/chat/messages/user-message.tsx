@@ -266,7 +266,7 @@ function EditableUserMessage({
 
   return (
     <div className="ml-auto flex max-w-2xl flex-col items-end gap-1">
-      <div className="w-full rounded-[20px] border border-border bg-card px-4 py-2.5 shadow-sm">
+      <div className="w-full rounded-md border-2 border-border bg-card px-4 py-2.5 shadow-[var(--hard-shadow-sm)]">
         <EditorContent editor={editor} className="prompt-editor max-w-none" />
       </div>
       <div className="flex items-center gap-2">
@@ -300,7 +300,7 @@ function useUserMessageEditor(document: AppUserMessage["jsonContent"]) {
         }).configure({
           HTMLAttributes: {
             class:
-              "mention inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-sm font-medium text-amber-700 dark:text-amber-200",
+              "mention inline-flex items-center gap-1 rounded-sm border border-border bg-signal-yellow px-1.5 py-0.5 text-sm font-bold text-accent-foreground",
           },
           renderText({ node, suggestion }) {
             return `${suggestion?.char ?? "/"}${node.attrs.label ?? node.attrs.id ?? ""}`;

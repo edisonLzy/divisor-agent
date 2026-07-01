@@ -15,6 +15,7 @@ type InvokeArgs<C extends keyof AgentRuntimeIPC> = Parameters<AgentRuntimeIPC[C]
 declare global {
   interface Window {
     electronAPI: {
+      platform: NodeJS.Platform;
       /**
        * Type-safe IPC invoke.
        * The channel name determines the params type and return type automatically.

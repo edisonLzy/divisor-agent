@@ -11,7 +11,7 @@ export function IconNode({ icon, children, className, ...props }: IconNodeProps)
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-sm font-medium",
+        "inline-flex items-center gap-1 rounded-sm border border-border px-1.5 py-0.5 text-sm font-bold",
         className,
       )}
       {...props}

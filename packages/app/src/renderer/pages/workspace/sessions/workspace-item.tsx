@@ -102,10 +102,10 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
     <Collapsible open={open} onOpenChange={setOpen}>
       <div
         className={cn(
-          "group flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] transition-[background-color,color]",
+          "group flex w-full items-center gap-2 rounded-md border-2 px-3 py-1.5 text-[13px] transition-[background-color,color]",
           open
-            ? "bg-sidebar-accent/70 text-sidebar-foreground"
-            : "text-sidebar-foreground/78 hover:bg-sidebar-accent/80 hover:text-sidebar-foreground",
+            ? "border-sidebar-border bg-sidebar-accent text-sidebar-foreground shadow-[var(--hard-shadow-sm)]"
+            : "border-transparent text-sidebar-foreground/78 hover:bg-sidebar-accent hover:text-sidebar-foreground",
         )}
       >
         <CollapsibleTrigger className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-left leading-5">
@@ -120,21 +120,21 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
         <span className="relative flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={handleTogglePin}
-            className="flex items-center justify-center rounded-md p-1 text-sidebar-foreground/32 transition-colors hover:bg-black/10 hover:text-sidebar-foreground"
+            className="flex items-center justify-center rounded-sm p-1 text-sidebar-foreground/40 transition-colors hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
             title={workspace.isTop ? "取消置顶" : "置顶"}
           >
             {workspace.isTop ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
           </button>
           <button
             onClick={() => setDeleteDialogOpen(true)}
-            className="flex items-center justify-center rounded-md p-1 text-sidebar-foreground/32 transition-colors hover:bg-black/10 hover:text-red-400"
+            className="flex items-center justify-center rounded-sm p-1 text-sidebar-foreground/40 transition-colors hover:bg-destructive/15 hover:text-destructive"
             title="删除"
           >
             <Trash2 className="size-3.5" />
           </button>
           <button
             onClick={handleCreateWorkflowSession}
-            className="flex items-center justify-center rounded-md p-1 text-sidebar-foreground/32 transition-colors hover:bg-black/10 hover:text-sidebar-foreground"
+            className="flex items-center justify-center rounded-sm p-1 text-sidebar-foreground/40 transition-colors hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
             title="新建对话"
           >
             <Plus className="size-3.5" />
@@ -143,7 +143,7 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
       </div>
 
       <CollapsibleContent>
-        <div className="space-y-0.5 py-1 pl-4">
+        <div className="flex flex-col gap-0.5 py-1 pl-4">
           {isLoading ? (
             <div className="px-3 py-1.5 text-[12px] text-sidebar-foreground/30">加载中...</div>
           ) : sessions.length === 0 ? (
@@ -159,7 +159,7 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
                 <button
                   onClick={() => fetchNextPage()}
                   disabled={isFetchingNextPage}
-                  className="mt-1 w-full rounded-lg px-3 py-1.5 text-left text-[12px] text-sidebar-foreground/35 transition-colors hover:bg-sidebar-accent/80 hover:text-sidebar-foreground disabled:cursor-default disabled:hover:bg-transparent"
+                  className="mt-1 w-full rounded-sm border-2 border-transparent px-3 py-1.5 text-left text-[12px] text-sidebar-foreground/40 transition-colors hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-foreground disabled:cursor-default disabled:hover:bg-transparent"
                 >
                   {isFetchingNextPage ? "加载中..." : "加载更多"}
                 </button>

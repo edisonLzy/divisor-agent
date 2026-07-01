@@ -1,3 +1,4 @@
+import { Badge } from "@renderer/components/ui/badge";
 import { Input } from "@renderer/components/ui/input";
 import { Switch } from "@renderer/components/ui/switch";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
@@ -118,7 +119,7 @@ export function SettingsSkillsPage() {
                   key={skill.id}
                   className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/35"
                 >
-                  <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground">
+                  <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-sm border-2 border-border bg-signal-purple text-accent-foreground shadow-[var(--hard-shadow-sm)]">
                     <BoxIcon className="size-4" />
                   </span>
                   <div className="min-w-0 flex-1">
@@ -126,9 +127,7 @@ export function SettingsSkillsPage() {
                       <div className="truncate text-[13px] font-medium text-foreground">
                         {skill.name}
                       </div>
-                      <span className="shrink-0 rounded-full border border-border bg-background px-2 py-0.5 text-[11px] text-muted-foreground">
-                        {SKILL_SCOPE_LABEL[skill.scope]}
-                      </span>
+                      <Badge variant="outline">{SKILL_SCOPE_LABEL[skill.scope]}</Badge>
                     </div>
                     <div className="mt-1 line-clamp-2 text-[12px] leading-5 text-muted-foreground">
                       {skill.description}
