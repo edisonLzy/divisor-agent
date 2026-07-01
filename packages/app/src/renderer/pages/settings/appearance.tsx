@@ -51,18 +51,18 @@ export function SettingsAppearancePage() {
   ];
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-160 flex-col px-10 py-12">
-      <h1 className="mb-8 text-center text-[20px] font-medium text-foreground">外观</h1>
-      <div className="space-y-6">
-        <div className="overflow-hidden rounded-lg border border-border bg-card">
-          <div className="flex flex-col gap-4 border-b border-border px-4 py-4 md:flex-row md:items-center md:justify-between">
+    <div className="mx-auto flex min-h-full w-full max-w-180 flex-col px-10 py-12">
+      <h1 className="mb-8 text-center text-2xl font-bold tracking-tight text-foreground">外观</h1>
+      <div className="flex flex-col gap-6">
+        <div className="overflow-hidden rounded-md border-2 border-border bg-card shadow-[var(--hard-shadow)]">
+          <div className="flex flex-col gap-4 border-b-2 border-border px-4 py-4 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="text-[13px] font-medium text-foreground">主题</div>
               <div className="mt-0.5 text-[11px] text-muted-foreground">
                 使用浅色、深色，或匹配系统设置
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-background p-1">
+            <div className="flex flex-wrap items-center gap-2 rounded-md border-2 border-border bg-background p-1 shadow-[var(--hard-shadow-sm)]">
               {THEME_OPTIONS.map((option) => {
                 const Icon = option.icon;
                 const isActive = option.value === theme;
@@ -74,10 +74,10 @@ export function SettingsAppearancePage() {
                     aria-pressed={isActive}
                     onClick={() => setTheme(option.value)}
                     className={cn(
-                      "flex items-center gap-1.5 rounded px-3 py-1.5 text-[12px] transition-colors",
+                      "flex items-center gap-1.5 rounded-sm border px-3 py-1.5 text-[12px] font-semibold transition-all",
                       isActive
-                        ? "bg-accent text-foreground shadow-sm"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                        ? "border-border bg-accent text-accent-foreground shadow-[var(--hard-shadow-sm)]"
+                        : "border-transparent text-muted-foreground hover:border-border/30 hover:bg-muted hover:text-foreground",
                     )}
                   >
                     <Icon className="size-3" />
@@ -88,8 +88,8 @@ export function SettingsAppearancePage() {
             </div>
           </div>
 
-          <div className="grid gap-3 border-b border-border bg-background/30 px-4 py-4 md:grid-cols-3">
-            <div className="rounded-lg border border-border bg-background/70 px-3 py-3">
+          <div className="grid gap-3 border-b-2 border-border bg-background px-4 py-4 md:grid-cols-3">
+            <div className="rounded-md border-2 border-border bg-card px-3 py-3 shadow-[var(--hard-shadow-sm)]">
               <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                 当前选择
               </div>
@@ -100,7 +100,7 @@ export function SettingsAppearancePage() {
                 {selectedTheme.description}
               </div>
             </div>
-            <div className="rounded-lg border border-border bg-background/70 px-3 py-3">
+            <div className="rounded-md border-2 border-border bg-card px-3 py-3 shadow-[var(--hard-shadow-sm)]">
               <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                 实际生效
               </div>
@@ -111,7 +111,7 @@ export function SettingsAppearancePage() {
                 {theme === "system" ? "由系统外观实时决定" : "已固定为当前外观模式"}
               </div>
             </div>
-            <div className="rounded-lg border border-border bg-background/70 px-3 py-3">
+            <div className="rounded-md border-2 border-border bg-card px-3 py-3 shadow-[var(--hard-shadow-sm)]">
               <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                 偏好保存
               </div>
@@ -122,9 +122,9 @@ export function SettingsAppearancePage() {
             </div>
           </div>
 
-          <div className="border-b border-border bg-muted/25 p-4">
-            <div className="flex overflow-hidden rounded border border-border bg-background text-[11px] font-mono leading-relaxed max-md:flex-col">
-              <div className="border-r border-border max-md:border-r-0 max-md:border-b md:flex-1">
+          <div className="bg-muted p-4">
+            <div className="flex overflow-hidden rounded-md border-2 border-border bg-background text-[11px] leading-relaxed font-mono shadow-[var(--hard-shadow-sm)] max-md:flex-col">
+              <div className="border-r-2 border-border max-md:border-r-0 max-md:border-b-2 md:flex-1">
                 <CodePreviewPane
                   title="Preference"
                   description="展示当前保存的主题偏好。"
@@ -172,15 +172,15 @@ function CodePreviewPane({
             key={`${title}-${line.line}`}
             className={cn(
               "flex border-l-2 border-transparent text-[11px] leading-relaxed",
-              line.tone === "selected" && "border-sky-500/70 bg-sky-500/10",
-              line.tone === "resolved" && "border-emerald-500/70 bg-emerald-500/10",
+              line.tone === "selected" && "border-signal-cyan bg-signal-cyan/10",
+              line.tone === "resolved" && "border-signal-green bg-signal-green/10",
             )}
           >
             <div
               className={cn(
                 "mr-3 w-4 shrink-0 text-right text-muted-foreground",
-                line.tone === "selected" && "text-sky-600 dark:text-sky-300",
-                line.tone === "resolved" && "text-emerald-600 dark:text-emerald-300",
+                line.tone === "selected" && "text-signal-cyan",
+                line.tone === "resolved" && "text-signal-green",
               )}
             >
               {line.line}
@@ -188,8 +188,8 @@ function CodePreviewPane({
             <div
               className={cn(
                 "min-w-0 whitespace-pre-wrap text-foreground/80",
-                line.tone === "selected" && "text-sky-700 dark:text-sky-200",
-                line.tone === "resolved" && "text-emerald-700 dark:text-emerald-200",
+                line.tone === "selected" && "text-signal-cyan",
+                line.tone === "resolved" && "text-signal-green",
               )}
             >
               {line.content}

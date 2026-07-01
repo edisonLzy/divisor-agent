@@ -92,16 +92,12 @@ export function PendingSessionContent({ insetForWindowControls }: PendingSession
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <PanelHeader
-        dragRegion
-        insetForWindowControls={insetForWindowControls}
-        className="border-b-0"
-      >
-        <span className="sr-only">New session</span>
+      <PanelHeader dragRegion insetForWindowControls={insetForWindowControls}>
+        <h1 className="truncate text-sm font-bold tracking-tight text-foreground">新对话</h1>
       </PanelHeader>
       <section className="min-h-0 flex-1 px-6 pt-6">
         <div className="mx-auto flex h-full w-full max-w-4xl flex-col items-center justify-center gap-8 pb-16">
-          <h1 className="text-center text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
+          <h1 className="text-center text-3xl font-bold tracking-[-0.03em] text-foreground sm:text-5xl">
             我们应该在 divisor-agent 中构建什么？
           </h1>
 
@@ -152,7 +148,7 @@ function WorkspaceSelector({ value, onChange }: WorkspaceSelectorProps) {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger className="group flex h-6 w-auto max-w-[200px] items-center gap-1.5 rounded-[8px] border-none bg-muted/50 px-2.5 py-0 text-xs text-muted-foreground shadow-none hover:bg-muted/80 hover:text-foreground focus:outline-hidden">
+      <PopoverTrigger className="group flex h-7 w-auto max-w-[200px] items-center gap-1.5 rounded-sm border-2 border-border bg-card px-2.5 py-0 text-xs text-muted-foreground shadow-[var(--hard-shadow-sm)] transition-all hover:translate-x-px hover:translate-y-px hover:bg-accent hover:text-accent-foreground hover:shadow-none focus:outline-hidden">
         {selectedWorkspace ? (
           <>
             <Folder className="size-3.5 opacity-50" />

@@ -11,7 +11,7 @@ export function Titlebar({ children, className, style }: TitlebarProps) {
   return (
     <div
       className={cn(
-        "absolute top-0 left-0 right-0 z-10 flex h-9 items-center gap-3",
+        "relative flex h-11 shrink-0 items-center gap-3 border-b-2 border-border bg-accent",
         "pl-20 pr-4 select-none",
         className,
       )}

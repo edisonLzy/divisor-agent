@@ -22,7 +22,7 @@ export function PanelHeader({
   return (
     <header
       className={cn(
-        "relative flex min-h-10 shrink-0 items-center border-b border-border/70 px-4 py-1 pr-14",
+        "relative flex min-h-11 shrink-0 items-center border-b-2 border-border bg-card px-4 py-1 pr-14",
         dragRegion && "app-drag-region",
         insetForWindowControls && "pl-28",
         className,
