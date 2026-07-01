@@ -1,87 +1,50 @@
-import { readFile } from "node:fs/promises";
+import { ipcMain } from "electron";
+import type { BrowserWindow } from "electron";
 
-import { BrowserWindow, ipcMain } from "electron";
+type UnbindFunction = VoidFunction;
 
-import type { FileSystemIPC } from "../shared/file-system-ipc";
-import type { AgentModelsIPC } from "../shared/models-ipc";
-import type { AgentSessionIPC } from "../shared/session-ipc";
-import type { AgentSkillsIPC } from "../shared/skills-ipc";
-import type { SystemIPC } from "../shared/system-ipc";
-import type { AgentPool } from "./agent-pool";
+export abstract class AbstractAgentIPCHandler<AgentIPC> {
+  protected typedIpcMain = createTypedIpcMain<AgentIPC>();
 
-function registerAgentRuntimeHandlers(agentPool: AgentPool, browserWindow: BrowserWindow) {
-  const offAny = agentPool.onAny(({ name, data }) => {
-    if (browserWindow.isDestroyed() || typeof name !== "string") {
+  protected unbind: UnbindFunction | null = null;
+
+  private browserWindow: BrowserWindow | null = null;
+
+  constructor(initialBrowserWindow: BrowserWindow) {
+    this.browserWindow = initialBrowserWindow;
+  }
+
+  protected get currentBrowserWindow(): BrowserWindow | null {
+    return this.browserWindow;
+  }
+
+  public updateBrowserWindow = (browserWindow: BrowserWindow) => {
+    this.browserWindow = browserWindow;
+  };
+
+  public sendMessageToRenderer(name: string, data: unknown) {
+    const browserWindow = this.browserWindow;
+    if (!browserWindow || browserWindow.isDestroyed() || browserWindow.webContents.isDestroyed()) {
       return;
     }
 
     browserWindow.webContents.send(name, data);
-  });
-
-  return () => {
-    offAny();
-  };
-}
-
-function registerIPCHandlers(agentPool: AgentPool, browserWindow: BrowserWindow) {
-  const typedIpcMain = createTypedIpcMain();
-
-  typedIpcMain.handle("setModel", agentPool.setModel);
-  typedIpcMain.handle("getAvailableModels", agentPool.getAvailableModels);
-  typedIpcMain.handle("getModelConfig", agentPool.getModelConfig);
-  typedIpcMain.handle("saveModelConfig", agentPool.saveModelConfig);
-  typedIpcMain.handle("prompt", agentPool.prompt);
-  typedIpcMain.handle("runOneTimeAgent", agentPool.runOneTimeAgent);
-  typedIpcMain.handle("abortPrompt", agentPool.abortPrompt);
-  typedIpcMain.handle("setHistoryMessages", agentPool.setHistoryMessages);
-  typedIpcMain.handle("setSessionId", agentPool.setSessionId);
-  typedIpcMain.handle("setSessionScope", agentPool.setSessionScope);
-  typedIpcMain.handle("destroySession", agentPool.destroySession);
-  typedIpcMain.handle("setPermissionMode", agentPool.setPermissionMode);
-  typedIpcMain.handle("resolvePermissionRequest", agentPool.resolvePermissionRequest);
-  typedIpcMain.handle("listSkills", agentPool.listSkills);
-  typedIpcMain.handle("setSkillEnabled", agentPool.setSkillEnabled);
-  typedIpcMain.handle("fsReadTextFile", handleFsReadTextFile);
-  typedIpcMain.handle("isWindowFullScreen", async () => browserWindow.isFullScreen());
-
-  return () => {
-    typedIpcMain.removeAllListeners();
-  };
-}
-
-async function handleFsReadTextFile(
-  path: string,
-): Promise<{ content: string; bytes: number } | { error: string }> {
-  try {
-    const content = await readFile(path, "utf-8");
-    return { content, bytes: Buffer.byteLength(content, "utf-8") };
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : String(err) };
   }
+
+  // bind ipcMain events; subclasses must register their IPC channels here
+  // and return a function that reverses the registration.
+  protected abstract bind(): UnbindFunction;
 }
 
-export function bindAgentRuntimeIPC(
-  agentPool: AgentPool,
-  browserWindow: BrowserWindow,
-): () => void {
-  const unregisterAgentRuntimeHandlers = registerAgentRuntimeHandlers(agentPool, browserWindow);
-  const unregisterIPCHandlers = registerIPCHandlers(agentPool, browserWindow);
-
-  return () => {
-    // Unbind logic here
-    unregisterAgentRuntimeHandlers();
-    unregisterIPCHandlers();
-  };
-}
-
-function createTypedIpcMain() {
-  type AgentIPC = AgentModelsIPC & AgentSessionIPC & AgentSkillsIPC & FileSystemIPC & SystemIPC;
+function createTypedIpcMain<AgentIPC = Record<string, any>>() {
   return {
-    ...ipcMain,
     handle<C extends keyof AgentIPC = keyof AgentIPC>(channel: C, listener: AgentIPC[C]) {
       ipcMain.handle(channel as unknown as string, (_, ...params) => {
         return (listener as any)(...params);
       });
+    },
+    removeHandler<C extends keyof AgentIPC = keyof AgentIPC>(channel: C) {
+      ipcMain.removeHandler(channel as string);
     },
   };
 }

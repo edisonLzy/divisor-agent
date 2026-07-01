@@ -1,3 +1,5 @@
+import type { ExtensionIPCTransport } from "@divisor-agent/extension-core/common";
+
 import type { AllowedMainExposeEvents, AgentRuntimeIPC } from "../shared/events-ipc.js";
 
 type InvokeArgs<C extends keyof AgentRuntimeIPC> = Parameters<AgentRuntimeIPC[C]>;
@@ -16,6 +18,7 @@ interface ElectronAPI {
 declare global {
   interface Window {
     electronAPI: ElectronAPI;
+    extensionsAPI: ExtensionIPCTransport;
     api: unknown;
   }
 }

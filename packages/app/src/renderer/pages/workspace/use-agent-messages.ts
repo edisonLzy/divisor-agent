@@ -140,11 +140,13 @@ export function useAgentMessages() {
           return;
         }
 
-        const turnStartIdx = turnContentStartIndicesRef.current[sessionId] ?? 0;
-        if (turnStartIdx !== 0) return;
+        if (isAgentAssistantMessage(message)) {
+          const turnStartIdx = turnContentStartIndicesRef.current[sessionId] ?? 0;
+          if (turnStartIdx !== 0) return;
 
-        const entryId = mainStore.getState().appendMessageEntry(sessionId, message);
-        mainStore.getState().setStreamingEntryId(sessionId, entryId);
+          const entryId = mainStore.getState().appendMessageEntry(sessionId, message);
+          mainStore.getState().setStreamingEntryId(sessionId, entryId);
+        }
       },
 
       message_update: (event) => {

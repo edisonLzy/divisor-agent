@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getFileBaseName, parseFileHref } from "../helper";
+import { getFileBaseName, parseFileHref } from "../../common/helper";
 
 describe("parseFileHref", () => {
   it("parses a custom file link without line numbers", () => {

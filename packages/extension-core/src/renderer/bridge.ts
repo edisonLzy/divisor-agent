@@ -1,27 +1,20 @@
-import type { ExtensionManifest } from "../manifest.js";
-import type { RendererExtensionDefinition } from "./define";
-import { RendererExtensionRegistry } from "./registry";
-
-export interface InstalledRendererExtension {
-  manifest: ExtensionManifest;
-  extension: RendererExtensionDefinition;
-}
+import type { RendererExtensionDefinition } from "./define.js";
+import { RendererExtensionRegistry } from "./registry.js";
 
 export class RendererExtensionBridge {
   private registry = new RendererExtensionRegistry();
   private initialized = false;
 
-  constructor(private extensions: InstalledRendererExtension[]) {}
+  constructor(private extensions: RendererExtensionDefinition[]) {}
 
   initialize() {
-    if (this.initialized) {
-      return;
-    }
+    if (this.initialized) return;
 
-    for (const item of this.extensions) {
-      this.registry.registerExtension(item.manifest);
-      item.extension.setup({
-        manifest: item.manifest,
+    for (const extension of this.extensions) {
+      this.registry.registerExtension(extension);
+      const metadata = { id: extension.id, name: extension.name };
+      extension.setup({
+        extension: metadata,
         slashCommands: {
           register: (command) => this.registry.registerSlashCommand(command),
         },

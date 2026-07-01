@@ -3,11 +3,12 @@ import type {
   ExtensionAgentModel,
   ExtensionAgentToolOptions,
 } from "@divisor-agent/extension-core/main";
+import type { BrowserWindow } from "electron";
 
 import type { SystemPromptBuilder } from "../prompt/index.js";
 import type { AppTool } from "../tools/index.js";
 import { installedMainExtensions } from "./installed-extensions.js";
-import type { ExtensionRuntimeService } from "./runtime-service.js";
+import { ExtensionRuntimeService } from "./runtime-service.js";
 
 export interface ExtensionToolRuntimeContext {
   getModel(): ExtensionAgentModel | undefined;
@@ -15,13 +16,19 @@ export interface ExtensionToolRuntimeContext {
 }
 
 export class ExtensionService extends MainExtensionBridge implements SystemPromptBuilder {
-  constructor(private runtimeService?: ExtensionRuntimeService) {
-    super(installedMainExtensions, { runtime: runtimeService });
-    this.initialize();
-  }
+  private readonly runtimeService: ExtensionRuntimeService;
 
-  setRuntimeService(runtimeService: ExtensionRuntimeService) {
+  constructor(
+    runtimeService: ExtensionRuntimeService,
+    getBrowserWindow: () => BrowserWindow | null,
+  ) {
+    super(installedMainExtensions, {
+      extensionRuntime: runtimeService,
+      getBrowserWindow,
+    });
     this.runtimeService = runtimeService;
+    runtimeService.setExtensionService(this);
+    this.initialize();
   }
 
   buildSystemPrompt(raw: string): string {
@@ -49,10 +56,6 @@ export class ExtensionService extends MainExtensionBridge implements SystemPromp
     return {
       ...tool,
       execute: async (...args: Parameters<AppTool["execute"]>) => {
-        if (!this.runtimeService) {
-          return tool.execute(...args);
-        }
-
         return this.runtimeService.runWithContext(context, () => tool.execute(...args));
       },
     };

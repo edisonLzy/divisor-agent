@@ -55,7 +55,13 @@ export function App() {
           sideChat.appendSideChatMeta(sideChatId, {
             mainSessionId: input.mainSessionId,
             context: input.context ?? {},
-            model: input.model,
+            model: input.model
+              ? {
+                  ...input.model,
+                  modelName: input.model.modelId,
+                  providerName: input.model.providerId,
+                }
+              : undefined,
             pendingPrompt: input.pendingPrompt,
             createdAt: Date.now(),
             inputDisabled: input.inputDisabled,

@@ -61,6 +61,13 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
   Agent: MockAgent,
 }));
 
+vi.mock("electron", () => ({
+  ipcMain: {
+    handle: vi.fn(),
+    removeHandler: vi.fn(),
+  },
+}));
+
 vi.mock("node:fs/promises", () => ({
   mkdir: vi.fn(),
   writeFile: vi.fn(),
@@ -100,7 +107,7 @@ describe("AgentPool", () => {
   });
 
   it("runs a one-time agent with the provided system prompt, model, and no tools", async () => {
-    const pool = new AgentPool();
+    const pool = new AgentPool({} as never);
     const userMessage = createUserMessage("Name this session");
 
     const result = await pool.runOneTimeAgent([userMessage], {
@@ -128,7 +135,7 @@ describe("AgentPool", () => {
   });
 
   it("uses all messages as the one-time agent transcript", async () => {
-    const pool = new AgentPool();
+    const pool = new AgentPool({} as never);
     const firstUser = createUserMessage("Earlier request");
     const assistantMessage = {
       role: "assistant",
@@ -155,7 +162,7 @@ describe("AgentPool", () => {
   });
 
   it("throws when the requested model cannot be resolved", async () => {
-    const pool = new AgentPool();
+    const pool = new AgentPool({} as never);
 
     await expect(
       pool.runOneTimeAgent([createUserMessage("Hello")], {
@@ -171,7 +178,7 @@ describe("AgentPool", () => {
   it("aborts and returns partial output on timeout", async () => {
     vi.useFakeTimers();
     agentMockState.promptBehavior = "pending";
-    const pool = new AgentPool();
+    const pool = new AgentPool({} as never);
 
     const resultPromise = pool.runOneTimeAgent([createUserMessage("Hello")], {
       systemPrompt: "Only output text.",

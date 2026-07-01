@@ -1,6 +1,6 @@
 import type { Components as StreamdownComponents } from "streamdown";
 
-import type { ExtensionManifest } from "../manifest.js";
+import type { ExtensionMetadata } from "../common/ipc/index.js";
 import type {
   ArtifactRegistration,
   AssistantBlockRegistration,
@@ -16,15 +16,18 @@ type StreamdownComponentRegistration = {
 };
 
 export class RendererExtensionRegistry {
-  private extensions = new Map<string, ExtensionManifest>();
+  private extensions = new Map<string, ExtensionMetadata>();
   private slashCommands: RendererSlashCommand[] = [];
   private assistantBlocks = new Map<string, AssistantBlockRegistration>();
   private artifacts = new Map<string, ArtifactRegistration<any>>();
   private streamdownComponents: StreamdownComponentRegistration[] = [];
   private streamdownRehypePluginComposers: StreamdownRehypePluginComposer[] = [];
 
-  registerExtension(manifest: ExtensionManifest) {
-    this.extensions.set(manifest.id, manifest);
+  registerExtension(extension: ExtensionMetadata) {
+    if (this.extensions.has(extension.id)) {
+      throw new Error(`Duplicate extension id: ${extension.id}`);
+    }
+    this.extensions.set(extension.id, { id: extension.id, name: extension.name });
   }
 
   registerSlashCommand(command: RendererSlashCommand) {

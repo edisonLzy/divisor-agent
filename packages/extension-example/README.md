@@ -6,13 +6,14 @@
 
 ## 它演示了什么
 
-| 扩展点(API)       | 注册内容              | 作用                                                                  |
-| ----------------- | --------------------- | --------------------------------------------------------------------- |
-| `systemPrompt`    | `example.prompt`      | 告诉主 Agent 何时发出 `divisor-block` / `divisor-artifact` 围栏代码块 |
-| `tools`           | `example/hello`       | 最简单的工具:接收 `name`,返回 `Hello, <name>`                         |
-| `slashCommands`   | `example.insert-card` | 在输入框输入 `/Insert example card`,插入一段提示模板                  |
-| `assistantBlocks` | `example.card`        | 渲染端注册一个 assistant 区块类型,展示 `title` 字段                   |
-| `artifacts`       | `example.artifact`    | 注册一个 artifact 类型,在右侧面板里渲染                               |
+| 扩展点(API)       | 注册内容                    | 作用                                                                  |
+| ----------------- | --------------------------- | --------------------------------------------------------------------- |
+| `systemPrompt`    | `example.prompt`            | 告诉主 Agent 何时发出 `divisor-block` / `divisor-artifact` 围栏代码块 |
+| `tools`           | `example/hello`             | 最简单的工具:接收 `name`,返回 `Hello, <name>`                         |
+| `slashCommands`   | `example.insert-card`       | 在输入框输入 `/Insert example card`,插入一段提示模板                  |
+| `assistantBlocks` | `example.card`              | 渲染端注册一个 assistant 区块类型,展示 `title` 字段                   |
+| `artifacts`       | `example.artifact`          | 注册一个 artifact 类型,在右侧面板里渲染                               |
+| `ipc`             | `getState` / `stateChanged` | Main 与 renderer 间的类型安全 invoke 和事件推送                       |
 
 每一项都是 `extension-core` 提供的最小可运行示例,复制改名即可成为新的扩展。
 
@@ -42,7 +43,6 @@
 
 | 子路径       | 来源               | 用途                                |
 | ------------ | ------------------ | ----------------------------------- |
-| `./manifest` | `src/manifest.ts`  | `id: "example"`,`name: "Example"`   |
 | `./main`     | `src/main.ts`      | 主进程扩展:系统提示 + 工具          |
 | `./renderer` | `src/renderer.tsx` | 渲染进程扩展:指令 + 区块 + artifact |
 
@@ -66,8 +66,8 @@ cp -R packages/extension-example packages/extension-<your-name>
 
 然后改这几处即可:
 
-- `package.json` — `name` 改为 `@divisor-agent/extension-<your-name>`;`exports` 里的子路径保持 `./manifest` / `./main` / `./renderer` 三件套
-- `src/manifest.ts` — `id` 必须是稳定且唯一的字符串,后续在 artifact / 区块 / 工具命名里都建议带上这个前缀
+- `package.json` — `name` 改为 `@divisor-agent/extension-<your-name>`;保留 `./main` / `./renderer` 两个入口
+- `src/extension.ts` — 定义 main / renderer 共用的稳定唯一 `id` 和 `name`
 - `src/main.ts` — 替换示例的 system prompt 和 tool 实现
 - `src/renderer.tsx` — 替换示例的 slash command / block / artifact
 - `packages/app/package.json` — 把新包加到 `dependencies`
@@ -107,7 +107,7 @@ packages/extension-example/
 ├── README.md
 ├── package.json
 └── src/
-    ├── manifest.ts    # 扩展清单
+    ├── extension.ts   # main / renderer 共用 metadata
     ├── main.ts        # 主进程:系统提示 + 工具
     └── renderer.tsx   # 渲染进程:指令 + 区块 + artifact
 ```

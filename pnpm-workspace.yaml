@@ -31,6 +31,9 @@ catalog:
   typescript: ^6.0.3
   vitest: ^4.0.16
 
+  # Electron runtime
+  electron: ^39.2.6
+
 minimumReleaseAgeExclude:
   - "@earendil-works/pi-agent-core@0.74.0"
   - "@earendil-works/pi-ai@0.74.0"

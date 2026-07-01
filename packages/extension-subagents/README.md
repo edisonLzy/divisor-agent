@@ -8,7 +8,7 @@
 
 | 维度           | 内容                                                                               |
 | -------------- | ---------------------------------------------------------------------------------- |
-| Manifest id    | `subagents`                                                                        |
+| Extension id   | `subagents`                                                                        |
 | 注册的工具     | `subagents/run`                                                                    |
 | 注册的指令     | `/subagent`(在输入框输入 `/` 弹出)                                                 |
 | 注入系统提示   | `subagents.prompt` — 告诉主 Agent 何时以及如何调用本扩展                           |
@@ -48,14 +48,13 @@
 
 ## 暴露的入口(`exports`)
 
-| 子路径       | 来源               | 用途                                  |
-| ------------ | ------------------ | ------------------------------------- |
-| `./manifest` | `src/manifest.ts`  | `id: "subagents"`,`name: "Subagents"` |
-| `./main`     | `src/main.ts`      | 主进程扩展:工具 + 系统提示            |
-| `./renderer` | `src/renderer.tsx` | 渲染进程扩展:指令 + 区块              |
-| `./types`    | `src/types.ts`     | 子 Agent 快照、工具事件等共享类型     |
+| 子路径       | 来源               | 用途                              |
+| ------------ | ------------------ | --------------------------------- |
+| `./main`     | `src/main.ts`      | 主进程扩展:工具 + 系统提示        |
+| `./renderer` | `src/renderer.tsx` | 渲染进程扩展:指令 + 区块          |
+| `./types`    | `src/types.ts`     | 子 Agent 快照、工具事件等共享类型 |
 
-主 App 通过 `packages/app/src/{main,renderer}/extensions/installed-extensions.ts` 引入 `manifest` + `main` / `renderer`,在主进程和渲染进程两侧各挂一次(参考 [electron-vite externalize 注意事项](#externalize-说明))。
+主 App 通过 `packages/app/src/{main,renderer}/extensions/installed-extensions.ts` 直接引入 main / renderer definition，在两个进程各挂一次(参考 [electron-vite externalize 注意事项](#externalize-说明))。
 
 ## 工具 `subagents/run` 参数
 
@@ -136,7 +135,7 @@ packages/extension-subagents/
 ├── README.md
 ├── package.json
 └── src/
-    ├── manifest.ts    # 扩展清单(id + name)
+    ├── extension.ts   # main / renderer 共用 metadata
     ├── main.ts        # 主进程:工具 + 系统提示
     ├── renderer.tsx   # 渲染进程:/subagent 指令 + subagents.list 区块
     └── types.ts       # 共享类型(子 Agent 快照、工具事件、运行时快照)

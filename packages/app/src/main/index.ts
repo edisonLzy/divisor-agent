@@ -2,8 +2,40 @@ import { join } from "path";
 
 import { app, BrowserWindow } from "electron";
 
-import { bindAgentRuntimeIPC } from "./agent-ipc.js";
 import { AgentPool } from "./agent-pool.js";
+import { BrowserWindowManager } from "./browser-window/index.js";
+import { FileSystemManager } from "./file-system/index.js";
+
+app.whenReady().then(() => {
+  let browserWindow: BrowserWindow | null = createWindow();
+
+  const agentPool = new AgentPool(browserWindow);
+
+  const fsManager = new FileSystemManager(browserWindow);
+
+  const browserWindowManager = new BrowserWindowManager(browserWindow);
+
+  app.on("activate", () => {
+    if (!browserWindow || browserWindow.isDestroyed()) {
+      browserWindow = createWindow();
+      agentPool.updateBrowserWindow(browserWindow);
+      fsManager.updateBrowserWindow(browserWindow);
+      browserWindowManager.updateBrowserWindow(browserWindow);
+    }
+  });
+
+  app.on("quit", () => {
+    void fsManager.destroy();
+    void browserWindowManager.destroy();
+    void agentPool.destroyAll();
+  });
+});
+
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") app.quit();
+});
+
+console.log("Divisor Agent main process started!");
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -26,37 +58,10 @@ function createWindow() {
   });
 
   if (process.env.ELECTRON_RENDERER_URL) {
-    mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
+    void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {
-    mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
+    void mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
   }
 
   return mainWindow;
 }
-
-function createAgentRuntime() {
-  const agentPool = new AgentPool();
-  return agentPool;
-}
-
-app.whenReady().then(async () => {
-  const browserWindow = createWindow();
-  const agentPool = createAgentRuntime();
-
-  const unbind = bindAgentRuntimeIPC(agentPool, browserWindow);
-
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
-
-  app.on("quit", () => {
-    unbind();
-    agentPool.destroyAll();
-  });
-});
-
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
-});
-
-console.log("Divisor Agent main process started!");

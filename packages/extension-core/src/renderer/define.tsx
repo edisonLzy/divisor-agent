@@ -2,7 +2,7 @@ import type { Editor, Range } from "@tiptap/core";
 import type { ComponentType, JSX } from "react";
 import type { Components as StreamdownComponents, StreamdownProps } from "streamdown";
 
-import type { ExtensionManifest } from "../manifest.js";
+import type { ExtensionMetadata } from "../common/ipc/index.js";
 
 export interface RendererSlashCommandRunContext {
   editor: Editor;
@@ -52,7 +52,7 @@ export type StreamdownRehypePluginComposer = (
 ) => StreamdownRehypePlugins;
 
 export interface RendererExtensionContext {
-  manifest: ExtensionManifest;
+  readonly extension: ExtensionMetadata;
   slashCommands: {
     register(command: RendererSlashCommand): void;
   };
@@ -62,15 +62,6 @@ export interface RendererExtensionContext {
   artifacts: {
     register<TContent = Record<string, unknown>>(artifact: ArtifactRegistration<TContent>): void;
   };
-  /**
-   * Streamdown component hooks. Each registered function receives the
-   * previously registered renderer for a key and returns a new renderer,
-   * allowing multiple extensions to layer behavior for the same element.
-   *
-   * Use this to customize how the assistant's markdown is rendered — for
-   * example, override `a` to intercept `file://` links or `code` to wrap
-   * code blocks in custom UI.
-   */
   streamdown: {
     registerComponents(components: StreamdownComponentComposerMap): void;
     registerRehypePlugins(composer: StreamdownRehypePluginComposer): void;
@@ -79,12 +70,12 @@ export interface RendererExtensionContext {
 
 export type RendererExtensionSetup = (ctx: RendererExtensionContext) => void;
 
-export interface RendererExtensionDefinition {
+export interface RendererExtensionDefinition extends ExtensionMetadata {
   setup: RendererExtensionSetup;
 }
 
 export function defineRendererExtension(
-  setup: RendererExtensionSetup,
+  definition: RendererExtensionDefinition,
 ): RendererExtensionDefinition {
-  return { setup };
+  return definition;
 }

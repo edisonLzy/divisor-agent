@@ -95,7 +95,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
   constructor(
     private modelRegistry = new ModelRegistry(),
     private skillService: SkillService,
-    private extensionService = new ExtensionService(),
+    private extensionService: ExtensionService,
     private options: AgentRuntimeOptions = {},
   ) {
     super();

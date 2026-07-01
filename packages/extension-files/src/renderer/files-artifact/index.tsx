@@ -6,8 +6,8 @@ import {
   FILES_ARTIFACT_NAME,
   FILES_ARTIFACT_TYPE,
   FS_READ_TEXT_FILE_CHANNEL,
-} from "../constants";
-import { getFileBaseName, type ParsedFileHref } from "../helper";
+} from "../../common/constants";
+import { getFileBaseName, type ParsedFileHref } from "../../common/helper";
 import { CodeBlockEditor } from "./code-block-editor";
 import { FilesTabBar } from "./files-tab-bar";
 import { languageFromPath } from "./language-from-path";

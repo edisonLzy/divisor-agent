@@ -1,42 +1,37 @@
-import type { ExtensionManifest } from "../manifest.js";
-import type { MainExtensionDefinition, MainExtensionRuntimeAPI } from "./define";
-import { MainExtensionRegistry } from "./registry";
-
-export interface InstalledMainExtension {
-  manifest: ExtensionManifest;
-  extension: MainExtensionDefinition;
-}
-
-export interface MainExtensionBridgeServices {
-  runtime?: MainExtensionRuntimeAPI;
-}
+import type { ExtensionDisposer } from "../common/ipc/index.js";
+import type { AnyMainExtensionDefinition, HostMainExtensionContextValues } from "./define.js";
+import { MainExtensionIPC } from "./ipc.js";
+import { MainExtensionRegistry } from "./registry.js";
 
 export class MainExtensionBridge {
-  private registry = new MainExtensionRegistry();
+  private disposers: ExtensionDisposer[] = [];
+  private ipcInstances: MainExtensionIPC<any, any>[] = [];
   private initialized = false;
+  private registry = new MainExtensionRegistry();
 
   constructor(
-    private extensions: InstalledMainExtension[],
-    private services: MainExtensionBridgeServices = {},
+    private extensions: AnyMainExtensionDefinition[],
+    private hostContextValues: HostMainExtensionContextValues,
   ) {}
 
   initialize() {
-    if (this.initialized) {
-      return;
-    }
+    if (this.initialized) return;
 
-    for (const item of this.extensions) {
-      this.registry.registerExtension(item.manifest);
-      item.extension.setup({
-        manifest: item.manifest,
-        runtime: this.services.runtime ?? createUnavailableRuntimeAPI(),
+    for (const extension of this.extensions) {
+      this.registry.registerExtension(extension);
+      const ipc = new MainExtensionIPC(extension.id, this.hostContextValues);
+      this.ipcInstances.push(ipc);
+      const disposer = extension.setup({
+        ...this.hostContextValues,
+        ipc,
         systemPrompt: {
-          register: (prompt) => this.registry.registerSystemPrompt(item.manifest, prompt),
+          register: (prompt) => this.registry.registerSystemPrompt(extension, prompt),
         },
         tools: {
           register: (tool) => this.registry.registerTool(tool),
         },
       });
+      if (disposer) this.disposers.push(disposer);
     }
 
     this.initialized = true;
@@ -53,19 +48,21 @@ export class MainExtensionBridge {
   getTools() {
     return this.registry.getTools();
   }
-}
 
-function createUnavailableRuntimeAPI(): MainExtensionRuntimeAPI {
-  const reject = () => {
-    throw new Error("Main extension runtime API is not available");
-  };
-
-  return {
-    abortAgent: reject,
-    createAgent: reject,
-    destroyAgent: reject,
-    getCurrentAgentContext: reject,
-    promptAgent: reject,
-    subscribeAgentEvents: reject,
-  };
+  dispose() {
+    for (const disposer of this.disposers.reverse()) {
+      try {
+        disposer();
+      } catch (error) {
+        console.error("Failed to dispose main extension", error);
+      }
+    }
+    this.disposers = [];
+    for (const ipc of this.ipcInstances) {
+      ipc.dispose();
+    }
+    this.ipcInstances = [];
+    this.registry.dispose();
+    this.initialized = false;
+  }
 }

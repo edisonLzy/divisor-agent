@@ -1,3 +1,4 @@
+import { ExtensionsPreloadAPI } from "@divisor-agent/extension-core/common/ipc/preload";
 import { contextBridge, ipcRenderer } from "electron";
 
 import type {
@@ -42,4 +43,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.removeListener(event, subscription);
     };
   },
+});
+
+const extensionsAPI = new ExtensionsPreloadAPI();
+contextBridge.exposeInMainWorld("extensionsAPI", {
+  invoke: extensionsAPI.invoke,
+  on: extensionsAPI.on,
 });
