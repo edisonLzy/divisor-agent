@@ -1,8 +1,13 @@
 export { RendererExtensionBridge } from "./bridge";
-export { createUseExtensionIPC } from "./ipc";
 export { ExtensionsContextAPIProvider, useExtensionsContextAPI } from "./contextAPI";
 export { defineRendererExtension } from "./define";
-export { useArtifact, useAssistantBlock, useExtensions, usePluginSlashCommands } from "./hooks";
+export {
+  createExtensionIPC,
+  useArtifact,
+  useAssistantBlock,
+  useExtensions,
+  usePluginSlashCommands,
+} from "./hooks";
 export { parseExtensionParts } from "./parser";
 export { ExtensionProvider, useExtensionRegistry } from "./provider";
 export { RendererExtensionRegistry } from "./registry";

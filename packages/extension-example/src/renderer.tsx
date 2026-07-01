@@ -1,17 +1,17 @@
 import {
-  createUseExtensionIPC,
+  createExtensionIPC,
   defineRendererExtension,
 } from "@divisor-agent/extension-core/renderer";
 import { useEffect, useState } from "react";
 
 import {
-  EXAMPLE_EXTENSION,
-  type ExampleInvokeEvents,
-  type ExampleOnEvents,
+  type AllowedRenderInvokeEvents,
+  type AllowedMainExposeEvents,
   type ExampleState,
-} from "./extension";
+} from "./share/example-ipc";
+import { EXAMPLE_EXTENSION } from "./share/example-meta";
 
-const useExampleIPC = createUseExtensionIPC<ExampleInvokeEvents, ExampleOnEvents>(
+const useExampleIPC = createExtensionIPC<AllowedRenderInvokeEvents, AllowedMainExposeEvents>(
   EXAMPLE_EXTENSION.id,
 );
 
@@ -28,6 +28,15 @@ function ExampleCard({ props }: { props: Record<string, unknown> }) {
     <div className="rounded-md border bg-card p-3 text-sm text-card-foreground">
       <div>{String(props.title ?? "")}</div>
       <div className="text-muted-foreground">Greetings: {state?.greetingCount ?? 0}</div>
+      <button
+        type="button"
+        className="mt-2 rounded bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/90"
+        onClick={() => {
+          void ipc.invoke("incrementGreeting");
+        }}
+      >
+        +1 Greeting
+      </button>
     </div>
   );
 }

@@ -1,5 +1,4 @@
 import type {
-  AnyExtensionIPCFunction,
   ExtensionDisposer,
   ExtensionIPCArgs,
   ExtensionIPCKey,
@@ -13,35 +12,13 @@ declare global {
   }
 }
 
-export interface RendererExtensionIPC<InvokeEvents, OnEvents> {
-  invoke<K extends ExtensionIPCKey<InvokeEvents>>(
-    method: K,
-    ...args: ExtensionIPCArgs<InvokeEvents, K>
-  ): Promise<Awaited<ExtensionIPCResult<InvokeEvents, K>>>;
-  on<K extends ExtensionIPCKey<OnEvents>>(
-    event: K,
-    listener: (...args: ExtensionIPCArgs<OnEvents, K>) => void,
+export interface RendererExtensionIPC<AllowedRenderInvokeEvents, AllowedMainExposeEvents> {
+  invoke<C extends ExtensionIPCKey<AllowedRenderInvokeEvents>>(
+    method: C,
+    ...args: ExtensionIPCArgs<AllowedRenderInvokeEvents, C>
+  ): Promise<Awaited<ExtensionIPCResult<AllowedRenderInvokeEvents, C>>>;
+  on<E extends ExtensionIPCKey<AllowedMainExposeEvents>>(
+    event: E,
+    listener: (...args: ExtensionIPCArgs<AllowedMainExposeEvents, E>) => void,
   ): ExtensionDisposer;
-}
-
-export function createUseExtensionIPC<
-  InvokeEvents extends Record<keyof InvokeEvents, AnyExtensionIPCFunction> = {},
-  OnEvents extends Record<keyof OnEvents, AnyExtensionIPCFunction> = {},
->(extensionId: string): () => RendererExtensionIPC<InvokeEvents, OnEvents> {
-  if (!extensionId.trim()) {
-    throw new Error("Extension id cannot be empty");
-  }
-
-  const client = {
-    invoke(method: string, ...args: unknown[]) {
-      return window.extensionsAPI.invoke(extensionId, method, args);
-    },
-    on(event: string, listener: (...args: unknown[]) => void) {
-      return window.extensionsAPI.on(extensionId, event, listener);
-    },
-  } as RendererExtensionIPC<InvokeEvents, OnEvents>;
-
-  return function useExtensionIPC() {
-    return client;
-  };
 }

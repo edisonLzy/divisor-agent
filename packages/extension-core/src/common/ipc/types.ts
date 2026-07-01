@@ -21,19 +21,7 @@ export interface ExtensionMetadata {
 
 export type ExtensionDisposer = () => void;
 
-export interface ExtensionIPCInvokeRequest {
-  args: unknown[];
-  extensionId: string;
-  method: string;
-}
-
-export interface ExtensionIPCEventEnvelope {
-  args: unknown[];
-  event: string;
-  extensionId: string;
-}
-
-/** Low-level contextBridge transport. Extension code should use createUseExtensionIPC instead. */
+/** Low-level contextBridge transport. Extension code should use createExtensionIPC instead. */
 export interface ExtensionIPCTransport {
   invoke(extensionId: string, method: string, args: unknown[]): Promise<unknown>;
   on(extensionId: string, event: string, listener: (...args: unknown[]) => void): ExtensionDisposer;

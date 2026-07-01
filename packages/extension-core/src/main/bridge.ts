@@ -5,25 +5,25 @@ import { MainExtensionRegistry } from "./registry.js";
 
 export class MainExtensionBridge {
   private disposers: ExtensionDisposer[] = [];
+  private ipcInstances: MainExtensionIPC<any, any>[] = [];
   private initialized = false;
   private registry = new MainExtensionRegistry();
-  private ipc: MainExtensionIPC;
 
   constructor(
     private extensions: AnyMainExtensionDefinition[],
     private hostContextValues: HostMainExtensionContextValues,
-  ) {
-    this.ipc = new MainExtensionIPC(hostContextValues);
-  }
+  ) {}
 
   initialize() {
     if (this.initialized) return;
 
     for (const extension of this.extensions) {
       this.registry.registerExtension(extension);
+      const ipc = new MainExtensionIPC(extension.id, this.hostContextValues);
+      this.ipcInstances.push(ipc);
       const disposer = extension.setup({
         ...this.hostContextValues,
-        ipc: this.ipc,
+        ipc,
         systemPrompt: {
           register: (prompt) => this.registry.registerSystemPrompt(extension, prompt),
         },
@@ -35,10 +35,6 @@ export class MainExtensionBridge {
     }
 
     this.initialized = true;
-  }
-
-  invokeIPC(extensionId: string, method: string, args: unknown[]) {
-    return this.ipc.invoke(extensionId, method, args);
   }
 
   listExtensions() {
@@ -62,7 +58,10 @@ export class MainExtensionBridge {
       }
     }
     this.disposers = [];
-    this.ipc.dispose();
+    for (const ipc of this.ipcInstances) {
+      ipc.dispose();
+    }
+    this.ipcInstances = [];
     this.registry.dispose();
     this.initialized = false;
   }

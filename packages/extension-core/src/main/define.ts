@@ -2,7 +2,11 @@ import type { AgentEvent, AgentTool, AppUserMessage } from "@earendil-works/pi-a
 import type { TSchema } from "@earendil-works/pi-ai";
 import type { BrowserWindow } from "electron";
 
-import type { ExtensionDisposer, ExtensionMetadata } from "../common/ipc/index.js";
+import type {
+  AnyExtensionIPCFunction,
+  ExtensionDisposer,
+  ExtensionMetadata,
+} from "../common/ipc/index.js";
 import type { MainExtensionIPC } from "./ipc.js";
 
 export interface MainSystemPromptRegistration {
@@ -62,8 +66,11 @@ export interface HostMainExtensionContextValues {
   extensionRuntime: MainExtensionRuntimeAPI;
 }
 
-export interface MainExtensionContext extends HostMainExtensionContextValues {
-  readonly ipc: MainExtensionIPC;
+export interface MainExtensionContext<
+  AllowedRenderInvokeEvents = Record<string, AnyExtensionIPCFunction>,
+  AllowedMainExposeEvents = Record<string, AnyExtensionIPCFunction>,
+> extends HostMainExtensionContextValues {
+  readonly ipc: MainExtensionIPC<AllowedRenderInvokeEvents, AllowedMainExposeEvents>;
   readonly systemPrompt: {
     register(prompt: MainSystemPromptRegistration): void;
   };
@@ -72,14 +79,34 @@ export interface MainExtensionContext extends HostMainExtensionContextValues {
   };
 }
 
-export type MainExtensionSetup = (ctx: MainExtensionContext) => void | ExtensionDisposer;
+export type MainExtensionSetup<
+  AllowedRenderInvokeEvents = Record<string, AnyExtensionIPCFunction>,
+  AllowedMainExposeEvents = Record<string, AnyExtensionIPCFunction>,
+> = (
+  ctx: MainExtensionContext<AllowedRenderInvokeEvents, AllowedMainExposeEvents>,
+) => void | ExtensionDisposer;
 
-export interface MainExtensionDefinition extends ExtensionMetadata {
-  setup: MainExtensionSetup;
+export interface MainExtensionDefinition<
+  AllowedRenderInvokeEvents = Record<string, AnyExtensionIPCFunction>,
+  AllowedMainExposeEvents = Record<string, AnyExtensionIPCFunction>,
+> extends ExtensionMetadata {
+  setup: MainExtensionSetup<AllowedRenderInvokeEvents, AllowedMainExposeEvents>;
 }
 
-export type AnyMainExtensionDefinition = MainExtensionDefinition;
+export type AnyMainExtensionDefinition = MainExtensionDefinition<
+  Record<string, AnyExtensionIPCFunction>,
+  Record<string, AnyExtensionIPCFunction>
+>;
 
-export function defineMainExtension(definition: MainExtensionDefinition): MainExtensionDefinition {
+export function defineMainExtension<
+  AllowedRenderInvokeEvents extends {
+    [K in keyof AllowedRenderInvokeEvents]: AnyExtensionIPCFunction;
+  } = Record<string, AnyExtensionIPCFunction>,
+  AllowedMainExposeEvents extends {
+    [K in keyof AllowedMainExposeEvents]: AnyExtensionIPCFunction;
+  } = Record<string, AnyExtensionIPCFunction>,
+>(
+  definition: MainExtensionDefinition<AllowedRenderInvokeEvents, AllowedMainExposeEvents>,
+): MainExtensionDefinition<AllowedRenderInvokeEvents, AllowedMainExposeEvents> {
   return definition;
 }

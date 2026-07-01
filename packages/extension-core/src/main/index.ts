@@ -3,7 +3,6 @@ export { defineMainExtension } from "./define";
 export { MainExtensionIPC } from "./ipc";
 export { MainExtensionRegistry } from "./registry";
 
-export type { UntypedExtensionIPCHandler } from "./ipc";
 export type {
   AnyMainExtensionDefinition,
   CreateExtensionAgentInput,

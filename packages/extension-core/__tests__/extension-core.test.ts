@@ -3,7 +3,6 @@ vi.mock("electron", () => ({
 }));
 
 import {
-  EXTENSION_EVENT_CHANNEL,
   formatArtifactFence,
   formatAssistantBlockFence,
   parseArtifactPayload,
@@ -15,7 +14,7 @@ import type {
   MainExtensionRuntimeAPI,
 } from "@divisor-agent/extension-core/main";
 import {
-  createUseExtensionIPC,
+  createExtensionIPC,
   defineRendererExtension,
   parseExtensionParts,
   RendererExtensionBridge,
@@ -58,8 +57,8 @@ describe("extension-core", () => {
           };
         },
       } as never);
-      ctx.ipc.handle(metadata.id, "getState", (prefix: string) => `${prefix}:ready`);
-      ctx.ipc.emit(metadata.id, "stateChanged", "ready");
+      ctx.ipc.handle("getState", (prefix: string) => `${prefix}:ready`);
+      ctx.ipc.emit("stateChanged", "ready");
     });
     const extension = defineMainExtension({
       ...metadata,
@@ -78,12 +77,7 @@ describe("extension-core", () => {
     expect(bridge.listExtensions()).toEqual([metadata]);
     expect(bridge.getSystemPrompts()).toEqual(["Use test extension behavior."]);
     expect(bridge.getTools()).toHaveLength(1);
-    await expect(bridge.invokeIPC(metadata.id, "getState", ["test"])).resolves.toBe("test:ready");
-    expect(send).toHaveBeenCalledWith(EXTENSION_EVENT_CHANNEL, {
-      args: ["ready"],
-      event: "stateChanged",
-      extensionId: metadata.id,
-    });
+    expect(send).toHaveBeenCalledWith(`extension:${metadata.id}:stateChanged`, "ready");
 
     bridge.dispose();
   });
@@ -141,7 +135,7 @@ describe("extension-core", () => {
     const on = vi.fn(() => unsubscribe);
     vi.stubGlobal("window", { extensionsAPI: { invoke, on } });
 
-    const useExtensionIPC = createUseExtensionIPC<InvokeEvents, OnEvents>(metadata.id);
+    const useExtensionIPC = createExtensionIPC<InvokeEvents, OnEvents>(metadata.id);
     const ipc = useExtensionIPC();
     const listener = vi.fn();
 
@@ -157,8 +151,8 @@ describe("extension-core", () => {
     const duplicateHandler = defineMainExtension({
       ...metadata,
       setup(ctx) {
-        ctx.ipc.handle(metadata.id, "ping", () => undefined);
-        ctx.ipc.handle(metadata.id, "ping", () => undefined);
+        ctx.ipc.handle("ping", () => undefined);
+        ctx.ipc.handle("ping", () => undefined);
       },
     });
     expect(() =>
