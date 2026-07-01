@@ -115,10 +115,10 @@ export function SessionItem({ session }: SessionItemProps) {
   return (
     <div
       className={cn(
-        "group flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] transition-[background-color,color]",
+        "group flex w-full items-center gap-2 rounded-md border-2 border-transparent px-3 py-1.5 text-[13px] transition-all",
         isActive
-          ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-[inset_0_0_0_1px_rgb(255_255_255/0.03)]"
-          : "hover:bg-sidebar-accent/80",
+          ? "border-sidebar-border bg-card text-sidebar-accent-foreground shadow-[var(--hard-shadow-sm)]"
+          : "hover:border-sidebar-border/30 hover:bg-sidebar-accent",
       )}
     >
       <button
@@ -153,14 +153,14 @@ export function SessionItem({ session }: SessionItemProps) {
         >
           <button
             onClick={handleTogglePin}
-            className="flex items-center justify-center rounded-md p-1 text-sidebar-foreground/32 transition-colors hover:bg-black/10 hover:text-sidebar-foreground"
+            className="flex items-center justify-center rounded-sm border border-transparent p-1 text-sidebar-foreground/45 transition-colors hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-foreground"
             title={session.isTop ? "取消置顶" : "置顶"}
           >
             {session.isTop ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
           </button>
           <button
             onClick={handleDelete}
-            className="flex items-center justify-center rounded-md p-1 text-sidebar-foreground/32 transition-colors hover:bg-black/10 hover:text-red-400"
+            className="flex items-center justify-center rounded-sm border border-transparent p-1 text-sidebar-foreground/45 transition-colors hover:border-destructive hover:bg-destructive/10 hover:text-destructive"
             title="删除"
           >
             <Trash2 className="size-3.5" />

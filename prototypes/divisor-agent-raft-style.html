@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Divisor Agent · Raft-inspired Style Prototype</title>
+    <style>
+      :root {
+        --bg: #f7f3e9;
+        --surface: #fffdf8;
+        --surface-2: #f1ede3;
+        --ink: #191817;
+        --muted: #716d67;
+        --line: #191817;
+        --yellow: #ffd84a;
+        --pink: #f486ae;
+        --cyan: #4bc7e8;
+        --green: #a8da73;
+        --purple: #bdb3e6;
+        --danger: #ef7469;
+        --shadow: 3px 3px 0 var(--line);
+        --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      }
+
+      [data-theme="dark"] {
+        --bg: #111110;
+        --surface: #1a1917;
+        --surface-2: #24221f;
+        --ink: #f2eee5;
+        --muted: #aaa49a;
+        --line: #f2eee5;
+        --yellow: #e9bd35;
+        --pink: #dc6e98;
+        --cyan: #31b3d4;
+        --green: #8bc45c;
+        --purple: #9f92d0;
+        --danger: #dc685f;
+        --shadow: 3px 3px 0 #000;
+      }
+
+      * { box-sizing: border-box; }
+
+      html,
+      body { height: 100%; }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--font);
+        font-size: 14px;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      button,
+      input,
+      textarea,
+      select { color: inherit; font: inherit; }
+
+      button,
+      select { cursor: pointer; }
+
+      button:focus-visible,
+      input:focus-visible,
+      textarea:focus-visible,
+      select:focus-visible {
+        outline: 3px solid var(--cyan);
+        outline-offset: 2px;
+      }
+
+      .app {
+        display: grid;
+        grid-template-rows: 44px minmax(0, 1fr);
+        height: 100%;
+      }
+
+      .titlebar {
+        position: relative;
+        z-index: 40;
+        display: grid;
+        grid-template-columns: 260px 1fr auto;
+        align-items: center;
+        gap: 16px;
+        border-bottom: 2px solid var(--line);
+        padding: 0 12px 0 18px;
+        background: var(--yellow);
+        color: #171513;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 900;
+        letter-spacing: -.03em;
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 25px;
+        height: 25px;
+        place-items: center;
+        border: 2px solid #171513;
+        border-radius: 5px;
+        background: #fff;
+        box-shadow: 2px 2px 0 #171513;
+        font-family: var(--mono);
+        font-size: 11px;
+      }
+
+      .prototype-badge {
+        border: 1px solid #171513;
+        padding: 2px 4px;
+        background: var(--pink);
+        font-family: var(--mono);
+        font-size: 8px;
+        letter-spacing: .06em;
+      }
+
+      .local-status {
+        justify-self: center;
+        font-family: var(--mono);
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: .08em;
+      }
+
+      .status-dot {
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        margin-right: 6px;
+        border: 1px solid currentColor;
+        background: var(--green);
+      }
+
+      .title-actions,
+      .header-actions,
+      .composer-actions,
+      .artifact-actions { display: flex; align-items: center; gap: 7px; }
+
+      .btn,
+      .icon-btn,
+      .select {
+        min-height: 32px;
+        border: 2px solid var(--line);
+        border-radius: 6px;
+        background: var(--surface);
+        color: var(--ink);
+        font-weight: 700;
+      }
+
+      .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 0 11px; }
+      .icon-btn { min-width: 34px; padding: 0 8px; }
+      .select { padding: 0 26px 0 9px; font-size: 11px; }
+
+      .btn:hover,
+      .icon-btn:hover,
+      .select:hover { background: var(--yellow); }
+
+      .btn.primary { background: var(--pink); box-shadow: var(--shadow); }
+      .btn.primary:hover { transform: translate(1px, 1px); box-shadow: 2px 2px 0 var(--line); }
+      .btn.small { min-height: 29px; padding-inline: 9px; font-size: 11px; }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: 260px minmax(480px, 1fr) 360px;
+        min-height: 0;
+      }
+
+      .sidebar,
+      .chat,
+      .artifact-panel { min-width: 0; min-height: 0; }
+
+      .sidebar {
+        display: flex;
+        flex-direction: column;
+        border-right: 2px solid var(--line);
+        background: var(--bg);
+      }
+
+      .sidebar.collapsed { display: none; }
+      .workspace.sidebar-hidden { grid-template-columns: minmax(480px, 1fr) 360px; }
+      .workspace.artifact-hidden { grid-template-columns: 260px minmax(480px, 1fr); }
+      .workspace.sidebar-hidden.artifact-hidden { grid-template-columns: minmax(480px, 1fr); }
+
+      .new-chat-wrap { padding: 13px; border-bottom: 1px solid color-mix(in srgb, var(--line), transparent 72%); }
+      .new-chat { width: 100%; justify-content: space-between; }
+      .new-chat span:last-child { font-family: var(--mono); font-size: 8px; }
+
+      .sidebar-scroll { flex: 1; overflow: auto; padding: 8px 10px 18px; }
+      .side-section { margin-top: 15px; }
+
+      .side-heading {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 0 5px 7px;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: .1em;
+      }
+
+      .side-heading span:last-child { margin-left: auto; }
+
+      .session,
+      .project,
+      .recent {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        gap: 9px;
+        border: 0;
+        border-radius: 6px;
+        padding: 7px;
+        background: transparent;
+        color: inherit;
+        text-align: left;
+      }
+
+      .session:hover,
+      .project:hover,
+      .recent:hover { background: var(--surface-2); }
+
+      .session.active {
+        border: 2px solid var(--line);
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .avatar {
+        display: grid;
+        width: 29px;
+        height: 29px;
+        flex: 0 0 29px;
+        place-items: center;
+        border: 2px solid var(--line);
+        border-radius: 4px;
+        background: var(--yellow);
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: 700;
+      }
+
+      .avatar.pink { background: var(--pink); }
+      .avatar.cyan { background: var(--cyan); }
+      .avatar.green { background: var(--green); }
+      .avatar.purple { background: var(--purple); }
+
+      .session-copy { min-width: 0; flex: 1; }
+      .session-copy b { display: block; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+      .session-copy small { display: block; margin-top: 2px; color: var(--muted); font-family: var(--mono); font-size: 8px; }
+
+      .project { font-size: 12px; font-weight: 750; }
+      .project-count { margin-left: auto; border: 1px solid var(--line); padding: 1px 4px; background: var(--yellow); font-family: var(--mono); font-size: 8px; }
+      .project-sessions { margin-left: 17px; border-left: 1px solid color-mix(in srgb, var(--line), transparent 55%); padding-left: 7px; }
+      .recent { padding-block: 6px; color: var(--muted); font-size: 11px; }
+
+      .sidebar-footer { border-top: 2px solid var(--line); padding: 11px; background: var(--yellow); color: #171513; }
+      .usage-row { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 8px; font-weight: 700; }
+      .usage-track { height: 6px; margin: 6px 0 10px; border: 1px solid #171513; background: #fff; }
+      .usage-track i { display: block; width: 62%; height: 100%; background: var(--cyan); }
+      .profile { display: flex; align-items: center; gap: 9px; }
+      .profile b { display: block; font-size: 11px; }
+      .profile small { font-size: 8px; }
+      .profile .btn { margin-left: auto; border-color: #171513; color: #171513; background: #fff; }
+
+      .chat { position: relative; display: flex; flex-direction: column; overflow: hidden; background: var(--surface); }
+
+      .chat-header {
+        position: relative;
+        z-index: 8;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 62px;
+        gap: 12px;
+        border-bottom: 2px solid var(--line);
+        padding: 0 13px;
+        background: color-mix(in srgb, var(--surface), transparent 4%);
+      }
+
+      .channel { display: flex; align-items: center; min-width: 0; gap: 10px; }
+      .channel-mark { display: grid; width: 33px; height: 33px; place-items: center; border: 2px solid var(--line); border-radius: 5px; background: var(--yellow); font-family: var(--mono); font-weight: 800; }
+      .channel h1 { overflow: hidden; margin: 0; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+      .channel p { margin: 3px 0 0; color: var(--muted); font-family: var(--mono); font-size: 8px; letter-spacing: .04em; }
+
+      .messages { flex: 1; overflow: auto; padding: 24px clamp(18px, 5vw, 64px) 170px; }
+      .date-line { display: flex; align-items: center; max-width: 790px; margin: 0 auto 25px; color: var(--muted); font-family: var(--mono); font-size: 8px; }
+      .date-line::before,
+      .date-line::after { height: 1px; flex: 1; background: color-mix(in srgb, var(--line), transparent 70%); content: ""; }
+      .date-line span { padding: 0 11px; }
+
+      .message { display: grid; grid-template-columns: 34px minmax(0, 1fr); max-width: 790px; margin: 0 auto 24px; gap: 11px; }
+      .message .avatar { width: 34px; height: 34px; box-shadow: 2px 2px 0 var(--line); }
+      .message-head { display: flex; align-items: center; min-height: 21px; gap: 7px; }
+      .message-head b { font-size: 12px; }
+      .agent-badge { border: 1px solid var(--line); padding: 1px 3px; background: var(--green); font-family: var(--mono); font-size: 7px; }
+      .message-head time { color: var(--muted); font-family: var(--mono); font-size: 8px; }
+      .message-body { font-size: 13px; line-height: 1.65; }
+      .message-body p { margin: 4px 0 0; }
+      code { border: 1px solid var(--line); border-radius: 3px; padding: 1px 4px; background: var(--yellow); color: #171513; font-family: var(--mono); font-size: 10px; }
+
+      .file-chip { display: inline-flex; align-items: center; gap: 7px; margin-top: 9px; border: 1px solid var(--line); border-radius: 4px; padding: 5px 7px; background: var(--surface); font-family: var(--mono); font-size: 8px; }
+      .file-chip em { color: var(--muted); font-style: normal; }
+
+      .style-map { display: grid; gap: 7px; margin-top: 11px; }
+      .style-map div { display: grid; grid-template-columns: 62px 1fr; border-left: 3px solid var(--cyan); padding-left: 10px; }
+      .style-map b { font-size: 11px; }
+      .style-map span { color: var(--muted); }
+
+      .tool-card { max-width: 730px; margin: 0 auto 24px; border: 2px solid var(--line); border-radius: 7px; background: var(--surface); box-shadow: var(--shadow); overflow: hidden; }
+      .tool-summary { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; width: 100%; min-height: 54px; border: 0; padding: 0; background: transparent; color: inherit; text-align: left; }
+      .tool-type { display: grid; align-self: stretch; place-items: center; border-right: 2px solid var(--line); background: var(--cyan); font-family: var(--mono); font-size: 9px; font-weight: 700; }
+      .tool-copy { min-width: 0; padding: 0 10px; }
+      .tool-copy b { display: block; font-size: 11px; }
+      .tool-copy small { display: block; overflow: hidden; margin-top: 3px; color: var(--muted); font-family: var(--mono); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+      .tool-state { padding-right: 11px; color: var(--green); font-family: var(--mono); font-size: 8px; font-weight: 700; }
+      .tool-output { border-top: 2px solid var(--line); padding: 10px 12px; background: #171615; color: #eee8de; font-family: var(--mono); font-size: 8px; line-height: 1.9; }
+      .tool-output[hidden] { display: none; }
+      .tool-output span { color: #817b73; }
+
+      .artifact-card { display: flex; align-items: center; width: min(470px, 100%); gap: 10px; margin-top: 11px; border: 2px solid var(--line); border-radius: 6px; padding: 8px; background: var(--surface); box-shadow: var(--shadow); text-align: left; }
+      .artifact-card .avatar { background: var(--purple); }
+      .artifact-card span:nth-child(2) { min-width: 0; flex: 1; }
+      .artifact-card b { display: block; font-size: 11px; }
+      .artifact-card small { display: block; margin-top: 2px; color: var(--muted); font-family: var(--mono); font-size: 8px; }
+
+      .composer-wrap { position: absolute; right: 0; bottom: 0; left: 0; z-index: 9; padding: 18px clamp(15px, 4vw, 54px) 20px; background: linear-gradient(transparent, var(--surface) 34%); pointer-events: none; }
+      .composer { max-width: 790px; margin: 0 auto; border: 2px solid var(--line); border-radius: 9px; background: var(--surface); box-shadow: var(--shadow); overflow: visible; pointer-events: auto; }
+      .composer textarea { display: block; width: 100%; min-height: 66px; resize: none; border: 0; padding: 12px 13px 8px; background: transparent; outline: 0; font-size: 12px; line-height: 1.5; }
+      .composer textarea::placeholder { color: var(--muted); }
+      .composer-footer { display: flex; align-items: center; gap: 7px; min-height: 43px; border-top: 1px solid color-mix(in srgb, var(--line), transparent 72%); padding: 6px 7px; }
+      .composer-hint { margin-left: auto; color: var(--muted); font-family: var(--mono); font-size: 7px; }
+      .send { min-width: 34px; background: var(--yellow); box-shadow: 2px 2px 0 var(--line); }
+      .send:disabled { cursor: not-allowed; background: var(--surface-2); box-shadow: none; opacity: .65; }
+
+      .typing { display: none; align-items: center; max-width: 790px; margin: -8px auto 20px; gap: 9px; color: var(--muted); font-family: var(--mono); font-size: 8px; }
+      .typing.visible { display: flex; }
+      .typing i { width: 5px; height: 5px; background: var(--cyan); animation: pulse .8s infinite alternate; }
+      .typing i:nth-child(2) { animation-delay: .12s; }
+      .typing i:nth-child(3) { animation-delay: .24s; }
+      @keyframes pulse { to { opacity: .25; transform: translateY(-3px); } }
+
+      .artifact-panel { display: flex; flex-direction: column; border-left: 2px solid var(--line); background: var(--bg); }
+      .artifact-panel.hidden { display: none; }
+      .artifact-header { display: flex; align-items: center; justify-content: space-between; min-height: 62px; border-bottom: 2px solid var(--line); padding: 0 12px 0 15px; background: var(--purple); color: #171513; }
+      [data-theme="dark"] .artifact-header { color: var(--ink); }
+      .eyebrow { font-family: var(--mono); font-size: 8px; font-weight: 700; letter-spacing: .1em; }
+      .artifact-header h2 { margin: 3px 0 0; font-size: 14px; }
+      .tabs { display: flex; min-height: 42px; border-bottom: 2px solid var(--line); }
+      .tabs button { flex: 1; border: 0; border-right: 1px solid var(--line); background: var(--surface); color: inherit; font-size: 11px; font-weight: 700; }
+      .tabs button:last-child { border-right: 0; }
+      .tabs button.active { background: var(--yellow); color: #171513; box-shadow: inset 0 -3px 0 #171513; }
+      .artifact-content { flex: 1; overflow: auto; padding: 16px; }
+      .preview-frame { border: 2px solid var(--line); border-radius: 7px; background: var(--surface); box-shadow: var(--shadow); overflow: hidden; }
+      .preview-bar { display: flex; align-items: center; min-height: 31px; border-bottom: 2px solid var(--line); padding: 0 8px; background: var(--yellow); color: #171513; font-family: var(--mono); font-size: 7px; }
+      .preview-bar span { margin-left: auto; }
+      .preview-layout { display: grid; grid-template-columns: 58px 1fr; min-height: 390px; }
+      .preview-side { display: flex; align-items: center; flex-direction: column; gap: 11px; border-right: 1px solid var(--line); padding: 10px 7px; }
+      .preview-side i { width: 28px; height: 7px; border-radius: 3px; background: var(--surface-2); }
+      .preview-side i.active { background: var(--pink); }
+      .preview-main header { border-bottom: 1px solid var(--line); padding: 11px; font-size: 9px; font-weight: 700; }
+      .preview-message { display: grid; grid-template-columns: 23px 1fr; gap: 7px; margin: 16px 11px; font-size: 8px; }
+      .preview-message i { display: grid; width: 23px; height: 23px; place-items: center; border: 1px solid var(--line); border-radius: 3px; background: var(--cyan); font-family: var(--mono); font-size: 6px; font-style: normal; }
+      .preview-message p { margin: 3px 0 0; }
+      .preview-tool { margin: 16px 11px; border: 1px solid var(--line); border-radius: 4px; padding: 9px; box-shadow: 2px 2px 0 var(--line); font-size: 8px; }
+      .preview-input { margin: 90px 11px 0; border: 1px solid var(--line); border-radius: 4px; padding: 10px; color: var(--muted); font-size: 8px; }
+      .code-view { display: none; border: 2px solid var(--line); border-radius: 7px; background: #151413; color: #eee8de; box-shadow: var(--shadow); overflow: hidden; }
+      .code-view pre { margin: 0; overflow: auto; padding: 14px; font-family: var(--mono); font-size: 9px; line-height: 1.8; }
+      .changes-view { display: none; gap: 8px; }
+      .change-row { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 5px; padding: 9px; background: var(--surface); box-shadow: 2px 2px 0 var(--line); font-family: var(--mono); font-size: 8px; }
+      .change-row em { margin-left: auto; color: var(--green); font-style: normal; font-weight: 700; }
+      .artifact-footer { display: flex; align-items: center; gap: 7px; min-height: 55px; border-top: 2px solid var(--line); padding: 8px 10px; background: var(--surface); }
+      .build-state { margin-right: auto; color: var(--green); font-family: var(--mono); font-size: 8px; font-weight: 700; }
+
+      .modal-backdrop { position: fixed; inset: 0; z-index: 100; display: none; place-items: start center; padding-top: 12vh; background: rgb(0 0 0 / .38); backdrop-filter: blur(3px); }
+      .modal-backdrop.open { display: grid; }
+      .modal { width: min(540px, calc(100vw - 28px)); border: 2px solid var(--line); border-radius: 9px; background: var(--bg); box-shadow: 6px 6px 0 var(--line); overflow: hidden; }
+      [data-theme="dark"] .modal { box-shadow: 6px 6px 0 #000; }
+      .modal-head { display: flex; align-items: center; justify-content: space-between; min-height: 58px; border-bottom: 2px solid var(--line); padding: 0 12px 0 15px; background: var(--purple); }
+      .modal-head h2 { margin: 0; font-size: 15px; }
+      .search-box { display: flex; align-items: center; min-height: 54px; border-bottom: 1px solid var(--line); padding: 0 13px; background: var(--surface); }
+      .search-box input { width: 100%; border: 0; background: transparent; outline: 0; font-size: 13px; }
+      .search-results { min-height: 210px; padding: 10px; }
+      .search-result { display: flex; align-items: center; width: 100%; gap: 9px; border: 1px solid transparent; border-radius: 5px; padding: 7px; background: transparent; color: inherit; text-align: left; }
+      .search-result:hover { border-color: var(--line); background: var(--surface); box-shadow: 2px 2px 0 var(--line); }
+      .setting-row { display: flex; align-items: center; gap: 16px; min-height: 74px; border-bottom: 1px solid color-mix(in srgb, var(--line), transparent 70%); padding: 12px 16px; background: var(--surface); }
+      .setting-copy { flex: 1; }
+      .setting-copy b { display: block; font-size: 12px; }
+      .setting-copy small { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; }
+      .switch { position: relative; width: 45px; height: 25px; border: 2px solid var(--line); border-radius: 13px; background: var(--surface-2); }
+      .switch i { position: absolute; top: 3px; left: 3px; width: 15px; height: 15px; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); transition: transform .15s ease; }
+      .switch.on { background: var(--green); }
+      .switch.on i { transform: translateX(20px); }
+      .modal-footer { display: flex; justify-content: flex-end; padding: 12px; }
+
+      .toast { position: fixed; right: 18px; bottom: 18px; z-index: 130; display: none; border: 2px solid var(--line); border-radius: 6px; padding: 9px 12px; background: var(--green); color: #171513; box-shadow: var(--shadow); font-family: var(--mono); font-size: 9px; font-weight: 700; }
+      .toast.show { display: block; }
+
+      @media (max-width: 1120px) {
+        .workspace,
+        .workspace.sidebar-hidden,
+        .workspace.artifact-hidden,
+        .workspace.sidebar-hidden.artifact-hidden { grid-template-columns: minmax(0, 1fr); }
+        .sidebar { position: fixed; top: 44px; bottom: 0; left: 0; z-index: 30; width: 270px; box-shadow: 8px 0 0 rgb(0 0 0 / .12); }
+        .sidebar.collapsed { display: flex; transform: translateX(-110%); }
+        .artifact-panel { position: fixed; top: 44px; right: 0; bottom: 0; z-index: 31; width: min(390px, 94vw); box-shadow: -8px 0 0 rgb(0 0 0 / .12); }
+        .artifact-panel.hidden { display: flex; transform: translateX(110%); }
+      }
+
+      @media (max-width: 680px) {
+        .titlebar { grid-template-columns: 1fr auto; padding-inline: 10px; }
+        .local-status { display: none; }
+        .brand { font-size: 13px; }
+        .prototype-badge { display: none; }
+        .title-actions .icon-btn:first-child { display: none; }
+        .chat-header { min-height: 58px; padding-inline: 9px; }
+        .channel-mark,
+        .channel p,
+        .header-actions .btn { display: none; }
+        .messages { padding: 20px 13px 165px; }
+        .message { grid-template-columns: 30px minmax(0, 1fr); gap: 9px; }
+        .message .avatar { width: 30px; height: 30px; }
+        .style-map div { grid-template-columns: 1fr; }
+        .tool-summary { grid-template-columns: 40px minmax(0, 1fr); }
+        .tool-state { display: none; }
+        .composer-wrap { padding: 14px 9px 12px; }
+        .composer-hint { display: none; }
+        .composer-footer .select { max-width: 126px; }
+        .artifact-footer .build-state,
+        .artifact-footer .btn:not(.primary) { display: none; }
+        .artifact-footer { justify-content: flex-end; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="titlebar">
+        <div class="brand"><span class="brand-mark">D/</span><span>DIVISOR AGENT</span><span class="prototype-badge">STYLE STUDY</span></div>
+        <div class="local-status"><span class="status-dot"></span>LOCAL AGENT ONLINE</div>
+        <div class="title-actions">
+          <button class="icon-btn" id="searchOpen">搜索</button>
+          <button class="icon-btn" id="themeToggle">深色</button>
+          <button class="icon-btn" id="settingsOpen">设置</button>
+        </div>
+      </header>
+
+      <div class="workspace" id="workspace">
+        <aside class="sidebar" id="sidebar">
+          <div class="new-chat-wrap"><button class="btn primary new-chat" id="newChat"><span>新对话</span><span>⌘ N</span></button></div>
+          <div class="sidebar-scroll">
+            <section class="side-section">
+              <div class="side-heading"><span>置顶</span><span>01</span></div>
+              <button class="session active" data-session="style"><span class="avatar pink">R</span><span class="session-copy"><b>重构工作台样式</b><small>进行中</small></span></button>
+            </section>
+
+            <section class="side-section">
+              <div class="side-heading"><span>项目</span><span>03</span></div>
+              <button class="project"><span>divisor-agent</span><span class="project-count">4</span></button>
+              <div class="project-sessions">
+                <button class="session" data-session="runtime"><span class="avatar cyan">A</span><span class="session-copy"><b>Agent runtime 事件流</b><small>昨天</small></span></button>
+                <button class="session" data-session="tree"><span class="avatar green">S</span><span class="session-copy"><b>Session tree 分支设计</b><small>周一</small></span></button>
+                <button class="session" data-session="model"><span class="avatar purple">M</span><span class="session-copy"><b>模型配置与回退策略</b><small>6 月 25 日</small></span></button>
+              </div>
+            </section>
+
+            <section class="side-section">
+              <div class="side-heading"><span>最近</span><span>02</span></div>
+              <button class="recent">IPC bridge 类型检查</button>
+              <button class="recent">Server session rewind</button>
+            </section>
+          </div>
+
+          <footer class="sidebar-footer">
+            <div class="usage-row"><span>本地上下文</span><span>62%</span></div>
+            <div class="usage-track"><i></i></div>
+            <div class="profile"><span class="avatar">ZY</span><span><b>Zhiyu</b><small>个人工作区</small></span><button class="btn small" id="profileSettings">设置</button></div>
+          </footer>
+        </aside>
+
+        <main class="chat">
+          <header class="chat-header">
+            <div class="channel">
+              <button class="icon-btn" id="sidebarToggle">侧栏</button>
+              <span class="channel-mark">#</span>
+              <div><h1 id="channelTitle">重构工作台样式</h1><p><span class="status-dot"></span>RUNNING LOCALLY · 12 FILES IN CONTEXT</p></div>
+            </div>
+            <div class="header-actions"><button class="btn small">成员 2</button><button class="icon-btn" id="artifactToggle">产物</button><button class="icon-btn" id="moreButton">更多</button></div>
+          </header>
+
+          <section class="messages" id="messages">
+            <div class="date-line"><span>今天 · 10:32</span></div>
+
+            <article class="message">
+              <span class="avatar">ZY</span>
+              <div><div class="message-head"><b>Zhiyu</b><time>10:32</time></div><div class="message-body"><p>请在功能保持不变的前提下，将当前工作台调整为受 <code>raft.build</code> 启发的视觉风格。</p><span class="file-chip">packages/app/src/renderer <em>12 files</em></span></div></div>
+            </article>
+
+            <article class="message">
+              <span class="avatar cyan">AI</span>
+              <div><div class="message-head"><b>Divisor</b><span class="agent-badge">AGENT</span><time>10:33</time></div><div class="message-body"><p>我会保留现有信息架构和交互，仅调整视觉层：</p><div class="style-map"><div><b>结构</b><span>会话树、聊天流、输入区与产物面板不变</span></div><div><b>样式</b><span>暖色画布、清晰描边、轻量硬阴影</span></div><div><b>主题</b><span>同一语义色映射到 light / dark 两套 token</span></div></div></div></div>
+            </article>
+
+            <div class="tool-card">
+              <button class="tool-summary" id="toolToggle"><span class="tool-type">TOOL</span><span class="tool-copy"><b>读取工作区结构</b><small>rg --files packages/app/src/renderer</small></span><span class="tool-state">DONE · 0.8s</span></button>
+              <div class="tool-output" id="toolOutput"><div><span>01</span> packages/app/src/renderer/pages/workspace/index.tsx</div><div><span>02</span> packages/app/src/renderer/pages/workspace/chat/index.tsx</div><div><span>03</span> packages/app/src/renderer/pages/workspace/sessions/index.tsx</div></div>
+            </div>
+
+            <article class="message">
+              <span class="avatar cyan">AI</span>
+              <div><div class="message-head"><b>Divisor</b><span class="agent-badge">AGENT</span><time>10:34</time></div><div class="message-body"><p>样式稿已生成。右侧保留现有产物查看、代码与变更三个状态。</p><button class="artifact-card" id="openArtifact"><span class="avatar purple">HTML</span><span><b>divisor-agent-raft-style.html</b><small>Standalone interaction prototype</small></span><span>打开</span></button></div></div>
+            </article>
+
+            <div id="dynamicMessages"></div>
+            <div class="typing" id="typing"><span class="avatar cyan">AI</span><i></i><i></i><i></i><span>DIVISOR IS THINKING</span></div>
+          </section>
+
+          <div class="composer-wrap">
+            <div class="composer">
+              <textarea id="prompt" rows="2" placeholder="给 Divisor 发送消息，@ 引用文件，/ 使用技能…"></textarea>
+              <div class="composer-footer">
+                <select class="select" id="permission"><option>工作区写入</option><option>仅建议</option><option>完全访问</option></select>
+                <span class="composer-hint">ENTER 发送 · SHIFT+ENTER 换行</span>
+                <select class="select" id="model"><option>GPT-5.1 Codex</option><option>Claude Sonnet 4</option><option>Gemini 2.5 Pro</option></select>
+                <button class="icon-btn send" id="send" disabled>发送</button>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        <aside class="artifact-panel" id="artifactPanel">
+          <header class="artifact-header"><div><span class="eyebrow">ARTIFACT / 01</span><h2>工作台样式稿</h2></div><button class="icon-btn" id="artifactClose">关闭</button></header>
+          <nav class="tabs"><button class="active" data-tab="preview">预览</button><button data-tab="code">代码</button><button data-tab="changes">变更 4</button></nav>
+          <div class="artifact-content">
+            <div class="preview-frame" id="previewView">
+              <div class="preview-bar">LOCAL PREVIEW <span>single-file.html</span></div>
+              <div class="preview-layout"><div class="preview-side"><i class="active"></i><i></i><i></i><i></i></div><div class="preview-main"><header># 重构工作台样式</header><div class="preview-message"><i>ZY</i><p>保持功能，只调整视觉样式。</p></div><div class="preview-message"><i>AI</i><p>已映射 light / dark token。</p></div><div class="preview-tool">读取工作区结构 · DONE</div><div class="preview-input">发送消息…</div></div></div>
+            </div>
+            <div class="code-view" id="codeView"><pre>&lt;main class="workspace"&gt;
+  &lt;aside class="sessions"&gt;...&lt;/aside&gt;
+  &lt;section class="chat"&gt;...&lt;/section&gt;
+  &lt;aside class="artifacts"&gt;...&lt;/aside&gt;
+&lt;/main&gt;
+
+&lt;script&gt;
+  themeToggle.addEventListener("click", toggleTheme);
+  send.addEventListener("click", sendPrompt);
+&lt;/script&gt;</pre></div>
+            <div class="changes-view" id="changesView"><div class="change-row"><span>index.css</span><em>tokens only</em></div><div class="change-row"><span>workspace/index.tsx</span><em>structure kept</em></div><div class="change-row"><span>chat/prompt-input</span><em>styles only</em></div><div class="change-row"><span>sessions/index.tsx</span><em>styles only</em></div></div>
+          </div>
+          <footer class="artifact-footer"><span class="build-state">BUILD PASSED</span><button class="btn small" id="copyLink">复制路径</button><button class="btn primary small" id="runPreview">刷新预览</button></footer>
+        </aside>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="searchModal"><section class="modal" role="dialog" aria-modal="true"><header class="modal-head"><h2>搜索</h2><button class="icon-btn" data-close="searchModal">关闭</button></header><div class="search-box"><input id="searchInput" placeholder="搜索会话…" /></div><div class="search-results" id="searchResults"></div></section></div>
+
+    <div class="modal-backdrop" id="settingsModal"><section class="modal" role="dialog" aria-modal="true"><header class="modal-head"><h2>界面设置</h2><button class="icon-btn" data-close="settingsModal">关闭</button></header><div class="setting-row"><span class="setting-copy"><b>紧凑消息密度</b><small>保持当前信息密度</small></span><button class="switch on" aria-pressed="true"><i></i></button></div><div class="setting-row"><span class="setting-copy"><b>工具完成提示</b><small>Agent 完成工具执行后提示</small></span><button class="switch" aria-pressed="false"><i></i></button></div><div class="setting-row"><span class="setting-copy"><b>主题</b><small id="themeDescription">Light · Raft-inspired</small></span><button class="btn small" id="themeToggleInSettings">切换主题</button></div><footer class="modal-footer"><button class="btn primary" data-close="settingsModal">完成</button></footer></section></div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+      const $ = (selector, root = document) => root.querySelector(selector);
+      const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+
+      const state = {
+        theme: localStorage.getItem("divisor-prototype-theme") || "light",
+        sidebarOpen: window.innerWidth > 1120,
+        artifactOpen: window.innerWidth > 1120,
+      };
+
+      const sessionData = [
+        { id: "style", title: "重构工作台样式", meta: "进行中", initial: "R", color: "pink" },
+        { id: "runtime", title: "Agent runtime 事件流", meta: "昨天", initial: "A", color: "cyan" },
+        { id: "tree", title: "Session tree 分支设计", meta: "周一", initial: "S", color: "green" },
+        { id: "model", title: "模型配置与回退策略", meta: "6 月 25 日", initial: "M", color: "purple" },
+      ];
+
+      function applyTheme(theme) {
+        state.theme = theme;
+        document.documentElement.dataset.theme = theme;
+        localStorage.setItem("divisor-prototype-theme", theme);
+        $("#themeToggle").textContent = theme === "light" ? "深色" : "浅色";
+        $("#themeDescription").textContent = `${theme === "light" ? "Light" : "Dark"} · Raft-inspired`;
+      }
+
+      function toggleTheme() {
+        applyTheme(state.theme === "light" ? "dark" : "light");
+        notify(`已切换至${state.theme === "light" ? "浅色" : "深色"}模式`);
+      }
+
+      function applyPanels() {
+        $("#sidebar").classList.toggle("collapsed", !state.sidebarOpen);
+        $("#artifactPanel").classList.toggle("hidden", !state.artifactOpen);
+        $("#workspace").classList.toggle("sidebar-hidden", !state.sidebarOpen);
+        $("#workspace").classList.toggle("artifact-hidden", !state.artifactOpen);
+      }
+
+      function notify(message) {
+        const toast = $("#toast");
+        toast.textContent = message;
+        toast.classList.add("show");
+        clearTimeout(notify.timer);
+        notify.timer = setTimeout(() => toast.classList.remove("show"), 1900);
+      }
+
+      function openModal(id) {
+        $("#" + id).classList.add("open");
+        const focusTarget = $("input, button", $("#" + id));
+        if (focusTarget) setTimeout(() => focusTarget.focus(), 20);
+      }
+
+      function closeModal(id) { $("#" + id).classList.remove("open"); }
+
+      function selectSession(id) {
+        const session = sessionData.find(item => item.id === id);
+        if (!session) return;
+        $$(".session").forEach(button => button.classList.toggle("active", button.dataset.session === id));
+        $("#channelTitle").textContent = session.title;
+        if (window.innerWidth <= 1120) state.sidebarOpen = false;
+        applyPanels();
+      }
+
+      function renderSearch(query = "") {
+        const normalized = query.trim().toLowerCase();
+        const matches = sessionData.filter(item => item.title.toLowerCase().includes(normalized));
+        $("#searchResults").innerHTML = matches.length
+          ? matches.map(item => `<button class="search-result" data-result="${item.id}"><span class="avatar ${item.color}">${item.initial}</span><span class="session-copy"><b>${item.title}</b><small>${item.meta}</small></span></button>`).join("")
+          : `<p style="color:var(--muted);text-align:center;padding:36px 0">没有匹配的会话</p>`;
+        $$("[data-result]").forEach(button => button.addEventListener("click", () => { selectSession(button.dataset.result); closeModal("searchModal"); }));
+      }
+
+      function appendMessage(role, text) {
+        const user = role === "user";
+        const article = document.createElement("article");
+        article.className = "message";
+        article.innerHTML = `<span class="avatar ${user ? "" : "cyan"}">${user ? "ZY" : "AI"}</span><div><div class="message-head"><b>${user ? "Zhiyu" : "Divisor"}</b>${user ? "" : '<span class="agent-badge">AGENT</span>'}<time>刚刚</time></div><div class="message-body"><p></p></div></div>`;
+        $("p", article).textContent = text;
+        $("#dynamicMessages").append(article);
+      }
+
+      function sendPrompt() {
+        const prompt = $("#prompt");
+        const value = prompt.value.trim();
+        if (!value) return;
+        appendMessage("user", value);
+        prompt.value = "";
+        $("#send").disabled = true;
+        $("#typing").classList.add("visible");
+        $("#messages").scrollTop = $("#messages").scrollHeight;
+        setTimeout(() => {
+          $("#typing").classList.remove("visible");
+          appendMessage("assistant", "收到。该交互稿会保持当前产品功能与布局关系，仅继续调整视觉 token 和组件样式。");
+          $("#messages").scrollTop = $("#messages").scrollHeight;
+        }, 1100);
+      }
+
+      function setArtifactTab(tab) {
+        $$(".tabs button").forEach(button => button.classList.toggle("active", button.dataset.tab === tab));
+        $("#previewView").style.display = tab === "preview" ? "block" : "none";
+        $("#codeView").style.display = tab === "code" ? "block" : "none";
+        $("#changesView").style.display = tab === "changes" ? "grid" : "none";
+      }
+
+      applyTheme(state.theme);
+      applyPanels();
+      renderSearch();
+
+      $("#themeToggle").addEventListener("click", toggleTheme);
+      $("#themeToggleInSettings").addEventListener("click", toggleTheme);
+      $("#sidebarToggle").addEventListener("click", () => { state.sidebarOpen = !state.sidebarOpen; applyPanels(); });
+      $("#artifactToggle").addEventListener("click", () => { state.artifactOpen = !state.artifactOpen; applyPanels(); });
+      $("#artifactClose").addEventListener("click", () => { state.artifactOpen = false; applyPanels(); });
+      $("#openArtifact").addEventListener("click", () => { state.artifactOpen = true; applyPanels(); });
+      $("#searchOpen").addEventListener("click", () => openModal("searchModal"));
+      $("#settingsOpen").addEventListener("click", () => openModal("settingsModal"));
+      $("#profileSettings").addEventListener("click", () => openModal("settingsModal"));
+      $("#searchInput").addEventListener("input", event => renderSearch(event.target.value));
+      $$("[data-close]").forEach(button => button.addEventListener("click", () => closeModal(button.dataset.close)));
+      $$(".modal-backdrop").forEach(backdrop => backdrop.addEventListener("mousedown", event => { if (event.target === backdrop) closeModal(backdrop.id); }));
+      $$(".session").forEach(button => button.addEventListener("click", () => selectSession(button.dataset.session)));
+      $$(".tabs button").forEach(button => button.addEventListener("click", () => setArtifactTab(button.dataset.tab)));
+      $$(".switch").forEach(button => button.addEventListener("click", () => { button.classList.toggle("on"); button.setAttribute("aria-pressed", button.classList.contains("on")); }));
+
+      $("#toolToggle").addEventListener("click", () => { $("#toolOutput").hidden = !$("#toolOutput").hidden; });
+      $("#prompt").addEventListener("input", event => { $("#send").disabled = !event.target.value.trim(); });
+      $("#prompt").addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendPrompt(); } });
+      $("#send").addEventListener("click", sendPrompt);
+      $("#newChat").addEventListener("click", () => { $("#channelTitle").textContent = "未命名会话"; $("#dynamicMessages").innerHTML = ""; notify("已创建新的本地会话"); });
+      $("#moreButton").addEventListener("click", () => notify("更多操作菜单 · 交互占位"));
+      $("#copyLink").addEventListener("click", async () => { try { await navigator.clipboard.writeText(location.href); notify("已复制当前文件路径"); } catch { notify("浏览器未允许复制"); } });
+      $("#runPreview").addEventListener("click", () => notify("预览已刷新"));
+
+      document.addEventListener("keydown", event => {
+        if (event.key === "Escape") $$(".modal-backdrop.open").forEach(modal => closeModal(modal.id));
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); openModal("searchModal"); }
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "n") { event.preventDefault(); $("#newChat").click(); }
+      });
+
+      window.addEventListener("resize", () => {
+        if (window.innerWidth <= 1120) {
+          state.sidebarOpen = false;
+          state.artifactOpen = false;
+        }
+        applyPanels();
+      });
+    </script>
+  </body>
+</html>

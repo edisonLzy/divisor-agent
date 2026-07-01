@@ -18,7 +18,7 @@ export function Chat({ isSidebarCollapsed }: ChatProps) {
 
   return (
     <div
-      className="-ml-px flex h-full flex-col overflow-hidden rounded-l-[20px] border border-border/70 border-l-0 supports-backdrop-filter:backdrop-blur-xl"
+      className="flex h-full flex-col overflow-hidden border-l-2 border-border"
       style={{
         background:
           "radial-gradient(circle at 10% 0%, var(--workspace-glow), transparent 40%), var(--workspace-surface)",

@@ -160,7 +160,7 @@ export function PromptInput({
   return (
     <div
       className={cn(
-        "mx-auto flex w-full max-w-4xl flex-col rounded-[24px] border border-border bg-card shadow-[0_20px_48px_rgb(15_23_42/0.08)] transition-all duration-300 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20 dark:shadow-[0_20px_48px_rgb(0_0_0/0.28)]",
+        "mx-auto flex w-full max-w-4xl flex-col rounded-lg border-2 border-border bg-card shadow-[var(--hard-shadow)] transition-all duration-200 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/25",
         disabled && !isRunning && "opacity-80",
       )}
     >
@@ -189,10 +189,10 @@ export function PromptInput({
             disabled={isRunning ? !isStopEnabled : !canSubmit}
             size="icon-sm"
             className={cn(
-              "size-7 rounded-full transition-colors disabled:bg-muted disabled:text-muted-foreground/50",
+              "size-7 rounded-md border-2 border-border shadow-[var(--hard-shadow-sm)] transition-all disabled:bg-muted disabled:text-muted-foreground/50 disabled:shadow-none",
               isRunning
                 ? "bg-destructive/15 text-destructive hover:bg-destructive/25"
-                : "bg-muted-foreground/20 text-muted-foreground hover:bg-muted-foreground/30",
+                : "bg-accent text-accent-foreground hover:translate-x-px hover:translate-y-px hover:bg-accent hover:shadow-none",
             )}
             aria-label={isRunning ? "Stop response" : "Send prompt"}
           >

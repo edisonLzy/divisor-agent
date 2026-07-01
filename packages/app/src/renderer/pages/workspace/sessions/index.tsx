@@ -33,7 +33,7 @@ import { WorkspaceItem } from "./workspace-item";
 
 export function Sessions() {
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden bg-sidebar/78 text-[13px] text-sidebar-foreground/70 select-none pt-9 supports-backdrop-filter:bg-sidebar/68 supports-backdrop-filter:backdrop-blur-xl">
+    <div className="flex h-full w-full flex-col overflow-hidden bg-sidebar text-[13px] text-sidebar-foreground/75 select-none">
       <TopActions />
 
       <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-2 py-4">
@@ -120,7 +120,7 @@ function CreateWorkspaceButton() {
     <>
       <button
         onClick={() => setDialogOpen(true)}
-        className="flex items-center justify-center rounded-md p-0.5 text-sidebar-foreground/32 transition-colors hover:bg-black/10 hover:text-sidebar-foreground"
+        className="flex items-center justify-center rounded-sm border border-transparent p-0.5 text-sidebar-foreground/45 transition-colors hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-foreground"
         title="创建项目"
       >
         <FolderPlus className="size-3.5" />
@@ -180,7 +180,7 @@ function ChatGroup() {
       action={
         <button
           onClick={() => handleCreateSession()}
-          className="flex items-center justify-center rounded-md p-0.5 text-sidebar-foreground/32 transition-colors hover:bg-black/10 hover:text-sidebar-foreground"
+          className="flex items-center justify-center rounded-sm border border-transparent p-0.5 text-sidebar-foreground/45 transition-colors hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-foreground"
           title="新对话"
         >
           <MessageSquarePlus className="size-3.5" />
@@ -224,9 +224,9 @@ interface GroupSectionProps {
 
 function GroupSection({ title, defaultOpen = true, action, children }: GroupSectionProps) {
   return (
-    <Collapsible defaultOpen={defaultOpen} className="space-y-1.5">
+    <Collapsible defaultOpen={defaultOpen} className="flex flex-col gap-1.5">
       <div className="group/section flex items-center gap-1 px-3 py-0.5">
-        <CollapsibleTrigger className="flex cursor-pointer items-center gap-1 text-[11px] font-semibold tracking-[0.14em] text-sidebar-foreground/35 transition-colors hover:text-sidebar-foreground/55">
+        <CollapsibleTrigger className="flex cursor-pointer items-center gap-1 font-mono text-[10px] font-bold tracking-[0.12em] text-sidebar-foreground/45 uppercase transition-colors hover:text-sidebar-foreground/70">
           <span>{title}</span>
         </CollapsibleTrigger>
         {action && (
@@ -236,7 +236,7 @@ function GroupSection({ title, defaultOpen = true, action, children }: GroupSect
         )}
       </div>
       <CollapsibleContent>
-        <div className="space-y-0.5">{children}</div>
+        <div className="flex flex-col gap-0.5">{children}</div>
       </CollapsibleContent>
     </Collapsible>
   );

@@ -85,10 +85,10 @@ export function SettingsSkillsPage() {
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-160 flex-col px-10 py-12">
-      <h1 className="mb-8 text-center text-[20px] font-medium text-foreground">Skills</h1>
-      <div className="min-h-0 space-y-4">
-        <div className="flex max-h-[min(680px,calc(100vh-9rem))] flex-col overflow-hidden rounded-lg border border-border bg-card">
-          <div className="shrink-0 flex flex-col gap-4 border-b border-border px-4 py-4 md:flex-row md:items-center md:justify-between">
+      <h1 className="mb-8 text-center text-2xl font-bold tracking-tight text-foreground">Skills</h1>
+      <div className="flex min-h-0 flex-col gap-4">
+        <div className="flex max-h-[min(680px,calc(100vh-9rem))] flex-col overflow-hidden rounded-md border-2 border-border bg-card shadow-[var(--hard-shadow)]">
+          <div className="flex shrink-0 flex-col gap-4 border-b-2 border-border px-4 py-4 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="text-[13px] font-medium text-foreground">Skills Discovery</div>
               <div className="mt-0.5 text-[11px] text-muted-foreground">

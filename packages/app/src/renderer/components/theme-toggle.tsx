@@ -39,7 +39,7 @@ export function ThemeToggle() {
         type="button"
         className={cn(
           buttonVariants({ variant: "outline", size: "sm" }),
-          "gap-2 rounded-full border-border bg-background/80 px-3 text-foreground shadow-sm backdrop-blur supports-backdrop-filter:bg-background/70",
+          "gap-2 bg-card px-3 text-card-foreground",
         )}
         aria-label="切换主题"
       >
@@ -48,7 +48,10 @@ export function ThemeToggle() {
         <ChevronDownIcon className="size-4 text-muted-foreground" />
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="min-w-40 rounded-xl">
+      <DropdownMenuContent
+        align="end"
+        className="min-w-40 rounded-md border-2 border-border shadow-[var(--hard-shadow)]"
+      >
         <DropdownMenuGroup>
           <DropdownMenuLabel>主题</DropdownMenuLabel>
         </DropdownMenuGroup>
@@ -66,7 +69,7 @@ export function ThemeToggle() {
               <DropdownMenuRadioItem
                 key={value}
                 value={value}
-                className="gap-2.5 rounded-lg px-2 py-1.5"
+                className="gap-2.5 rounded-sm px-2 py-1.5"
               >
                 <Icon className="size-4 text-muted-foreground" />
                 <span>{label}</span>

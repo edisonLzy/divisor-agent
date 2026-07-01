@@ -32,7 +32,7 @@ export function ToggleSidebarButton(props: ToggleSidebarButtonProps) {
   return (
     <button
       onClick={onToggle}
-      className="flex items-center justify-center rounded-md p-1 text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+      className="flex items-center justify-center rounded-sm border-2 border-border bg-card p-1 text-sidebar-foreground shadow-[var(--hard-shadow-sm)] transition-all hover:translate-x-px hover:translate-y-px hover:bg-accent hover:text-accent-foreground hover:shadow-none"
       style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       title={isCollapsed ? "展开侧栏" : "折叠侧栏"}
     >

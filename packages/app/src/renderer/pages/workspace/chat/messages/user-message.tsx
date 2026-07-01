@@ -66,7 +66,7 @@ export function StickyUserMessage({ message, onJump }: StickyUserMessageProps) {
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-30 px-2">
       <div className="mx-auto w-full max-w-4xl">
-        <div className="pointer-events-auto grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-border/70 bg-background/95 px-3 py-2.5 text-sm text-foreground shadow-[0_20px_70px_rgb(15_23_42/0.14)] supports-backdrop-filter:backdrop-blur-xl dark:shadow-[0_24px_80px_rgb(0_0_0/0.38)]">
+        <div className="pointer-events-auto grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md border-2 border-border bg-background px-3 py-2.5 text-sm text-foreground shadow-[var(--hard-shadow)]">
           <div className="pm-readonly min-w-0 overflow-hidden text-[14px] leading-6 text-foreground [&_.ProseMirror]:overflow-hidden [&_.ProseMirror]:text-ellipsis [&_.ProseMirror]:!whitespace-nowrap [&_.ProseMirror_p]:overflow-hidden [&_.ProseMirror_p]:text-ellipsis [&_.ProseMirror_p]:!whitespace-nowrap">
             <EditorContent editor={readOnlyEditor} className="prompt-editor max-w-none min-w-0" />
           </div>
@@ -171,16 +171,21 @@ function ReadonlyUserMessage({ message, isRunning, onStartEdit }: ReadonlyUserMe
   const plainText = typeof message.content === "string" ? message.content : "unsupported content";
 
   return (
-    <div className="ml-auto flex max-w-2xl flex-col items-end gap-1">
-      <div className="rounded-[20px] bg-secondary px-4 py-2.5 text-[14px] leading-6 text-secondary-foreground shadow-[0_18px_48px_rgb(15_23_42/0.08)] dark:shadow-[0_18px_48px_rgb(0_0_0/0.2)]">
-        <div className="pm-readonly min-w-0 text-[14px] leading-6 text-secondary-foreground">
-          <EditorContent editor={readOnlyEditor} className="prompt-editor max-w-none min-w-0" />
+    <div className="grid max-w-3xl grid-cols-[34px_minmax(0,1fr)] items-start gap-3">
+      <span className="flex size-8.5 items-center justify-center rounded-sm border-2 border-border bg-signal-yellow font-mono text-[10px] font-bold text-accent-foreground shadow-[var(--hard-shadow-sm)]">
+        YOU
+      </span>
+      <div className="flex min-w-0 flex-col items-start gap-1">
+        <div className="rounded-md border-2 border-border bg-card px-4 py-2.5 text-[14px] leading-6 text-card-foreground shadow-[var(--hard-shadow-sm)]">
+          <div className="pm-readonly min-w-0 text-[14px] leading-6 text-card-foreground">
+            <EditorContent editor={readOnlyEditor} className="prompt-editor max-w-none min-w-0" />
+          </div>
         </div>
+        <MessageToolbar align="start">
+          <CopyMessageButton text={plainText} />
+          <EditMessageButton isRunning={isRunning} onEdit={onStartEdit} />
+        </MessageToolbar>
       </div>
-      <MessageToolbar align="end">
-        <CopyMessageButton text={plainText} />
-        <EditMessageButton isRunning={isRunning} onEdit={onStartEdit} />
-      </MessageToolbar>
     </div>
   );
 }
