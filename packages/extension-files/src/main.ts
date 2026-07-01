@@ -5,7 +5,7 @@ import {
   EXTENSION_NAME,
   FILES_SYSTEM_PROMPT_CONTENT,
   FILES_SYSTEM_PROMPT_ID,
-} from "./constants";
+} from "./common/constants";
 
 export default defineMainExtension({
   id: EXTENSION_ID,

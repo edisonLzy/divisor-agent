@@ -115,7 +115,24 @@ shadcn/ui (base-nova style) with 25+ components in `packages/app/src/renderer/co
 - **Testing**: Vitest 4.x workspace mode. Each package has `vitest.config.ts` with `__tests__/` directory. Tests use `vi.mock()` with hoisted mocks
 - **Production build**: Server uses `packages/server/tsconfig.build.json` (excludes tests)
 - **No barrel-export files**: Do **not** create `index.ts` files whose only job is to re-export from sibling modules (`export * from "./foo"; export * from "./bar"`). Barrels hurt tree-shaking, hide the real dependency graph, and silently bloat bundles when a single symbol is imported. An `index.ts` containing **actual implementation** (e.g. `src/helper/index.ts` exporting `parseFileHref`) is fine — that's the canonical module file, not a barrel. If a directory grows and you need multiple files, **callers must import the specific file** (`import { parseFileHref } from "../helper/parse-file-href"`), not the directory. Package-level `package.json` `exports` entries (e.g. `"./renderer": "./src/renderer.tsx"`) are single-file mappings, not barrels — those stay.
-- **Package layout — public exports live at `src/` root, internals live in subdirectories**: A workspace package's outward-facing files (the ones listed under `package.json` `exports`) should sit directly under `src/` as flat files; everything else belongs in a named subdirectory. This makes the public surface scannable at a glance — anything in `src/` root is reachable from outside, anything in a subdirectory is internal. See `packages/extension-files/src/` for the canonical layout: `manifest.ts` / `main.ts` / `renderer.tsx` at the root (the three `exports` entries), with `constants/`, `helper/`, `files-artifact/` as internal modules.
+- **Package layout — public exports live at `src/` root, internals live in subdirectories**: A workspace package's outward-facing files (the ones listed under `package.json` `exports`) should sit directly under `src/` as flat files; everything else belongs in a named subdirectory. This makes the public surface scannable at a glance — anything in `src/` root is reachable from outside, anything in a subdirectory is internal. See `packages/extension-files/src/` for the canonical layout: `main.ts` / `renderer.tsx` at the root (the two `exports` entries), with `common/`, `renderer/` as internal modules.
+- **Extension package directory structure**: Every extension package follows this standard layout:
+
+  ```
+  src/
+    common/         # shared between main & renderer: meta constants, IPC type definitions, pure helpers
+    main/           # main-process internal modules (optional — omit for simple extensions)
+    renderer/       # renderer-process internal modules: components, hooks (optional — omit for simple extensions)
+    main.ts         # main expose file (defineMainExtension call)
+    renderer.tsx    # renderer expose file (defineRendererExtension call)
+  ```
+
+  - `common/` — code shared across processes. No Electron or React dependencies.
+  - `main/` — Node.js / Electron main-process internals. Only needed when main-side logic grows beyond a single file.
+  - `renderer/` — React component internals. Only needed when renderer-side logic grows beyond a single file.
+  - Simple extensions (like `extension-example`) can omit `main/` and `renderer/`, with all logic inline in the expose files.
+  - `extension-core` is the reference implementation of this layout.
+  - **Tests** follow the same three-level structure: `__tests__/common/`, `__tests__/main/`, `__tests__/renderer/` (or `src/__tests__/common/` etc).
 
 ### Workspace packages and electron-vite externalization
 

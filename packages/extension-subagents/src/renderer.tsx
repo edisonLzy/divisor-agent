@@ -10,12 +10,12 @@ import {
   XCircleIcon,
 } from "lucide-react";
 
-import { SUBAGENTS_EXTENSION } from "./extension";
+import { SUBAGENTS_EXTENSION } from "./common/extension";
 import {
   SUBAGENTS_LIST_BLOCK_TYPE,
   type SubagentsListBlockProps,
   type SubagentStatus,
-} from "./types";
+} from "./common/types";
 
 function SubagentsListBlock({ props }: { props: Record<string, unknown> }) {
   const api = useExtensionsContextAPI();

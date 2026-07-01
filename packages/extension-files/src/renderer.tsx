@@ -14,9 +14,9 @@ import {
   FILE_HREF_PROTOCOL,
   FILE_HREF_SCHEME,
   FILES_ARTIFACT_TYPE,
-} from "./constants";
-import { addOrActivateFile, FilesArtifact } from "./files-artifact";
-import { parseFileHref } from "./helper";
+} from "./common/constants";
+import { parseFileHref } from "./common/helper";
+import { addOrActivateFile, FilesArtifact } from "./renderer/files-artifact";
 
 interface FileAnchorProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
   href?: string;

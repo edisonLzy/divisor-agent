@@ -2,14 +2,14 @@ import { defineMainExtension } from "@divisor-agent/extension-core/main";
 import type { ExtensionAgentEvent } from "@divisor-agent/extension-core/main";
 import { Type } from "@earendil-works/pi-ai";
 
-import { SUBAGENTS_EXTENSION } from "./extension";
+import { SUBAGENTS_EXTENSION } from "./common/extension";
 import {
   SUBAGENTS_LIST_BLOCK_TYPE,
   SUBAGENTS_TOOL_NAME,
   type SubagentRuntimeSnapshot,
   type SubagentSnapshot,
   type SubagentTaskInput,
-} from "./types";
+} from "./common/types";
 
 const MAX_SUBAGENTS = 4;
 

@@ -58,7 +58,7 @@ import {
 } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
-import { HIGHLIGHT_DECORATION_CLASS } from "../constants";
+import { HIGHLIGHT_DECORATION_CLASS } from "../../common/constants";
 import type { FileComment, FileCommentRange } from "./index";
 import { loadLanguageExtension } from "./language-from-path";
 

@@ -12,7 +12,7 @@
  * URL-scheme and artifact-id constants live in `./constants.ts`.
  */
 
-import { FILE_HREF_PREFIX } from "../constants";
+import { FILE_HREF_PREFIX } from "./constants";
 
 export interface ParsedFileHref {
   endLine?: number;

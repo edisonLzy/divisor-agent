@@ -8,8 +8,8 @@ import {
   type AllowedRenderInvokeEvents,
   type AllowedMainExposeEvents,
   type ExampleState,
-} from "./share/example-ipc";
-import { EXAMPLE_EXTENSION } from "./share/example-meta";
+} from "./common/example-ipc";
+import { EXAMPLE_EXTENSION } from "./common/example-meta";
 
 const useExampleIPC = createExtensionIPC<AllowedRenderInvokeEvents, AllowedMainExposeEvents>(
   EXAMPLE_EXTENSION.id,
