@@ -1,10 +1,20 @@
 import { SquarePen } from "lucide-react";
 
 import { useCreateSession } from "../use-create-session";
+import { useWindowFullScreen } from "../use-window-full-screen";
 
 export function TopActions() {
+  const isWindowFullScreen = useWindowFullScreen();
+
   return (
-    <header className="app-drag-region flex h-12 shrink-0 items-center border-b-2 border-sidebar-border px-2 pl-[calc(var(--window-controls-left)+0.5rem)]">
+    <header
+      className="app-drag-region flex h-12 shrink-0 items-center border-b-2 border-sidebar-border px-2"
+      style={
+        isWindowFullScreen
+          ? undefined
+          : { paddingLeft: "calc(var(--window-controls-left) + 0.5rem)" }
+      }
+    >
       <CreateSessionButton />
     </header>
   );
