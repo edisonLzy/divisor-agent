@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Prompt Context · 三版交互原型</title>
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+    <style>
+      :root {
+        color-scheme: light;
+        --background: #fffaf0;
+        --foreground: #141111;
+        --card: #fffdf8;
+        --secondary: #f1ede3;
+        --muted: #eee9de;
+        --muted-foreground: #716b64;
+        --accent: #ffd440;
+        --destructive: #df5148;
+        --ring: #27ccf3;
+        --cyan: #27ccf3;
+        --green: #a8df72;
+        --purple: #bbb0e6;
+        --pink: #fe7da8;
+        --border: #141111;
+        --shadow: 3px 3px 0 var(--border);
+        --shadow-sm: 2px 2px 0 var(--border);
+      }
+      html[data-theme="dark"] {
+        color-scheme: dark;
+        --background: #11100f;
+        --foreground: #f3eee5;
+        --card: #191715;
+        --secondary: #24211e;
+        --muted: #24211e;
+        --muted-foreground: #aaa39a;
+        --accent: #d7ad2f;
+        --destructive: #ef7469;
+        --ring: #31b6d6;
+        --cyan: #31b6d6;
+        --green: #91c866;
+        --purple: #9f92d0;
+        --pink: #dc6e98;
+        --border: #f3eee5;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-width: 980px;
+        min-height: 100vh;
+        overflow: hidden;
+        background: var(--background);
+        color: var(--foreground);
+        font-family: "Space Grotesk", "PingFang SC", system-ui, sans-serif;
+        font-size: 14px;
+        -webkit-font-smoothing: antialiased;
+      }
+      button, textarea { color: inherit; font: inherit; }
+      button { cursor: pointer; }
+      button:focus-visible, textarea:focus-visible, [contenteditable]:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--ring) 55%, transparent);
+        outline-offset: 2px;
+      }
+      .icon { width: 15px; height: 15px; stroke-width: 2.2; flex: 0 0 auto; }
+      .topbar {
+        display: flex;
+        height: 52px;
+        align-items: center;
+        gap: 14px;
+        border-bottom: 2px solid var(--border);
+        padding: 0 16px;
+        background: var(--accent);
+        color: #141111;
+      }
+      .topbar strong { font-size: 13px; letter-spacing: -.02em; }
+      .topbar .version { border: 1px solid #141111; padding: 2px 5px; background: #fffdf8; font: 700 9px "SFMono-Regular", monospace; }
+      .top-actions { display: flex; margin-left: auto; gap: 8px; }
+      .button {
+        display: inline-flex; min-height: 30px; align-items: center; justify-content: center; gap: 6px;
+        border: 2px solid currentColor; border-radius: 6px; padding: 0 10px; background: var(--card);
+        color: var(--foreground); box-shadow: var(--shadow-sm); font-weight: 700;
+      }
+      .topbar .button { color: #141111; background: #fffdf8; }
+      .button:hover { transform: translate(1px, 1px); box-shadow: none; }
+      .button.primary { background: var(--accent); }
+      .button.ghost { border-color: transparent; background: transparent; box-shadow: none; }
+      .layout { display: grid; grid-template-columns: 300px 1fr; height: calc(100vh - 52px); }
+      .sidebar { overflow: auto; border-right: 2px solid var(--border); background: var(--card); padding: 22px 18px; }
+      .eyebrow { color: var(--muted-foreground); font: 700 10px "SFMono-Regular", monospace; letter-spacing: .1em; text-transform: uppercase; }
+      h1 { margin: 8px 0 8px; font-size: 23px; line-height: 1.15; letter-spacing: -.035em; }
+      .lead { margin: 0 0 22px; color: var(--muted-foreground); font-size: 12px; line-height: 1.6; }
+      .variant-nav { display: grid; gap: 8px; }
+      .variant-button {
+        display: grid; grid-template-columns: 28px 1fr; gap: 10px; width: 100%; text-align: left;
+        border: 2px solid transparent; border-radius: 6px; padding: 10px; background: transparent;
+      }
+      .variant-button:hover { background: var(--secondary); }
+      .variant-button.active { border-color: var(--border); background: var(--accent); color: #141111; box-shadow: var(--shadow-sm); }
+      .variant-number { font: 800 11px "SFMono-Regular", monospace; }
+      .variant-button b { display: block; font-size: 13px; }
+      .variant-button small { display: block; margin-top: 3px; color: inherit; opacity: .7; font-size: 10px; line-height: 1.35; }
+      .legend { margin-top: 22px; border-top: 2px solid var(--border); padding-top: 16px; }
+      .legend-row { display: flex; align-items: center; gap: 7px; margin-top: 9px; color: var(--muted-foreground); font-size: 11px; }
+      .dot { width: 10px; height: 10px; border: 1.5px solid var(--border); }
+      .dot.file { background: var(--purple); } .dot.browser { background: var(--cyan); } .dot.text { background: var(--green); }
+      .recommendation { margin-top: 18px; border: 2px solid var(--border); border-radius: 6px; padding: 10px; background: var(--secondary); box-shadow: var(--shadow-sm); font-size: 11px; line-height: 1.5; }
+      .recommendation b { display: block; margin-bottom: 3px; }
+      .stage { position: relative; overflow: auto; background: var(--background); }
+      .stage-header { display: flex; height: 48px; align-items: center; border-bottom: 2px solid var(--border); padding: 0 18px; background: var(--card); }
+      .stage-header b { font-size: 13px; }
+      .stage-header span { margin-left: 8px; color: var(--muted-foreground); font-size: 11px; }
+      .stage-body { display: flex; min-height: calc(100% - 48px); flex-direction: column; justify-content: flex-end; padding: 42px 54px 38px; }
+      .conversation { display: grid; width: min(860px, 100%); margin: 0 auto 42px; gap: 26px; }
+      .message-row { display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: start; gap: 11px; }
+      .message-row.user { width: min(720px, 100%); }
+      .identity {
+        display: grid; width: 30px; height: 30px; place-items: center; border: 2px solid var(--border);
+        border-radius: 4px; background: var(--cyan); box-shadow: var(--shadow-sm); font: 800 9px "SFMono-Regular", monospace;
+      }
+      .message-row.user .identity { background: var(--accent); color: #141111; }
+      .message-body { min-width: 0; }
+      .message-author { margin: 0 0 7px; font-size: 11px; font-weight: 800; }
+      .user-bubble { overflow: hidden; border: 2px solid var(--border); border-radius: 7px; background: var(--card); box-shadow: var(--shadow-sm); }
+      .sent-view { display: none; }
+      .sent-view.active { display: block; }
+      .sent-badge-strip { display: flex; flex-wrap: wrap; gap: 5px; border-bottom: 2px solid var(--border); padding: 7px 9px; background: var(--secondary); }
+      .sent-badge-strip .context-chip { max-width: 190px; padding: 2px 6px; box-shadow: none; font-size: 9px; }
+      .sent-inline-prompt { margin: 0; padding: 11px 12px; font-size: 13px; line-height: 2; }
+      .sent-inline-prompt .inline-context { padding: 1px 5px; font-size: 9px; }
+      .sent-context-head {
+        display: flex; min-height: 34px; align-items: center; gap: 7px; border-bottom: 1px solid color-mix(in srgb, var(--border) 28%, transparent);
+        padding: 6px 9px; background: var(--secondary); font-size: 10px;
+      }
+      .sent-context-head strong { font-size: 11px; }
+      .sent-type-counts { display: flex; gap: 5px; color: var(--muted-foreground); }
+      .sent-type-counts span { display: inline-flex; align-items: center; gap: 3px; }
+      .sent-context-toggle { margin-left: auto; }
+      .sent-context-list { display: none; border-bottom: 2px solid var(--border); background: var(--secondary); }
+      .sent-context-list.open { display: block; }
+      .sent-context-item {
+        display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 7px; align-items: start;
+        padding: 8px 9px; border-top: 1px solid color-mix(in srgb, var(--border) 22%, transparent);
+      }
+      .sent-context-item:first-child { border-top: 0; }
+      .sent-context-item b { display: block; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+      .sent-context-item small { display: block; overflow: hidden; margin-top: 2px; color: var(--muted-foreground); font: 9px "SFMono-Regular", monospace; text-overflow: ellipsis; white-space: nowrap; }
+      .sent-context-item em { color: var(--muted-foreground); font-size: 9px; font-style: normal; white-space: nowrap; }
+      .sent-prompt { margin: 0; padding: 10px 12px; font-size: 13px; line-height: 1.6; }
+      .message-actions { display: flex; gap: 3px; margin-top: 5px; }
+      .message-actions .mini-button { height: 24px; color: var(--muted-foreground); font-size: 9px; }
+      .message-label { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; font-weight: 750; }
+      .message-label i { display: grid; width: 25px; height: 25px; place-items: center; border: 2px solid var(--border); background: var(--cyan); box-shadow: var(--shadow-sm); }
+      .assistant-copy { max-width: 650px; color: var(--muted-foreground); line-height: 1.65; }
+      .assistant-copy strong { color: var(--foreground); }
+      .composer-wrap { width: min(860px, 100%); margin: 0 auto; }
+      .composer {
+        position: relative; border: 2px solid var(--border); border-radius: 8px; background: var(--card); box-shadow: var(--shadow);
+        transition: border-color .15s, box-shadow .15s;
+      }
+      .composer:focus-within { border-color: var(--ring); box-shadow: 3px 3px 0 var(--border), 0 0 0 2px color-mix(in srgb, var(--ring) 30%, transparent); }
+      .view { display: none; } .view.active { display: block; }
+      .context-strip { display: flex; flex-wrap: wrap; gap: 7px; border-bottom: 2px solid var(--border); padding: 9px 11px; background: var(--secondary); }
+      .context-chip, .inline-context {
+        position: relative; display: inline-flex; max-width: 240px; align-items: center; gap: 6px;
+        border: 2px solid var(--border); border-radius: 5px; padding: 4px 7px; background: var(--card);
+        box-shadow: var(--shadow-sm); font-size: 11px; font-weight: 700; vertical-align: middle;
+      }
+      .context-chip[data-type="file"], .inline-context[data-type="file"] { background: color-mix(in srgb, var(--purple) 35%, var(--card)); }
+      .context-chip[data-type="browser"], .inline-context[data-type="browser"] { background: color-mix(in srgb, var(--cyan) 25%, var(--card)); }
+      .context-chip[data-type="text"], .inline-context[data-type="text"] { background: color-mix(in srgb, var(--green) 30%, var(--card)); }
+      .context-chip .label, .inline-context .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .chip-remove { display: grid; width: 17px; height: 17px; place-items: center; border: 0; border-radius: 3px; padding: 0; background: transparent; }
+      .chip-remove:hover { background: color-mix(in srgb, var(--destructive) 20%, transparent); color: var(--destructive); }
+      .tooltip {
+        position: fixed; z-index: 50; display: none; width: 340px; border: 2px solid var(--border); border-radius: 7px;
+        padding: 12px; background: var(--card); box-shadow: var(--shadow); pointer-events: none;
+      }
+      .tooltip.visible { display: block; }
+      .tooltip-head { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; font-weight: 800; }
+      .tooltip-meta { color: var(--muted-foreground); font: 600 10px "SFMono-Regular", monospace; }
+      .tooltip-preview { margin-top: 9px; border: 1px solid var(--border); border-radius: 4px; padding: 9px; background: var(--secondary); font-size: 11px; line-height: 1.55; white-space: pre-wrap; }
+      .tooltip-foot { display: flex; justify-content: space-between; margin-top: 9px; color: var(--muted-foreground); font-size: 10px; }
+      .editor {
+        min-height: 86px; max-height: 180px; overflow: auto; padding: 13px 14px; outline: 0;
+        font-size: 14px; line-height: 1.7; white-space: pre-wrap;
+      }
+      .editor:empty::before { content: attr(data-placeholder); color: var(--muted-foreground); }
+      .inline-editor { min-height: 112px; }
+      .inline-context { margin: 0 3px; padding: 2px 6px; box-shadow: none; cursor: default; }
+      .inline-context.selected { outline: 2px solid var(--ring); outline-offset: 1px; }
+      .context-summary {
+        display: flex; align-items: center; gap: 8px; border-bottom: 2px solid var(--border); padding: 8px 11px; background: var(--secondary);
+      }
+      .summary-count { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; }
+      .summary-types { display: flex; gap: 5px; }
+      .summary-type { display: inline-flex; align-items: center; gap: 4px; border: 1.5px solid var(--border); border-radius: 4px; padding: 2px 5px; font-size: 10px; }
+      .summary-expand { margin-left: auto; }
+      .context-drawer { display: none; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; border-bottom: 2px solid var(--border); padding: 10px; background: var(--secondary); }
+      .context-drawer.open { display: grid; }
+      .drawer-card { min-width: 0; border: 2px solid var(--border); border-radius: 5px; padding: 8px; background: var(--card); }
+      .drawer-card header { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; }
+      .drawer-card p { margin: 7px 0 0; color: var(--muted-foreground); font-size: 10px; line-height: 1.4; }
+      .composer-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid color-mix(in srgb, var(--border) 28%, transparent); padding: 9px 11px; }
+      .footer-group { display: flex; align-items: center; gap: 7px; }
+      .mini-button { display: inline-flex; height: 28px; align-items: center; gap: 5px; border: 2px solid transparent; border-radius: 5px; padding: 0 7px; background: transparent; font-size: 11px; font-weight: 700; }
+      .mini-button:hover { border-color: var(--border); background: var(--secondary); }
+      .send { display: grid; width: 29px; height: 29px; place-items: center; border: 2px solid var(--border); border-radius: 6px; padding: 0; background: var(--accent); box-shadow: var(--shadow-sm); }
+      .send:hover { transform: translate(1px, 1px); box-shadow: none; }
+      .hint { margin-top: 9px; color: var(--muted-foreground); font-size: 10px; text-align: right; }
+      .add-menu {
+        position: absolute; z-index: 20; bottom: 54px; left: 10px; display: none; width: 285px;
+        border: 2px solid var(--border); border-radius: 7px; padding: 7px; background: var(--card); box-shadow: var(--shadow);
+      }
+      .add-menu.open { display: block; }
+      .add-menu-head { padding: 6px 8px 8px; color: var(--muted-foreground); font: 700 10px "SFMono-Regular", monospace; }
+      .add-option { display: flex; width: 100%; align-items: flex-start; gap: 9px; border: 0; border-radius: 5px; padding: 8px; background: transparent; text-align: left; }
+      .add-option:hover { background: var(--secondary); }
+      .add-option i { display: grid; width: 26px; height: 26px; place-items: center; border: 1.5px solid var(--border); }
+      .add-option b { display: block; font-size: 11px; } .add-option small { display: block; margin-top: 2px; color: var(--muted-foreground); font-size: 9px; }
+      .api-panel {
+        position: absolute; right: 20px; bottom: 20px; width: 340px; border: 2px solid var(--border); border-radius: 7px;
+        padding: 11px; background: var(--card); box-shadow: var(--shadow); transform: translateY(calc(100% + 40px)); transition: transform .2s;
+      }
+      .api-panel.open { transform: translateY(0); }
+      .api-panel header { display: flex; align-items: center; justify-content: space-between; font-weight: 800; }
+      .api-panel pre { overflow: auto; margin: 9px 0; border: 1px solid var(--border); padding: 8px; background: var(--secondary); font: 10px/1.5 "SFMono-Regular", monospace; }
+      .toast { position: fixed; right: 18px; top: 68px; z-index: 80; display: none; border: 2px solid var(--border); border-radius: 6px; padding: 10px 12px; background: var(--green); color: #141111; box-shadow: var(--shadow); font-weight: 800; }
+      .toast.visible { display: block; }
+      @media (max-height: 720px) { .conversation { margin-bottom: 24px; } .stage-body { padding-top: 24px; padding-bottom: 24px; } }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <strong>PROMPT CONTEXT / 交互方案</strong><span class="version">HTML PROTOTYPE · 03 VARIANTS</span>
+      <nav class="top-actions" aria-label="原型工具">
+        <button class="button" id="apiButton"><i data-lucide="braces" class="icon"></i>模拟 Extension API</button>
+        <button class="button" id="themeButton"><i data-lucide="moon" class="icon"></i>切换主题</button>
+        <button class="button" id="resetButton"><i data-lucide="rotate-ccw" class="icon"></i>重置</button>
+      </nav>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar">
+        <span class="eyebrow">Context as a first-class input</span>
+        <h1>补充上下文<br />三版交互稿</h1>
+        <p class="lead">比较“输入前管理”与“写作中引用”的心智模型。所有方案共用统一上下文数据，不把可见标签当作实际 prompt 文本。</p>
+        <nav class="variant-nav" aria-label="方案选择">
+          <button class="variant-button active" data-view="strip"><span class="variant-number">01</span><span><b>独立上下文栏</b><small>稳定、清晰、最适合多来源上下文</small></span></button>
+          <button class="variant-button" data-view="inline"><span class="variant-number">02</span><span><b>Rich Text 行内块</b><small>引用位置明确，写作感更强</small></span></button>
+          <button class="variant-button" data-view="hybrid"><span class="variant-number">03</span><span><b>摘要 + 按需展开</b><small>紧凑，兼顾管理与写作</small></span></button>
+        </nav>
+        <section class="legend">
+          <span class="eyebrow">Context types</span>
+          <div class="legend-row"><span class="dot file"></span>File / 文件与代码注释</div>
+          <div class="legend-row"><span class="dot browser"></span>Browser / 页面元素与快照</div>
+          <div class="legend-row"><span class="dot text"></span>Plain text / 对话选文</div>
+        </section>
+        <div class="recommendation"><b>设计建议：以 03 为产品默认</b>上下文少时保持轻量；需要核对来源时展开管理。02 可作为高级能力，用于显式表达“这段话针对哪个上下文”。</div>
+      </aside>
+
+      <section class="stage">
+        <header class="stage-header"><b>修复 session item 的右键菜单定位</b><span>上下文会随下一条用户指令提交</span></header>
+        <div class="stage-body">
+          <div class="conversation">
+            <article class="message-row user" aria-label="携带补充上下文的用户消息">
+              <span class="identity">YOU</span>
+              <div class="message-body">
+                <p class="message-author">你</p>
+                <div class="user-bubble">
+                  <div class="sent-view active" data-sent-view="strip">
+                    <div class="sent-badge-strip">
+                      <span class="context-chip context-target" data-id="file" data-type="file"><i data-lucide="file-code-2" class="icon"></i><span class="label">session-item.tsx · L287</span></span>
+                      <span class="context-chip context-target" data-id="browser" data-type="browser"><i data-lucide="mouse-pointer-click" class="icon"></i><span class="label">浏览器选中元素</span></span>
+                      <span class="context-chip context-target" data-id="text" data-type="text"><i data-lucide="text-quote" class="icon"></i><span class="label">1 个已选文本片段</span></span>
+                    </div>
+                    <p class="sent-prompt">请根据补充上下文修复定位问题，并补充边界测试。</p>
+                  </div>
+                  <div class="sent-view" data-sent-view="inline">
+                    <p class="sent-inline-prompt">请检查 <span class="inline-context context-target" data-id="file" data-type="file"><i data-lucide="file-code-2" class="icon"></i><span class="label">session-item.tsx · L287</span></span> 的菜单定位，并参考 <span class="inline-context context-target" data-id="browser" data-type="browser"><i data-lucide="mouse-pointer-click" class="icon"></i><span class="label">浏览器选中元素</span></span> 修复 hover 后的偏移。</p>
+                  </div>
+                  <div class="sent-view" data-sent-view="hybrid">
+                    <div class="sent-context-head">
+                      <i data-lucide="layers-3" class="icon"></i><strong>3 个补充上下文</strong>
+                      <div class="sent-type-counts">
+                        <span><i data-lucide="file-code-2" class="icon"></i>1</span>
+                        <span><i data-lucide="mouse-pointer-click" class="icon"></i>1</span>
+                        <span><i data-lucide="text-quote" class="icon"></i>1</span>
+                      </div>
+                      <button class="mini-button sent-context-toggle" id="sentContextToggle"><span>展开</span><i data-lucide="chevron-down" class="icon"></i></button>
+                    </div>
+                    <div class="sent-context-list" id="sentContextList">
+                      <div class="sent-context-item"><i data-lucide="file-code-2" class="icon"></i><span><b>session-item.tsx · L287</b><small>packages/app/src/renderer/pages/workspace/sessions/session-item.tsx</small></span><em>发送时快照</em></div>
+                      <div class="sent-context-item"><i data-lucide="mouse-pointer-click" class="icon"></i><span><b>Button · More actions</b><small>localhost:5173/workspace · button[data-menu-trigger]</small></span><em>Browser</em></div>
+                      <div class="sent-context-item"><i data-lucide="text-quote" class="icon"></i><span><b>1 个已选文本片段</b><small>Assistant message · turn_018</small></span><em>Chat</em></div>
+                    </div>
+                    <p class="sent-prompt">修复这个问题，保持现有交互不变，并增加覆盖浏览器缩放场景的测试。</p>
+                  </div>
+                </div>
+                <div class="message-actions"><button class="mini-button" id="copyPromptButton"><i data-lucide="copy" class="icon"></i>复制指令</button><button class="mini-button"><i data-lucide="pencil" class="icon"></i>编辑并重发</button></div>
+              </div>
+            </article>
+            <article class="message-row assistant">
+              <span class="identity"><i data-lucide="sparkles" class="icon"></i></span>
+              <div class="message-body"><p class="message-author">Divisor Agent</p><p class="assistant-copy">我已经定位到菜单锚点的计算逻辑。你可以继续输入要求，或从 <strong>文件、浏览器和对话选文</strong>中补充精确上下文。</p></div>
+            </article>
+          </div>
+
+          <div class="composer-wrap">
+            <section class="composer">
+              <div class="view active" id="view-strip">
+                <div class="context-strip" id="stripContexts"></div>
+                <div class="editor" contenteditable="true" spellcheck="false" data-placeholder="Ask anything...">请根据补充上下文修复定位问题，并补充边界测试。</div>
+              </div>
+
+              <div class="view" id="view-inline">
+                <div class="editor inline-editor" id="inlineEditor" contenteditable="true" spellcheck="false" data-placeholder="输入指令，或插入上下文…">请检查 <span class="inline-context context-target" contenteditable="false" data-id="file" data-type="file"><i data-lucide="file-code-2" class="icon"></i><span class="label">session-item.tsx · L287</span></span> 的菜单定位，并参考 <span class="inline-context context-target" contenteditable="false" data-id="browser" data-type="browser"><i data-lucide="mouse-pointer-click" class="icon"></i><span class="label">浏览器选中元素</span></span> 修复 hover 后的偏移。</div>
+              </div>
+
+              <div class="view" id="view-hybrid">
+                <div class="context-summary">
+                  <span class="summary-count"><i data-lucide="layers-3" class="icon"></i><span id="hybridCount">3 个上下文</span></span>
+                  <div class="summary-types"><span class="summary-type"><i data-lucide="file-code-2" class="icon"></i>1</span><span class="summary-type"><i data-lucide="mouse-pointer-click" class="icon"></i>1</span><span class="summary-type"><i data-lucide="text-quote" class="icon"></i>1</span></div>
+                  <button class="mini-button summary-expand" id="expandButton"><span>展开核对</span><i data-lucide="chevron-down" class="icon"></i></button>
+                </div>
+                <div class="context-drawer" id="contextDrawer"></div>
+                <div class="editor" contenteditable="true" spellcheck="false" data-placeholder="Ask anything...">修复这个问题，保持现有交互不变，并增加覆盖浏览器缩放场景的测试。</div>
+              </div>
+
+              <footer class="composer-footer">
+                <div class="footer-group">
+                  <button class="mini-button" id="addButton"><i data-lucide="plus" class="icon"></i>添加上下文</button>
+                  <button class="mini-button"><i data-lucide="shield-check" class="icon"></i>完全访问<i data-lucide="chevron-down" class="icon"></i></button>
+                </div>
+                <div class="footer-group"><button class="mini-button">GPT-5.5 <i data-lucide="chevron-down" class="icon"></i></button><button class="send" id="sendButton" aria-label="发送"><i data-lucide="arrow-up" class="icon"></i></button></div>
+              </footer>
+              <div class="add-menu" id="addMenu">
+                <div class="add-menu-head">ADD CONTEXT</div>
+                <button class="add-option" data-add="file"><i><i data-lucide="file-code-2" class="icon"></i></i><span><b>选择文件或代码范围</b><small>关联 path、行号、选区与注释</small></span></button>
+                <button class="add-option" data-add="browser"><i><i data-lucide="mouse-pointer-click" class="icon"></i></i><span><b>选择浏览器元素</b><small>关联 URL、DOM 路径和页面快照</small></span></button>
+                <button class="add-option" data-add="text"><i><i data-lucide="text-quote" class="icon"></i></i><span><b>粘贴或引用文本</b><small>关联来源消息与原始选文</small></span></button>
+              </div>
+            </section>
+            <p class="hint">Hover 查看详情 · 点击 × 移除 · Backspace 可整体删除行内上下文</p>
+          </div>
+        </div>
+
+        <aside class="api-panel" id="apiPanel">
+          <header><span>Extension API Playground</span><button class="mini-button" id="closeApi"><i data-lucide="x" class="icon"></i></button></header>
+          <pre>promptContext.insert({
+  type: "browser",
+  label: "Checkout submit button",
+  source: { extensionId: "browser" },
+  payload: { url, selector, snapshot }
+})</pre>
+          <button class="button primary" id="insertApi"><i data-lucide="plus" class="icon"></i>插入到当前输入</button>
+        </aside>
+      </section>
+    </main>
+
+    <div class="tooltip" id="tooltip" role="tooltip"></div>
+    <div class="toast" id="toast" role="status"></div>
+
+    <script>
+      const contextSeed = [
+        { id: "file", type: "file", icon: "file-code-2", label: "session-item.tsx · L287", title: "代码注释", meta: "packages/app/src/renderer/pages/workspace/sessions/session-item.tsx", preview: "右 287\n\n右键菜单在缩放后偏离锚点，请检查坐标系。", source: "Artifact · 2 分钟前" },
+        { id: "browser", type: "browser", icon: "mouse-pointer-click", label: "浏览器选中元素", title: "Button · More actions", meta: "http://localhost:5173/workspace · button[data-menu-trigger]", preview: "元素尺寸 28 × 28\nViewport 1440 × 900 · zoom 125%", source: "Browser · 刚刚" },
+        { id: "text", type: "text", icon: "text-quote", label: "1 个已选文本片段", title: "对话选文", meta: "Assistant message · turn_018", preview: "锚点坐标来自 getBoundingClientRect，但浮层挂载到缩放后的容器。", source: "Chat · 1 分钟前" }
+      ];
+      let contexts = structuredClone(contextSeed);
+      let currentView = "strip";
+      const $ = (selector) => document.querySelector(selector);
+      const $$ = (selector) => [...document.querySelectorAll(selector)];
+      const iconHtml = (name) => `<i data-lucide="${name}" class="icon"></i>`;
+
+      function refreshIcons() { if (window.lucide) lucide.createIcons(); }
+      function contextChip(item, removable = true) {
+        return `<span class="context-chip context-target" data-id="${item.id}" data-type="${item.type}">${iconHtml(item.icon)}<span class="label">${item.label}</span>${removable ? `<button class="chip-remove" data-remove="${item.id}" aria-label="移除 ${item.label}">${iconHtml("x")}</button>` : ""}</span>`;
+      }
+      function render() {
+        $("#stripContexts").innerHTML = contexts.length ? contexts.map((item) => contextChip(item)).join("") : `<span style="color:var(--muted-foreground);font-size:11px">暂无补充上下文</span>`;
+        $("#contextDrawer").innerHTML = contexts.map((item) => `<article class="drawer-card context-target" data-id="${item.id}"><header>${iconHtml(item.icon)}<span>${item.label}</span><button class="chip-remove" data-remove="${item.id}" style="margin-left:auto">${iconHtml("x")}</button></header><p>${item.meta}</p></article>`).join("");
+        $("#hybridCount").textContent = `${contexts.length} 个上下文`;
+        refreshIcons();
+      }
+      function showToast(message) {
+        const toast = $("#toast"); toast.textContent = message; toast.classList.add("visible");
+        clearTimeout(showToast.timer); showToast.timer = setTimeout(() => toast.classList.remove("visible"), 2200);
+      }
+      function switchView(view) {
+        currentView = view;
+        $$(".variant-button").forEach((button) => button.classList.toggle("active", button.dataset.view === view));
+        $$(".view").forEach((panel) => panel.classList.toggle("active", panel.id === `view-${view}`));
+        $$(".sent-view").forEach((panel) => panel.classList.toggle("active", panel.dataset.sentView === view));
+        $(".hint").textContent = view === "inline" ? "行内块参与光标移动 · 单击选中 · Backspace 整体删除" : "Hover 查看详情 · 点击 × 移除 · 上下文不污染可编辑指令文本";
+      }
+      function addContext(type, fromApi = false) {
+        const base = type === "file"
+          ? { type, icon: "file-code-2", label: "use-chat-editor.ts · L73", title: "文件选区", meta: "packages/app/src/renderer/pages/workspace/chat/use-chat-editor.ts", preview: "extensions 数组与 TipTap node 注册位置。", source: "Artifact · 刚刚" }
+          : type === "browser"
+            ? { type, icon: "mouse-pointer-click", label: fromApi ? "Checkout submit button" : "新选中的页面元素", title: "Browser element", meta: "http://localhost:5173/checkout · button[type=submit]", preview: "可见文本：提交订单\n状态：enabled · visible", source: fromApi ? "Extension API · browser" : "Browser · 刚刚" }
+            : { type, icon: "text-quote", label: "新引用的文本片段", title: "对话选文", meta: "User message · current session", preview: "作为补充上下文插入的原始选文。", source: "Chat · 刚刚" };
+        base.id = `${type}-${Date.now()}`;
+        contexts.push(base);
+        if (currentView === "inline") {
+          const node = document.createElement("span");
+          node.className = "inline-context context-target"; node.contentEditable = "false"; node.dataset.id = base.id; node.dataset.type = base.type;
+          node.innerHTML = `${iconHtml(base.icon)}<span class="label">${base.label}</span>`;
+          $("#inlineEditor").append(" ", node, " "); refreshIcons();
+        }
+        render(); $("#addMenu").classList.remove("open"); showToast(fromApi ? "Extension 已插入 1 条浏览器上下文" : "已添加上下文");
+      }
+      function removeContext(id) { contexts = contexts.filter((item) => item.id !== id); document.querySelectorAll(`[data-id="${id}"]`).forEach((node) => node.remove()); render(); showToast("已移除上下文"); }
+
+      document.addEventListener("click", (event) => {
+        const variant = event.target.closest(".variant-button"); if (variant) switchView(variant.dataset.view);
+        const remove = event.target.closest("[data-remove]"); if (remove) { event.stopPropagation(); removeContext(remove.dataset.remove); }
+        const option = event.target.closest("[data-add]"); if (option) addContext(option.dataset.add);
+        const inline = event.target.closest(".inline-context"); if (inline) { $$(".inline-context").forEach((n) => n.classList.remove("selected")); inline.classList.add("selected"); }
+        if (!event.target.closest("#addMenu") && !event.target.closest("#addButton")) $("#addMenu").classList.remove("open");
+      });
+      document.addEventListener("mouseover", (event) => {
+        const target = event.target.closest(".context-target"); if (!target) return;
+        const item = contexts.find((entry) => entry.id === target.dataset.id) || contextSeed.find((entry) => entry.id === target.dataset.id); if (!item) return;
+        const tooltip = $("#tooltip"); tooltip.innerHTML = `<div class="tooltip-head">${iconHtml(item.icon)}${item.title}</div><div class="tooltip-meta">${item.meta}</div><div class="tooltip-preview">${item.preview}</div><div class="tooltip-foot"><span>${item.source}</span><span>随 prompt 提交</span></div>`;
+        const rect = target.getBoundingClientRect(); const left = Math.min(rect.left, innerWidth - 360); const top = rect.top > 220 ? rect.top - 12 : rect.bottom + 12;
+        tooltip.style.left = `${Math.max(10, left)}px`; tooltip.style.top = `${top}px`; tooltip.style.transform = rect.top > 220 ? "translateY(-100%)" : "none"; tooltip.classList.add("visible"); refreshIcons();
+      });
+      document.addEventListener("mouseout", (event) => { if (event.target.closest(".context-target")) $("#tooltip").classList.remove("visible"); });
+      $("#inlineEditor").addEventListener("keydown", (event) => { if ((event.key === "Backspace" || event.key === "Delete") && $(".inline-context.selected")) { event.preventDefault(); const node = $(".inline-context.selected"); removeContext(node.dataset.id); } });
+      $("#addButton").onclick = () => $("#addMenu").classList.toggle("open");
+      $("#expandButton").onclick = () => { const open = $("#contextDrawer").classList.toggle("open"); $("#expandButton span").textContent = open ? "收起" : "展开核对"; };
+      $("#apiButton").onclick = () => $("#apiPanel").classList.add("open");
+      $("#closeApi").onclick = () => $("#apiPanel").classList.remove("open");
+      $("#insertApi").onclick = () => { addContext("browser", true); $("#apiPanel").classList.remove("open"); };
+      $("#sentContextToggle").onclick = () => {
+        const open = $("#sentContextList").classList.toggle("open");
+        $("#sentContextToggle span").textContent = open ? "收起" : "展开";
+        $("#sentContextToggle [data-lucide]").setAttribute("data-lucide", open ? "chevron-up" : "chevron-down");
+        refreshIcons();
+      };
+      $("#copyPromptButton").onclick = () => showToast("已复制用户指令；上下文未包含在剪贴板中");
+      $("#themeButton").onclick = () => { const dark = document.documentElement.dataset.theme === "dark"; document.documentElement.dataset.theme = dark ? "light" : "dark"; $("#themeButton").innerHTML = `${iconHtml(dark ? "moon" : "sun")}切换主题`; refreshIcons(); };
+      $("#resetButton").onclick = () => { contexts = structuredClone(contextSeed); $("#contextDrawer").classList.remove("open"); render(); switchView("strip"); showToast("原型状态已重置"); };
+      $("#sendButton").onclick = () => showToast(`已提交指令与 ${contexts.length} 条结构化上下文`);
+      render(); refreshIcons();
+    </script>
+  </body>
+</html>
