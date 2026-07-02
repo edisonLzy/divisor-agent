@@ -2,7 +2,7 @@
 
 > 状态：当前生产 UI 的设计基线<br>
 > 适用范围：Electron Renderer、Workspace、Session、Chat、Artifact、Settings、Dialog、Toast 及后续新增功能<br>
-> 设计原型：`prototypes/electron-variant-01-split-context-bars.html`<br>
+> 设计原型：`docs/原型/electron-variant-01-split-context-bars.html`<br>
 > 样式真相源：`packages/app/src/renderer/index.css`
 
 ## 1. 设计目标
@@ -350,7 +350,7 @@ pnpm format:check
 | Composer            | `packages/app/src/renderer/pages/workspace/chat/prompt-input/index.tsx` |
 | Settings            | `packages/app/src/renderer/pages/settings/`                             |
 | Electron 窗口配置   | `packages/app/src/main/index.ts`                                        |
-| 原型基线            | `prototypes/electron-variant-01-split-context-bars.html`                |
+| 原型基线            | `docs/原型/electron-variant-01-split-context-bars.html`                 |
 
 ## 11. 决策优先级
 

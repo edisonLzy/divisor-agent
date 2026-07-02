@@ -1,7 +1,7 @@
 # Design QA — Electron Scheme 01: Split Context Bars
 
 - source visual truth path: `.design-evidence/raft/prototype-desktop.png`
-- selected structure/spec path: `prototypes/electron-variant-01-split-context-bars.html`
+- selected structure/spec path: `docs/原型/electron-variant-01-split-context-bars.html`
 - implementation screenshots:
   - `/tmp/divisor-scheme1-active-artifact-light-stable.png`
   - `/tmp/divisor-scheme1-settings-dark.png`
