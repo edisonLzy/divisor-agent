@@ -1,6 +1,11 @@
 import type { AgentEvent } from "@earendil-works/pi-agent-core";
 
-import type { BrowserArtifactIPC, BrowserStateChangedEvent } from "./browser-artifact-ipc";
+import type {
+  BrowserArtifactIPC,
+  BrowserScreenshotUpdatedEvent,
+  BrowserStateChangedEvent,
+  BrowserTabChangedEvent,
+} from "./browser-artifact-ipc";
 import type { FileSystemIPC } from "./file-system-ipc";
 import type { AgentModelsIPC } from "./models-ipc";
 import type { PermissionRequestedEvent } from "./permissions-ipc";
@@ -10,7 +15,12 @@ import type { SystemIPC } from "./system-ipc";
 
 export type AgentSessionScope = "main" | "side-chat";
 type SessionTagged<T> = T & { scope: AgentSessionScope; sessionId: string };
-type AgentRuntimeEvent = AgentEvent | PermissionRequestedEvent | BrowserStateChangedEvent;
+type AgentRuntimeEvent =
+  | AgentEvent
+  | PermissionRequestedEvent
+  | BrowserStateChangedEvent
+  | BrowserTabChangedEvent
+  | BrowserScreenshotUpdatedEvent;
 
 // main -> renderer events. These are verified at compile-time to be a subset of the
 export const ALLOWED_MAIN_EXPOSE_EVENTS: AgentRuntimeEvent["type"][] = [
@@ -26,6 +36,8 @@ export const ALLOWED_MAIN_EXPOSE_EVENTS: AgentRuntimeEvent["type"][] = [
   "tool_execution_end",
   "permission_requested",
   "browser_state_changed",
+  "browser_tab_changed",
+  "browser_screenshot_updated",
 ];
 
 /**
@@ -71,6 +83,16 @@ export const ALLOWED_RENDER_INVOKE_EVENTS: (keyof AgentRuntimeIPC)[] = [
   "browserReload",
   "browserCaptureForAnnotation",
   "browserSetVisible",
+  "browserSetMode",
+  "browserObserve",
+  "browserDispatch",
+  "browserOpenTab",
+  "browserSwitchTab",
+  "browserCloseTab",
+  "browserListTabs",
+  "browserRegisterArtifact",
+  "browserUnregisterArtifact",
+  "browserUpdateAllowlist",
   "fsReadTextFile",
   "isWindowFullScreen",
 ];

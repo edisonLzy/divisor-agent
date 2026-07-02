@@ -1,5 +1,6 @@
 import { useExtensionRegistry } from "@divisor-agent/extension-core/renderer";
 import { Shimmer } from "@renderer/components/ai-elements/shimmer";
+import { BrowserActionBlock } from "@renderer/components/browser/browser-action-block";
 import {
   Collapsible,
   CollapsibleContent,
@@ -46,6 +47,10 @@ export function AssistantToolMessage({
   const blockRegistration = assistantBlock ? registry.getAssistantBlock(assistantBlock.type) : null;
   const Block = blockRegistration?.render;
 
+  // Built-in fallback: browser tools render via `BrowserActionBlock`. Extension
+  // registrations still win via the registry above.
+  const isBuiltInBrowserAction = assistantBlock?.type === "browser_action";
+
   return (
     <div className="flex flex-col gap-2">
       {Block && assistantBlock ? (
@@ -55,6 +60,17 @@ export function AssistantToolMessage({
             sessionId,
           }}
           raw={JSON.stringify(assistantBlock)}
+        />
+      ) : isBuiltInBrowserAction && assistantBlock ? (
+        <BrowserActionBlock
+          a11yText={assistantBlock.props.a11yText as string | undefined}
+          action={assistantBlock.props.action as string | undefined}
+          ref={assistantBlock.props.ref as string | undefined}
+          screenshotDataUrl={assistantBlock.props.screenshotDataUrl as string | undefined}
+          sessionId={sessionId}
+          text={assistantBlock.props.text as string | undefined}
+          title={assistantBlock.props.title as string | undefined}
+          url={assistantBlock.props.url as string | undefined}
         />
       ) : null}
 

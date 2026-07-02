@@ -1,5 +1,7 @@
 import type { AppUserMessage } from "@earendil-works/pi-agent-core";
 import { Button } from "@renderer/components/ui/button";
+import { BrowserModeBar } from "@renderer/components/browser/browser-mode-bar";
+import { BrowserTabBar } from "@renderer/components/browser/browser-tab-bar";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { createTextDocument } from "@renderer/lib/rich-text";
 import { cn } from "@renderer/lib/utils";
@@ -9,6 +11,10 @@ import type {
   BrowserArtifactContent,
   BrowserState,
   BrowserStateChangedEvent,
+  BrowserTabChangedEvent,
+  ControlMode,
+  Observation,
+  TabInfo,
 } from "@shared/browser-artifact-ipc";
 import {
   ArrowLeft,
@@ -60,6 +66,9 @@ export function BrowserArtifact({ artifactId, content, sessionId }: BrowserArtif
   const [composerExpanded, setComposerExpanded] = useState(false);
   const [comment, setComment] = useState("");
   const [isSent, setIsSent] = useState(false);
+  const [tabs, setTabs] = useState<TabInfo[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [controlMode, setControlMode] = useState<ControlMode>("agent");
   const activeSession = useStore(mainStore, (state) => state.getSession(sessionId));
   const selectedTarget = selectedTargetIndex !== null ? targets[selectedTargetIndex] : null;
   const hoveredTarget = targets[hoveredTargetIndex] ?? targets[0] ?? null;
@@ -96,9 +105,38 @@ export function BrowserArtifact({ artifactId, content, sessionId }: BrowserArtif
         url: event.url,
       });
       setAddress((current) => (current === event.url ? current : event.url));
+      if (event.mode) setControlMode(event.mode);
     });
     return off;
   }, [artifactId, on, sessionId]);
+
+  // Phase C: subscribe to multi-tab changes and screenshot updates.
+  useEffect(() => {
+    const offTabs = on("browser_tab_changed", (event: BrowserTabChangedEvent) => {
+      if (event.sessionId !== sessionId || event.artifactId !== artifactId) return;
+      setTabs(event.tabs);
+      setActiveTabId(event.activeTabId);
+    });
+    const offScreenshot = on(
+      "browser_screenshot_updated",
+      (event: { sessionId: string; artifactId: string; tabId: string; screenshotDataUrl: string }) => {
+        if (event.sessionId !== sessionId || event.artifactId !== artifactId) return;
+        const win = window as unknown as { __browserLatestObservation?: Observation };
+        win.__browserLatestObservation = {
+          a11yText: "",
+          capturedAt: Date.now(),
+          refMap: {},
+          screenshotDataUrl: event.screenshotDataUrl,
+          title: browserState.title,
+          url: browserState.url,
+        };
+      },
+    );
+    return () => {
+      offTabs();
+      offScreenshot();
+    };
+  }, [artifactId, browserState.title, browserState.url, on, sessionId]);
 
   useLayoutEffect(() => {
     const stage = stageRef.current;
@@ -299,6 +337,7 @@ export function BrowserArtifact({ artifactId, content, sessionId }: BrowserArtif
         </form>
 
         <div className="flex items-center gap-1">
+          <BrowserModeBar artifactId={artifactId} mode={controlMode} sessionId={sessionId} />
           <Button
             type="button"
             variant={mode === "selecting" ? "secondary" : "ghost"}
@@ -319,6 +358,25 @@ export function BrowserArtifact({ artifactId, content, sessionId }: BrowserArtif
           </Button>
         </div>
       </div>
+
+      {tabs.length > 1 || tabs.length === 0 ? null : null}
+      {tabs.length > 0 ? (
+        <div className="flex shrink-0 items-center gap-1 border-b border-border/70 bg-card/40 px-2 py-1">
+          <BrowserTabBar
+            activeTabId={activeTabId ?? undefined}
+            artifactId={artifactId}
+            sessionId={sessionId}
+            tabs={tabs}
+          />
+        </div>
+      ) : null}
+
+      {controlMode === "user" ? (
+        <div className="flex shrink-0 items-center gap-2 border-b border-amber-300/40 bg-amber-300/10 px-2 py-1 text-xs text-amber-100">
+          <span>⚠︎</span>
+          <span>Agent paused — sensitive site or you took over. Drive the page manually.</span>
+        </div>
+      ) : null}
 
       <div ref={stageRef} className="relative min-h-0 flex-1 overflow-hidden bg-[#0d0d0d]">
         {mode !== "browse" && captureDataUrl ? (
