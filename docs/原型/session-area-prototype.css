@@ -438,7 +438,7 @@ textarea:focus-visible {
   transform: translateY(-50%);
 }
 
-.session-row:not(:hover):not(:focus-within):not(.is-active) .row-actions,
+.session-row:not(:hover):not(:focus-within):not(.is-active):not(.is-confirming) .row-actions,
 .workspace-row:not(:hover):not(:focus-within) .row-actions {
   visibility: hidden;
   opacity: 0;
@@ -447,9 +447,16 @@ textarea:focus-visible {
 .session-row:hover .row-time,
 .session-row:focus-within .row-time,
 .session-row.is-active .row-time,
+.session-row.is-confirming .row-time,
 .workspace-row:hover .row-time,
 .workspace-row:focus-within .row-time {
   display: none;
+}
+
+.workspace-row:hover .workspace-count,
+.workspace-row:focus-within .workspace-count {
+  visibility: hidden;
+  opacity: 0;
 }
 
 .row-actions {
@@ -457,6 +464,7 @@ textarea:focus-visible {
 }
 
 .row-action {
+  flex: 0 0 auto;
   min-height: 27px;
   border: 1px solid var(--line-soft);
   border-radius: 4px;
@@ -465,6 +473,7 @@ textarea:focus-visible {
   color: var(--muted);
   font-size: 10px;
   font-weight: 750;
+  white-space: nowrap;
 }
 
 .row-action:hover {
@@ -476,6 +485,22 @@ textarea:focus-visible {
 .row-action.danger:hover {
   background: var(--danger);
   color: #fff;
+}
+
+.row-action.confirm-danger {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: #fff;
+  transition: filter 120ms ease;
+}
+
+.row-action.confirm-danger:hover,
+.row-action.confirm-danger:focus-visible {
+  filter: brightness(0.82);
+}
+
+.row-action.confirm-danger:active {
+  filter: brightness(0.72);
 }
 
 .workspace-row.is-open {
@@ -955,13 +980,18 @@ body[data-variant="balanced"] {
   font-size: 10px;
 }
 
-[data-variant="balanced"] .row-trailing {
-  min-width: 58px;
+[data-variant="balanced"] .session-row .row-trailing {
+  min-width: 96px;
+  margin-left: 6px;
+}
+
+[data-variant="balanced"] .workspace-row .row-trailing {
+  min-width: 132px;
   margin-left: 6px;
 }
 
 [data-variant="balanced"] .row-time {
-  font: 10px var(--mono);
+  display: none;
 }
 
 [data-variant="balanced"] .workspace-row {
@@ -1048,6 +1078,12 @@ body[data-variant="compact"] {
 
 [data-variant="compact"] .status {
   font-size: 9px;
+}
+
+[data-variant="compact"] .session-row:hover .session-meta,
+[data-variant="compact"] .session-row:focus-within .session-meta,
+[data-variant="compact"] .session-row.is-active .session-meta {
+  visibility: hidden;
 }
 
 [data-variant="compact"] .row-trailing {

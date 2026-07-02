@@ -11,12 +11,18 @@ const buttonVariants = cva(
           "border-border bg-primary text-primary-foreground shadow-[var(--hard-shadow-sm)] hover:translate-x-px hover:translate-y-px hover:shadow-none",
         outline:
           "border-border bg-background text-foreground shadow-[var(--hard-shadow-sm)] hover:translate-x-px hover:translate-y-px hover:bg-accent hover:text-accent-foreground hover:shadow-none aria-expanded:bg-accent aria-expanded:text-accent-foreground",
+        "outline-flat":
+          "border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground active:translate-x-0 active:translate-y-0",
         secondary:
           "border-border bg-secondary text-secondary-foreground shadow-[var(--hard-shadow-sm)] hover:translate-x-px hover:translate-y-px hover:bg-accent hover:text-accent-foreground hover:shadow-none aria-expanded:bg-accent aria-expanded:text-accent-foreground",
         ghost:
           "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
         destructive:
           "border-border bg-destructive text-white shadow-[var(--hard-shadow-sm)] hover:translate-x-px hover:translate-y-px hover:shadow-none focus-visible:border-destructive focus-visible:ring-destructive/30",
+        "destructive-flat":
+          "border-destructive bg-destructive text-white hover:brightness-90 active:translate-x-0 active:translate-y-0 active:brightness-80 focus-visible:border-destructive focus-visible:ring-destructive/30",
+        "destructive-outline":
+          "border-border bg-background text-muted-foreground hover:border-destructive hover:bg-destructive hover:text-white active:translate-x-0 active:translate-y-0 focus-visible:border-destructive focus-visible:ring-destructive/30",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {

@@ -166,6 +166,7 @@
     data: cloneInitialData(),
     activeSessionId: "style",
     loadingSessionId: null,
+    pendingDeleteSessionId: null,
     collapsedGroups: new Set(),
     recentVisible: variant === "compact" ? 5 : 3,
     workspaceVisible: {},
@@ -261,10 +262,11 @@
   function renderSession(session, { recent = false } = {}) {
     const isActive = session.id === state.activeSessionId;
     const isLoading = session.id === state.loadingSessionId;
+    const isConfirmingDelete = session.id === state.pendingDeleteSessionId;
     const status = isLoading ? "running" : session.status;
     const label = isLoading ? "载入中" : statusLabel(status);
     return `
-      <div class="session-row ${isActive ? "is-active" : ""} ${recent ? "recent-session" : ""}" data-session-id="${session.id}">
+      <div class="session-row ${isActive ? "is-active" : ""} ${isConfirmingDelete ? "is-confirming" : ""} ${recent ? "recent-session" : ""}" data-session-id="${session.id}">
         <button class="session-main" data-action="select-session" data-session-id="${session.id}" aria-current="${isActive ? "page" : "false"}">
           <span class="session-avatar tone-${session.tone}">${escapeHtml(session.initial)}</span>
           <span class="session-copy">
@@ -278,8 +280,13 @@
         <span class="row-trailing">
           <time class="row-time">${escapeHtml(session.relativeTime)}</time>
           <span class="row-actions">
-            <button class="row-action" data-action="toggle-session-pin" data-session-id="${session.id}" title="${session.isTop ? "取消置顶" : "置顶"}">${session.isTop ? "取消置顶" : "置顶"}</button>
-            <button class="row-action danger" data-action="delete-session" data-session-id="${session.id}" title="删除会话">删除</button>
+            ${
+              isConfirmingDelete
+                ? `<button class="row-action confirm-danger" data-action="confirm-delete-session" data-session-id="${session.id}" title="确认删除会话">确认删除</button>
+                   <button class="row-action" data-action="cancel-delete-session" data-session-id="${session.id}" title="取消删除">取消</button>`
+                : `<button class="row-action" data-action="toggle-session-pin" data-session-id="${session.id}" title="${session.isTop ? "取消置顶" : "置顶"}">${session.isTop ? "取消置顶" : "置顶"}</button>
+                   <button class="row-action danger" data-action="request-delete-session" data-session-id="${session.id}" title="删除会话">删除</button>`
+            }
           </span>
         </span>
       </div>`;
@@ -308,9 +315,9 @@
               <span class="workspace-title">${escapeHtml(workspace.name || "untitled")}</span>
               <span class="workspace-meta">${workspace.open ? "项目已展开" : "点击查看项目内对话"}</span>
             </span>
-            <span class="workspace-count">${workspace.sessions.length}</span>
           </button>
           <span class="row-trailing">
+            <span class="workspace-count">${workspace.sessions.length}</span>
             <span class="row-actions">
               <button class="row-action" data-action="toggle-workspace-pin" data-workspace-id="${workspace.id}">${workspace.isTop ? "取消置顶" : "置顶"}</button>
               <button class="row-action" data-action="new-workspace-session" data-workspace-id="${workspace.id}">新建</button>
@@ -391,6 +398,7 @@
   function selectSession(id) {
     const session = findSession(id);
     if (!session || state.loadingSessionId === id) return;
+    if (state.pendingDeleteSessionId !== id) state.pendingDeleteSessionId = null;
     state.loadingSessionId = id;
     addEvent(`getSessionEntries(${id})`);
     render();
@@ -420,8 +428,21 @@
       workspace.sessions = workspace.sessions.filter((item) => item.id !== id);
     });
     if (state.activeSessionId === id) state.activeSessionId = null;
+    state.pendingDeleteSessionId = null;
     addEvent(`deleteSession(${id}) → invalidateQueries`);
     notify(`已删除「${session.name}」`, "danger");
+    render();
+  }
+
+  function requestDeleteSession(id) {
+    if (!findSession(id)) return;
+    state.pendingDeleteSessionId = id;
+    render();
+  }
+
+  function cancelDeleteSession(id) {
+    if (state.pendingDeleteSessionId !== id) return;
+    state.pendingDeleteSessionId = null;
     render();
   }
 
@@ -530,6 +551,7 @@
     state.data = cloneInitialData();
     state.activeSessionId = "style";
     state.loadingSessionId = null;
+    state.pendingDeleteSessionId = null;
     state.collapsedGroups.clear();
     state.recentVisible = variant === "compact" ? 5 : 3;
     state.workspaceVisible = {};
@@ -540,12 +562,20 @@
 
   document.addEventListener("click", (event) => {
     const target = event.target.closest("[data-action]");
-    if (!target) return;
+    if (!target) {
+      if (state.pendingDeleteSessionId) {
+        state.pendingDeleteSessionId = null;
+        render();
+      }
+      return;
+    }
     const action = target.dataset.action;
 
     if (action === "select-session") selectSession(target.dataset.sessionId);
     if (action === "toggle-session-pin") toggleSessionPin(target.dataset.sessionId);
-    if (action === "delete-session") deleteSession(target.dataset.sessionId);
+    if (action === "request-delete-session") requestDeleteSession(target.dataset.sessionId);
+    if (action === "confirm-delete-session") deleteSession(target.dataset.sessionId);
+    if (action === "cancel-delete-session") cancelDeleteSession(target.dataset.sessionId);
     if (action === "toggle-workspace") toggleWorkspace(target.dataset.workspaceId);
     if (action === "toggle-workspace-pin") toggleWorkspacePin(target.dataset.workspaceId);
     if (action === "new-workspace-session") newSession(target.dataset.workspaceId);
@@ -607,6 +637,10 @@
       newSession();
     }
     if (event.key === "Escape" && state.modal) closeModal();
+    else if (event.key === "Escape" && state.pendingDeleteSessionId) {
+      state.pendingDeleteSessionId = null;
+      render();
+    }
   });
 
   els.modal.addEventListener("click", (event) => {
