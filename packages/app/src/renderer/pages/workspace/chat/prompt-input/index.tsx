@@ -13,11 +13,11 @@ import { useCallback, useEffect, useRef } from "react";
 
 import { INSERT_PROMPT_TEXT_EVENT } from "../prompt-insert-event";
 import type { PromptSubmission } from "../prompt-types";
-import { useChatEditor } from "../use-chat-editor";
+import { useChatEditor, UseChatEditorOptions } from "../use-chat-editor";
 import { ModalSelector, useModalSelector } from "./modal-selector";
 import { PermissionSelector, usePermissionSelector } from "./permission-selector";
 
-interface PromptInputProps {
+export interface PromptInputProps extends Pick<UseChatEditorOptions, "onCreate" | "onDestroy"> {
   disabled?: boolean;
   isRunning?: boolean;
   initialModel?: AvailableModel | null;
@@ -36,6 +36,8 @@ export function PromptInput({
   onSteer,
   onFollowUp,
   onStop,
+  onCreate,
+  onDestroy,
   sessionId,
 }: PromptInputProps) {
   const modelSelectorProps = useModalSelector(initialModel);
@@ -49,6 +51,8 @@ export function PromptInput({
     // can type steer/follow-up prompts while the agent is processing.
     disabled,
     getFloatingReference: () => editorContainerRef.current,
+    onCreate,
+    onDestroy,
   });
 
   useEffect(() => {

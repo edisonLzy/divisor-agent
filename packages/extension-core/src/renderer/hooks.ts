@@ -1,4 +1,5 @@
 import type { AnyExtensionIPCFunction } from "../common/ipc/index.js";
+import { useExtensionsContextAPI } from "./contextAPI.js";
 import type { RendererExtensionIPC } from "./ipc.js";
 import { useExtensionRegistry } from "./provider";
 
@@ -48,4 +49,9 @@ export function createExtensionIPC<
   return function useExtensionIPC() {
     return client;
   };
+}
+
+export function useSharedPromptEditor() {
+  const api = useExtensionsContextAPI();
+  return api.sharedPromptEditor;
 }

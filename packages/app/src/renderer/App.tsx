@@ -1,6 +1,7 @@
 import {
   ExtensionProvider,
   ExtensionsContextAPIProvider,
+  SharedPromptEditor,
   type ExtensionsContextAPI,
 } from "@divisor-agent/extension-core/renderer";
 import type { AppUserMessage } from "@earendil-works/pi-agent-core";
@@ -125,6 +126,7 @@ export function App() {
           ...entries.slice(insertIndex),
         ]);
       },
+      sharedPromptEditor: SharedPromptEditor.create(),
     }),
     [],
   );

@@ -7,7 +7,7 @@ import {
 import { insertSkillNode, skillNode } from "@renderer/components/richtext/inline/skill-node";
 import type { CommandItem } from "@renderer/components/richtext/types";
 import { useAgentSkills } from "@renderer/hooks/use-agent-skills";
-import type { JSONContent } from "@tiptap/core";
+import type { EditorOptions, JSONContent } from "@tiptap/core";
 import Placeholder from "@tiptap/extension-placeholder";
 import { useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -17,13 +17,21 @@ interface VirtualElement {
   getBoundingClientRect: () => DOMRect;
 }
 
-interface UseChatEditorOptions {
+export interface UseChatEditorOptions {
   content?: JSONContent;
   disabled: boolean;
+  onCreate?: EditorOptions["onCreate"];
+  onDestroy?: EditorOptions["onDestroy"];
   getFloatingReference?: () => Element | VirtualElement | null;
 }
 
-export function useChatEditor({ content, disabled, getFloatingReference }: UseChatEditorOptions) {
+export function useChatEditor({
+  content,
+  disabled,
+  onCreate: onCreateFromUser,
+  onDestroy: onDestroyFromUser,
+  getFloatingReference,
+}: UseChatEditorOptions) {
   const [hasContent, setHasContent] = useState(false);
 
   const skillItems = useSkillsCommandItems();
@@ -100,7 +108,11 @@ export function useChatEditor({ content, disabled, getFloatingReference }: UseCh
       },
       editable: !disabled,
       onCreate: ({ editor: nextEditor }) => {
+        onCreateFromUser?.({ editor: nextEditor });
         setHasContent(nextEditor.getText().trim().length > 0);
+      },
+      onDestroy: () => {
+        onDestroyFromUser?.();
       },
       onUpdate: ({ editor: nextEditor }) => {
         setHasContent(nextEditor.getText().trim().length > 0);
