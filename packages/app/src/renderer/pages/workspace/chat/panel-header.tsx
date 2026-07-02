@@ -5,43 +5,44 @@ interface PanelHeaderProps {
   children: ReactNode;
   className?: string;
   dragRegion?: boolean;
-  insetForWindowControls?: boolean;
+  windowControls?: "left" | "right" | "both" | "none";
 }
 
 interface FixedActionsProps {
   children: ReactNode;
   className?: string;
+  reserveWindowControls?: boolean;
 }
 
 export function PanelHeader({
   children,
   className,
   dragRegion = false,
-  insetForWindowControls = false,
+  windowControls = "none",
 }: PanelHeaderProps) {
   return (
     <header
       className={cn(
-        "relative flex min-h-10 shrink-0 items-center border-b border-border/70 px-4 py-1 pr-14",
+        "relative flex h-12 shrink-0 items-center gap-2 border-b-2 border-border bg-card px-3 py-1 pr-14",
         dragRegion && "app-drag-region",
-        insetForWindowControls && "pl-28",
+        (windowControls === "left" || windowControls === "both") &&
+          "pl-[calc(var(--window-controls-left)+0.75rem)]",
+        (windowControls === "right" || windowControls === "both") &&
+          "pr-[calc(var(--window-controls-right)+0.75rem)]",
         className,
       )}
     >
-      {dragRegion && insetForWindowControls ? (
-        // Carve out the global sidebar toggle area from Electron's native drag region.
-        <span aria-hidden className="app-no-drag absolute top-0 bottom-0 left-0 z-10 w-32" />
-      ) : null}
       {children}
     </header>
   );
 }
 
-export function FixedActions({ children, className }: FixedActionsProps) {
+export function FixedActions({ children, className, reserveWindowControls }: FixedActionsProps) {
   return (
     <div
       className={cn(
-        "app-no-drag pointer-events-none absolute right-3 top-1.5 z-50 flex h-7 items-center gap-2 [&>*]:pointer-events-auto",
+        "app-no-drag pointer-events-none absolute top-2 right-3 z-50 flex h-8 items-center gap-2 [&>*]:pointer-events-auto",
+        reserveWindowControls && "right-[calc(var(--window-controls-right)+0.75rem)]",
         className,
       )}
       style={{ WebkitAppRegion: "no-drag" } as CSSProperties}

@@ -61,6 +61,7 @@ export const ALLOWED_RENDER_INVOKE_EVENTS: (keyof AgentRuntimeIPC)[] = [
   "setSkillEnabled",
   "fsReadTextFile",
   "isWindowFullScreen",
+  "setWindowControlsTheme",
 ];
 
 export type AllowedRenderInvokeEvents = (typeof ALLOWED_RENDER_INVOKE_EVENTS)[number];

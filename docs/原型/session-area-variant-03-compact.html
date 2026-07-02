@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
+    <title>Session Area · Variant 03 · Compact</title>
+    <link rel="stylesheet" href="./session-area-prototype.css" />
+  </head>
+  <body data-variant="compact">
+    <header class="prototype-bar">
+      <strong>SESSION AREA / 高密度效率型</strong><span class="variant-code">VARIANT 03</span>
+      <nav class="prototype-actions" aria-label="原型操作">
+        <a class="prototype-button" href="./session-area-variants-index.html">变体总览</a>
+        <button class="prototype-button" data-action="toggle-theme">切换浅色</button>
+        <button class="prototype-button" data-action="reset">重置状态</button>
+      </nav>
+    </header>
+
+    <main class="prototype-stage">
+      <section class="sidebar-shell" aria-label="Session 区域交互原型">
+        <aside class="session-sidebar">
+          <header class="sidebar-topbar">
+            <button class="new-chat-button" data-action="new-session">
+              <span>新对话</span><kbd>⌘ N</kbd>
+            </button>
+          </header>
+          <div class="sidebar-scroll"><div class="sidebar-content" id="sidebarContent"></div></div>
+          <footer class="sidebar-footer">
+            <button class="settings-button" data-action="settings">
+              <span>设置</span><span>应用级入口</span>
+            </button>
+          </footer>
+        </aside>
+      </section>
+
+      <aside class="prototype-panel">
+        <div class="prototype-panel-inner">
+          <span class="prototype-eyebrow">Power user · Maximum scan speed</span>
+          <h1>当 Session 数量很多时仍保持可扫描</h1>
+          <p class="prototype-lead">
+            一行承载标题、状态与相对时间，项目树缩进更浅，适合几十个会话的日常管理。它对现有实现改动最小，
+            但视觉上也最不像参考截图，适合作为效率优先的备选。
+          </p>
+          <section class="inspector-card">
+            <header class="inspector-head">当前会话状态 <span>RUNTIME PREVIEW</span></header>
+            <div class="inspector-body">
+              <div class="inspector-content">
+                <h2 class="selected-session-title" id="selectedSessionTitle"></h2>
+                <span class="status" id="selectedSessionStatus"></span>
+                <p class="selected-session-copy" id="selectedSessionCopy"></p>
+              </div>
+              <div class="event-log">
+                <strong>INTERACTION LOG</strong>
+                <div class="event-list" id="eventList"></div>
+              </div>
+            </div>
+          </section>
+          <section class="checklist-card">
+            <header class="checklist-head">功能覆盖 <span>SESSION-ITEM + WORKSPACE</span></header>
+            <div class="checklist-grid">
+              <div class="check-item">
+                <b>选择与历史恢复</b><small>载入态 → setSessionId → history 同步 → active。</small>
+              </div>
+              <div class="check-item">
+                <b>运行状态</b><small>空闲、执行中、已完成、失败四类状态。</small>
+              </div>
+              <div class="check-item">
+                <b>置顶与取消置顶</b><small>会话和项目均可在分组间移动。</small>
+              </div>
+              <div class="check-item">
+                <b>删除</b><small>会话即时删除；项目使用破坏性确认。</small>
+              </div>
+              <div class="check-item">
+                <b>项目操作</b><small>展开、收起、项目内新建会话、加载更多。</small>
+              </div>
+              <div class="check-item">
+                <b>列表状态</b><small>分组折叠、空状态、分页、相对时间和键盘焦点。</small>
+              </div>
+            </div>
+          </section>
+        </div>
+      </aside>
+    </main>
+
+    <div class="modal-backdrop" id="modalBackdrop" role="presentation">
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <header><h2 id="modalTitle"></h2></header>
+        <div class="modal-body" id="modalBody"></div>
+        <footer>
+          <button class="modal-button" data-action="modal-cancel">取消</button>
+          <button class="modal-button primary" id="modalConfirm">确认</button>
+        </footer>
+      </section>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite">
+      <span id="toastMessage"></span
+      ><button onclick="this.parentElement.classList.remove('is-visible')">关闭</button>
+    </div>
+    <script src="./session-area-prototype.js"></script>
+  </body>
+</html>

@@ -99,7 +99,7 @@ function SkillNodeView({ node }: NodeViewProps) {
     <NodeViewWrapper as="span" className="inline-flex" contentEditable={false}>
       <IconNode
         icon={<Wrench aria-hidden="true" />}
-        className="bg-amber-500/15 text-amber-700 dark:text-amber-200"
+        className="border border-border bg-signal-yellow text-accent-foreground"
       >
         {label}
       </IconNode>

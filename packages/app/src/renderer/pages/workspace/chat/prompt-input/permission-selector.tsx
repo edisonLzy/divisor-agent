@@ -64,7 +64,7 @@ export function PermissionSelector({ disabled = false, onChange, value }: Permis
       disabled={disabled}
     >
       <SelectTrigger
-        className="h-7 w-auto max-w-44 gap-1 rounded-sm border-none bg-transparent px-2 text-foreground shadow-none hover:bg-muted data-popup-open:bg-muted focus:ring-0"
+        className="h-7 w-auto max-w-44 gap-1 rounded-sm border-2 border-border bg-card px-2 text-foreground shadow-[var(--hard-shadow-sm)] hover:bg-accent data-popup-open:bg-accent focus:ring-0"
         aria-label="Select permission mode"
       >
         <SelectValue className="pointer-events-none min-w-0">
@@ -79,7 +79,7 @@ export function PermissionSelector({ disabled = false, onChange, value }: Permis
         align="end"
         alignItemWithTrigger={false}
         sideOffset={8}
-        className="w-max min-w-42 max-w-64 max-h-none overflow-hidden rounded-2xl border border-border/80 bg-popover/96 p-0 text-popover-foreground shadow-[0_18px_48px_rgb(15_23_42/0.16)] backdrop-blur-xl dark:shadow-[0_18px_48px_rgb(0_0_0/0.4)]"
+        className="max-h-none w-max min-w-42 max-w-64 overflow-hidden rounded-md border-2 border-border bg-popover p-0 text-popover-foreground shadow-[var(--hard-shadow)]"
       >
         <TooltipProvider delay={120}>
           <SelectGroup className="min-w-0 p-0">
@@ -92,12 +92,12 @@ export function PermissionSelector({ disabled = false, onChange, value }: Permis
                   key={option.value}
                   value={option.value}
                   className={cn(
-                    "mb-0.5 last:mb-0 w-full overflow-hidden rounded-lg border border-transparent px-3 py-2 text-foreground focus:bg-transparent focus:text-foreground",
+                    "mb-0.5 last:mb-0 w-full overflow-hidden rounded-sm border border-transparent px-3 py-2 text-foreground focus:bg-accent focus:text-accent-foreground",
                     isSelected && "text-foreground",
                   )}
                 >
                   <div className="flex min-w-0 flex-1 items-center gap-2.5 overflow-hidden pr-6">
-                    <span className="flex size-5 shrink-0 items-center justify-center rounded-lg bg-background/80 text-muted-foreground">
+                    <span className="flex size-5 shrink-0 items-center justify-center rounded-sm border border-border bg-signal-green text-accent-foreground">
                       <OptionIcon className="size-3" />
                     </span>
                     <div className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -109,7 +109,7 @@ export function PermissionSelector({ disabled = false, onChange, value }: Permis
                           render={
                             <button
                               type="button"
-                              className="flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground/75 transition-colors hover:text-foreground"
+                              className="flex size-4 shrink-0 items-center justify-center rounded-sm text-muted-foreground/75 transition-colors hover:bg-muted hover:text-foreground"
                               onClick={(event) => {
                                 event.preventDefault();
                                 event.stopPropagation();

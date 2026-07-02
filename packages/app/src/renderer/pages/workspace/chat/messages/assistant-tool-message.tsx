@@ -58,17 +58,23 @@ export function AssistantToolMessage({
         />
       ) : null}
 
-      <Collapsible defaultOpen={false}>
-        <CollapsibleTrigger className="group/tool flex w-full cursor-pointer items-center gap-1.5 text-sm">
+      <Collapsible
+        defaultOpen={false}
+        className="overflow-hidden rounded-md border-2 border-border bg-card shadow-[var(--hard-shadow)]"
+      >
+        <CollapsibleTrigger className="group/tool flex min-h-12 w-full cursor-pointer items-center gap-2 text-sm">
+          <span className="flex min-h-12 self-stretch items-center border-r-2 border-border bg-signal-cyan px-2 font-mono text-[8px] font-bold text-accent-foreground">
+            TOOL
+          </span>
           <Shimmer as="span" className="text-xs text-muted-foreground" animate={isRunning}>
             {`${statusLabel(toolState?.status)} ${toolName}`}
           </Shimmer>
-          <ChevronRightIcon className="size-3.5 text-muted-foreground transition-transform group-data-panel-open/tool:rotate-90" />
+          <ChevronRightIcon className="ml-auto mr-3 size-3.5 text-muted-foreground transition-transform group-data-panel-open/tool:rotate-90" />
         </CollapsibleTrigger>
 
-        <CollapsibleContent>
-          <div className="flex flex-col gap-3 pt-3">
-            <section className="rounded-2xl border border-border/70 bg-card/80 p-3">
+        <CollapsibleContent className="border-t-2 border-border bg-muted p-3">
+          <div className="flex flex-col gap-3">
+            <section className="rounded-md border-2 border-border bg-card p-3">
               <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                 Input
               </div>
@@ -77,7 +83,7 @@ export function AssistantToolMessage({
               </pre>
             </section>
 
-            <section className="rounded-2xl border border-border/70 bg-card/80 p-3">
+            <section className="rounded-md border-2 border-border bg-card p-3">
               <pre className="overflow-x-auto whitespace-pre-wrap wrap-break-word text-xs leading-6 text-card-foreground">
                 {output}
               </pre>

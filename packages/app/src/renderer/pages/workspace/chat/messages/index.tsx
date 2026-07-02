@@ -53,7 +53,7 @@ export function ChatMessages({
   if (messageEntries.length === 0) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="rounded-full border border-border bg-background/80 px-5 py-2 text-sm text-muted-foreground shadow-sm">
+        <div className="rounded-md border-2 border-border bg-card px-5 py-2 text-sm text-muted-foreground shadow-[var(--hard-shadow-sm)]">
           Start a conversation
         </div>
       </div>

@@ -75,6 +75,8 @@ export function ThemeProvider({
     root.classList.remove("light", "dark");
     root.classList.add(resolvedTheme);
     root.style.colorScheme = resolvedTheme;
+
+    void window.electronAPI.invoke("setWindowControlsTheme", resolvedTheme);
   }, [resolvedTheme, theme]);
 
   const setTheme = (nextTheme: Theme) => {

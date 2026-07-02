@@ -12,7 +12,7 @@ import { mainStore } from "@renderer/store/main";
 import { useQueryClient } from "@tanstack/react-query";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { motion } from "motion/react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useCallback } from "react";
 import { useStore } from "zustand";
 
@@ -27,9 +27,13 @@ import { createSessionTitleFromPrompt, shouldAutoRenameSession } from "./session
 
 interface ActiveSessionContentProps {
   insetForWindowControls: boolean;
+  sidebarControl: ReactNode;
 }
 
-export function ActiveSessionContent({ insetForWindowControls }: ActiveSessionContentProps) {
+export function ActiveSessionContent({
+  insetForWindowControls,
+  sidebarControl,
+}: ActiveSessionContentProps) {
   const {
     entries,
     isRunning,
@@ -69,8 +73,22 @@ export function ActiveSessionContent({ insetForWindowControls }: ActiveSessionCo
       >
         <ResizablePanel defaultSize={isArtifactPanelOpen ? "68%" : "100%"} minSize="42%">
           <div className="flex h-full min-w-0 flex-col">
-            <PanelHeader dragRegion insetForWindowControls={insetForWindowControls}>
-              <h1 className="truncate text-sm font-medium text-foreground">{sessionName}</h1>
+            <PanelHeader
+              dragRegion
+              windowControls={
+                insetForWindowControls
+                  ? isArtifactPanelOpen
+                    ? "left"
+                    : "both"
+                  : isArtifactPanelOpen
+                    ? "none"
+                    : "right"
+              }
+            >
+              {sidebarControl}
+              <h1 className="truncate text-sm font-bold tracking-tight text-foreground">
+                {sessionName}
+              </h1>
             </PanelHeader>
             <section className="min-h-0 min-w-0 flex-1 overflow-x-hidden px-6 pt-6">
               <ChatMessages
@@ -112,7 +130,7 @@ export function ActiveSessionContent({ insetForWindowControls }: ActiveSessionCo
 
         {isArtifactPanelOpen ? (
           <>
-            <ResizableHandle />
+            <ResizableHandle className="w-0.5 bg-border" />
             <ResizablePanel defaultSize="32%" minSize="22%" maxSize="48%" className="min-w-0">
               <ArtifactsPanel sessionId={activeSessionId} />
             </ResizablePanel>
@@ -120,7 +138,7 @@ export function ActiveSessionContent({ insetForWindowControls }: ActiveSessionCo
         ) : null}
       </ResizablePanelGroup>
 
-      <FixedActions>
+      <FixedActions reserveWindowControls={!isArtifactPanelOpen}>
         <ToggleArtifactPanelButton sessionId={activeSessionId} />
       </FixedActions>
     </div>
@@ -143,7 +161,7 @@ function ToggleArtifactPanelButton({ sessionId }: ToggleArtifactPanelButtonProps
   return (
     <button
       type="button"
-      className="flex items-center justify-center rounded-md p-1 text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+      className="flex items-center justify-center rounded-sm border-2 border-border bg-card p-1 text-foreground shadow-[var(--hard-shadow-sm)] transition-all hover:translate-x-px hover:translate-y-px hover:bg-accent hover:text-accent-foreground hover:shadow-none"
       style={{ WebkitAppRegion: "no-drag" } as CSSProperties}
       onClick={() => {
         const nextIsOpen = !mainStore.getState().getArtifactState(sessionId).isOpen;

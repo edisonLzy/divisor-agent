@@ -1,3 +1,4 @@
+import { Badge } from "@renderer/components/ui/badge";
 import { Input } from "@renderer/components/ui/input";
 import { Switch } from "@renderer/components/ui/switch";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
@@ -85,10 +86,10 @@ export function SettingsSkillsPage() {
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-160 flex-col px-10 py-12">
-      <h1 className="mb-8 text-center text-[20px] font-medium text-foreground">Skills</h1>
-      <div className="min-h-0 space-y-4">
-        <div className="flex max-h-[min(680px,calc(100vh-9rem))] flex-col overflow-hidden rounded-lg border border-border bg-card">
-          <div className="shrink-0 flex flex-col gap-4 border-b border-border px-4 py-4 md:flex-row md:items-center md:justify-between">
+      <h1 className="mb-8 text-center text-2xl font-bold tracking-tight text-foreground">Skills</h1>
+      <div className="flex min-h-0 flex-col gap-4">
+        <div className="flex max-h-[min(680px,calc(100vh-9rem))] flex-col overflow-hidden rounded-md border-2 border-border bg-card shadow-[var(--hard-shadow)]">
+          <div className="flex shrink-0 flex-col gap-4 border-b-2 border-border px-4 py-4 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="text-[13px] font-medium text-foreground">Skills Discovery</div>
               <div className="mt-0.5 text-[11px] text-muted-foreground">
@@ -118,7 +119,7 @@ export function SettingsSkillsPage() {
                   key={skill.id}
                   className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/35"
                 >
-                  <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground">
+                  <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-sm border-2 border-border bg-signal-purple text-accent-foreground shadow-[var(--hard-shadow-sm)]">
                     <BoxIcon className="size-4" />
                   </span>
                   <div className="min-w-0 flex-1">
@@ -126,9 +127,7 @@ export function SettingsSkillsPage() {
                       <div className="truncate text-[13px] font-medium text-foreground">
                         {skill.name}
                       </div>
-                      <span className="shrink-0 rounded-full border border-border bg-background px-2 py-0.5 text-[11px] text-muted-foreground">
-                        {SKILL_SCOPE_LABEL[skill.scope]}
-                      </span>
+                      <Badge variant="outline">{SKILL_SCOPE_LABEL[skill.scope]}</Badge>
                     </div>
                     <div className="mt-1 line-clamp-2 text-[12px] leading-5 text-muted-foreground">
                       {skill.description}

@@ -1,5 +1,6 @@
 import type { Workspace, Session } from "@renderer/apis/sessions";
 import { listSessions, pinWorkspace, deleteWorkspace } from "@renderer/apis/sessions";
+import { Badge } from "@renderer/components/ui/badge";
 import { Button } from "@renderer/components/ui/button";
 import {
   Collapsible,
@@ -18,7 +19,7 @@ import {
 import { cn } from "@renderer/lib/utils";
 import { mainStore } from "@renderer/store/main";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
-import { Folder, FolderOpen, Pin, PinOff, Plus, Trash2 } from "lucide-react";
+import { Folder, FolderOpen } from "lucide-react";
 import { useCallback, useState } from "react";
 
 import { SessionItem } from "./session-item";
@@ -52,10 +53,11 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
     initialPageParam: 0,
     getNextPageParam: (lastPage) =>
       lastPage.hasMore ? lastPage.offset + lastPage.limit : undefined,
-    enabled: open,
+    staleTime: 30_000,
   });
 
   const sessions = data?.pages.flatMap((page) => page.sessions) ?? [];
+  const sessionCount = data ? (hasNextPage ? `${sessions.length}+` : String(sessions.length)) : "—";
 
   const handleTogglePin = useCallback(
     async (e: React.MouseEvent) => {
@@ -102,48 +104,64 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
     <Collapsible open={open} onOpenChange={setOpen}>
       <div
         className={cn(
-          "group flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] transition-[background-color,color]",
+          "group/workspace flex min-h-10 w-full items-center gap-2 rounded-md border-2 px-2 py-1 text-[13px] transition-[background-color,color]",
           open
-            ? "bg-sidebar-accent/70 text-sidebar-foreground"
-            : "text-sidebar-foreground/78 hover:bg-sidebar-accent/80 hover:text-sidebar-foreground",
+            ? "border-sidebar-border bg-sidebar-accent text-sidebar-foreground shadow-[var(--hard-shadow-sm)]"
+            : "border-transparent text-sidebar-foreground/78 hover:bg-sidebar-accent hover:text-sidebar-foreground",
         )}
       >
-        <CollapsibleTrigger className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-left leading-5">
+        <CollapsibleTrigger className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-left">
           {open ? (
             <FolderOpen className="size-4 shrink-0 text-sidebar-foreground/55" />
           ) : (
             <Folder className="size-4 shrink-0 text-sidebar-foreground/40" />
           )}
-          <span className="truncate">{workspace.name || "untitled"}</span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate font-semibold leading-5">{workspace.name || "untitled"}</span>
+            <span className="truncate text-[10px] leading-4 text-sidebar-foreground/45">
+              {open ? "项目已展开" : "点击查看项目内对话"}
+            </span>
+          </span>
         </CollapsibleTrigger>
 
-        <span className="relative flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={handleTogglePin}
-            className="flex items-center justify-center rounded-md p-1 text-sidebar-foreground/32 transition-colors hover:bg-black/10 hover:text-sidebar-foreground"
-            title={workspace.isTop ? "取消置顶" : "置顶"}
+        <span className="relative flex min-w-32 shrink-0 items-center justify-end">
+          <Badge
+            className="group-hover/workspace:invisible group-focus-within/workspace:invisible"
+            aria-label={data ? `${sessionCount} 个对话` : "对话数量尚未加载"}
           >
-            {workspace.isTop ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
-          </button>
-          <button
-            onClick={() => setDeleteDialogOpen(true)}
-            className="flex items-center justify-center rounded-md p-1 text-sidebar-foreground/32 transition-colors hover:bg-black/10 hover:text-red-400"
-            title="删除"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
-          <button
-            onClick={handleCreateWorkflowSession}
-            className="flex items-center justify-center rounded-md p-1 text-sidebar-foreground/32 transition-colors hover:bg-black/10 hover:text-sidebar-foreground"
-            title="新建对话"
-          >
-            <Plus className="size-3.5" />
-          </button>
+            {sessionCount}
+          </Badge>
+          <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center gap-1 opacity-0 transition-opacity group-hover/workspace:pointer-events-auto group-hover/workspace:opacity-100 group-focus-within/workspace:pointer-events-auto group-focus-within/workspace:opacity-100">
+            <Button
+              variant="outline-flat"
+              size="xs"
+              onClick={handleTogglePin}
+              title={workspace.isTop ? "取消置顶" : "置顶"}
+            >
+              {workspace.isTop ? "取消置顶" : "置顶"}
+            </Button>
+            <Button
+              variant="outline-flat"
+              size="xs"
+              onClick={handleCreateWorkflowSession}
+              title="新建对话"
+            >
+              新建
+            </Button>
+            <Button
+              variant="destructive-outline"
+              size="xs"
+              onClick={() => setDeleteDialogOpen(true)}
+              title="删除"
+            >
+              删除
+            </Button>
+          </span>
         </span>
       </div>
 
       <CollapsibleContent>
-        <div className="space-y-0.5 py-1 pl-4">
+        <div className="flex flex-col gap-0.5 py-1 pl-4">
           {isLoading ? (
             <div className="px-3 py-1.5 text-[12px] text-sidebar-foreground/30">加载中...</div>
           ) : sessions.length === 0 ? (
@@ -159,7 +177,7 @@ export function WorkspaceItem({ workspace }: WorkspaceItemProps) {
                 <button
                   onClick={() => fetchNextPage()}
                   disabled={isFetchingNextPage}
-                  className="mt-1 w-full rounded-lg px-3 py-1.5 text-left text-[12px] text-sidebar-foreground/35 transition-colors hover:bg-sidebar-accent/80 hover:text-sidebar-foreground disabled:cursor-default disabled:hover:bg-transparent"
+                  className="mt-1 w-full rounded-sm border-2 border-transparent px-3 py-1.5 text-left text-[12px] text-sidebar-foreground/40 transition-colors hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-foreground disabled:cursor-default disabled:hover:bg-transparent"
                 >
                   {isFetchingNextPage ? "加载中..." : "加载更多"}
                 </button>

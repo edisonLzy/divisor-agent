@@ -34,12 +34,12 @@ export function SelectionPopup({ position, selectedText, onOpen, onDismiss }: Se
         type="button"
         variant="secondary"
         size="sm"
-        className="h-7 gap-1 rounded-lg border border-border/70 bg-background/95 px-2.5 text-xs shadow-md supports-backdrop-filter:backdrop-blur-xl"
+        className="h-7 gap-1 rounded-sm border-2 border-border bg-background px-2.5 text-xs shadow-[var(--hard-shadow-sm)]"
         onClick={() => {
           onOpen(selectedText);
         }}
       >
-        <PanelRightOpen className="size-3" />
+        <PanelRightOpen data-icon="inline-start" />
         在侧边栏深入讨论
       </Button>
     </div>

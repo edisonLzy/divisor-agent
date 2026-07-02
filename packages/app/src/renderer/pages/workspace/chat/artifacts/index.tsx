@@ -114,7 +114,7 @@ export function ArtifactsPanel({ className, sessionId }: ArtifactsPanelProps) {
   return (
     <aside
       className={cn(
-        "flex h-full min-w-90 flex-col border-l border-border/70 bg-background/80 supports-backdrop-filter:backdrop-blur-xl",
+        "flex h-full min-w-90 flex-col border-l-2 border-border bg-background",
         className,
       )}
     >
@@ -123,7 +123,7 @@ export function ArtifactsPanel({ className, sessionId }: ArtifactsPanelProps) {
         onValueChange={(value) => setActiveArtifactId(sessionId, value)}
         className="min-h-0 flex-1 gap-0"
       >
-        <PanelHeader dragRegion className="pl-2">
+        <PanelHeader dragRegion windowControls="right" className="bg-signal-purple pl-2">
           <div className="relative min-w-0 flex-1">
             <DndContext
               sensors={sensors}
@@ -195,7 +195,7 @@ function ArtifactTab({ artifact, onClose }: ArtifactTabProps) {
     >
       <TabsTrigger
         value={artifact.id}
-        className="app-no-drag min-w-0 max-w-48 cursor-grab justify-start gap-1.5 rounded-lg !border-0 p-2 text-xs !shadow-none after:!hidden data-active:!border-0 data-active:!bg-[#F4F4F4] data-active:!shadow-none focus-visible:!border-0 hover:!bg-[#F4F4F4] active:cursor-grabbing dark:data-active:!border-0 dark:data-active:!bg-muted dark:hover:!bg-muted"
+        className="app-no-drag min-w-0 max-w-48 cursor-grab justify-start gap-1.5 rounded-sm p-2 text-xs after:!hidden data-active:bg-accent data-active:text-accent-foreground focus-visible:border-ring hover:bg-muted active:cursor-grabbing"
         {...attributes}
         {...listeners}
       >
@@ -284,7 +284,7 @@ function ArtifactEmptyState() {
   return (
     <div className="grid h-full min-h-80 place-items-center">
       <div className="w-full max-w-sm px-6 text-center">
-        <div className="mx-auto mb-4 grid size-11 place-items-center rounded-lg border border-dashed border-border bg-muted/40">
+        <div className="mx-auto mb-4 grid size-11 place-items-center rounded-md border-2 border-border bg-signal-purple shadow-[var(--hard-shadow-sm)]">
           <Sparkles className="size-4 text-muted-foreground" strokeWidth={1.75} />
         </div>
         <div className="text-sm font-medium text-foreground">No artifact selected</div>

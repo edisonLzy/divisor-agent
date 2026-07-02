@@ -1,4 +1,5 @@
 import { Titlebar } from "@renderer/components/titlebar";
+import { Button } from "@renderer/components/ui/button";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -7,7 +8,7 @@ import {
 import { cn } from "@renderer/lib/utils";
 import { ArrowLeft, Bot, BoxIcon, Paintbrush, Settings } from "lucide-react";
 import { type CSSProperties } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 type SettingsSection = "appearance" | "models" | "skills";
 
@@ -24,52 +25,61 @@ const SECTIONS: Array<{
 
 export function SettingsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const activeSectionLabel =
+    SECTIONS.find((section) => location.pathname.startsWith(section.path))?.label ?? "设置";
 
   return (
-    <div className="flex h-screen w-full flex-col overflow-hidden bg-transparent text-foreground">
-      <Titlebar>
-        <button
-          onClick={() => navigate("/")}
-          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] font-medium text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
-          style={{ WebkitAppRegion: "no-drag" } as CSSProperties}
-        >
-          <ArrowLeft className="size-3.5" />
-          返回应用
-        </button>
-      </Titlebar>
-      <ResizablePanelGroup orientation="horizontal" className="flex-1">
+    <div className="h-screen w-full overflow-hidden bg-background text-foreground">
+      <ResizablePanelGroup orientation="horizontal" className="h-full">
         <ResizablePanel defaultSize="20%" minSize="16%" maxSize="24%">
-          <aside className="flex h-full flex-col border-r border-sidebar-border/70 bg-sidebar/78 px-3 py-4 pt-9 text-foreground select-none supports-backdrop-filter:bg-sidebar/68 supports-backdrop-filter:backdrop-blur-xl">
-            <nav className="flex flex-col space-y-0.5">
-              {SECTIONS.map((section) => {
-                return (
-                  <NavLink
-                    key={section.id}
-                    to={section.path}
-                    className={({ isActive }) =>
-                      cn(
-                        "flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",
-                        isActive
-                          ? "bg-accent text-foreground"
-                          : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                      )
-                    }
-                  >
-                    <section.icon className="size-3.5 opacity-80" />
-                    <span>{section.label}</span>
-                  </NavLink>
-                );
-              })}
-            </nav>
-          </aside>
+          <div className="flex h-full min-w-0 flex-col bg-sidebar">
+            <Titlebar windowControls="left" className="bg-sidebar text-sidebar-foreground">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/")}
+                style={{ WebkitAppRegion: "no-drag" } as CSSProperties}
+              >
+                <ArrowLeft data-icon="inline-start" />
+                返回应用
+              </Button>
+            </Titlebar>
+            <aside className="min-h-0 flex-1 overflow-y-auto px-3 py-4 text-foreground select-none">
+              <nav className="flex flex-col gap-1">
+                {SECTIONS.map((section) => {
+                  return (
+                    <NavLink
+                      key={section.id}
+                      to={section.path}
+                      className={({ isActive }) =>
+                        cn(
+                          "flex w-full items-center gap-2.5 rounded-md border-2 px-2 py-1.5 text-left text-[13px] transition-all",
+                          isActive
+                            ? "border-border bg-accent text-accent-foreground shadow-[var(--hard-shadow-sm)]"
+                            : "border-transparent text-muted-foreground hover:border-border/30 hover:bg-sidebar-accent hover:text-foreground",
+                        )
+                      }
+                    >
+                      <section.icon className="size-3.5 opacity-80" />
+                      <span>{section.label}</span>
+                    </NavLink>
+                  );
+                })}
+              </nav>
+            </aside>
+          </div>
         </ResizablePanel>
 
-        <ResizableHandle />
+        <ResizableHandle className="w-0.5 bg-border" />
 
         <ResizablePanel defaultSize="80%" minSize="60%">
-          <div className="h-full w-full bg-sidebar/78 supports-backdrop-filter:bg-sidebar/68 supports-backdrop-filter:backdrop-blur-xl">
+          <div className="flex h-full w-full flex-col bg-background">
+            <Titlebar windowControls="right" className="bg-background pl-4 text-foreground">
+              <h1 className="truncate text-sm font-bold tracking-tight">{activeSectionLabel}</h1>
+            </Titlebar>
             <main
-              className="-ml-px h-full overflow-y-auto rounded-l-[20px] border border-border/70 border-l-0 supports-backdrop-filter:backdrop-blur-xl"
+              className="min-h-0 flex-1 overflow-y-auto bg-[var(--workspace-surface)]"
               style={
                 {
                   background:
