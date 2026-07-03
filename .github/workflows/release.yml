@@ -91,20 +91,27 @@ jobs:
           if [[ -n "$CSC_LINK" && -n "$APPLE_ID" && -n "$APPLE_APP_SPECIFIC_PASSWORD" && -n "$APPLE_TEAM_ID" ]]; then
             NOTARIZE=true
           fi
-          # Build arm64 only on macos-latest. electron-builder v26.8.1's
-          # `--universal` stage trips over a "not a file" lipo bug on arm64
-          # runners; revisit when v26.9 or later ships a fix.
-          pnpm --filter @divisor-agent/app exec electron-builder --mac --arm64 --publish never \
+          # `cd` into the package dir first. Running through
+          # `pnpm --filter @divisor-agent/app exec ...` on pnpm 11 + electron-builder
+          # 26.8.1 mis-resolves the cwd and dies with "packages/app not a file".
+          # --arm64 sidesteps the `--universal` lipo bug on arm64 runners;
+          # revisit when electron-builder ships a fix.
+          cd packages/app
+          pnpm exec electron-builder --mac --arm64 --publish never \
             --config.extraMetadata.version="$RELEASE_VERSION" \
             --config.mac.notarize="$NOTARIZE"
       - name: Package Windows
         if: runner.os == 'Windows'
         shell: pwsh
-        run: pnpm --filter @divisor-agent/app exec electron-builder --win --x64 --publish never --config.extraMetadata.version="$env:RELEASE_VERSION"
+        # `cd` into the package dir first — see the macOS step for context.
+        run: cd packages/app; pnpm exec electron-builder --win --x64 --publish never --config.extraMetadata.version="$env:RELEASE_VERSION"
       - name: Package Linux
         if: runner.os == 'Linux'
         shell: bash
-        run: pnpm --filter @divisor-agent/app exec electron-builder --linux AppImage deb --x64 --publish never --config.extraMetadata.version="$RELEASE_VERSION"
+        # `cd` into the package dir first — see the macOS step for context.
+        run: |
+          cd packages/app
+          pnpm exec electron-builder --linux AppImage deb --x64 --publish never --config.extraMetadata.version="$RELEASE_VERSION"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
