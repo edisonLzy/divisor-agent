@@ -1,9 +1,13 @@
 {
   "name": "@divisor-agent/app",
   "version": "1.0.0",
-  "description": "An Electron application with React and TypeScript",
-  "homepage": "https://electron-vite.org",
-  "author": "example.com",
+  "description": "A desktop AI agent application",
+  "homepage": "https://github.com/edisonLzy/divisor-agent",
+  "author": "edisonLzy",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/edisonLzy/divisor-agent.git"
+  },
   "main": "./out/main/index.mjs",
   "scripts": {
     "format": "prettier --write .",
@@ -60,6 +64,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "catalog:",
     "cmdk": "^1.1.1",
+    "electron-updater": "^6.8.9",
     "embla-carousel-react": "^8.6.0",
     "emittery": "^2.0.0",
     "fuse.js": "^7.4.1",

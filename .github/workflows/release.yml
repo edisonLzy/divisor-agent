@@ -1,0 +1,146 @@
+name: Release desktop app
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-master
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Resolve release version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        name: Create unique version
+        shell: bash
+        run: |
+          BASE_VERSION=$(node -p "require('./packages/app/package.json').version")
+          MAJOR_MINOR=${BASE_VERSION%.*}
+          VERSION="${MAJOR_MINOR}.${GITHUB_RUN_NUMBER}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @divisor-agent/app typecheck
+      - run: pnpm vitest run packages/app/__tests__/main/updater/update-manager.test.ts
+
+  build:
+    name: Build ${{ matrix.name }}
+    needs:
+      - version
+      - validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            os: macos-latest
+            artifact: release-macos
+          - name: Windows
+            os: windows-latest
+            artifact: release-windows
+          - name: Linux
+            os: ubuntu-latest
+            artifact: release-linux
+    runs-on: ${{ matrix.os }}
+    env:
+      RELEASE_VERSION: ${{ needs.version.outputs.version }}
+      CSC_LINK: ${{ secrets.MACOS_CERTIFICATE }}
+      CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build Electron bundles
+        run: pnpm --filter @divisor-agent/app exec electron-vite build
+      - name: Package macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          NOTARIZE=false
+          if [[ -n "$CSC_LINK" && -n "$APPLE_ID" && -n "$APPLE_APP_SPECIFIC_PASSWORD" && -n "$APPLE_TEAM_ID" ]]; then
+            NOTARIZE=true
+          fi
+          pnpm --filter @divisor-agent/app exec electron-builder --mac --universal --publish never \
+            --config.extraMetadata.version="$RELEASE_VERSION" \
+            --config.mac.notarize="$NOTARIZE"
+      - name: Package Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: pnpm --filter @divisor-agent/app exec electron-builder --win --x64 --publish never --config.extraMetadata.version="$env:RELEASE_VERSION"
+      - name: Package Linux
+        if: runner.os == 'Linux'
+        shell: bash
+        run: pnpm --filter @divisor-agent/app exec electron-builder --linux AppImage deb --x64 --publish never --config.extraMetadata.version="$RELEASE_VERSION"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            packages/app/dist/*.AppImage
+            packages/app/dist/*.blockmap
+            packages/app/dist/*.deb
+            packages/app/dist/*.dmg
+            packages/app/dist/*.exe
+            packages/app/dist/*.yml
+            packages/app/dist/*.zip
+
+  release:
+    name: Publish GitHub release
+    needs:
+      - version
+      - build
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release-artifacts
+          merge-multiple: true
+      - name: Publish release assets
+        shell: bash
+        run: |
+          TAG="v${RELEASE_VERSION}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" release-artifacts/* --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" release-artifacts/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "Divisor Agent ${RELEASE_VERSION}" \
+              --generate-notes
+          fi
