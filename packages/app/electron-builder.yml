@@ -34,6 +34,12 @@ mac:
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
+  # electron-builder v26.8.1 on arm64 runners fails the lipo stage of
+  # `--universal` with "packages/app not a file" — it tries to read the
+  # working directory as the x64 input. Single-arch on macos-latest
+  # (arm64) sidesteps the bug. Toggling back to --universal later requires
+  # either an electron-builder upgrade or running macOS jobs on intel.
+  artifactName: Divisor-Agent-${version}-${arch}.${ext}
 dmg:
   artifactName: Divisor-Agent-${version}-${arch}.${ext}
 linux:
@@ -43,6 +49,11 @@ linux:
     - deb
   maintainer: edisonLzy
   category: Utility
+  # The package name `@divisor-agent/app` produces a default deb filename
+  # `dist/@divisor-agent/app_0.0.x_amd64.deb`. fpm refuses `@` in the name
+  # and electron-builder doesn't mkdir the parent directory. Pin a clean
+  # explicit filename.
+  artifactName: Divisor-Agent-${version}-${arch}.${ext}
 appImage:
   artifactName: Divisor-Agent-${version}-${arch}.${ext}
 npmRebuild: false
