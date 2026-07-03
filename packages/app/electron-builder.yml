@@ -25,7 +25,14 @@ mac:
   target:
     - dmg
     - zip
-  hardenedRuntime: true
+  # ad-hoc signing ("-") — works without a Developer ID and avoids the
+  # "packages/app not a file" failure that electron-builder v26.8.1 trips
+  # on in the codesign stage when no signing identity is configured. With
+  # a real Developer ID set the value to the certificate name and provide
+  # `CSC_LINK` + `CSC_KEY_PASSWORD` secrets.
+  identity: "-"
+  hardenedRuntime: false
+  gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
@@ -34,11 +41,6 @@ mac:
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
-  # electron-builder v26.8.1 on arm64 runners fails the lipo stage of
-  # `--universal` with "packages/app not a file" — it tries to read the
-  # working directory as the x64 input. Single-arch on macos-latest
-  # (arm64) sidesteps the bug. Toggling back to --universal later requires
-  # either an electron-builder upgrade or running macOS jobs on intel.
   artifactName: Divisor-Agent-${version}-${arch}.${ext}
 dmg:
   artifactName: Divisor-Agent-${version}-${arch}.${ext}
