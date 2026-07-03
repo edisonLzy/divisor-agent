@@ -91,27 +91,33 @@ jobs:
           if [[ -n "$CSC_LINK" && -n "$APPLE_ID" && -n "$APPLE_APP_SPECIFIC_PASSWORD" && -n "$APPLE_TEAM_ID" ]]; then
             NOTARIZE=true
           fi
-          # `cd` into the package dir first. Running through
-          # `pnpm --filter @divisor-agent/app exec ...` on pnpm 11 + electron-builder
-          # 26.8.1 mis-resolves the cwd and dies with "packages/app not a file".
-          # --arm64 sidesteps the `--universal` lipo bug on arm64 runners;
-          # revisit when electron-builder ships a fix.
+          # electron-builder v26.8.1 trips over `--config.extraMetadata.version=...`
+          # (it tries to resolve "app" as an input file after that flag),
+          # so pin the version via package.json instead and run --arm64 to
+          # sidestep the `--universal` lipo bug on macos-latest.
           cd packages/app
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json'));p.version=process.env.RELEASE_VERSION;fs.writeFileSync('package.json',JSON.stringify(p,null,2));"
           pnpm exec electron-builder --mac --arm64 --publish never \
-            --config.extraMetadata.version="$RELEASE_VERSION" \
             --config.mac.notarize="$NOTARIZE"
       - name: Package Windows
         if: runner.os == 'Windows'
         shell: pwsh
-        # `cd` into the package dir first — see the macOS step for context.
-        run: cd packages/app; pnpm exec electron-builder --win --x64 --publish never --config.extraMetadata.version="$env:RELEASE_VERSION"
+        # Pin version via package.json — see the macOS step for why we don't
+        # use --config.extraMetadata.version.
+        run: |
+          cd packages/app
+          $env:PACKAGE_VERSION = $env:RELEASE_VERSION
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json'));p.version=process.env.PACKAGE_VERSION;fs.writeFileSync('package.json',JSON.stringify(p,null,2));"
+          pnpm exec electron-builder --win --x64 --publish never
       - name: Package Linux
         if: runner.os == 'Linux'
         shell: bash
-        # `cd` into the package dir first — see the macOS step for context.
+        # Pin version via package.json — see the macOS step for why we don't
+        # use --config.extraMetadata.version.
         run: |
           cd packages/app
-          pnpm exec electron-builder --linux AppImage deb --x64 --publish never --config.extraMetadata.version="$RELEASE_VERSION"
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json'));p.version=process.env.RELEASE_VERSION;fs.writeFileSync('package.json',JSON.stringify(p,null,2));"
+          pnpm exec electron-builder --linux AppImage deb --x64 --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
