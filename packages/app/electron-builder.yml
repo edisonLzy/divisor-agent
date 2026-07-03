@@ -25,11 +25,9 @@ mac:
   target:
     - dmg
     - zip
-  # ad-hoc signing ("-") — works without a Developer ID and avoids the
-  # "packages/app not a file" failure that electron-builder v26.8.1 trips
-  # on in the codesign stage when no signing identity is configured. With
-  # a real Developer ID set the value to the certificate name and provide
-  # `CSC_LINK` + `CSC_KEY_PASSWORD` secrets.
+  # Ad-hoc signing ("-") keeps unsigned development releases launchable on
+  # arm64. The release workflow unsets an empty CSC_LINK so electron-builder
+  # reaches this fallback instead of interpreting the empty value as a path.
   identity: "-"
   hardenedRuntime: false
   gatekeeperAssess: false
@@ -49,6 +47,11 @@ linux:
   target:
     - AppImage
     - deb
+  # `package.json` `name` is `@divisor-agent/app`. electron-builder derives
+  # `executableName` from this and produces `@divisor-agentapp`, which
+  # AppImage rejects. Pin a clean binary name to side-step the char-set
+  # check entirely.
+  executableName: divisor-agent
   maintainer: edisonLzy
   category: Utility
   # The package name `@divisor-agent/app` produces a default deb filename
