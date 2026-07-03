@@ -6,7 +6,7 @@ then publishes them with the generated updater metadata to a public GitHub Relea
 
 The release version is derived from `packages/app/package.json`: its major and minor values are
 kept, and the GitHub Actions run number becomes the patch version. For example, base version
-`1.0.0` in workflow run 42 is released as `1.0.42`.
+`0.0.0` in workflow run 42 is released as `0.0.42`.
 
 ## macOS signing
 
