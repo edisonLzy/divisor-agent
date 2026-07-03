@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: app
+appId: com.edisonlzy.divisor-agent
+productName: Divisor Agent
 icon: resources/icon.png
 directories:
   buildResources: build
@@ -13,15 +13,20 @@ files:
 asarUnpack:
   - resources/**
 win:
-  executableName: app
+  executableName: divisor-agent
   icon: resources/icon.png
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
+  artifactName: Divisor-Agent-${version}-${arch}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 mac:
   icon: resources/icon.png
+  target:
+    - dmg
+    - zip
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     - NSCameraUsageDescription: Application requests access to the device's camera.
@@ -30,20 +35,21 @@ mac:
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
 dmg:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: Divisor-Agent-${version}-${arch}.${ext}
 linux:
   icon: resources/icon.png
   target:
     - AppImage
-    - snap
     - deb
-  maintainer: electronjs.org
+  maintainer: edisonLzy
   category: Utility
 appImage:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: Divisor-Agent-${version}-${arch}.${ext}
 npmRebuild: false
 publish:
-  provider: generic
-  url: https://example.com/auto-updates
+  provider: github
+  owner: edisonLzy
+  repo: divisor-agent
+  releaseType: release
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/

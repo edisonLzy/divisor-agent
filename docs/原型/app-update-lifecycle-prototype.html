@@ -1,0 +1,1451 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Divisor Agent · 应用更新完整生命周期交互稿</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --background: #fffaf0;
+        --foreground: #141111;
+        --card: #fffdf8;
+        --secondary: #f1ede3;
+        --muted: #eee9de;
+        --muted-foreground: #716b64;
+        --accent: #ffd440;
+        --destructive: #df5148;
+        --cyan: #27ccf3;
+        --green: #a8df72;
+        --pink: #fe7da8;
+        --purple: #bbb0e6;
+        --border: #141111;
+        --sidebar: #fffaf0;
+        --radius: 6px;
+        --hard-shadow: 3px 3px 0 var(--border);
+        --hard-shadow-sm: 2px 2px 0 var(--border);
+        --font: "Space Grotesk", "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        --mono: "Space Mono", "SFMono-Regular", Consolas, monospace;
+      }
+
+      html[data-theme="dark"] {
+        color-scheme: dark;
+        --background: #11100f;
+        --foreground: #f3eee5;
+        --card: #191715;
+        --secondary: #24211e;
+        --muted: #24211e;
+        --muted-foreground: #aaa39a;
+        --accent: #d7ad2f;
+        --destructive: #ef7469;
+        --cyan: #31b6d6;
+        --green: #91c866;
+        --pink: #dc6e98;
+        --purple: #9f92d0;
+        --border: #f3eee5;
+        --sidebar: #151311;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-height: 100%;
+      }
+
+      body {
+        margin: 0;
+        background: var(--secondary);
+        color: var(--foreground);
+        font-family: var(--font);
+        font-size: 14px;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      button {
+        color: inherit;
+        font: inherit;
+      }
+
+      button:focus-visible {
+        outline: 3px solid var(--cyan);
+        outline-offset: 2px;
+      }
+
+      .review-bar {
+        position: sticky;
+        z-index: 20;
+        top: 0;
+        display: flex;
+        min-height: 52px;
+        align-items: center;
+        gap: 16px;
+        border-bottom: 2px solid #141111;
+        padding: 8px 18px;
+        background: #ffd440;
+        color: #141111;
+      }
+
+      .review-title {
+        display: flex;
+        min-width: 240px;
+        flex-direction: column;
+        line-height: 1.1;
+      }
+
+      .review-title strong {
+        font-size: 13px;
+      }
+
+      .review-title span {
+        margin-top: 3px;
+        font: 700 9px var(--mono);
+        letter-spacing: 0.08em;
+      }
+
+      .variant-tabs {
+        display: flex;
+        gap: 6px;
+      }
+
+      .review-actions {
+        display: flex;
+        margin-left: auto;
+        gap: 6px;
+      }
+
+      .review-button,
+      .variant-tab {
+        min-height: 30px;
+        border: 2px solid #141111;
+        border-radius: 5px;
+        padding: 0 10px;
+        background: #fffdf8;
+        color: #141111;
+        box-shadow: 2px 2px 0 #141111;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 750;
+      }
+
+      .variant-tab[aria-selected="true"] {
+        background: #141111;
+        color: #fffaf0;
+        box-shadow: none;
+        transform: translate(2px, 2px);
+      }
+
+      .review-button:active,
+      .variant-tab:active,
+      .button:active,
+      .icon-button:active,
+      .menu-row:active {
+        box-shadow: none;
+        transform: translate(1px, 1px);
+      }
+
+      .design-note {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-bottom: 2px solid var(--border);
+        padding: 8px 18px;
+        background: var(--card);
+      }
+
+      .design-note strong {
+        white-space: nowrap;
+        font-size: 12px;
+      }
+
+      .design-note p {
+        margin: 0;
+        color: var(--muted-foreground);
+        font-size: 12px;
+        line-height: 1.4;
+      }
+
+      .stage-wrap {
+        padding: 24px;
+      }
+
+      .app-window {
+        position: relative;
+        width: min(1200px, 100%);
+        height: min(760px, calc(100vh - 142px));
+        min-height: 620px;
+        margin: 0 auto;
+        overflow: hidden;
+        border: 2px solid var(--border);
+        border-radius: 8px;
+        background: var(--background);
+        box-shadow: 6px 6px 0 color-mix(in srgb, var(--border) 85%, transparent);
+      }
+
+      .mac-menu-bar {
+        display: flex;
+        height: 30px;
+        align-items: center;
+        gap: 20px;
+        border-bottom: 1px solid color-mix(in srgb, var(--border) 28%, transparent);
+        padding: 0 14px;
+        background: color-mix(in srgb, var(--card) 90%, transparent);
+        font-size: 12px;
+        user-select: none;
+      }
+
+      .mac-menu-bar button {
+        border: 0;
+        padding: 3px 7px;
+        background: transparent;
+        cursor: pointer;
+        font-weight: 700;
+      }
+
+      .mac-menu-bar button[aria-expanded="true"] {
+        border-radius: 4px;
+        background: var(--muted);
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: 250px minmax(0, 1fr);
+        height: calc(100% - 30px);
+      }
+
+      .sidebar {
+        position: relative;
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        border-right: 2px solid var(--border);
+        background: var(--sidebar);
+      }
+
+      .panel-header {
+        display: flex;
+        height: 48px;
+        flex: 0 0 48px;
+        align-items: center;
+        gap: 8px;
+        border-bottom: 2px solid var(--border);
+        padding: 0 12px;
+        background: var(--background);
+      }
+
+      .traffic-lights {
+        display: flex;
+        gap: 7px;
+        margin-right: 4px;
+      }
+
+      .traffic-light {
+        width: 11px;
+        height: 11px;
+        border: 1px solid #141111;
+        border-radius: 50%;
+      }
+
+      .traffic-light:nth-child(1) { background: #ff5f57; }
+      .traffic-light:nth-child(2) { background: #febc2e; }
+      .traffic-light:nth-child(3) { background: #28c840; }
+
+      .new-chat {
+        display: flex;
+        min-width: 0;
+        flex: 1;
+        height: 30px;
+        align-items: center;
+        justify-content: space-between;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        padding: 0 9px;
+        background: var(--pink);
+        color: #141111;
+        box-shadow: var(--hard-shadow-sm);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .shortcut {
+        border: 1px solid #141111;
+        padding: 1px 4px;
+        background: #fffdf8;
+        font: 700 9px var(--mono);
+      }
+
+      .session-list {
+        min-height: 0;
+        flex: 1;
+        overflow: hidden;
+        padding: 16px 9px;
+      }
+
+      .section-label {
+        margin: 0 8px 7px;
+        color: var(--muted-foreground);
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .session-row {
+        display: flex;
+        min-height: 34px;
+        align-items: center;
+        margin-bottom: 3px;
+        border: 2px solid transparent;
+        border-radius: var(--radius);
+        padding: 0 8px;
+        color: var(--muted-foreground);
+        font-size: 12px;
+      }
+
+      .session-row.active {
+        border-color: var(--border);
+        background: var(--card);
+        color: var(--foreground);
+        box-shadow: var(--hard-shadow-sm);
+        font-weight: 700;
+      }
+
+      .session-row span:first-child {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .session-row time {
+        margin-left: auto;
+        font: 400 9px var(--mono);
+      }
+
+      .sidebar-footer {
+        flex: 0 0 auto;
+        border-top: 2px solid var(--border);
+        padding: 9px;
+        background: var(--accent);
+        color: #141111;
+      }
+
+      .settings-button {
+        width: 100%;
+        min-height: 30px;
+        border: 2px solid #141111;
+        border-radius: var(--radius);
+        background: #fffdf8;
+        color: #141111;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .chat {
+        position: relative;
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        overflow: hidden;
+        background: var(--card);
+      }
+
+      .chat .panel-header {
+        padding: 0 16px;
+      }
+
+      .chat-title {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .header-meta {
+        margin-left: auto;
+        color: var(--muted-foreground);
+        font: 700 9px var(--mono);
+      }
+
+      .chat-scroll {
+        min-height: 0;
+        flex: 1;
+        overflow: hidden;
+        padding: 34px clamp(28px, 6vw, 84px) 24px;
+      }
+
+      .message {
+        max-width: 720px;
+        margin: 0 auto 26px;
+      }
+
+      .message-role {
+        display: inline-flex;
+        min-height: 22px;
+        align-items: center;
+        border: 2px solid var(--border);
+        border-radius: 4px;
+        padding: 0 7px;
+        background: var(--cyan);
+        color: #141111;
+        font-size: 10px;
+        font-weight: 850;
+      }
+
+      .message.user .message-role {
+        background: var(--accent);
+      }
+
+      .message p {
+        margin: 10px 0 0;
+        line-height: 1.7;
+      }
+
+      .message.user p {
+        display: inline-block;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        padding: 10px 12px;
+        background: var(--background);
+      }
+
+      .code-line {
+        margin-top: 12px;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        padding: 12px;
+        background: #171615;
+        color: #eee8de;
+        font: 11px/1.6 var(--mono);
+      }
+
+      .composer-wrap {
+        padding: 12px clamp(28px, 6vw, 84px) 18px;
+      }
+
+      .composer {
+        max-width: 760px;
+        min-height: 78px;
+        margin: 0 auto;
+        border: 2px solid var(--border);
+        border-radius: 8px;
+        padding: 12px 14px;
+        background: var(--background);
+        box-shadow: var(--hard-shadow);
+      }
+
+      .composer-placeholder {
+        color: var(--muted-foreground);
+        font-size: 12px;
+      }
+
+      .composer-footer {
+        display: flex;
+        align-items: center;
+        margin-top: 18px;
+        color: var(--muted-foreground);
+        font: 700 9px var(--mono);
+      }
+
+      .send-button {
+        min-height: 26px;
+        margin-left: auto;
+        border: 2px solid var(--border);
+        border-radius: 4px;
+        padding: 0 9px;
+        background: var(--foreground);
+        color: var(--background);
+        font-size: 10px;
+        font-weight: 800;
+      }
+
+      .button {
+        min-height: 30px;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        padding: 0 10px;
+        background: var(--card);
+        box-shadow: var(--hard-shadow-sm);
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .button.primary {
+        background: var(--foreground);
+        color: var(--background);
+      }
+
+      .button.success {
+        background: var(--green);
+        color: #141111;
+      }
+
+      .button.danger {
+        background: var(--destructive);
+        color: #fffdf8;
+      }
+
+      .button.ghost {
+        border-color: transparent;
+        background: transparent;
+        box-shadow: none;
+        color: var(--muted-foreground);
+      }
+
+      .update-surface {
+        z-index: 6;
+      }
+
+      .update-surface[hidden],
+      .native-menu[hidden],
+      .restart-screen[hidden],
+      .settings-sheet[hidden] {
+        display: none;
+      }
+
+      .surface-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .surface-copy {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .surface-copy strong {
+        display: block;
+        font-size: 12px;
+      }
+
+      .surface-copy p {
+        margin: 3px 0 0;
+        color: var(--muted-foreground);
+        font-size: 11px;
+        line-height: 1.35;
+      }
+
+      .surface-actions {
+        display: flex;
+        flex: 0 0 auto;
+        gap: 7px;
+      }
+
+      .status-mark {
+        display: grid;
+        width: 30px;
+        height: 30px;
+        flex: 0 0 30px;
+        place-items: center;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--cyan);
+        color: #141111;
+        font: 900 10px var(--mono);
+      }
+
+      .status-mark.success { background: var(--green); }
+      .status-mark.error { background: var(--destructive); color: #fffdf8; }
+      .status-mark.ready { background: var(--accent); }
+
+      .progress-track {
+        height: 7px;
+        margin-top: 8px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        background: var(--muted);
+      }
+
+      .progress-bar {
+        width: 0%;
+        height: 100%;
+        background: var(--cyan);
+        transition: width 220ms ease;
+      }
+
+      .variant-inline .update-surface {
+        position: absolute;
+        top: 48px;
+        right: 0;
+        left: 0;
+        border-bottom: 2px solid var(--border);
+        padding: 10px 14px;
+        background: var(--accent);
+      }
+
+      .variant-inline .update-surface[data-state="downloading"] {
+        background: var(--card);
+      }
+
+      .variant-inline .update-surface[data-state="ready"] {
+        background: var(--green);
+      }
+
+      .variant-inline .update-surface[data-state="error"] {
+        background: color-mix(in srgb, var(--destructive) 24%, var(--card));
+      }
+
+      .variant-toast .update-surface {
+        position: absolute;
+        right: 18px;
+        bottom: 18px;
+        width: min(372px, calc(100% - 36px));
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        padding: 13px;
+        background: var(--card);
+        box-shadow: var(--hard-shadow);
+      }
+
+      .variant-toast .update-surface[data-state="available"] { border-top: 7px solid var(--accent); }
+      .variant-toast .update-surface[data-state="downloading"] { border-top: 7px solid var(--cyan); }
+      .variant-toast .update-surface[data-state="ready"] { border-top: 7px solid var(--green); }
+      .variant-toast .update-surface[data-state="error"] { border-top: 7px solid var(--destructive); }
+
+      .variant-hub .sidebar-update {
+        position: relative;
+        display: flex;
+        width: 100%;
+        min-height: 38px;
+        align-items: center;
+        margin-bottom: 8px;
+        border: 2px solid #141111;
+        border-radius: var(--radius);
+        padding: 6px 8px;
+        background: #fffdf8;
+        color: #141111;
+        box-shadow: 2px 2px 0 #141111;
+        cursor: default;
+        text-align: left;
+        transition:
+          transform 150ms ease,
+          box-shadow 150ms ease,
+          background-color 150ms ease;
+      }
+
+      .variant-hub .sidebar-update-head {
+        display: flex;
+        width: 100%;
+        min-width: 0;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .variant-hub .sidebar-update strong,
+      .variant-hub .sidebar-update span {
+        display: block;
+      }
+
+      .variant-hub .sidebar-update strong {
+        flex: 0 1 auto;
+        overflow: hidden;
+        font-size: 11px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .variant-hub .sidebar-update small {
+        flex: 0 0 auto;
+        border: 1px solid #141111;
+        border-radius: 3px;
+        padding: 1px 4px;
+        background: #ffd440;
+        font: 700 8px var(--mono);
+      }
+
+      .variant-hub .sidebar-update-actions {
+        display: flex;
+        flex: 0 0 auto;
+        gap: 4px;
+      }
+
+      .variant-hub .sidebar-update-action {
+        min-height: 22px;
+        border: 1px solid #141111;
+        border-radius: 3px;
+        padding: 0 5px;
+        background: #fffdf8;
+        color: #141111;
+        cursor: pointer;
+        font-size: 9px;
+        font-weight: 800;
+      }
+
+      .variant-hub .sidebar-update-action.primary {
+        background: #141111;
+        color: #fffdf8;
+      }
+
+      .variant-hub .sidebar-update-action:active {
+        transform: translate(1px, 1px);
+      }
+
+      .variant-hub .sidebar-update span {
+        min-width: 0;
+        flex: 1;
+        overflow: hidden;
+        margin: 0;
+        color: #716b64;
+        font-size: 9px;
+        line-height: 1;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .variant-hub .sidebar-update .progress-track {
+        position: absolute;
+        right: 6px;
+        bottom: 2px;
+        left: 6px;
+        height: 3px;
+        margin: 0;
+        border-color: #141111;
+      }
+
+      .variant-hub .update-surface {
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        width: 332px;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        padding: 12px;
+        background: var(--card);
+        box-shadow: var(--hard-shadow);
+      }
+
+      .native-menu {
+        position: absolute;
+        z-index: 15;
+        top: 30px;
+        left: 8px;
+        width: 260px;
+        border: 1px solid #aaa;
+        border-radius: 8px;
+        padding: 6px;
+        background: rgba(246, 246, 246, 0.98);
+        color: #181818;
+        box-shadow: 0 12px 34px rgba(0, 0, 0, 0.26);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      .menu-row {
+        display: flex;
+        width: 100%;
+        min-height: 30px;
+        align-items: center;
+        border: 0;
+        border-radius: 5px;
+        padding: 0 10px;
+        background: transparent;
+        color: #181818;
+        cursor: default;
+        text-align: left;
+      }
+
+      .menu-row.actionable {
+        cursor: pointer;
+      }
+
+      .menu-row.actionable:hover {
+        background: #287cf4;
+        color: white;
+      }
+
+      .menu-row:disabled {
+        color: #888;
+      }
+
+      .menu-separator {
+        height: 1px;
+        margin: 5px 8px;
+        background: #d0d0d0;
+      }
+
+      .menu-shortcut {
+        margin-left: auto;
+        color: inherit;
+        opacity: 0.58;
+      }
+
+      .settings-sheet {
+        position: absolute;
+        z-index: 10;
+        inset: 0;
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        background: var(--background);
+      }
+
+      .settings-nav {
+        border-right: 2px solid var(--border);
+        padding: 22px 12px;
+        background: var(--sidebar);
+      }
+
+      .settings-nav strong {
+        display: block;
+        margin: 0 8px 18px;
+        font-size: 14px;
+      }
+
+      .settings-nav button {
+        width: 100%;
+        min-height: 34px;
+        border: 2px solid transparent;
+        border-radius: var(--radius);
+        background: transparent;
+        text-align: left;
+      }
+
+      .settings-nav button.active {
+        border-color: var(--border);
+        background: var(--accent);
+        color: #141111;
+        box-shadow: var(--hard-shadow-sm);
+        font-weight: 800;
+      }
+
+      .settings-content {
+        padding: 52px clamp(32px, 8vw, 96px);
+      }
+
+      .settings-content h2 {
+        margin: 0 0 8px;
+        font-size: 24px;
+        letter-spacing: -0.04em;
+      }
+
+      .settings-content > p {
+        margin: 0 0 30px;
+        color: var(--muted-foreground);
+      }
+
+      .settings-card {
+        max-width: 680px;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--card);
+        box-shadow: var(--hard-shadow);
+      }
+
+      .settings-row {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 16px;
+      }
+
+      .settings-row + .settings-row {
+        border-top: 2px solid var(--border);
+      }
+
+      .settings-row-copy {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .settings-row-copy strong,
+      .settings-row-copy span {
+        display: block;
+      }
+
+      .settings-row-copy span {
+        margin-top: 4px;
+        color: var(--muted-foreground);
+        font-size: 11px;
+      }
+
+      .restart-screen {
+        position: absolute;
+        z-index: 30;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: var(--background);
+      }
+
+      .restart-card {
+        width: min(430px, calc(100% - 40px));
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        padding: 24px;
+        background: var(--card);
+        box-shadow: var(--hard-shadow);
+        text-align: center;
+      }
+
+      .restart-card .status-mark {
+        margin: 0 auto 14px;
+      }
+
+      .restart-card h2 {
+        margin: 0;
+        font-size: 20px;
+      }
+
+      .restart-card p {
+        margin: 8px 0 0;
+        color: var(--muted-foreground);
+        line-height: 1.5;
+      }
+
+      .restart-card .progress-track {
+        margin-top: 18px;
+      }
+
+      .completed-toast {
+        position: absolute;
+        z-index: 12;
+        right: 18px;
+        bottom: 18px;
+        width: 340px;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        padding: 12px;
+        background: var(--green);
+        color: #141111;
+        box-shadow: 3px 3px 0 var(--border);
+      }
+
+      .completed-toast strong,
+      .completed-toast span {
+        display: block;
+      }
+
+      .completed-toast span {
+        margin-top: 3px;
+        font-size: 11px;
+      }
+
+      .flow-legend {
+        display: flex;
+        width: min(1200px, 100%);
+        margin: 18px auto 0;
+        gap: 8px;
+        overflow-x: auto;
+      }
+
+      .flow-step {
+        min-width: 118px;
+        flex: 1;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        padding: 8px 10px;
+        background: var(--card);
+        color: var(--muted-foreground);
+      }
+
+      .flow-step.active {
+        background: var(--accent);
+        color: #141111;
+        box-shadow: var(--hard-shadow-sm);
+      }
+
+      .flow-step b,
+      .flow-step span {
+        display: block;
+      }
+
+      .flow-step b {
+        font: 800 9px var(--mono);
+      }
+
+      .flow-step span {
+        margin-top: 3px;
+        font-size: 10px;
+      }
+
+      @media (max-width: 850px) {
+        .review-bar {
+          align-items: flex-start;
+          flex-wrap: wrap;
+        }
+        .review-title {
+          min-width: auto;
+        }
+        .review-actions {
+          margin-left: 0;
+        }
+        .stage-wrap {
+          padding: 12px;
+        }
+        .app-window {
+          min-height: 620px;
+        }
+        .workspace {
+          grid-template-columns: 190px minmax(0, 1fr);
+        }
+        .traffic-lights,
+        .header-meta {
+          display: none;
+        }
+        .chat-scroll {
+          padding-right: 24px;
+          padding-left: 24px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+          animation-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="review-bar">
+      <div class="review-title">
+        <strong>应用更新 · 完整生命周期交互稿</strong>
+        <span>DIVISOR AGENT / 03 DIRECTIONS</span>
+      </div>
+      <div class="variant-tabs" role="tablist" aria-label="选择设计方案">
+        <button class="variant-tab" role="tab" aria-selected="true" data-variant="inline">01 顶部状态条</button>
+        <button class="variant-tab" role="tab" aria-selected="false" data-variant="toast">02 右下角状态卡</button>
+        <button class="variant-tab" role="tab" aria-selected="false" data-variant="hub">03 系统菜单协同</button>
+      </div>
+      <div class="review-actions">
+        <button class="review-button" id="simulateError">模拟失败</button>
+        <button class="review-button" id="resetFlow">重置流程</button>
+        <button class="review-button" id="toggleTheme">切换深浅色</button>
+      </div>
+    </header>
+
+    <section class="design-note" aria-live="polite">
+      <strong id="variantName">方案 01 · 顶部状态条</strong>
+      <p id="variantDescription">上下文明确、无需遮挡内容，适合更新属于当前应用全局状态但仍需保持可见的场景。</p>
+    </section>
+
+    <main class="stage-wrap">
+      <section class="app-window variant-inline" id="appWindow">
+        <nav class="mac-menu-bar" aria-label="macOS 应用菜单演示">
+          <button id="appMenuTrigger" aria-expanded="false">Divisor Agent</button>
+          <span>文件</span>
+          <span>编辑</span>
+          <span>视图</span>
+          <span>窗口</span>
+        </nav>
+
+        <div class="native-menu" id="nativeMenu" hidden>
+          <button class="menu-row">关于 Divisor Agent</button>
+          <div class="menu-separator"></div>
+          <button class="menu-row actionable" id="openSettingsFromMenu">设置… <span class="menu-shortcut">⌘,</span></button>
+          <button class="menu-row actionable" id="checkFromMenu">检查更新…</button>
+          <div class="menu-separator"></div>
+          <button class="menu-row">服务</button>
+          <div class="menu-separator"></div>
+          <button class="menu-row">隐藏 Divisor Agent <span class="menu-shortcut">⌘H</span></button>
+          <button class="menu-row">退出 Divisor Agent <span class="menu-shortcut">⌘Q</span></button>
+        </div>
+
+        <div class="workspace">
+          <aside class="sidebar">
+            <header class="panel-header">
+              <div class="traffic-lights" aria-hidden="true">
+                <span class="traffic-light"></span><span class="traffic-light"></span><span class="traffic-light"></span>
+              </div>
+              <button class="new-chat">新对话 <span class="shortcut">⌘N</span></button>
+            </header>
+            <div class="session-list">
+              <p class="section-label">置顶</p>
+              <div class="session-row active"><span>应用更新交互设计</span><time>现在</time></div>
+              <div class="session-row"><span>Agent runtime 事件流</span><time>昨天</time></div>
+              <p class="section-label" style="margin-top: 22px">项目 · divisor-agent</p>
+              <div class="session-row"><span>Session tree 分支设计</span><time>周一</time></div>
+              <div class="session-row"><span>模型配置与回退策略</span><time>6/25</time></div>
+              <div class="session-row"><span>权限审批交互</span><time>6/23</time></div>
+            </div>
+            <footer class="sidebar-footer">
+              <div class="sidebar-update" id="sidebarUpdate" hidden aria-live="polite"></div>
+              <button class="settings-button" id="openSettings">设置</button>
+            </footer>
+          </aside>
+
+          <section class="chat">
+            <header class="panel-header">
+              <span class="chat-title">应用更新交互设计</span>
+              <span class="header-meta">CLAUDE SONNET 4 · DEFAULT</span>
+            </header>
+
+            <div class="update-surface" id="updateSurface" hidden aria-live="polite"></div>
+
+            <div class="chat-scroll">
+              <article class="message user">
+                <span class="message-role">USER</span>
+                <div><p>更新提醒不要打断当前 Agent 工作，但需要让用户明确知道下载与重启状态。</p></div>
+              </article>
+              <article class="message">
+                <span class="message-role">AGENT</span>
+                <p>我会把更新设计成渐进式状态：先轻提醒、接受后后台下载、完成时再请求重启。主动检查入口放在系统菜单和设置的“关于与更新”中。</p>
+                <div class="code-line">idle → checking → available → downloading → ready → restarting → completed</div>
+              </article>
+            </div>
+
+            <div class="composer-wrap">
+              <div class="composer">
+                <div class="composer-placeholder">继续描述你的想法，或输入 @ 添加文件…</div>
+                <div class="composer-footer">DEFAULT PERMISSIONS <button class="send-button">发送</button></div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <section class="settings-sheet" id="settingsSheet" hidden>
+          <aside class="settings-nav">
+            <strong>设置</strong>
+            <button>外观</button>
+            <button>Models</button>
+            <button>Skills</button>
+            <button class="active">关于与更新</button>
+            <button class="button ghost" id="closeSettings" style="margin-top: 24px">返回应用</button>
+          </aside>
+          <main class="settings-content">
+            <h2>关于与更新</h2>
+            <p>查看应用版本，并主动检查是否有可用更新。</p>
+            <section class="settings-card">
+              <div class="settings-row">
+                <div class="settings-row-copy"><strong>Divisor Agent</strong><span id="currentVersion">当前版本 1.0.0</span></div>
+                <span class="status-mark" id="versionMark">APP</span>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-copy"><strong id="settingsUpdateTitle">应用更新</strong><span id="settingsUpdateCopy">自动检查已开启。你也可以随时主动检查。</span></div>
+                <button class="button" id="checkFromSettings">检查更新</button>
+              </div>
+            </section>
+          </main>
+        </section>
+
+        <section class="restart-screen" id="restartScreen" hidden>
+          <div class="restart-card">
+            <span class="status-mark ready">APP</span>
+            <h2>正在完成更新</h2>
+            <p>Divisor Agent 正在安装 1.1.0，完成后会自动返回当前会话。</p>
+            <div class="progress-track"><div class="progress-bar" id="restartProgress"></div></div>
+          </div>
+        </section>
+
+        <aside class="completed-toast" id="completedToast" hidden aria-live="polite">
+          <strong>已更新至 Divisor Agent 1.1.0</strong>
+          <span>当前会话与工作状态已恢复。</span>
+        </aside>
+      </section>
+
+      <section class="flow-legend" aria-label="更新生命周期">
+        <div class="flow-step active" data-flow="idle"><b>01 · IDLE</b><span>等待自动提醒或主动检查</span></div>
+        <div class="flow-step" data-flow="checking"><b>02 · CHECKING</b><span>正在检查版本</span></div>
+        <div class="flow-step" data-flow="available"><b>03 · AVAILABLE</b><span>轻提醒新版本</span></div>
+        <div class="flow-step" data-flow="downloading"><b>04 · DOWNLOAD</b><span>后台下载与进度</span></div>
+        <div class="flow-step" data-flow="ready"><b>05 · READY</b><span>等待用户重启</span></div>
+        <div class="flow-step" data-flow="restarting"><b>06 · INSTALL</b><span>安装与恢复工作区</span></div>
+        <div class="flow-step" data-flow="completed"><b>07 · COMPLETE</b><span>更新完成轻反馈</span></div>
+      </section>
+    </main>
+
+    <script>
+      (() => {
+        const variants = {
+          inline: {
+            name: "方案 01 · 顶部状态条",
+            description: "上下文明确、无需遮挡内容，适合更新属于当前应用全局状态但仍需保持可见的场景。",
+          },
+          toast: {
+            name: "方案 02 · 右下角状态卡",
+            description: "最轻量、最接近现有 Toast 心智；不改变页面布局，但下载期间会占用少量内容空间。",
+          },
+          hub: {
+            name: "方案 03 · 系统菜单协同（推荐）",
+            description: "主动检查走原生应用菜单，自动提醒与下载进度沉入侧栏；最贴近桌面应用习惯，也最少打断对话。",
+          },
+        };
+
+        const state = {
+          variant: "inline",
+          phase: "idle",
+          progress: 0,
+          timer: null,
+          currentVersion: "1.0.0",
+        };
+
+        const els = {
+          appWindow: document.querySelector("#appWindow"),
+          variantName: document.querySelector("#variantName"),
+          variantDescription: document.querySelector("#variantDescription"),
+          updateSurface: document.querySelector("#updateSurface"),
+          sidebarUpdate: document.querySelector("#sidebarUpdate"),
+          nativeMenu: document.querySelector("#nativeMenu"),
+          appMenuTrigger: document.querySelector("#appMenuTrigger"),
+          checkFromMenu: document.querySelector("#checkFromMenu"),
+          settingsSheet: document.querySelector("#settingsSheet"),
+          settingsUpdateTitle: document.querySelector("#settingsUpdateTitle"),
+          settingsUpdateCopy: document.querySelector("#settingsUpdateCopy"),
+          checkFromSettings: document.querySelector("#checkFromSettings"),
+          currentVersion: document.querySelector("#currentVersion"),
+          versionMark: document.querySelector("#versionMark"),
+          restartScreen: document.querySelector("#restartScreen"),
+          restartProgress: document.querySelector("#restartProgress"),
+          completedToast: document.querySelector("#completedToast"),
+        };
+
+        function clearTimer() {
+          if (state.timer) window.clearInterval(state.timer);
+          state.timer = null;
+        }
+
+        function setPhase(phase) {
+          state.phase = phase;
+          const flowPhase = phase === "deferred" ? "ready" : phase;
+          document.querySelectorAll(".flow-step").forEach((step) => {
+            step.classList.toggle("active", step.dataset.flow === flowPhase);
+          });
+          render();
+        }
+
+        function actionButtons(primaryLabel, primaryAction, secondaryLabel, secondaryAction) {
+          return `<div class="surface-actions">
+            ${secondaryLabel ? `<button class="button ghost" data-action="${secondaryAction}">${secondaryLabel}</button>` : ""}
+            ${primaryLabel ? `<button class="button ${primaryAction === "restart" ? "success" : "primary"}" data-action="${primaryAction}">${primaryLabel}</button>` : ""}
+          </div>`;
+        }
+
+        function surfaceContent() {
+          const progress = Math.round(state.progress);
+          if (state.phase === "checking") {
+            return `<div class="surface-row"><span class="status-mark">···</span><div class="surface-copy"><strong>正在检查更新</strong><p>正在连接更新服务，请稍候。</p></div></div>`;
+          }
+          if (state.phase === "available") {
+            return `<div class="surface-row"><span class="status-mark ready">NEW</span><div class="surface-copy"><strong>Divisor Agent 1.1.0 可用</strong><p>约 42 MB，可在后台下载，不会中断当前任务。</p></div>${actionButtons("下载更新", "download", "稍后", "later")}</div>`;
+          }
+          if (state.phase === "downloading") {
+            return `<div class="surface-row"><span class="status-mark">${progress}%</span><div class="surface-copy"><strong>正在后台下载 1.1.0</strong><p>${progress}% · ${Math.max(1, Math.ceil((100 - progress) / 18))} 分钟后完成</p><div class="progress-track"><div class="progress-bar" style="width:${progress}%"></div></div></div>${actionButtons("暂停", "pause", "", "")}</div>`;
+          }
+          if (state.phase === "paused") {
+            return `<div class="surface-row"><span class="status-mark ready">${Math.round(state.progress)}%</span><div class="surface-copy"><strong>下载已暂停</strong><p>当前进度会保留，可稍后继续。</p><div class="progress-track"><div class="progress-bar" style="width:${state.progress}%"></div></div></div>${actionButtons("继续下载", "resume", "取消", "cancel")}</div>`;
+          }
+          if (state.phase === "ready") {
+            return `<div class="surface-row"><span class="status-mark success">OK</span><div class="surface-copy"><strong>更新已准备好</strong><p>立即重启约需 10 秒；也可以在退出应用时安装。</p></div>${actionButtons("重启并更新", "restart", "退出时安装", "install-later")}</div>`;
+          }
+          if (state.phase === "error") {
+            return `<div class="surface-row"><span class="status-mark error">ERR</span><div class="surface-copy"><strong>更新下载失败</strong><p>网络连接中断，当前下载进度已保留。</p></div>${actionButtons("重试", "retry", "关闭", "later")}</div>`;
+          }
+          return "";
+        }
+
+        function renderSidebarHub() {
+          const visible = state.variant === "hub" && !["idle", "restarting"].includes(state.phase);
+          els.sidebarUpdate.hidden = !visible;
+          if (!visible) return;
+          const progress = Math.round(state.progress);
+          const copy = {
+            checking: ["正在检查更新", "正在连接更新服务"],
+            available: ["新版本 1.1.0", "约 42 MB · 可后台下载"],
+            downloading: ["正在下载更新", `${progress}% · 后台进行中`],
+            paused: ["下载已暂停", `${progress}% · 进度已保留`],
+            ready: ["更新已准备好", "现在重启或退出时安装"],
+            deferred: ["将在退出时安装", "当前工作不会中断"],
+            error: ["更新下载失败", "当前进度已保留"],
+            completed: ["已更新至 1.1.0", "当前工作区已恢复"],
+          }[state.phase];
+          const actions = {
+            available: [["稍后", "later", ""], ["下载", "download", "primary"]],
+            downloading: [["暂停", "pause", ""]],
+            paused: [["取消", "cancel", ""], ["继续", "resume", "primary"]],
+            ready: [["稍后", "install-later", ""], ["重启", "restart", "primary"]],
+            deferred: [["立即重启", "restart", "primary"]],
+            error: [["关闭", "later", ""], ["重试", "retry", "primary"]],
+          }[state.phase] ?? [];
+          const actionMarkup = actions.length
+            ? `<div class="sidebar-update-actions">${actions.map(([label, action, variant]) => `<button class="sidebar-update-action ${variant}" data-sidebar-action="${action}">${label}</button>`).join("")}</div>`
+            : "";
+          els.sidebarUpdate.innerHTML = `<div class="sidebar-update-head"><strong>${copy[0]}</strong><span>${copy[1]}</span>${actionMarkup}</div>${state.phase === "downloading" || state.phase === "paused" ? `<div class="progress-track"><div class="progress-bar" style="width:${progress}%"></div></div>` : ""}`;
+        }
+
+        function renderSettings() {
+          const map = {
+            idle: ["应用更新", "自动检查已开启。你也可以随时主动检查。", "检查更新", false],
+            checking: ["正在检查更新", "正在连接更新服务…", "检查中…", true],
+            available: ["发现新版本 1.1.0", "约 42 MB，可在后台安全下载。", "下载更新", false],
+            downloading: ["正在下载 1.1.0", `${Math.round(state.progress)}% · 下载将在后台继续`, "下载中…", true],
+            paused: ["下载已暂停", `已完成 ${Math.round(state.progress)}%`, "继续下载", false],
+            ready: ["更新已准备好", "重启应用即可完成安装。", "重启并更新", false],
+            deferred: ["将在退出时安装", "你也可以选择立即重启完成更新。", "立即重启", false],
+            error: ["无法完成更新", "网络连接中断，请重试。", "重试", false],
+            completed: ["已是最新版本", "Divisor Agent 1.1.0", "再次检查", false],
+          }[state.phase] || ["应用更新", "", "检查更新", false];
+          els.settingsUpdateTitle.textContent = map[0];
+          els.settingsUpdateCopy.textContent = map[1];
+          els.checkFromSettings.textContent = map[2];
+          els.checkFromSettings.disabled = map[3];
+          els.currentVersion.textContent = `当前版本 ${state.currentVersion}`;
+          els.versionMark.textContent = state.phase === "completed" ? "1.1" : "APP";
+        }
+
+        function render() {
+          const shouldShowSurface = state.variant !== "hub" && !["idle", "restarting", "completed", "deferred"].includes(state.phase);
+          els.updateSurface.hidden = !shouldShowSurface;
+          els.updateSurface.dataset.state = state.phase;
+          els.updateSurface.innerHTML = shouldShowSurface ? surfaceContent() : "";
+          els.checkFromMenu.textContent = state.phase === "checking" ? "正在检查更新…" : "检查更新…";
+          els.checkFromMenu.disabled = state.phase === "checking";
+          renderSidebarHub();
+          renderSettings();
+        }
+
+        function checkForUpdates() {
+          if (state.phase === "checking") return;
+          clearTimer();
+          setPhase("checking");
+          window.setTimeout(() => {
+            if (state.phase === "checking") setPhase("available");
+          }, 950);
+        }
+
+        function startDownload() {
+          clearTimer();
+          if (state.progress >= 100) state.progress = 0;
+          setPhase("downloading");
+          state.timer = window.setInterval(() => {
+            state.progress = Math.min(100, state.progress + 4 + Math.random() * 8);
+            if (state.progress >= 100) {
+              state.progress = 100;
+              clearTimer();
+              setPhase("ready");
+            } else {
+              render();
+            }
+          }, 280);
+        }
+
+        function restartAndInstall() {
+          clearTimer();
+          setPhase("restarting");
+          els.restartScreen.hidden = false;
+          els.restartProgress.style.width = "0%";
+          let progress = 0;
+          state.timer = window.setInterval(() => {
+            progress = Math.min(100, progress + 10);
+            els.restartProgress.style.width = `${progress}%`;
+            if (progress >= 100) {
+              clearTimer();
+              window.setTimeout(() => {
+                els.restartScreen.hidden = true;
+                state.currentVersion = "1.1.0";
+                setPhase("completed");
+                if (state.variant !== "hub") {
+                  els.completedToast.hidden = false;
+                  window.setTimeout(() => { els.completedToast.hidden = true; }, 4200);
+                }
+              }, 350);
+            }
+          }, 180);
+        }
+
+        function performAction(action) {
+          if (action === "download" || action === "resume" || action === "retry") startDownload();
+          if (action === "pause") { clearTimer(); setPhase("paused"); }
+          if (action === "cancel") { state.progress = 0; setPhase("idle"); }
+          if (action === "later") setPhase("idle");
+          if (action === "restart") restartAndInstall();
+          if (action === "install-later") {
+            if (state.variant === "hub") {
+              setPhase("deferred");
+            } else {
+              setPhase("idle");
+              els.completedToast.innerHTML = "<strong>将在退出应用时安装</strong><span>你可以继续当前工作，无需立即重启。</span>";
+              els.completedToast.hidden = false;
+              window.setTimeout(() => { els.completedToast.hidden = true; }, 3600);
+            }
+          }
+        }
+
+        function resetFlow() {
+          clearTimer();
+          state.progress = 0;
+          state.currentVersion = "1.0.0";
+          els.restartScreen.hidden = true;
+          els.completedToast.hidden = true;
+          els.settingsSheet.hidden = true;
+          setPhase("idle");
+          window.setTimeout(() => setPhase("available"), 500);
+        }
+
+        document.querySelectorAll(".variant-tab").forEach((tab) => {
+          tab.addEventListener("click", () => {
+            state.variant = tab.dataset.variant;
+            document.querySelectorAll(".variant-tab").forEach((item) => item.setAttribute("aria-selected", String(item === tab)));
+            els.appWindow.className = `app-window variant-${state.variant}`;
+            els.variantName.textContent = variants[state.variant].name;
+            els.variantDescription.textContent = variants[state.variant].description;
+            render();
+          });
+        });
+
+        els.updateSurface.addEventListener("click", (event) => {
+          const action = event.target.closest("[data-action]")?.dataset.action;
+          if (action) performAction(action);
+        });
+
+        els.sidebarUpdate.addEventListener("click", (event) => {
+          const action = event.target.closest("[data-sidebar-action]")?.dataset.sidebarAction;
+          if (action) performAction(action);
+        });
+
+        els.appMenuTrigger.addEventListener("click", () => {
+          const nextOpen = els.nativeMenu.hidden;
+          els.nativeMenu.hidden = !nextOpen;
+          els.appMenuTrigger.setAttribute("aria-expanded", String(nextOpen));
+        });
+
+        els.checkFromMenu.addEventListener("click", () => {
+          els.nativeMenu.hidden = true;
+          els.appMenuTrigger.setAttribute("aria-expanded", "false");
+          checkForUpdates();
+        });
+
+        function openSettings() {
+          els.nativeMenu.hidden = true;
+          els.appMenuTrigger.setAttribute("aria-expanded", "false");
+          els.settingsSheet.hidden = false;
+          renderSettings();
+        }
+
+        document.querySelector("#openSettings").addEventListener("click", openSettings);
+        document.querySelector("#openSettingsFromMenu").addEventListener("click", openSettings);
+        document.querySelector("#closeSettings").addEventListener("click", () => { els.settingsSheet.hidden = true; });
+
+        els.checkFromSettings.addEventListener("click", () => {
+          if (state.phase === "available") startDownload();
+          else if (state.phase === "paused" || state.phase === "error") startDownload();
+          else if (state.phase === "ready" || state.phase === "deferred") restartAndInstall();
+          else checkForUpdates();
+        });
+
+        document.querySelector("#simulateError").addEventListener("click", () => {
+          clearTimer();
+          state.progress = Math.max(state.progress, 38);
+          setPhase("error");
+        });
+        document.querySelector("#resetFlow").addEventListener("click", resetFlow);
+        document.querySelector("#toggleTheme").addEventListener("click", () => {
+          document.documentElement.dataset.theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+        });
+
+        document.addEventListener("click", (event) => {
+          if (!els.nativeMenu.hidden && !event.target.closest("#nativeMenu") && !event.target.closest("#appMenuTrigger")) {
+            els.nativeMenu.hidden = true;
+            els.appMenuTrigger.setAttribute("aria-expanded", "false");
+          }
+        });
+
+        render();
+        window.setTimeout(() => setPhase("available"), 600);
+      })();
+    </script>
+  </body>
+</html>
