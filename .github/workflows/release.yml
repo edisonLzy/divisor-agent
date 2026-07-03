@@ -86,11 +86,13 @@ jobs:
       - name: Package macOS
         if: runner.os == 'macOS'
         shell: bash
-        # Pin version via package.json — see comments in earlier PRs for why
-        # `--config.extraMetadata.version` isn't safe. Ad-hoc signing
-        # (`identity: "-"`) is configured in electron-builder.yml so the
-        # step doesn't need Developer ID secrets; if `CSC_LINK` is later
-        # provided by a maintainer the override below flips notarize back on.
+        # Pin version via package.json (see earlier PRs for why
+        # `--config.extraMetadata.version` isn't safe). With
+        # electron-builder 26.15.6, codesign runs against an explicit
+        # ad-hoc identity (config "identity: -") so it doesn't fall into
+        # the "empty password" branch that v26.8.1 was crashing on. If a
+        # maintainer later wires up `MACOS_CERTIFICATE` + notarize
+        # secrets, the conditional flips notarize back on.
         run: |
           NOTARIZE=false
           if [[ -n "$CSC_LINK" && -n "$APPLE_ID" && -n "$APPLE_APP_SPECIFIC_PASSWORD" && -n "$APPLE_TEAM_ID" ]]; then
