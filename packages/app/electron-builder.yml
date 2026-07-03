@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: app
+appId: com.edisonlzy.divisor-agent
+productName: Divisor Agent
 icon: resources/icon.png
 directories:
   buildResources: build
@@ -13,15 +13,25 @@ files:
 asarUnpack:
   - resources/**
 win:
-  executableName: app
+  executableName: divisor-agent
   icon: resources/icon.png
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
+  artifactName: Divisor-Agent-${version}-${arch}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 mac:
   icon: resources/icon.png
+  target:
+    - dmg
+    - zip
+  # Ad-hoc signing ("-") keeps unsigned development releases launchable on
+  # arm64. The release workflow unsets an empty CSC_LINK so electron-builder
+  # reaches this fallback instead of interpreting the empty value as a path.
+  identity: "-"
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     - NSCameraUsageDescription: Application requests access to the device's camera.
@@ -29,21 +39,33 @@ mac:
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
+  artifactName: Divisor-Agent-${version}-${arch}.${ext}
 dmg:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: Divisor-Agent-${version}-${arch}.${ext}
 linux:
   icon: resources/icon.png
   target:
     - AppImage
-    - snap
     - deb
-  maintainer: electronjs.org
+  # `package.json` `name` is `@divisor-agent/app`. electron-builder derives
+  # `executableName` from this and produces `@divisor-agentapp`, which
+  # AppImage rejects. Pin a clean binary name to side-step the char-set
+  # check entirely.
+  executableName: divisor-agent
+  maintainer: edisonLzy
   category: Utility
+  # The package name `@divisor-agent/app` produces a default deb filename
+  # `dist/@divisor-agent/app_0.0.x_amd64.deb`. fpm refuses `@` in the name
+  # and electron-builder doesn't mkdir the parent directory. Pin a clean
+  # explicit filename.
+  artifactName: Divisor-Agent-${version}-${arch}.${ext}
 appImage:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: Divisor-Agent-${version}-${arch}.${ext}
 npmRebuild: false
 publish:
-  provider: generic
-  url: https://example.com/auto-updates
+  provider: github
+  owner: edisonLzy
+  repo: divisor-agent
+  releaseType: release
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/

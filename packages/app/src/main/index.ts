@@ -3,6 +3,7 @@ import { join } from "path";
 import { app, BrowserWindow } from "electron";
 
 import { AgentPool } from "./agent-pool.js";
+import { AppUpdateManager } from "./app-updater.js";
 import { BrowserWindowManager } from "./browser-window/index.js";
 import { FileSystemManager } from "./file-system/index.js";
 
@@ -15,18 +16,22 @@ app.whenReady().then(() => {
 
   const browserWindowManager = new BrowserWindowManager(browserWindow);
 
+  const appUpdateManager = new AppUpdateManager(browserWindow);
+
   app.on("activate", () => {
     if (!browserWindow || browserWindow.isDestroyed()) {
       browserWindow = createWindow();
       agentPool.updateBrowserWindow(browserWindow);
       fsManager.updateBrowserWindow(browserWindow);
       browserWindowManager.updateBrowserWindow(browserWindow);
+      appUpdateManager.updateBrowserWindow(browserWindow);
     }
   });
 
   app.on("quit", () => {
     void fsManager.destroy();
     void browserWindowManager.destroy();
+    appUpdateManager.destroy();
     void agentPool.destroyAll();
   });
 });
