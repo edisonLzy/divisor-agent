@@ -49,9 +49,9 @@ const { appMock, autoUpdaterMock, ipcMainMock } = vi.hoisted(() => {
 vi.mock("electron", () => ({ app: appMock, ipcMain: ipcMainMock }));
 vi.mock("electron-updater", () => ({ default: { autoUpdater: autoUpdaterMock } }));
 
-import { UpdateManager } from "../../../src/main/updater/index.js";
+import { AppUpdateManager } from "../../../src/main/app-updater.js";
 
-describe("UpdateManager", () => {
+describe("AppUpdateManager", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     autoUpdaterMock.reset();
@@ -83,8 +83,8 @@ describe("UpdateManager", () => {
     });
     expect(autoUpdaterMock.downloadUpdate).not.toHaveBeenCalled();
     expect(send).toHaveBeenLastCalledWith(
-      "update_state",
-      expect.objectContaining({ status: "available", version: "1.0.2" }),
+      "app_update",
+      expect.objectContaining({ type: "app_update", status: "available", version: "1.0.2" }),
     );
     manager.destroy();
   });
@@ -106,8 +106,8 @@ describe("UpdateManager", () => {
     await manager.startUpdate();
 
     expect(send).toHaveBeenCalledWith(
-      "update_state",
-      expect.objectContaining({ status: "downloading", percent: 64.4 }),
+      "app_update",
+      expect.objectContaining({ type: "app_update", status: "downloading", percent: 64.4 }),
     );
     await expect(manager.getUpdateState()).resolves.toMatchObject({
       status: "downloaded",
@@ -115,7 +115,7 @@ describe("UpdateManager", () => {
     });
     expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled();
 
-    await vi.advanceTimersByTimeAsync(800);
+    await manager.installUpdate();
     expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledWith(false, true);
     manager.destroy();
   });
@@ -131,5 +131,5 @@ function createManager() {
       send,
     },
   };
-  return { manager: new UpdateManager(browserWindow as never), send };
+  return { manager: new AppUpdateManager(browserWindow as never), send };
 }

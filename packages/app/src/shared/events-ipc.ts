@@ -1,16 +1,16 @@
 import type { AgentEvent } from "@earendil-works/pi-agent-core";
 
+import type { AppUpdateEvent, AppUpdateIPC } from "./app-update-ipc";
 import type { FileSystemIPC } from "./file-system-ipc";
 import type { AgentModelsIPC } from "./models-ipc";
 import type { PermissionRequestedEvent } from "./permissions-ipc";
 import type { AgentSessionIPC } from "./session-ipc";
 import type { AgentSkillsIPC } from "./skills-ipc";
 import type { SystemIPC } from "./system-ipc";
-import type { UpdateIPC, UpdateState } from "./update-ipc";
 
 export type AgentSessionScope = "main" | "side-chat";
 type SessionTagged<T> = T & { scope: AgentSessionScope; sessionId: string };
-type AgentRuntimeEvent = AgentEvent | PermissionRequestedEvent;
+type AgentRuntimeEvent = AgentEvent | PermissionRequestedEvent | AppUpdateEvent;
 
 // main -> renderer events. These are verified at compile-time to be a subset of the
 export const ALLOWED_MAIN_EXPOSE_EVENTS = [
@@ -25,19 +25,15 @@ export const ALLOWED_MAIN_EXPOSE_EVENTS = [
   "tool_execution_update",
   "tool_execution_end",
   "permission_requested",
-  "update_state",
+  "app_update",
 ] as const;
 
 /**
  * Each agent event is tagged with the sessionId so the renderer can
  * route multi-session events to the correct session's state store.
  */
-export type AllowedAgentExposeEvents = {
+export type AllowedMainExposeEvents = {
   [K in AgentRuntimeEvent as K["type"]]: SessionTagged<K>;
-};
-
-export type AllowedMainExposeEvents = AllowedAgentExposeEvents & {
-  update_state: UpdateState;
 };
 
 // render -> main
@@ -47,7 +43,7 @@ export type AgentRuntimeIPC = AgentModelsIPC &
   AgentSkillsIPC &
   FileSystemIPC &
   SystemIPC &
-  UpdateIPC;
+  AppUpdateIPC;
 
 export const ALLOWED_RENDER_INVOKE_EVENTS: (keyof AgentRuntimeIPC)[] = [
   "setModel",
@@ -72,6 +68,7 @@ export const ALLOWED_RENDER_INVOKE_EVENTS: (keyof AgentRuntimeIPC)[] = [
   "getUpdateState",
   "checkForUpdates",
   "startUpdate",
+  "installUpdate",
 ];
 
 export type AllowedRenderInvokeEvents = (typeof ALLOWED_RENDER_INVOKE_EVENTS)[number];

@@ -3,13 +3,16 @@ import type { BrowserWindow } from "electron";
 import electronUpdater from "electron-updater";
 import type { ProgressInfo, UpdateInfo } from "electron-updater";
 
-import type { UpdateIPC, UpdateState } from "../../shared/update-ipc.js";
-import { AbstractAgentIPCHandler } from "../agent-ipc.js";
+import type { AppUpdateIPC, AppUpdateState } from "../shared/app-update-ipc.js";
+import { AbstractAgentIPCHandler } from "./agent-ipc.js";
 
 const { autoUpdater } = electronUpdater;
 
-export class UpdateManager extends AbstractAgentIPCHandler<UpdateIPC> implements UpdateIPC {
-  private state: UpdateState = {
+export class AppUpdateManager
+  extends AbstractAgentIPCHandler<AppUpdateIPC>
+  implements AppUpdateIPC
+{
+  private state: AppUpdateState = {
     status: "idle",
     currentVersion: app.getVersion(),
   };
@@ -30,7 +33,7 @@ export class UpdateManager extends AbstractAgentIPCHandler<UpdateIPC> implements
     }
   }
 
-  getUpdateState = async (): Promise<UpdateState> => this.state;
+  getUpdateState = async (): Promise<AppUpdateState> => this.state;
 
   checkForUpdates = async (): Promise<void> => {
     if (
@@ -70,6 +73,11 @@ export class UpdateManager extends AbstractAgentIPCHandler<UpdateIPC> implements
     }
   };
 
+  installUpdate = async (): Promise<void> => {
+    if (this.state.status !== "downloaded") return;
+    autoUpdater.quitAndInstall(false, true);
+  };
+
   destroy() {
     if (this.checkTimer) clearTimeout(this.checkTimer);
     autoUpdater.off("checking-for-update", this.handleCheckingForUpdate);
@@ -85,10 +93,12 @@ export class UpdateManager extends AbstractAgentIPCHandler<UpdateIPC> implements
     this.typedIpcMain.handle("getUpdateState", this.getUpdateState);
     this.typedIpcMain.handle("checkForUpdates", this.checkForUpdates);
     this.typedIpcMain.handle("startUpdate", this.startUpdate);
+    this.typedIpcMain.handle("installUpdate", this.installUpdate);
     return () => {
       this.typedIpcMain.removeHandler("getUpdateState");
       this.typedIpcMain.removeHandler("checkForUpdates");
       this.typedIpcMain.removeHandler("startUpdate");
+      this.typedIpcMain.removeHandler("installUpdate");
     };
   }
 
@@ -120,7 +130,8 @@ export class UpdateManager extends AbstractAgentIPCHandler<UpdateIPC> implements
   };
 
   private handleDownloadProgress = (progress: ProgressInfo) => {
-    const version = "version" in this.state ? this.state.version : app.getVersion();
+    const version =
+      "version" in this.state ? (this.state.version ?? app.getVersion()) : app.getVersion();
     this.setState({
       status: "downloading",
       currentVersion: app.getVersion(),
@@ -138,17 +149,22 @@ export class UpdateManager extends AbstractAgentIPCHandler<UpdateIPC> implements
       currentVersion: app.getVersion(),
       version: info.version,
     });
-    setTimeout(() => autoUpdater.quitAndInstall(false, true), 800);
   };
 
   private handleError = (error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
+    const version = "version" in this.state ? this.state.version : undefined;
     console.error("Application update failed:", error);
-    this.setState({ status: "error", currentVersion: app.getVersion(), message });
+    this.setState({
+      status: "error",
+      currentVersion: app.getVersion(),
+      ...(version ? { version } : {}),
+      message,
+    });
   };
 
-  private setState(state: UpdateState) {
+  private setState(state: AppUpdateState) {
     this.state = state;
-    this.sendMessageToRenderer("update_state", state);
+    this.sendMessageToRenderer("app_update", { ...state, type: "app_update" });
   }
 }

@@ -1,12 +1,12 @@
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
-import type { AllowedAgentExposeEvents } from "@shared/events-ipc";
+import type { AllowedMainExposeEvents } from "@shared/events-ipc";
 import { useEffect, useRef } from "react";
 
 export type AgentEventHandlers = {
-  [K in keyof AllowedAgentExposeEvents]?: (event: AllowedAgentExposeEvents[K]) => void;
+  [K in keyof AllowedMainExposeEvents]?: (event: AllowedMainExposeEvents[K]) => void;
 };
 
-type AgentEventPayload = AllowedAgentExposeEvents[keyof AllowedAgentExposeEvents];
+type AgentEventPayload = AllowedMainExposeEvents[keyof AllowedMainExposeEvents];
 
 interface AgentEventSubscriptionOptions {
   shouldHandleEvent?: (event: AgentEventPayload) => boolean;
@@ -41,7 +41,7 @@ export function useSubscribeAgentEvents(
     const unsubscribes: (() => void)[] = [];
 
     for (const [event] of Object.entries(handlersRef.current)) {
-      const eventName = event as keyof AllowedAgentExposeEvents;
+      const eventName = event as keyof AllowedMainExposeEvents;
       unsubscribes.push(
         on(eventName, ((payload: unknown) => {
           const eventPayload = payload as AgentEventPayload;

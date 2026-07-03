@@ -1,4 +1,4 @@
-export type UpdateState =
+export type AppUpdateState =
   | {
       status: "idle" | "checking" | "not-available";
       currentVersion: string;
@@ -27,11 +27,17 @@ export type UpdateState =
   | {
       status: "error";
       currentVersion: string;
+      version?: string;
       message: string;
     };
 
-export interface UpdateIPC {
-  getUpdateState(): Promise<UpdateState>;
+export type AppUpdateEvent = AppUpdateState & {
+  type: "app_update";
+};
+
+export interface AppUpdateIPC {
+  getUpdateState(): Promise<AppUpdateState>;
   checkForUpdates(): Promise<void>;
   startUpdate(): Promise<void>;
+  installUpdate(): Promise<void>;
 }

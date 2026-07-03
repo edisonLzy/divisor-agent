@@ -3,9 +3,9 @@ import { join } from "path";
 import { app, BrowserWindow } from "electron";
 
 import { AgentPool } from "./agent-pool.js";
+import { AppUpdateManager } from "./app-updater.js";
 import { BrowserWindowManager } from "./browser-window/index.js";
 import { FileSystemManager } from "./file-system/index.js";
-import { UpdateManager } from "./updater/index.js";
 
 app.whenReady().then(() => {
   let browserWindow: BrowserWindow | null = createWindow();
@@ -16,7 +16,7 @@ app.whenReady().then(() => {
 
   const browserWindowManager = new BrowserWindowManager(browserWindow);
 
-  const updateManager = new UpdateManager(browserWindow);
+  const appUpdateManager = new AppUpdateManager(browserWindow);
 
   app.on("activate", () => {
     if (!browserWindow || browserWindow.isDestroyed()) {
@@ -24,14 +24,14 @@ app.whenReady().then(() => {
       agentPool.updateBrowserWindow(browserWindow);
       fsManager.updateBrowserWindow(browserWindow);
       browserWindowManager.updateBrowserWindow(browserWindow);
-      updateManager.updateBrowserWindow(browserWindow);
+      appUpdateManager.updateBrowserWindow(browserWindow);
     }
   });
 
   app.on("quit", () => {
     void fsManager.destroy();
     void browserWindowManager.destroy();
-    updateManager.destroy();
+    appUpdateManager.destroy();
     void agentPool.destroyAll();
   });
 });

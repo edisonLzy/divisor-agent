@@ -1,9 +1,12 @@
 import { Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import { AppUpdate } from "./app-update";
+
 export function BottomActions() {
   return (
-    <div className="shrink-0 border-t-2 border-sidebar-border bg-accent p-3">
+    <div className="flex shrink-0 flex-col gap-2 border-t-2 border-sidebar-border bg-accent p-3">
+      <AppUpdate />
       <SettingsButton />
     </div>
   );
