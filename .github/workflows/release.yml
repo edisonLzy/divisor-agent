@@ -43,7 +43,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @divisor-agent/app typecheck
-      - run: pnpm vitest run packages/app/__tests__/main/updater/update-manager.test.ts
+      - run: pnpm test
 
   build:
     name: Build ${{ matrix.name }}
