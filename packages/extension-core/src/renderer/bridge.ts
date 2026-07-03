@@ -30,6 +30,9 @@ export class RendererExtensionBridge {
           registerRehypePlugins: (composer) =>
             this.registry.registerStreamdownRehypePlugins(composer),
         },
+        promptInput: {
+          registerExtension: (extension) => this.registry.registerTipTapExtension(extension),
+        },
       });
     }
 

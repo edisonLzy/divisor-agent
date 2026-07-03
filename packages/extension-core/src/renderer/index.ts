@@ -6,6 +6,7 @@ export {
   useArtifact,
   useAssistantBlock,
   useExtensions,
+  usePluginPromptInputExtensions,
   usePluginSlashCommands,
   useSharedPromptEditor,
 } from "./hooks";
@@ -31,6 +32,7 @@ export type {
   RendererSlashCommandRunContext,
   StreamdownRehypePluginComposer,
   StreamdownRehypePlugins,
+  TipTapExtensionRegistration,
 } from "./define";
 export type { RendererExtensionIPC } from "./ipc";
 export type { ParsedExtensionPart } from "./parser";

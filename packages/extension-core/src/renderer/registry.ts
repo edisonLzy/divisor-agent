@@ -9,6 +9,7 @@ import type {
   StreamdownComponentComposerMap,
   StreamdownRehypePluginComposer,
   StreamdownRehypePlugins,
+  TipTapExtensionRegistration,
 } from "./define";
 
 type StreamdownComponentRegistration = {
@@ -22,6 +23,8 @@ export class RendererExtensionRegistry {
   private artifacts = new Map<string, ArtifactRegistration<any>>();
   private streamdownComponents: StreamdownComponentRegistration[] = [];
   private streamdownRehypePluginComposers: StreamdownRehypePluginComposer[] = [];
+  private tipTapExtensions: TipTapExtensionRegistration[] = [];
+  private tipTapExtensionNames = new Set<string>();
 
   registerExtension(extension: ExtensionMetadata) {
     if (this.extensions.has(extension.id)) {
@@ -48,6 +51,20 @@ export class RendererExtensionRegistry {
 
   registerStreamdownRehypePlugins(composer: StreamdownRehypePluginComposer) {
     this.streamdownRehypePluginComposers.push(composer);
+  }
+
+  /**
+   * Surface TipTap extension name collisions at registration time rather than
+   * deep inside TipTap's editor constructor where the error is harder to map
+   * back to the offending plugin.
+   */
+  registerTipTapExtension(extension: TipTapExtensionRegistration) {
+    const name = extension.name;
+    if (this.tipTapExtensionNames.has(name)) {
+      throw new Error(`Duplicate TipTap extension name: ${name}`);
+    }
+    this.tipTapExtensionNames.add(name);
+    this.tipTapExtensions.push(extension);
   }
 
   listExtensions() {
@@ -90,6 +107,10 @@ export class RendererExtensionRegistry {
       (plugins, compose) => compose(plugins),
       basePlugins,
     );
+  }
+
+  getTipTapExtensions() {
+    return [...this.tipTapExtensions];
   }
 }
 

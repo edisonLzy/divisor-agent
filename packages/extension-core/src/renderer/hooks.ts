@@ -13,6 +13,11 @@ export function usePluginSlashCommands() {
   return registry.getSlashCommands();
 }
 
+export function usePluginPromptInputExtensions() {
+  const registry = useExtensionRegistry();
+  return registry.getTipTapExtensions();
+}
+
 export function useAssistantBlock(type: string) {
   const registry = useExtensionRegistry();
   return registry.getAssistantBlock(type);

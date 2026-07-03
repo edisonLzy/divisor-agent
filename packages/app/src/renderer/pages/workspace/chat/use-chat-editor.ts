@@ -1,4 +1,7 @@
-import { usePluginSlashCommands } from "@divisor-agent/extension-core/renderer";
+import {
+  usePluginPromptInputExtensions,
+  usePluginSlashCommands,
+} from "@divisor-agent/extension-core/renderer";
 import { promptGhostSuggestionExtension } from "@renderer/components/richtext/extensions/prompt-ghost-suggestion";
 import {
   type SlashCommandSelection,
@@ -36,6 +39,7 @@ export function useChatEditor({
 
   const skillItems = useSkillsCommandItems();
   const pluginCommands = usePluginSlashCommands();
+  const pluginPromptInputExtensions = usePluginPromptInputExtensions();
   const pluginItems = useMemo(
     () =>
       pluginCommands.map(
@@ -97,6 +101,7 @@ export function useChatEditor({
           placeholder: "Ask anything...",
         }),
         ...(extensions ?? []),
+        ...pluginPromptInputExtensions,
         skillNode,
       ],
       content,
