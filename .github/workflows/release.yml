@@ -86,15 +86,16 @@ jobs:
       - name: Package macOS
         if: runner.os == 'macOS'
         shell: bash
+        # Pin version via package.json — see comments in earlier PRs for why
+        # `--config.extraMetadata.version` isn't safe. Ad-hoc signing
+        # (`identity: "-"`) is configured in electron-builder.yml so the
+        # step doesn't need Developer ID secrets; if `CSC_LINK` is later
+        # provided by a maintainer the override below flips notarize back on.
         run: |
           NOTARIZE=false
           if [[ -n "$CSC_LINK" && -n "$APPLE_ID" && -n "$APPLE_APP_SPECIFIC_PASSWORD" && -n "$APPLE_TEAM_ID" ]]; then
             NOTARIZE=true
           fi
-          # electron-builder v26.8.1 trips over `--config.extraMetadata.version=...`
-          # (it tries to resolve "app" as an input file after that flag),
-          # so pin the version via package.json instead and run --arm64 to
-          # sidestep the `--universal` lipo bug on macos-latest.
           cd packages/app
           node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json'));p.version=process.env.RELEASE_VERSION;fs.writeFileSync('package.json',JSON.stringify(p,null,2));"
           pnpm exec electron-builder --mac --arm64 --publish never \
