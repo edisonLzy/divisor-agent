@@ -22,6 +22,8 @@
     "@codemirror/state": "^6.0.0",
     "@codemirror/view": "^6.0.0",
     "@divisor-agent/extension-core": "workspace:*",
+    "@tiptap/core": "catalog:",
+    "@tiptap/react": "^3.22.5",
     "@types/react": "catalog:",
     "lucide-react": "catalog:",
     "react": "catalog:"

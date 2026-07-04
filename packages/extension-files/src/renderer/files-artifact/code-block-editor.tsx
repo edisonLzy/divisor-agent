@@ -59,8 +59,8 @@ import {
 import { createRoot, type Root } from "react-dom/client";
 
 import { HIGHLIGHT_DECORATION_CLASS } from "../../common/constants";
-import type { FileComment, FileCommentRange } from "./index";
 import { loadLanguageExtension } from "./language-from-path";
+import type { FileComment, FileCommentRange } from "./types";
 
 const HIGHLIGHT_DURATION_MS = 1000;
 
@@ -231,6 +231,8 @@ interface CodeBlockEditorProps {
   endLine?: number;
   error?: string;
   filePath?: string;
+  focusCommentId?: string;
+  focusCommentRequestId?: number;
   highlightExpiresAt?: number;
   highlightRequestId?: number;
   highlightLine?: number;
@@ -309,6 +311,8 @@ export function CodeBlockEditor({
   language,
   highlightLine,
   endLine,
+  focusCommentId,
+  focusCommentRequestId,
   highlightExpiresAt,
   highlightRequestId,
   filePath,
@@ -330,6 +334,7 @@ export function CodeBlockEditor({
   const activeCommentIdRef = useRef<string | null>(null);
   const dragSelectionRef = useRef<DragSelectionState | null>(null);
   const focusScrollFrameRef = useRef<number | null>(null);
+  const handledFocusCommentRequestKeyRef = useRef<string | null>(null);
   const manualSelectionRef = useRef(false);
   const callbacksRef = useRef<CommentCallbacks>({
     deleteComment: () => {},
@@ -887,6 +892,46 @@ export function CodeBlockEditor({
       if (clearTimer) clearTimeout(clearTimer);
     };
   }, [highlightLine, endLine, highlightExpiresAt, highlightRequestId]);
+
+  useEffect(() => {
+    if (!focusCommentId || focusCommentRequestId === undefined) return;
+    const requestKey = `${filePath ?? ""}:${focusCommentRequestId}`;
+    if (handledFocusCommentRequestKeyRef.current === requestKey) return;
+    const nextComment = comments.find((comment) => comment.id === focusCommentId);
+    if (!nextComment) return;
+    let frame = 0;
+    let attempts = 0;
+    let cancelled = false;
+
+    const tryFocusComment = () => {
+      if (cancelled) return;
+      attempts += 1;
+
+      const view = viewRef.current;
+      if (!view) {
+        if (attempts < 60) {
+          frame = requestAnimationFrame(tryFocusComment);
+        }
+        return;
+      }
+
+      if (!commentRangeToPositions(view.state, nextComment.range)) {
+        if (attempts < 60) {
+          frame = requestAnimationFrame(tryFocusComment);
+        }
+        return;
+      }
+
+      handledFocusCommentRequestKeyRef.current = requestKey;
+      focusComment(focusCommentId);
+    };
+
+    frame = requestAnimationFrame(tryFocusComment);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+    };
+  }, [code, comments, filePath, focusComment, focusCommentId, focusCommentRequestId]);
 
   const addComment = () => {
     if (!pendingSelection) return;
