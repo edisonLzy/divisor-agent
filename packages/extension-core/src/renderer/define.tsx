@@ -1,4 +1,4 @@
-import type { Editor, Range } from "@tiptap/core";
+import type { AnyExtension, Editor, Range } from "@tiptap/core";
 import type { ComponentType, JSX } from "react";
 import type { Components as StreamdownComponents, StreamdownProps } from "streamdown";
 
@@ -17,6 +17,13 @@ export interface RendererSlashCommand {
   extra?: string;
   run(ctx: RendererSlashCommandRunContext): void | Promise<void>;
 }
+
+/**
+ * A fully-configured TipTap extension (Extension, Node, or Mark) supplied by a
+ * renderer extension. The host merges it into the prompt editor's extensions
+ * array. The author owns all configuration at registration time.
+ */
+export type TipTapExtensionRegistration = AnyExtension;
 
 export interface AssistantBlockRenderProps<TProps = Record<string, unknown>> {
   props: TProps;
@@ -65,6 +72,9 @@ export interface RendererExtensionContext {
   streamdown: {
     registerComponents(components: StreamdownComponentComposerMap): void;
     registerRehypePlugins(composer: StreamdownRehypePluginComposer): void;
+  };
+  promptInput: {
+    registerExtension(extension: TipTapExtensionRegistration): void;
   };
 }
 

@@ -420,6 +420,12 @@ importers:
       '@divisor-agent/extension-core':
         specifier: workspace:*
         version: link:../extension-core
+      '@tiptap/core':
+        specifier: 'catalog:'
+        version: 3.22.5(@tiptap/pm@3.22.5)
+      '@tiptap/react':
+        specifier: ^3.22.5
+        version: 3.22.5(@floating-ui/dom@1.7.6)(@tiptap/core@3.22.5(@tiptap/pm@3.22.5))(@tiptap/pm@3.22.5)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.14

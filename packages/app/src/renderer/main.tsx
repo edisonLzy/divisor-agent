@@ -7,7 +7,7 @@ import { App } from "./App";
 document.documentElement.dataset.platform = window.electronAPI.platform;
 
 createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
+  // <StrictMode>
+  <App />,
+  // </StrictMode>,
 );

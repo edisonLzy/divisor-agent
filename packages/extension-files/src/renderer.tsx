@@ -16,7 +16,9 @@ import {
   FILES_ARTIFACT_TYPE,
 } from "./common/constants";
 import { parseFileHref } from "./common/helper";
-import { addOrActivateFile, FilesArtifact } from "./renderer/files-artifact";
+import { fileCommentExtension } from "./renderer/file-comment-extension";
+import { FilesArtifact } from "./renderer/files-artifact";
+import { addOrActivateFile } from "./renderer/files-artifact/artifact-state";
 
 interface FileAnchorProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
   href?: string;
@@ -78,6 +80,7 @@ export default defineRendererExtension({
           return plugin;
         }) as StreamdownRehypePlugins,
     );
+    ctx.promptInput.registerExtension(fileCommentExtension);
 
     ctx.artifacts.register({
       type: FILES_ARTIFACT_TYPE,

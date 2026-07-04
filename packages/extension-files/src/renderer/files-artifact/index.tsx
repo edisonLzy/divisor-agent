@@ -7,50 +7,13 @@ import {
   FILES_ARTIFACT_TYPE,
   FS_READ_TEXT_FILE_CHANNEL,
 } from "../../common/constants";
-import { getFileBaseName, type ParsedFileHref } from "../../common/helper";
+import { getFileBaseName } from "../../common/helper";
+import { syncPromptFileComments } from "../file-comment-extension";
+import { updateFileEntry } from "./artifact-state";
 import { CodeBlockEditor } from "./code-block-editor";
 import { FilesTabBar } from "./files-tab-bar";
 import { languageFromPath } from "./language-from-path";
-
-export interface FileEntry {
-  bytes?: number;
-  comments?: FileComment[];
-  content?: string;
-  endLine?: number;
-  error?: string;
-  fetchedAt?: number;
-  highlightExpiresAt?: number;
-  highlightRequestId?: number;
-  language?: string;
-  line?: number;
-  path: string;
-}
-
-export interface FileComment {
-  body: string;
-  createdAt: number;
-  id: string;
-  range: FileCommentRange;
-  updatedAt?: number;
-}
-
-export interface FileCommentRange {
-  endColumn: number;
-  endLine: number;
-  selectedText: string;
-  startColumn: number;
-  startLine: number;
-}
-
-export interface FilesArtifactContent {
-  activePath: string | null;
-  files: FileEntry[];
-}
-
-export const EMPTY_FILES_CONTENT: FilesArtifactContent = {
-  activePath: null,
-  files: [],
-};
+import type { FileComment, FilesArtifactContent } from "./types";
 
 interface FilesArtifactProps {
   artifactId: string;
@@ -88,12 +51,12 @@ export function FilesArtifact({ content, sessionId }: FilesArtifactProps) {
       .then((result) => {
         if (cancelled) return;
         if (result && typeof result === "object" && "error" in result) {
-          updateEntry(api, sessionId, active.path, content, {
+          updateFileEntry(api, sessionId, active.path, content, {
             error: String((result as { error: unknown }).error),
           });
         } else if (result && typeof result === "object" && "content" in result) {
           const { content: text, bytes } = result as { content: string; bytes: number };
-          updateEntry(api, sessionId, active.path, content, {
+          updateFileEntry(api, sessionId, active.path, content, {
             content: text,
             bytes,
             language: languageFromPath(active.path),
@@ -103,7 +66,7 @@ export function FilesArtifact({ content, sessionId }: FilesArtifactProps) {
       })
       .catch((err) => {
         if (cancelled) return;
-        updateEntry(api, sessionId, active.path, content, {
+        updateFileEntry(api, sessionId, active.path, content, {
           error: err instanceof Error ? err.message : String(err),
         });
       });
@@ -138,7 +101,13 @@ export function FilesArtifact({ content, sessionId }: FilesArtifactProps) {
 
   const updateActiveComments = (comments: FileComment[]) => {
     if (!active) return;
-    updateEntry(api, sessionId, active.path, content, { comments });
+    const latest = api.getArtifact<FilesArtifactContent>(sessionId, FILES_ARTIFACT_ID);
+    const current = latest?.content ?? content;
+    const previousComments =
+      current.files.find((file) => file.path === active.path)?.comments ?? active.comments ?? [];
+
+    syncPromptFileComments(api.sharedPromptEditor.editor, active.path, previousComments, comments);
+    updateFileEntry(api, sessionId, active.path, content, { comments });
   };
 
   if (files.length === 0) {
@@ -171,6 +140,8 @@ export function FilesArtifact({ content, sessionId }: FilesArtifactProps) {
             endLine={active.endLine}
             error={active.error}
             filePath={active.path}
+            focusCommentId={active.focusCommentId}
+            focusCommentRequestId={active.focusCommentRequestId}
             highlightExpiresAt={active.highlightExpiresAt}
             highlightRequestId={active.highlightRequestId}
             highlightLine={active.line}
@@ -181,64 +152,4 @@ export function FilesArtifact({ content, sessionId }: FilesArtifactProps) {
       ) : null}
     </div>
   );
-}
-
-// --- helpers used by the link renderer (renderer.tsx) -----------------------
-
-export function addOrActivateFile(
-  api: ReturnType<typeof useExtensionsContextAPI>,
-  sessionId: string,
-  parsed: ParsedFileHref,
-): void {
-  const existing = api.getArtifact<FilesArtifactContent>(sessionId, FILES_ARTIFACT_ID);
-  const current: FilesArtifactContent = existing?.content ?? EMPTY_FILES_CONTENT;
-  const found = current.files.find((f) => f.path === parsed.path);
-  const nextHighlightRequestId =
-    parsed.line !== undefined ? (found?.highlightRequestId ?? 0) + 1 : undefined;
-  const highlightExpiresAt = parsed.line !== undefined ? Date.now() + 1000 : undefined;
-  const newEntry: FileEntry = found
-    ? {
-        ...found,
-        endLine: parsed.line !== undefined ? parsed.endLine : undefined,
-        highlightExpiresAt,
-        highlightRequestId: nextHighlightRequestId,
-        line: parsed.line,
-      }
-    : {
-        endLine: parsed.line !== undefined ? parsed.endLine : undefined,
-        highlightExpiresAt,
-        highlightRequestId: nextHighlightRequestId,
-        line: parsed.line,
-        path: parsed.path,
-      };
-
-  const nextFiles = found
-    ? current.files.map((f) => (f.path === parsed.path ? newEntry : f))
-    : [...current.files, newEntry];
-
-  api.upsertArtifact<FilesArtifactContent>(sessionId, {
-    content: { activePath: parsed.path, files: nextFiles },
-    id: FILES_ARTIFACT_ID,
-    name: FILES_ARTIFACT_NAME,
-    type: FILES_ARTIFACT_TYPE,
-  });
-  api.openArtifact(sessionId, FILES_ARTIFACT_ID);
-}
-
-function updateEntry(
-  api: ReturnType<typeof useExtensionsContextAPI>,
-  sessionId: string,
-  path: string,
-  baseContent: FilesArtifactContent,
-  patch: Partial<FileEntry>,
-): void {
-  const latest = api.getArtifact<FilesArtifactContent>(sessionId, FILES_ARTIFACT_ID);
-  const current = latest?.content ?? baseContent;
-  const nextFiles = current.files.map((f) => (f.path === path ? { ...f, ...patch } : f));
-  api.upsertArtifact<FilesArtifactContent>(sessionId, {
-    content: { activePath: current.activePath, files: nextFiles },
-    id: FILES_ARTIFACT_ID,
-    name: FILES_ARTIFACT_NAME,
-    type: FILES_ARTIFACT_TYPE,
-  });
 }

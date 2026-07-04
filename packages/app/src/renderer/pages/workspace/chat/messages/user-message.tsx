@@ -1,3 +1,4 @@
+import { usePluginPromptInputExtensions } from "@divisor-agent/extension-core/renderer";
 import type { AppUserMessage } from "@earendil-works/pi-agent-core";
 import { setLeaf } from "@renderer/apis/sessions";
 import { getSelectedCommandIds } from "@renderer/components/richtext/extensions/slash-commands";
@@ -284,6 +285,8 @@ function EditableUserMessage({
 // ── Readonly Editor ───────────────────────────────────────────────────────────
 
 function useUserMessageEditor(document: AppUserMessage["jsonContent"]) {
+  const pluginPromptInputExtensions = usePluginPromptInputExtensions();
+
   return useEditor(
     {
       extensions: [
@@ -306,6 +309,7 @@ function useUserMessageEditor(document: AppUserMessage["jsonContent"]) {
             return `${suggestion?.char ?? "/"}${node.attrs.label ?? node.attrs.id ?? ""}`;
           },
         }),
+        ...pluginPromptInputExtensions,
         skillNode,
       ],
       content: document,

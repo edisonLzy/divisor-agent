@@ -101,6 +101,7 @@ The app is delivered as a single Electron desktop binary. Session, workspace, an
   - `@divisor-agent/extension-files` — file-system tools and UI
   - `@divisor-agent/extension-subagents` — sub-agent dispatch
 - Slash-command plugins, artifact panel for structured extension output
+- **Prompt Editor Extension API** — extensions can programmatically insert TipTap nodes/text via `sharedPromptEditor` module-level cell (`useSharedPromptEditor().editor`)
 
 ### 🪟 Tree-Based Session Management
 
@@ -119,9 +120,10 @@ The app is delivered as a single Electron desktop binary. Session, workspace, an
 
 ### 📝 Rich Text Input
 
-- **TipTap 3** (ProseMirror-based) editor with `@` file-search suggestions
+- **TipTap 3** (ProseMirror-based) editor with `@` file-search suggestions and extension-defined custom nodes (e.g., file comment annotations)
 - Model selector grouped by provider
 - Permission mode selector (Default / Full Access)
+- Extensions can programmatically insert content into the prompt editor via `useSharedPromptEditor().editor`
 
 ### 🧠 Skills
 
@@ -492,6 +494,9 @@ Extension workspace packages are **source-only** — their `package.json` `expor
 - Plugin system (slash commands, artifact panel, prompt ghost)
 - Window fullscreen detection and adaptive header padding
 - Shipped extensions: `extension-example`, `extension-files`, `extension-subagents`
+- **Prompt Editor Extension API** — `sharedPromptEditor` module-level cell exposes the active TipTap editor to extensions for programmatic content insertion (`useSharedPromptEditor().editor`)
+- **File Comment TipTap Extension** — structured file annotation nodes (path, line range, comment) rendered inline in the editor, synced with artifact state
+- **Floating UI Tooltips** — rich hover tooltips with metadata, preview, and source attribution replacing native title tooltips for file comment nodes
 
 ### 🏗️ In Progress
 

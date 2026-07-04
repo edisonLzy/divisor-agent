@@ -1,4 +1,7 @@
-import { usePluginSlashCommands } from "@divisor-agent/extension-core/renderer";
+import {
+  usePluginPromptInputExtensions,
+  usePluginSlashCommands,
+} from "@divisor-agent/extension-core/renderer";
 import { promptGhostSuggestionExtension } from "@renderer/components/richtext/extensions/prompt-ghost-suggestion";
 import {
   type SlashCommandSelection,
@@ -7,7 +10,7 @@ import {
 import { insertSkillNode, skillNode } from "@renderer/components/richtext/inline/skill-node";
 import type { CommandItem } from "@renderer/components/richtext/types";
 import { useAgentSkills } from "@renderer/hooks/use-agent-skills";
-import type { JSONContent } from "@tiptap/core";
+import type { EditorOptions, JSONContent } from "@tiptap/core";
 import Placeholder from "@tiptap/extension-placeholder";
 import { useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -17,17 +20,26 @@ interface VirtualElement {
   getBoundingClientRect: () => DOMRect;
 }
 
-interface UseChatEditorOptions {
+export interface UseChatEditorOptions {
   content?: JSONContent;
   disabled: boolean;
+  onCreate?: EditorOptions["onCreate"];
+  onDestroy?: EditorOptions["onDestroy"];
   getFloatingReference?: () => Element | VirtualElement | null;
 }
 
-export function useChatEditor({ content, disabled, getFloatingReference }: UseChatEditorOptions) {
+export function useChatEditor({
+  content,
+  disabled,
+  onCreate: onCreateFromUser,
+  onDestroy: onDestroyFromUser,
+  getFloatingReference,
+}: UseChatEditorOptions) {
   const [hasContent, setHasContent] = useState(false);
 
   const skillItems = useSkillsCommandItems();
   const pluginCommands = usePluginSlashCommands();
+  const pluginPromptInputExtensions = usePluginPromptInputExtensions();
   const pluginItems = useMemo(
     () =>
       pluginCommands.map(
@@ -89,6 +101,7 @@ export function useChatEditor({ content, disabled, getFloatingReference }: UseCh
           placeholder: "Ask anything...",
         }),
         ...(extensions ?? []),
+        ...pluginPromptInputExtensions,
         skillNode,
       ],
       content,
@@ -100,7 +113,11 @@ export function useChatEditor({ content, disabled, getFloatingReference }: UseCh
       },
       editable: !disabled,
       onCreate: ({ editor: nextEditor }) => {
+        onCreateFromUser?.({ editor: nextEditor });
         setHasContent(nextEditor.getText().trim().length > 0);
+      },
+      onDestroy: () => {
+        onDestroyFromUser?.();
       },
       onUpdate: ({ editor: nextEditor }) => {
         setHasContent(nextEditor.getText().trim().length > 0);

@@ -89,6 +89,8 @@ describe("extension-core", () => {
 
     function testRehypePlugin() {}
 
+    const testTipTapExtension = { name: "test-tiptap-extension" } as never;
+
     const setup = vi.fn((ctx) => {
       ctx.slashCommands.register({
         id: "test.command",
@@ -106,6 +108,7 @@ describe("extension-core", () => {
         render: TestRenderer,
       });
       ctx.streamdown.registerRehypePlugins((plugins) => [...plugins, testRehypePlugin]);
+      ctx.promptInput.registerExtension(testTipTapExtension);
     });
     const extension = defineRendererExtension({ ...metadata, setup });
     const bridge = new RendererExtensionBridge([extension]);
@@ -120,6 +123,7 @@ describe("extension-core", () => {
     expect(registry.getAssistantBlock("test.block")).toBeDefined();
     expect(registry.getArtifact("test.artifact")).toBeDefined();
     expect(registry.getStreamdownRehypePlugins([])).toEqual([testRehypePlugin]);
+    expect(registry.getTipTapExtensions()).toEqual([testTipTapExtension]);
   });
 
   it("binds renderer IPC clients to an extension id", async () => {
@@ -163,6 +167,27 @@ describe("extension-core", () => {
     const second = defineRendererExtension({ ...metadata, setup() {} });
     expect(() => new RendererExtensionBridge([first, second]).initialize()).toThrow(
       "Duplicate extension id",
+    );
+  });
+
+  it("rejects duplicate TipTap extension names at registration time", () => {
+    const metadataA = { id: "test-extension-a", name: "Test Extension A" } as const;
+    const metadataB = { id: "test-extension-b", name: "Test Extension B" } as const;
+
+    const a = defineRendererExtension({
+      ...metadataA,
+      setup(ctx) {
+        ctx.promptInput.registerExtension({ name: "dup" } as never);
+      },
+    });
+    const b = defineRendererExtension({
+      ...metadataB,
+      setup(ctx) {
+        ctx.promptInput.registerExtension({ name: "dup" } as never);
+      },
+    });
+    expect(() => new RendererExtensionBridge([a, b]).initialize()).toThrow(
+      "Duplicate TipTap extension name: dup",
     );
   });
 

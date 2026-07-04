@@ -1,6 +1,8 @@
 import { createContext, useContext } from "react";
 import type { ReactNode } from "react";
 
+import type { SharedPromptEditor } from "./sharedPromptEditor";
+
 export interface ExtensionArtifactInput<TContent = Record<string, unknown>> {
   content?: TContent;
   id: string;
@@ -40,6 +42,7 @@ export interface ExtensionsContextAPI {
     input: InsertSideChatUserMessageEntryInput,
     position: number,
   ): void;
+  sharedPromptEditor: SharedPromptEditor;
 }
 
 export interface ExtensionsContextAPIProviderProps {

@@ -1,3 +1,4 @@
+import { useSharedPromptEditor } from "@divisor-agent/extension-core/renderer";
 import type { AppUserMessage } from "@earendil-works/pi-agent-core";
 import { renameSession } from "@renderer/apis/sessions";
 import {
@@ -21,7 +22,7 @@ import { ChatMessages } from "./messages";
 import { FixedActions, PanelHeader } from "./panel-header";
 import { PendingMessagesPanel } from "./pending-messages";
 import { PermissionApprovalPanel } from "./permission";
-import { PromptInput } from "./prompt-input";
+import { PromptInput, PromptInputProps } from "./prompt-input";
 import type { PromptSubmission } from "./prompt-types";
 import { createSessionTitleFromPrompt, shouldAutoRenameSession } from "./session-title";
 
@@ -46,6 +47,8 @@ export function ActiveSessionContent({
     followUpPrompt,
   } = useActiveSessionChat();
 
+  const sharedPromptEditor = useSharedPromptEditor();
+
   const activeSessionId = useStore(mainStore, (state) => state.activeSessionId!);
   const isArtifactPanelOpen = useStore(
     mainStore,
@@ -64,13 +67,17 @@ export function ActiveSessionContent({
   });
   const sessionName = activeSession?.name.trim() || "untitled";
 
+  const handlePromptInputCreated: PromptInputProps["onCreate"] = ({ editor }) => {
+    sharedPromptEditor.editor = editor;
+  };
+
+  const handlePromptInputDestroyed: PromptInputProps["onDestroy"] = () => {
+    sharedPromptEditor.editor = null;
+  };
+
   return (
     <div className="relative isolate flex min-h-0 flex-1">
-      <ResizablePanelGroup
-        key={isArtifactPanelOpen ? "with-artifacts" : "chat-only"}
-        orientation="horizontal"
-        className="min-h-0 flex-1"
-      >
+      <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
         <ResizablePanel defaultSize={isArtifactPanelOpen ? "68%" : "100%"} minSize="42%">
           <div className="flex h-full min-w-0 flex-col">
             <PanelHeader
@@ -121,6 +128,8 @@ export function ActiveSessionContent({
                     onStop={stopPrompt}
                     onSubmit={submitPrompt}
                     sessionId={activeSessionId}
+                    onCreate={handlePromptInputCreated}
+                    onDestroy={handlePromptInputDestroyed}
                   />
                 )}
               </div>

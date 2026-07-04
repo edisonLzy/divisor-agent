@@ -1,4 +1,5 @@
 import type { AnyExtensionIPCFunction } from "../common/ipc/index.js";
+import { useExtensionsContextAPI } from "./contextAPI.js";
 import type { RendererExtensionIPC } from "./ipc.js";
 import { useExtensionRegistry } from "./provider";
 
@@ -10,6 +11,11 @@ export function useExtensions() {
 export function usePluginSlashCommands() {
   const registry = useExtensionRegistry();
   return registry.getSlashCommands();
+}
+
+export function usePluginPromptInputExtensions() {
+  const registry = useExtensionRegistry();
+  return registry.getTipTapExtensions();
 }
 
 export function useAssistantBlock(type: string) {
@@ -48,4 +54,9 @@ export function createExtensionIPC<
   return function useExtensionIPC() {
     return client;
   };
+}
+
+export function useSharedPromptEditor() {
+  const api = useExtensionsContextAPI();
+  return api.sharedPromptEditor;
 }
