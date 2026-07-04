@@ -77,11 +77,7 @@ export function ActiveSessionContent({
 
   return (
     <div className="relative isolate flex min-h-0 flex-1">
-      <ResizablePanelGroup
-        key={isArtifactPanelOpen ? "with-artifacts" : "chat-only"}
-        orientation="horizontal"
-        className="min-h-0 flex-1"
-      >
+      <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
         <ResizablePanel defaultSize={isArtifactPanelOpen ? "68%" : "100%"} minSize="42%">
           <div className="flex h-full min-w-0 flex-col">
             <PanelHeader
