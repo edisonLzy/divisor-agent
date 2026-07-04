@@ -13,6 +13,13 @@ export interface FileCommentNodeAttrs {
   startLine: number;
 }
 
+export interface FileCommentTooltipContent {
+  meta: string;
+  preview: string;
+  range: string;
+  title: string;
+}
+
 export function createFileCommentNodeAttrs(
   filePath: string,
   comment: FileComment,
@@ -59,6 +66,20 @@ export function getFileCommentPreview(attrs: FileCommentNodeAttrs): string {
   const selectedText = attrs.selectedText.trim();
   if (selectedText) return selectedText;
   return "Comment";
+}
+
+export function getFileCommentTooltipContent(
+  attrs: FileCommentNodeAttrs,
+): FileCommentTooltipContent {
+  const selectedText = attrs.selectedText.trim();
+  const body = attrs.body.trim();
+
+  return {
+    meta: attrs.filePath,
+    preview: [selectedText, body].filter(Boolean).join("\n\n") || "暂无注释内容",
+    range: formatFileCommentRange(attrs),
+    title: "代码注释",
+  };
 }
 
 export function serializeFileCommentNodeToXml(attrs: FileCommentNodeAttrs): string {
