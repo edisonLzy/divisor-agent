@@ -1,0 +1,24 @@
+{
+  "name": "@divisor-agent/extension-browser",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./main": "./src/main.ts",
+    "./renderer": "./src/renderer.tsx"
+  },
+  "scripts": {
+    "test": "vitest --run"
+  },
+  "dependencies": {
+    "@divisor-agent/extension-core": "workspace:*",
+    "@earendil-works/pi-ai": "catalog:",
+    "@tiptap/core": "catalog:",
+    "@tiptap/react": "^3.22.5",
+    "@types/react": "catalog:",
+    "lucide-react": "catalog:",
+    "react": "catalog:"
+  },
+  "devDependencies": {
+    "vitest": "catalog:"
+  }
+}

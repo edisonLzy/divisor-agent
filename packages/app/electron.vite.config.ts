@@ -24,6 +24,7 @@ export default defineConfig({
       // accepts string package names only (no regex); see CLAUDE.md.
       externalizeDeps: {
         exclude: [
+          "@divisor-agent/extension-browser",
           "@divisor-agent/extension-core",
           "@divisor-agent/extension-example",
           "@divisor-agent/extension-subagents",

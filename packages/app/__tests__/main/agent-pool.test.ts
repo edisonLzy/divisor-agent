@@ -62,9 +62,19 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
 }));
 
 vi.mock("electron", () => ({
+  app: {
+    getPath: vi.fn(() => "/tmp/divisor-agent-tests"),
+  },
   ipcMain: {
     handle: vi.fn(),
     removeHandler: vi.fn(),
+  },
+  session: {
+    fromPartition: vi.fn(() => ({
+      listenerCount: vi.fn(() => 1),
+      setPermissionCheckHandler: vi.fn(),
+      setPermissionRequestHandler: vi.fn(),
+    })),
   },
 }));
 
