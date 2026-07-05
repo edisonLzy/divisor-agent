@@ -1,3 +1,7 @@
+import type {
+  AskUserQuestionInput,
+  AskUserQuestionResult,
+} from "@divisor-agent/extension-core/common";
 import { MainExtensionBridge } from "@divisor-agent/extension-core/main";
 import type {
   ExtensionAgentModel,
@@ -13,6 +17,7 @@ import { ExtensionRuntimeService } from "./runtime-service.js";
 export interface ExtensionToolRuntimeContext {
   getModel(): ExtensionAgentModel | undefined;
   getSessionId(): string | undefined;
+  askUserQuestion(input: AskUserQuestionInput): Promise<AskUserQuestionResult>;
 }
 
 export class ExtensionService extends MainExtensionBridge implements SystemPromptBuilder {

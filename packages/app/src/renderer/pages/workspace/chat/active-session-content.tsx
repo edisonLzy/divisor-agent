@@ -18,10 +18,10 @@ import { useCallback } from "react";
 import { useStore } from "zustand";
 
 import { ArtifactsPanel } from "./artifacts";
+import { HumanInTheLoopPanel } from "./human-in-the-loop";
 import { ChatMessages } from "./messages";
 import { FixedActions, PanelHeader } from "./panel-header";
 import { PendingMessagesPanel } from "./pending-messages";
-import { PermissionApprovalPanel } from "./permission";
 import { PromptInput, PromptInputProps } from "./prompt-input";
 import type { PromptSubmission } from "./prompt-types";
 import { createSessionTitleFromPrompt, shouldAutoRenameSession } from "./session-title";
@@ -58,12 +58,11 @@ export function ActiveSessionContent({
   const activeSession = useStore(mainStore, (state) =>
     activeSessionId ? state.getSession(activeSessionId) : undefined,
   );
-  const pendingPermissionRequest = useStore(mainStore, (state) => {
+  const pendingHumanInTheLoopRequest = useStore(mainStore, (state) => {
     if (!activeSessionId) {
       return null;
     }
-
-    return state.getPermissionState(activeSessionId).requests[0] ?? null;
+    return state.getHumanInTheLoopState(activeSessionId).requests[0] ?? null;
   });
   const sessionName = activeSession?.name.trim() || "untitled";
 
@@ -116,8 +115,11 @@ export function ActiveSessionContent({
             >
               <div className="mx-auto flex w-full max-w-4xl flex-col gap-2">
                 {activeSessionId ? <PendingMessagesPanel sessionId={activeSessionId} /> : null}
-                {activeSessionId && pendingPermissionRequest ? (
-                  <PermissionApprovalPanel sessionId={activeSessionId} />
+                {activeSessionId && pendingHumanInTheLoopRequest ? (
+                  <HumanInTheLoopPanel
+                    request={pendingHumanInTheLoopRequest}
+                    sessionId={activeSessionId}
+                  />
                 ) : (
                   <PromptInput
                     disabled={false}

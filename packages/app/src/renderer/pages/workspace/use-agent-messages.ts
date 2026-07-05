@@ -13,6 +13,8 @@ import { EntryStatus, type SessionEntry } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
 import { useRef } from "react";
 
+import { useHumanInTheLoopMessages } from "./use-human-in-the-loop-messages";
+
 function getToolState(sessionId: string, toolCallId: string) {
   return mainStore.getState().getEntryState(sessionId).toolStates.get(toolCallId);
 }
@@ -37,6 +39,8 @@ export function useAgentMessages() {
   const extensionsApi = useExtensionsContextAPI();
   const turnContentStartIndicesRef = useRef<Record<string, number>>({});
   const hasPersistedRef = useRef<Record<string, boolean>>({});
+
+  useHumanInTheLoopMessages();
 
   useSubscribeAgentEvents(
     {
@@ -269,23 +273,6 @@ export function useAgentMessages() {
           output,
           requestId: existing?.requestId,
           approvalStatus: existing?.approvalStatus,
-        });
-      },
-
-      permission_requested: (event) => {
-        const { sessionId, type: _type, ...request } = event;
-
-        const existing = getToolState(sessionId, request.toolCallId);
-        mainStore.getState().enqueuePermissionRequest(sessionId, request);
-        mainStore.getState().setToolState(sessionId, request.toolCallId, {
-          toolCallId: request.toolCallId,
-          toolName: request.toolName,
-          status: "awaiting_approval",
-          args: existing?.args ?? request.args,
-          details: existing?.details,
-          output: existing?.output ?? "Waiting for permission approval...",
-          requestId: request.requestId,
-          approvalStatus: "pending",
         });
       },
     },

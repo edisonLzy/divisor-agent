@@ -319,6 +319,7 @@ function createContextValues(): HostMainExtensionContextValues {
 function createAgentRuntime(): MainExtensionRuntimeAPI {
   return {
     abortAgent: vi.fn(),
+    askUserQuestion: vi.fn(),
     createAgent: vi.fn(),
     destroyAgent: vi.fn(),
     getCurrentAgentContext: vi.fn(),

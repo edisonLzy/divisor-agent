@@ -54,5 +54,62 @@ ${formatArtifactFence({
         };
       },
     });
+
+    ctx.tools.register({
+      name: "example/ask-user-question",
+      label: "Example Ask User Question",
+      description:
+        "Demonstrate how an extension pauses tool execution to collect structured user feedback.",
+      parameters: Type.Object({}),
+      async execute() {
+        const result = await ctx.extensionRuntime.askUserQuestion({
+          questions: [
+            {
+              header: "Format",
+              question: "How should the extension present the result?",
+              options: [
+                {
+                  label: "Concise summary",
+                  description: "Return only the decision and key implementation notes.",
+                },
+                {
+                  label: "Detailed report",
+                  description: "Include reasoning, tradeoffs, and implementation examples.",
+                },
+              ],
+            },
+            {
+              header: "Sections",
+              question: "Which sections should the extension include?",
+              multiSelect: true,
+              options: [
+                {
+                  label: "Architecture",
+                  description: "Explain component ownership and data flow.",
+                },
+                {
+                  label: "Test plan",
+                  description: "List the important automated and manual scenarios.",
+                },
+                {
+                  label: "Migration",
+                  description: "Describe compatibility and rollout considerations.",
+                },
+              ],
+            },
+          ],
+        });
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `The user submitted the following extension preferences:\n${JSON.stringify(result, null, 2)}`,
+            },
+          ],
+          details: { humanInTheLoopResult: result },
+        };
+      },
+    });
   },
 });

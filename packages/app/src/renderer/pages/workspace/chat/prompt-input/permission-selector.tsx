@@ -142,7 +142,7 @@ export function usePermissionSelector(sessionId: string | null): PermissionSelec
       return "default";
     }
 
-    return state.getPermissionState(sessionId).mode;
+    return state.getPermissionPolicyState(sessionId).mode;
   });
 
   const handleChange = useCallback(
@@ -152,7 +152,7 @@ export function usePermissionSelector(sessionId: string | null): PermissionSelec
       }
 
       const store = mainStore.getState();
-      const previousMode = store.getPermissionState(sessionId).mode;
+      const previousMode = store.getPermissionPolicyState(sessionId).mode;
       if (previousMode === mode) {
         return;
       }

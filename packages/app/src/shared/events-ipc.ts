@@ -1,6 +1,7 @@
 import type { AgentEvent } from "@earendil-works/pi-agent-core";
 
 import type { AppUpdateEvent, AppUpdateIPC } from "./app-update-ipc";
+import type { AskUserQuestionRequestedEvent } from "./ask-user-question-ipc";
 import type { FileSystemIPC } from "./file-system-ipc";
 import type { AgentModelsIPC } from "./models-ipc";
 import type { PermissionRequestedEvent } from "./permissions-ipc";
@@ -10,7 +11,11 @@ import type { SystemIPC } from "./system-ipc";
 
 export type AgentSessionScope = "main" | "side-chat";
 type SessionTagged<T> = T & { scope: AgentSessionScope; sessionId: string };
-type AgentRuntimeEvent = AgentEvent | PermissionRequestedEvent | AppUpdateEvent;
+type AgentRuntimeEvent =
+  | AgentEvent
+  | PermissionRequestedEvent
+  | AskUserQuestionRequestedEvent
+  | AppUpdateEvent;
 
 // main -> renderer events. These are verified at compile-time to be a subset of the
 export const ALLOWED_MAIN_EXPOSE_EVENTS = [
@@ -25,6 +30,7 @@ export const ALLOWED_MAIN_EXPOSE_EVENTS = [
   "tool_execution_update",
   "tool_execution_end",
   "permission_requested",
+  "ask_user_question_requested",
   "app_update",
 ] as const;
 
@@ -60,6 +66,7 @@ export const ALLOWED_RENDER_INVOKE_EVENTS: (keyof AgentRuntimeIPC)[] = [
   "destroySession",
   "setPermissionMode",
   "resolvePermissionRequest",
+  "resolveAskUserQuestion",
   "listSkills",
   "setSkillEnabled",
   "fsReadTextFile",

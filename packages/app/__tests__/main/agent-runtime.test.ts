@@ -181,6 +181,39 @@ describe("AgentRuntime", () => {
     // this file rather than rewritten against a misleading event name.
   });
 
+  describe("askUserQuestion", () => {
+    it("allows a built-in tool factory to request input through the runtime", async () => {
+      const extensionService = {
+        buildSystemPrompt: (raw: string) => raw,
+        getToolsForRuntime: () => [],
+      } as unknown as ExtensionService;
+      const runtime = new AgentRuntime(undefined, new SkillService(), extensionService);
+      runtime.setSessionId("runtime-session");
+
+      const requestEvent = runtime.once("ask_user_question_requested");
+      const resultPromise = runtime.askUserQuestion({
+        questions: [
+          {
+            header: "Scope",
+            question: "Which scope?",
+            options: [
+              { label: "Focused", description: "Only this module." },
+              { label: "Broad", description: "All related modules." },
+            ],
+          },
+        ],
+      });
+      const request = (await requestEvent).data;
+      await runtime.resolveAskUserQuestion(request.requestId, {
+        answers: [{ question: "Which scope?", selectedOptions: ["Focused"] }],
+      });
+
+      await expect(resultPromise).resolves.toMatchObject({
+        answers: [{ selectedOptions: ["Focused"] }],
+      });
+    });
+  });
+
   describe("destroy", () => {
     it("clears all listeners without throwing", () => {
       const runtime = createRuntime();

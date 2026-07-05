@@ -4,23 +4,27 @@ import { createEntriesSlice } from "../entries-slice";
 import type { EntriesSlice } from "../entries-slice";
 import { createArtifactSlice } from "./artifact-slice";
 import type { ArtifactSlice } from "./artifact-slice";
+import { createHumanInTheLoopSlice } from "./human-in-the-loop-slice";
+import type { HumanInTheLoopSlice } from "./human-in-the-loop-slice";
 import { createPendingMessagesSlice } from "./pending-messages-slice";
 import type { PendingMessagesSlice } from "./pending-messages-slice";
-import { createPermissionSlice } from "./permission-slice";
-import type { PermissionSlice } from "./permission-slice";
+import { createPermissionPolicySlice } from "./permission-policy-slice";
+import type { PermissionPolicySlice } from "./permission-policy-slice";
 import { createSessionsSlice } from "./session-slice";
 import type { SessionsSlice } from "./session-slice";
 
 type MainStoreState = EntriesSlice &
   SessionsSlice &
-  PermissionSlice &
+  PermissionPolicySlice &
+  HumanInTheLoopSlice &
   ArtifactSlice &
   PendingMessagesSlice;
 
 export const mainStore = createStore<MainStoreState>()((...args) => ({
   ...createEntriesSlice(...args),
   ...createSessionsSlice(...args),
-  ...createPermissionSlice(...args),
+  ...createPermissionPolicySlice(...args),
+  ...createHumanInTheLoopSlice(...args),
   ...createArtifactSlice(...args),
   ...createPendingMessagesSlice(...args),
 }));
