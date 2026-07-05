@@ -7,9 +7,9 @@ describe("AskUserQuestionService", () => {
     const service = new AskUserQuestionService();
     const requestEvent = service.once("human-in-the-loop");
 
-    const resultPromise = service.requestForSession("session-1", "main", createInput());
+    const resultPromise = service.request(createInput());
     const request = (await requestEvent).data;
-    service.resolveForSession("session-1", request.requestId, {
+    service.resolve(request.requestId, {
       answers: [{ question: "Which approach?", selectedOptions: ["Shared core"] }],
       additionalNote: "Keep it small.",
     });
@@ -24,21 +24,18 @@ describe("AskUserQuestionService", () => {
       ],
       additionalNote: "Keep it small.",
     });
-    expect(request.payload).toMatchObject({ sessionId: "session-1", scope: "main" });
+    expect(request).toMatchObject({ kind: "ask_user_question" });
+    expect(request.questions[0]).toMatchObject({ header: "Architecture" });
   });
 
   it("rejects invalid question counts and incomplete answers", async () => {
     const service = new AskUserQuestionService();
-    expect(() => service.requestForSession("session-1", "main", { questions: [] })).toThrow(
-      "between 1 and 3",
-    );
+    expect(() => service.request({ questions: [] })).toThrow("between 1 and 3");
 
     const requestEvent = service.once("human-in-the-loop");
-    const resultPromise = service.requestForSession("session-1", "main", createInput());
+    const resultPromise = service.request(createInput());
     const requestId = (await requestEvent).data.requestId;
-    expect(() => service.resolveForSession("session-1", requestId, { answers: [] })).toThrow(
-      "answer every question",
-    );
+    expect(() => service.resolve(requestId, { answers: [] })).toThrow("answer every question");
     service.cancelAll("test complete");
     await expect(resultPromise).rejects.toThrow("test complete");
   });

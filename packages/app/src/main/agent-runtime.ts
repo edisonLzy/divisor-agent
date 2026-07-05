@@ -1,4 +1,8 @@
 import type {
+  AskUserQuestionInput,
+  AskUserQuestionResult,
+} from "@divisor-agent/extension-core/common";
+import type {
   ExtensionAgentModel,
   ExtensionAgentToolOptions,
 } from "@divisor-agent/extension-core/main";
@@ -12,7 +16,7 @@ import type { PermissionMode } from "../shared/permissions-ipc.js";
 import type { AgentSessionIPC } from "../shared/session-ipc.js";
 import type { AgentSkillsIPC } from "../shared/skills-ipc.js";
 import { ExtensionService } from "./extensions/extension-service.js";
-import { PermissionService } from "./human-in-the-loop/index.js";
+import { AskUserQuestionService, PermissionService } from "./human-in-the-loop/index.js";
 import { ModelRegistry } from "./models/index.js";
 import { SystemPromptService } from "./prompt/index.js";
 import { SkillService } from "./skills/index.js";
@@ -54,6 +58,7 @@ export type AgentRuntimeDelegate = {
     | "destroySession"
     | "runOneTimeAgent"
     | "resolveAskUserQuestion"
+    | "resolvePermissionRequest"
     | "listSkills"
     | "setSkillEnabled"
     ? never
@@ -87,6 +92,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
   private agent!: Agent;
   private permissionMode: PermissionMode;
   private permissionService: PermissionService;
+  private askUserQuestionService: AskUserQuestionService;
   private scope: AgentSessionScope = "main";
   private systemPromptService: SystemPromptService;
   private sessionId: string | undefined;
@@ -100,6 +106,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
     super();
     this.permissionMode = "default";
     this.permissionService = new PermissionService();
+    this.askUserQuestionService = new AskUserQuestionService();
     this.systemPromptService = new SystemPromptService();
     this.systemPromptService.addBuilder(this.skillService);
     this.systemPromptService.addBuilder(this.extensionService);
@@ -113,9 +120,16 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
       (tool) => !excludedToolNames.has(tool.name),
     );
 
-    this.permissionService.setRequestCallback((request) => {
+    this.permissionService.on("human-in-the-loop", ({ data: request }) => {
       this.emit("permission_requested", {
         type: "permission_requested",
+        ...request,
+      });
+    });
+
+    this.askUserQuestionService.on("human-in-the-loop", ({ data: request }) => {
+      this.emit("ask_user_question_requested", {
+        type: "ask_user_question_requested",
         ...request,
       });
     });
@@ -188,6 +202,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
               getModel: () => this.getCurrentModel(),
               getScope: () => this.scope,
               getSessionId: () => this.sessionId,
+              askUserQuestion: (input) => this.askUserQuestion(input),
             },
             this.options.extensionTools,
           ),
@@ -220,6 +235,23 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
   public getScope() {
     return this.scope;
   }
+
+  public async askUserQuestion(input: AskUserQuestionInput): Promise<AskUserQuestionResult> {
+    if (!this.sessionId) {
+      throw new Error("Ask user question is not configured for this agent runtime");
+    }
+    if (this.scope !== "main") {
+      throw new Error("Ask user question is only supported by the main agent");
+    }
+    return this.askUserQuestionService.request(input);
+  }
+
+  public resolveAskUserQuestion = async (
+    requestId: string,
+    resolution: AskUserQuestionResult,
+  ): Promise<void> => {
+    this.askUserQuestionService.resolve(requestId, resolution);
+  };
 
   public setHistoryMessages: AgentRuntimeDelegate["setHistoryMessages"] = async (messages) => {
     this.agent.state.messages = messages;
@@ -265,6 +297,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
 
   public abortPrompt: AgentRuntimeDelegate["abortPrompt"] = async () => {
     this.permissionService.cancelAll("Agent prompt aborted");
+    this.askUserQuestionService.cancelAll("Agent prompt aborted");
     this.agent.abort();
   };
 
@@ -298,6 +331,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
 
   public destroy() {
     this.permissionService.cancelAll("Agent runtime destroyed");
+    this.askUserQuestionService.cancelAll("Agent runtime destroyed");
     this.clearListeners();
   }
 

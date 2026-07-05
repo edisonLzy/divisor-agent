@@ -276,7 +276,7 @@ export function useAgentMessages() {
         const { sessionId, type: _type, ...request } = event;
 
         const existing = getToolState(sessionId, request.toolCallId);
-        mainStore.getState().enqueuePermissionRequest(sessionId, request);
+        mainStore.getState().enqueueHumanInTheLoopRequest(sessionId, request);
         mainStore.getState().setToolState(sessionId, request.toolCallId, {
           toolCallId: request.toolCallId,
           toolName: request.toolName,
@@ -291,7 +291,7 @@ export function useAgentMessages() {
 
       ask_user_question_requested: (event) => {
         const { sessionId, type: _type, ...request } = event;
-        mainStore.getState().enqueueAskUserQuestionRequest(sessionId, request);
+        mainStore.getState().enqueueHumanInTheLoopRequest(sessionId, request);
       },
     },
     {

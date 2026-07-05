@@ -3,14 +3,7 @@ import type {
   AskUserQuestionResult,
 } from "@divisor-agent/extension-core/common";
 
-import type { AgentSessionScope } from "../../shared/events-ipc.js";
 import { AbstractHumanInTheLoop } from "./abstract-human-in-the-loop.js";
-
-export interface AskUserQuestionServicePayload {
-  input: AskUserQuestionInput;
-  scope: AgentSessionScope;
-  sessionId: string;
-}
 
 function requireText(value: unknown, field: string): string {
   if (typeof value !== "string" || !value.trim()) {
@@ -21,45 +14,17 @@ function requireText(value: unknown, field: string): string {
 
 export class AskUserQuestionService extends AbstractHumanInTheLoop<
   "ask_user_question",
-  AskUserQuestionServicePayload,
+  AskUserQuestionInput,
   AskUserQuestionResult
 > {
   public readonly kind = "ask_user_question" as const;
 
-  public requestForSession(
-    sessionId: string,
-    scope: AgentSessionScope,
-    input: AskUserQuestionInput,
-  ): Promise<AskUserQuestionResult> {
-    return this.request({ input, scope, sessionId });
-  }
-
-  public resolveForSession(
-    sessionId: string,
-    requestId: string,
-    result: AskUserQuestionResult,
-  ): void {
-    const pending = this.getPendingPayload(requestId);
-    if (!pending || pending.sessionId !== sessionId) {
-      throw new Error(`Unknown ask user question request: ${requestId}`);
-    }
-    this.resolve(requestId, result);
-  }
-
-  public cancelForSession(sessionId: string, reason: string): void {
-    this.cancelWhere((payload) => payload.sessionId === sessionId, reason);
-  }
-
-  protected parsePayload(value: unknown): AskUserQuestionServicePayload {
+  protected parsePayload(value: unknown): AskUserQuestionInput {
     if (!value || typeof value !== "object") {
       throw new Error("Ask user question input must contain questions");
     }
-    const payload = value as AskUserQuestionServicePayload;
-    const sessionId = requireText(payload.sessionId, "sessionId");
-    if (payload.scope !== "main" && payload.scope !== "side-chat") {
-      throw new Error("Ask user question scope is invalid");
-    }
-    const questions = payload.input?.questions;
+    const payload = value as AskUserQuestionInput;
+    const questions = payload.questions;
     if (!Array.isArray(questions) || questions.length < 1 || questions.length > 3) {
       throw new Error("Ask user question requires between 1 and 3 questions");
     }
@@ -103,25 +68,19 @@ export class AskUserQuestionService extends AbstractHumanInTheLoop<
       throw new Error("Ask user question text must be unique within a request");
     }
 
-    return { sessionId, scope: payload.scope, input: { questions: normalizedQuestions } };
+    return { questions: normalizedQuestions };
   }
 
-  protected parseResult(
-    value: unknown,
-    payload: AskUserQuestionServicePayload,
-  ): AskUserQuestionResult {
+  protected parseResult(value: unknown, payload: AskUserQuestionInput): AskUserQuestionResult {
     if (!value || typeof value !== "object" || !("answers" in value)) {
       throw new Error("Ask user question result must contain answers");
     }
     const result = value as AskUserQuestionResult;
-    if (
-      !Array.isArray(result.answers) ||
-      result.answers.length !== payload.input.questions.length
-    ) {
+    if (!Array.isArray(result.answers) || result.answers.length !== payload.questions.length) {
       throw new Error("Ask user question result must answer every question");
     }
 
-    const answers = payload.input.questions.map((question) => {
+    const answers = payload.questions.map((question) => {
       const answer = result.answers.find((candidate) => candidate.question === question.question);
       if (!answer) throw new Error(`Missing answer for question: ${question.question}`);
       const selectedOptions = Array.isArray(answer.selectedOptions) ? answer.selectedOptions : [];

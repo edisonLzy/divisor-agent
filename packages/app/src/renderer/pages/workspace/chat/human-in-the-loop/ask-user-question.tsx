@@ -22,7 +22,7 @@ interface DraftAnswer {
   selectedOptions: string[];
 }
 
-export function AskUserQuestionPanel({ sessionId }: AskUserQuestionPanelProps) {
+export function AskUserQuestionInteractionPanel({ sessionId }: AskUserQuestionPanelProps) {
   const { isSubmitting, request, submit } = useCurrentAskUserQuestionRequest(sessionId);
   if (!request) return null;
 
@@ -324,17 +324,17 @@ function createEmptyAnswer(): DraftAnswer {
 function useCurrentAskUserQuestionRequest(sessionId: string) {
   const { invoke } = useElectronIPC();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const request = useStore(
-    mainStore,
-    (state) => state.getAskUserQuestionState(sessionId).requests[0] ?? null,
-  );
+  const request = useStore(mainStore, (state) => {
+    const current = state.getHumanInTheLoopState(sessionId).requests[0];
+    return current?.kind === "ask_user_question" ? current : null;
+  });
 
   async function submit(resolution: AskUserQuestionResolution) {
     if (!request || isSubmitting) return;
     setIsSubmitting(true);
     try {
       await invoke("resolveAskUserQuestion", sessionId, request.requestId, resolution);
-      mainStore.getState().resolveAskUserQuestionRequest(sessionId, request.requestId, resolution);
+      mainStore.getState().resolveHumanInTheLoopRequest(sessionId, request.requestId, resolution);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "提交回答失败");
     } finally {

@@ -52,6 +52,7 @@ export type ExtensionAgentEvent = AgentEvent;
 
 export interface MainExtensionRuntimeAPI {
   abortAgent(agentId: string): Promise<void>;
+  askUserQuestion(input: AskUserQuestionInput): Promise<AskUserQuestionResult>;
   createAgent(input?: CreateExtensionAgentInput): Promise<ExtensionAgentHandle>;
   destroyAgent(agentId: string): Promise<void>;
   getCurrentAgentContext(): ExtensionCurrentAgentContext | undefined;
@@ -62,14 +63,9 @@ export interface MainExtensionRuntimeAPI {
   ): () => void;
 }
 
-export interface MainHumanInTheLoopAPI {
-  askUserQuestion(input: AskUserQuestionInput): Promise<AskUserQuestionResult>;
-}
-
 export interface HostMainExtensionContextValues {
   getBrowserWindow(): BrowserWindow | null;
   extensionRuntime: MainExtensionRuntimeAPI;
-  humanInTheLoop: MainHumanInTheLoopAPI;
 }
 
 export interface MainExtensionContext<

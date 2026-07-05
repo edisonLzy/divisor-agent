@@ -62,7 +62,7 @@ ${formatArtifactFence({
         "Demonstrate how an extension pauses tool execution to collect structured user feedback.",
       parameters: Type.Object({}),
       async execute() {
-        const result = await ctx.humanInTheLoop.askUserQuestion({
+        const result = await ctx.extensionRuntime.askUserQuestion({
           questions: [
             {
               header: "Format",

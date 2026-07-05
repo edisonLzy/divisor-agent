@@ -11,21 +11,19 @@ import type {
   ExtensionAgentHandle,
   ExtensionAgentModel,
   MainExtensionRuntimeAPI,
-  MainHumanInTheLoopAPI,
 } from "@divisor-agent/extension-core/main";
 import Emittery from "emittery";
 import { v4 as uuidv4 } from "uuid";
 
 import type { AllowedMainExposeEvents } from "../../shared/events-ipc.js";
 import { AgentRuntime } from "../agent-runtime.js";
-import type { AskUserQuestionService } from "../human-in-the-loop/index.js";
 import { ModelRegistry } from "../models/index.js";
 import { SkillService } from "../skills/index.js";
 import type { ExtensionService, ExtensionToolRuntimeContext } from "./extension-service.js";
 
 export class ExtensionRuntimeService
   extends Emittery<AllowedMainExposeEvents>
-  implements MainExtensionRuntimeAPI, MainHumanInTheLoopAPI
+  implements MainExtensionRuntimeAPI
 {
   private extensionService: ExtensionService | undefined;
   private runtimeContextStorage = new AsyncLocalStorage<ExtensionToolRuntimeContext>();
@@ -34,7 +32,6 @@ export class ExtensionRuntimeService
   constructor(
     private modelRegistry: ModelRegistry,
     private skillService: SkillService,
-    private askUserQuestionService: AskUserQuestionService,
   ) {
     super();
   }
@@ -59,14 +56,10 @@ export class ExtensionRuntimeService
 
   async askUserQuestion(input: AskUserQuestionInput): Promise<AskUserQuestionResult> {
     const context = this.runtimeContextStorage.getStore();
-    const sessionId = context?.getSessionId();
-    if (!context || !sessionId) {
+    if (!context) {
       throw new Error("Ask user question can only be called while an extension tool is executing");
     }
-    if (context.getScope() !== "main") {
-      throw new Error("Ask user question is only supported by the main agent");
-    }
-    return this.askUserQuestionService.requestForSession(sessionId, context.getScope(), input);
+    return context.askUserQuestion(input);
   }
 
   async createAgent(input: CreateExtensionAgentInput = {}): Promise<ExtensionAgentHandle> {

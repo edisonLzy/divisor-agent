@@ -2,12 +2,11 @@ import { randomUUID } from "node:crypto";
 
 import Emittery from "emittery";
 
-export interface HumanInTheLoopRequest<TKind extends string, TPayload> {
+export type HumanInTheLoopRequest<TKind extends string, TPayload> = {
   requestId: string;
   kind: TKind;
   createdAt: number;
-  payload: TPayload;
-}
+} & TPayload;
 
 interface PendingRequest<TPayload, TResult> {
   payload: TPayload;
@@ -24,7 +23,7 @@ export class HumanInTheLoopCancelledError extends Error {
 
 export abstract class AbstractHumanInTheLoop<
   TKind extends string,
-  TPayload,
+  TPayload extends Record<string, any>,
   TResult,
 > extends Emittery<{
   "human-in-the-loop": HumanInTheLoopRequest<TKind, TPayload>;
@@ -40,7 +39,7 @@ export abstract class AbstractHumanInTheLoop<
       requestId,
       kind: this.kind,
       createdAt: Date.now(),
-      payload: parsedPayload,
+      ...parsedPayload,
     };
 
     const result = new Promise<TResult>((resolve, reject) => {
@@ -61,12 +60,7 @@ export abstract class AbstractHumanInTheLoop<
   }
 
   public cancelAll(reason: string): void {
-    this.cancelWhere(() => true, reason);
-  }
-
-  protected cancelWhere(predicate: (payload: TPayload) => boolean, reason: string): void {
     for (const [requestId, pending] of this.pendingRequests) {
-      if (!predicate(pending.payload)) continue;
       pending.reject(new HumanInTheLoopCancelledError(reason));
       this.pendingRequests.delete(requestId);
     }

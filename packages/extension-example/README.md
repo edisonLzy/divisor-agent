@@ -6,15 +6,15 @@
 
 ## 它演示了什么
 
-| 扩展点(API)       | 注册内容                    | 作用                                                                  |
-| ----------------- | --------------------------- | --------------------------------------------------------------------- |
-| `systemPrompt`    | `example.prompt`            | 告诉主 Agent 何时发出 `divisor-block` / `divisor-artifact` 围栏代码块 |
-| `tools`           | `example/hello`             | 最简单的工具:接收 `name`,返回 `Hello, <name>`                         |
-| `humanInTheLoop`  | `example/ask-user-question` | 暂停 Extension Tool,收集多题结构化反馈后继续执行                      |
-| `slashCommands`   | `example.insert-card`       | 在输入框输入 `/Insert example card`,插入一段提示模板                  |
-| `assistantBlocks` | `example.card`              | 渲染端注册一个 assistant 区块类型,展示 `title` 字段                   |
-| `artifacts`       | `example.artifact`          | 注册一个 artifact 类型,在右侧面板里渲染                               |
-| `ipc`             | `getState` / `stateChanged` | Main 与 renderer 间的类型安全 invoke 和事件推送                       |
+| 扩展点(API)        | 注册内容                    | 作用                                                                  |
+| ------------------ | --------------------------- | --------------------------------------------------------------------- |
+| `systemPrompt`     | `example.prompt`            | 告诉主 Agent 何时发出 `divisor-block` / `divisor-artifact` 围栏代码块 |
+| `tools`            | `example/hello`             | 最简单的工具:接收 `name`,返回 `Hello, <name>`                         |
+| `extensionRuntime` | `example/ask-user-question` | 暂停 Extension Tool,收集多题结构化反馈后继续执行                      |
+| `slashCommands`    | `example.insert-card`       | 在输入框输入 `/Insert example card`,插入一段提示模板                  |
+| `assistantBlocks`  | `example.card`              | 渲染端注册一个 assistant 区块类型,展示 `title` 字段                   |
+| `artifacts`        | `example.artifact`          | 注册一个 artifact 类型,在右侧面板里渲染                               |
+| `ipc`              | `getState` / `stateChanged` | Main 与 renderer 间的类型安全 invoke 和事件推送                       |
 
 每一项都是 `extension-core` 提供的最小可运行示例,复制改名即可成为新的扩展。
 
@@ -27,7 +27,7 @@
   ─ tools.register("example/hello")
        → 用户在对话中触发时,主 Agent 拿到 "Hello, ..." 的工具结果
   ─ tools.register("example/ask-user-question")
-       → ctx.humanInTheLoop.askUserQuestion(...) 暂停工具
+       → ctx.extensionRuntime.askUserQuestion(...) 暂停工具
        → 用户完成单选、多选、Other 和补充说明后返回结构化结果
 
 渲染进程 (src/renderer.tsx)

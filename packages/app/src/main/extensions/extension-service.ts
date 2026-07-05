@@ -1,3 +1,7 @@
+import type {
+  AskUserQuestionInput,
+  AskUserQuestionResult,
+} from "@divisor-agent/extension-core/common";
 import { MainExtensionBridge } from "@divisor-agent/extension-core/main";
 import type {
   ExtensionAgentModel,
@@ -14,6 +18,7 @@ export interface ExtensionToolRuntimeContext {
   getModel(): ExtensionAgentModel | undefined;
   getScope(): "main" | "side-chat";
   getSessionId(): string | undefined;
+  askUserQuestion(input: AskUserQuestionInput): Promise<AskUserQuestionResult>;
 }
 
 export class ExtensionService extends MainExtensionBridge implements SystemPromptBuilder {
@@ -26,7 +31,6 @@ export class ExtensionService extends MainExtensionBridge implements SystemPromp
     super(installedMainExtensions, {
       extensionRuntime: runtimeService,
       getBrowserWindow,
-      humanInTheLoop: runtimeService,
     });
     this.runtimeService = runtimeService;
     runtimeService.setExtensionService(this);

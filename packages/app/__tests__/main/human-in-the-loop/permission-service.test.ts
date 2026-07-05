@@ -6,7 +6,7 @@ describe("PermissionService", () => {
   it("emits a request and resolves an approval", async () => {
     const service = new PermissionService();
     const handleRequest = vi.fn();
-    service.setRequestCallback(handleRequest);
+    service.on("human-in-the-loop", ({ data }) => handleRequest(data));
 
     const permissionPromise = service.requestPermission(createPayload());
     await vi.waitFor(() => expect(handleRequest).toHaveBeenCalledOnce());
@@ -24,7 +24,7 @@ describe("PermissionService", () => {
   it("returns the denial reason", async () => {
     const service = new PermissionService();
     const handleRequest = vi.fn();
-    service.setRequestCallback(handleRequest);
+    service.on("human-in-the-loop", ({ data }) => handleRequest(data));
     const permissionPromise = service.requestPermission(createPayload());
     await vi.waitFor(() => expect(handleRequest).toHaveBeenCalledOnce());
 
@@ -40,7 +40,7 @@ describe("PermissionService", () => {
   it("auto-approves commands after remembering a prefix", async () => {
     const service = new PermissionService();
     const handleRequest = vi.fn();
-    service.setRequestCallback(handleRequest);
+    service.on("human-in-the-loop", ({ data }) => handleRequest(data));
     const permissionPromise = service.requestPermission(createPayload());
     await vi.waitFor(() => expect(handleRequest).toHaveBeenCalledOnce());
     const requestId = handleRequest.mock.calls[0][0].requestId;

@@ -1,12 +1,9 @@
 import {
   getPermissionCommandText,
   type PermissionPayload,
-  type PermissionRequest,
   type PermissionResolution,
 } from "../../shared/permissions-ipc.js";
 import { AbstractHumanInTheLoop } from "./abstract-human-in-the-loop.js";
-
-export type PermissionCallback = (request: PermissionRequest) => void;
 
 export class PermissionService extends AbstractHumanInTheLoop<
   "permission",
@@ -16,18 +13,6 @@ export class PermissionService extends AbstractHumanInTheLoop<
   public readonly kind = "permission" as const;
 
   private rememberedCommandPrefixes = new Map<string, Set<string>>();
-  private onRequestCallback: PermissionCallback | null = null;
-
-  constructor() {
-    super();
-    this.on("human-in-the-loop", ({ data: { requestId, createdAt, payload } }) => {
-      this.onRequestCallback?.({ requestId, createdAt, kind: this.kind, ...payload });
-    });
-  }
-
-  setRequestCallback(callback: PermissionCallback) {
-    this.onRequestCallback = callback;
-  }
 
   requestPermission(payload: PermissionPayload): Promise<PermissionResolution> {
     return this.request(payload);
