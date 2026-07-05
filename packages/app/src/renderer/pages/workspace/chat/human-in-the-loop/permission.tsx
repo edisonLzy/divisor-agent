@@ -9,9 +9,9 @@ import type { PermissionRequest, PermissionResolution } from "@shared/permission
 import { ChevronDown, ChevronUp, CornerDownLeft } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { useStore } from "zustand";
 
 interface PermissionApprovalPanelProps {
+  request: PermissionRequest;
   sessionId: string;
 }
 
@@ -20,9 +20,11 @@ const DEFAULT_DENY_REASON =
 
 type PermissionChoice = "approve" | "approve-prefix" | "deny";
 
-export function PermissionApprovalPanel({ sessionId }: PermissionApprovalPanelProps) {
-  const { approve, approveWithRememberedPrefix, deny, isSubmitting, request } =
-    useCurrentPermissionRequest(sessionId);
+export function PermissionApprovalPanel({ request, sessionId }: PermissionApprovalPanelProps) {
+  const { approve, approveWithRememberedPrefix, deny, isSubmitting } = usePermissionRequest(
+    sessionId,
+    request,
+  );
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [denyReason, setDenyReason] = useState("");
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -32,10 +34,6 @@ export function PermissionApprovalPanel({ sessionId }: PermissionApprovalPanelPr
     setDenyReason("");
     setIsDetailsOpen(false);
   }, [request?.requestId]);
-
-  if (!request) {
-    return null;
-  }
 
   const formattedArgs = formatToolArgs(request.args);
 
@@ -313,18 +311,12 @@ function updateResolvedToolState(
   });
 }
 
-function useCurrentPermissionRequest(sessionId: string | null) {
+const usePermissionRequest = (sessionId: string, request: PermissionRequest) => {
   const { invoke } = useElectronIPC();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const request = useStore(mainStore, (state) => {
-    if (!sessionId) return null;
-    const current = state.getHumanInTheLoopState(sessionId).requests[0];
-    return current?.kind === "permission" ? current : null;
-  });
 
   const resolveRequest = useCallback(
     async (resolution: PermissionResolution) => {
-      if (!sessionId || !request) return;
       setIsSubmitting(true);
       try {
         await invoke("resolvePermissionRequest", sessionId, request.requestId, resolution);
@@ -360,5 +352,5 @@ function useCurrentPermissionRequest(sessionId: string | null) {
     [resolveRequest],
   );
 
-  return { request, isSubmitting, approve, approveWithRememberedPrefix, deny };
-}
+  return { isSubmitting, approve, approveWithRememberedPrefix, deny };
+};

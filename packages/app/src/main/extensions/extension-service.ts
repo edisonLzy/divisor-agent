@@ -16,7 +16,6 @@ import { ExtensionRuntimeService } from "./runtime-service.js";
 
 export interface ExtensionToolRuntimeContext {
   getModel(): ExtensionAgentModel | undefined;
-  getScope(): "main" | "side-chat";
   getSessionId(): string | undefined;
   askUserQuestion(input: AskUserQuestionInput): Promise<AskUserQuestionResult>;
 }

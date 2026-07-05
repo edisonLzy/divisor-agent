@@ -10,8 +10,8 @@ interface HumanInTheLoopPanelProps {
 
 export function HumanInTheLoopPanel({ request, sessionId }: HumanInTheLoopPanelProps) {
   if (request.kind === "permission") {
-    return <PermissionApprovalPanel sessionId={sessionId} />;
+    return <PermissionApprovalPanel request={request} sessionId={sessionId} />;
   }
 
-  return <AskUserQuestionInteractionPanel sessionId={sessionId} />;
+  return <AskUserQuestionInteractionPanel request={request} sessionId={sessionId} />;
 }

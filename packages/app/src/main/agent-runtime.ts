@@ -16,7 +16,8 @@ import type { PermissionMode } from "../shared/permissions-ipc.js";
 import type { AgentSessionIPC } from "../shared/session-ipc.js";
 import type { AgentSkillsIPC } from "../shared/skills-ipc.js";
 import { ExtensionService } from "./extensions/extension-service.js";
-import { AskUserQuestionService, PermissionService } from "./human-in-the-loop/index.js";
+import { AskUserQuestionService } from "./human-in-the-loop/ask-user-question-service.js";
+import { PermissionService } from "./human-in-the-loop/permission-service.js";
 import { ModelRegistry } from "./models/index.js";
 import { SystemPromptService } from "./prompt/index.js";
 import { SkillService } from "./skills/index.js";
@@ -39,6 +40,13 @@ type StripSessionId<T> = T extends (sessionId: string, ...args: infer A) => infe
 
 type CombinedIPC = AgentSessionIPC & AgentModelsIPC & AgentSkillsIPC;
 
+type SessionRoutedMethodNames =
+  | Exclude<
+      keyof AgentSessionIPC,
+      "destroySession" | "runOneTimeAgent" | "setSessionId" | "setSessionScope"
+    >
+  | "setModel";
+
 /**
  * Contract that AgentRuntime must satisfy, auto-derived from IPC interfaces.
  *
@@ -49,20 +57,7 @@ type CombinedIPC = AgentSessionIPC & AgentModelsIPC & AgentSkillsIPC;
  * on AgentRuntime, the delegation call in AgentPool errors at compile time.
  */
 export type AgentRuntimeDelegate = {
-  [K in keyof CombinedIPC as K extends
-    | "getAvailableModels"
-    | "getModelConfig"
-    | "saveModelConfig"
-    | "setSessionId"
-    | "setSessionScope"
-    | "destroySession"
-    | "runOneTimeAgent"
-    | "resolveAskUserQuestion"
-    | "resolvePermissionRequest"
-    | "listSkills"
-    | "setSkillEnabled"
-    ? never
-    : K]: StripSessionId<CombinedIPC[K]>;
+  [K in SessionRoutedMethodNames]: StripSessionId<CombinedIPC[K]>;
 } & {
   listSkills: AgentSkillsIPC["listSkills"];
   setSessionId(sessionId: string): void;
@@ -200,7 +195,6 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
           ...this.extensionService.getToolsForRuntime(
             {
               getModel: () => this.getCurrentModel(),
-              getScope: () => this.scope,
               getSessionId: () => this.sessionId,
               askUserQuestion: (input) => this.askUserQuestion(input),
             },

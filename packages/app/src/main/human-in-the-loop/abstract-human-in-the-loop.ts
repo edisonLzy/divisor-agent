@@ -1,6 +1,5 @@
-import { randomUUID } from "node:crypto";
-
 import Emittery from "emittery";
+import { v4 as uuidv4 } from "uuid";
 
 export type HumanInTheLoopRequest<TKind extends string, TPayload> = {
   requestId: string;
@@ -34,7 +33,7 @@ export abstract class AbstractHumanInTheLoop<
 
   public request(payload: TPayload): Promise<TResult> {
     const parsedPayload = this.parsePayload(payload);
-    const requestId = randomUUID();
+    const requestId = uuidv4();
     const request = {
       requestId,
       kind: this.kind,

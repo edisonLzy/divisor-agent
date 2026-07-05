@@ -10,9 +10,9 @@ import type {
 import { CornerDownLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { useStore } from "zustand";
 
 interface AskUserQuestionPanelProps {
+  request: AskUserQuestionRequest;
   sessionId: string;
 }
 
@@ -22,9 +22,8 @@ interface DraftAnswer {
   selectedOptions: string[];
 }
 
-export function AskUserQuestionInteractionPanel({ sessionId }: AskUserQuestionPanelProps) {
-  const { isSubmitting, request, submit } = useCurrentAskUserQuestionRequest(sessionId);
-  if (!request) return null;
+export function AskUserQuestionInteractionPanel({ request, sessionId }: AskUserQuestionPanelProps) {
+  const { isSubmitting, submit } = useAskUserQuestionRequest(sessionId, request);
 
   return (
     <AskUserQuestionContent
@@ -68,11 +67,11 @@ function AskUserQuestionContent({ isSubmitting, request, submit }: AskUserQuesti
     );
   });
 
-  function updateAnswer(next: DraftAnswer) {
+  const updateAnswer = (next: DraftAnswer) => {
     setAnswers((current) => ({ ...current, [questionIndex]: next }));
-  }
+  };
 
-  function toggleOption(label: string) {
+  const toggleOption = (label: string) => {
     if (question.multiSelect) {
       updateAnswer({
         ...answer,
@@ -83,26 +82,26 @@ function AskUserQuestionContent({ isSubmitting, request, submit }: AskUserQuesti
       return;
     }
     updateAnswer({ ...answer, customSelected: false, selectedOptions: [label] });
-  }
+  };
 
-  function toggleCustom() {
+  const toggleCustom = () => {
     updateAnswer({
       ...answer,
       customSelected: !answer.customSelected,
       selectedOptions: question.multiSelect ? answer.selectedOptions : [],
     });
-  }
+  };
 
-  function continueToNext() {
+  const continueToNext = () => {
     if (!isAnswerValid) return;
     if (questionIndex < request.questions.length - 1) {
       setQuestionIndex((current) => current + 1);
       return;
     }
     setIsReviewing(true);
-  }
+  };
 
-  async function submitAnswers() {
+  const submitAnswers = async () => {
     if (!allAnswersValid || isSubmitting) return;
     await submit({
       answers: request.questions.map((item, index) => {
@@ -115,10 +114,10 @@ function AskUserQuestionContent({ isSubmitting, request, submit }: AskUserQuesti
       }),
       additionalNote: additionalNote.trim() || undefined,
     });
-  }
+  };
 
   useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
+    const handleKeyDown = (event: KeyboardEvent) => {
       if (isSubmitting || event.target instanceof HTMLTextAreaElement) return;
       if (event.key === "Enter") {
         event.preventDefault();
@@ -133,7 +132,7 @@ function AskUserQuestionContent({ isSubmitting, request, submit }: AskUserQuesti
       if (!isReviewing && optionIndex >= 0 && optionIndex < question.options.length) {
         toggleOption(question.options[optionIndex].label);
       }
-    }
+    };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   });
@@ -321,16 +320,12 @@ function createEmptyAnswer(): DraftAnswer {
   return { customAnswer: "", customSelected: false, selectedOptions: [] };
 }
 
-function useCurrentAskUserQuestionRequest(sessionId: string) {
+const useAskUserQuestionRequest = (sessionId: string, request: AskUserQuestionRequest) => {
   const { invoke } = useElectronIPC();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const request = useStore(mainStore, (state) => {
-    const current = state.getHumanInTheLoopState(sessionId).requests[0];
-    return current?.kind === "ask_user_question" ? current : null;
-  });
 
-  async function submit(resolution: AskUserQuestionResolution) {
-    if (!request || isSubmitting) return;
+  const submit = async (resolution: AskUserQuestionResolution) => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
       await invoke("resolveAskUserQuestion", sessionId, request.requestId, resolution);
@@ -340,7 +335,7 @@ function useCurrentAskUserQuestionRequest(sessionId: string) {
     } finally {
       setIsSubmitting(false);
     }
-  }
+  };
 
-  return { isSubmitting, request, submit };
-}
+  return { isSubmitting, submit };
+};
