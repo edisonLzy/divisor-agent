@@ -1,0 +1,808 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Divisor Agent · Deep Research 交互稿（端到端可玩）</title>
+    <style>
+      /* ===== Design Tokens — 精确对齐 packages/app/src/renderer/index.css ===== */
+      :root {
+        --background: #fffaf0;
+        --foreground: #141111;
+        --card: #fffdf8;
+        --card-foreground: #141111;
+        --popover: #fffdf8;
+        --secondary: #f1ede3;
+        --muted: #eee9de;
+        --muted-foreground: #716b64;
+        --accent: #ffd440;
+        --accent-foreground: #141111;
+        --primary: #fe7da8;
+        --primary-foreground: #141111;
+        --destructive: #df5148;
+        --border: #141111;
+        --ring: #27ccf3;
+        --sidebar: #fffaf0;
+        --sidebar-primary: #fe7da8;
+        --signal-yellow: #ffd440;
+        --signal-pink: #fe7da8;
+        --signal-cyan: #27ccf3;
+        --signal-green: #a8df72;
+        --signal-purple: #bbb0e6;
+        --hard-shadow: 3px 3px 0 #141111;
+        --hard-shadow-sm: 2px 2px 0 #141111;
+        --radius: 0.375rem;
+        --font: "Space Grotesk", Inter, ui-sans-serif, system-ui, -apple-system, "PingFang SC", sans-serif;
+        --mono: "Space Mono", "SFMono-Regular", Consolas, monospace;
+      }
+      [data-theme="dark"] {
+        --background: #11100f;
+        --foreground: #f3eee5;
+        --card: #191715;
+        --card-foreground: #f3eee5;
+        --popover: #191715;
+        --secondary: #24211e;
+        --muted: #24211e;
+        --muted-foreground: #aaa39a;
+        --accent: #d7ad2f;
+        --accent-foreground: #11100f;
+        --primary: #dc6e98;
+        --primary-foreground: #11100f;
+        --destructive: #ef7469;
+        --border: #f3eee5;
+        --ring: #31b6d6;
+        --sidebar: #11100f;
+        --sidebar-primary: #dc6e98;
+        --signal-yellow: #d7ad2f;
+        --signal-pink: #dc6e98;
+        --signal-cyan: #31b6d6;
+        --signal-green: #91c866;
+        --signal-purple: #9f92d0;
+        --hard-shadow: 3px 3px 0 #000;
+        --hard-shadow-sm: 2px 2px 0 #000;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body { margin: 0; overflow: hidden; background: var(--background); color: var(--foreground); font-family: var(--font); font-size: 14px; -webkit-font-smoothing: antialiased; }
+      button, input, textarea, select { color: inherit; font: inherit; }
+      button, select { cursor: pointer; }
+      :focus-visible { outline: none; }
+      button:focus-visible { border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring), transparent 60%); }
+
+      /* icons (inline svg use currentColor) */
+      svg { display: block; }
+      .ic { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
+      .ic-sm { width: 14px; height: 14px; }
+      .ic-xs { width: 12px; height: 12px; }
+      .spin { animation: spin 1s linear infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      /* ===== App frame ===== */
+      .app { display: grid; grid-template-rows: 44px minmax(0,1fr); height: 100%; }
+      .titlebar { position: relative; z-index: 40; display: flex; align-items: center; gap: 12px; border-bottom: 2px solid var(--border); padding: 0 12px 0 16px; background: var(--signal-yellow); color: #141111; }
+      .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; letter-spacing: -0.02em; }
+      .brand-mark { display: grid; width: 24px; height: 24px; place-items: center; border: 2px solid #141111; border-radius: 5px; background: #fff; box-shadow: 2px 2px 0 #141111; font-family: var(--mono); font-size: 10px; font-weight: 700; }
+      .proto-badge { border: 1px solid #141111; padding: 2px 5px; background: var(--signal-pink); font-family: var(--mono); font-size: 8px; font-weight: 700; letter-spacing: 0.06em; border-radius: 3px; }
+      .tb-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+      .tb-label { font-family: var(--mono); font-size: 8px; font-weight: 700; letter-spacing: 0.08em; opacity: 0.7; }
+      .segmented { display: inline-flex; border: 2px solid #141111; border-radius: 6px; overflow: hidden; background: #fff; }
+      .segmented button { border: 0; padding: 5px 9px; background: transparent; color: #141111; font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 0.03em; }
+      .segmented button + button { border-left: 2px solid #141111; }
+      .segmented button.active { background: var(--signal-cyan); }
+
+      /* ===== Buttons (对齐 button.tsx variants) ===== */
+      .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 10px; border: 2px solid transparent; border-radius: var(--radius); font-size: 14px; font-weight: 600; white-space: nowrap; transition: all .12s; background: transparent; }
+      .btn:active { transform: translate(1px,1px); }
+      .btn-default { border-color: var(--border); background: var(--primary); color: var(--primary-foreground); box-shadow: var(--hard-shadow-sm); }
+      .btn-default:hover { transform: translate(1px,1px); box-shadow: none; }
+      .btn-outline { border-color: var(--border); background: var(--background); color: var(--foreground); box-shadow: var(--hard-shadow-sm); }
+      .btn-outline:hover { background: var(--accent); color: var(--accent-foreground); }
+      .btn-secondary { border-color: var(--border); background: var(--secondary); color: var(--foreground); box-shadow: var(--hard-shadow-sm); }
+      .btn-secondary:hover { background: var(--accent); }
+      .btn-ghost { color: var(--foreground); }
+      .btn-ghost:hover { background: var(--muted); }
+      .btn-destructive { border-color: var(--border); background: var(--destructive); color: #fff; box-shadow: var(--hard-shadow-sm); }
+      .btn-sm { height: 28px; padding: 0 9px; font-size: 12.8px; gap: 4px; }
+      .btn-xs { height: 24px; padding: 0 8px; font-size: 12px; gap: 4px; }
+      .btn-icon { width: 32px; height: 32px; padding: 0; }
+      .btn-icon-sm { width: 28px; height: 28px; padding: 0; }
+
+      /* ===== Workspace ===== */
+      .workspace { display: grid; grid-template-columns: 240px minmax(0,1fr); min-height: 0; }
+      .workspace.artifact-open { grid-template-columns: 240px minmax(0,1fr) 380px; }
+      .workspace.sidebar-collapsed { grid-template-columns: minmax(0,1fr); }
+      .workspace.sidebar-collapsed.artifact-open { grid-template-columns: minmax(0,1fr) 380px; }
+
+      /* ---- Sidebar ---- */
+      .sidebar { display: flex; flex-direction: column; border-right: 2px solid var(--border); background: var(--sidebar); min-width: 0; }
+      .workspace.sidebar-collapsed .sidebar { display: none; }
+      .sidebar-new { padding: 12px; }
+      .new-chat { width: 100%; justify-content: space-between; }
+      .kbd { font-family: var(--mono); font-size: 8px; opacity: 0.7; }
+      .sidebar-scroll { flex: 1; overflow: auto; padding: 4px 10px 18px; }
+      .side-heading { display: flex; align-items: center; padding: 12px 5px 6px; color: var(--muted-foreground); font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+      .session { display: flex; align-items: center; width: 100%; gap: 9px; border: 2px solid transparent; border-radius: var(--radius); padding: 6px 7px; background: transparent; color: inherit; text-align: left; margin-bottom: 2px; }
+      .session:hover { background: var(--muted); }
+      .session.active { border-color: var(--border); background: var(--card); box-shadow: var(--hard-shadow-sm); }
+      .badge-sq { display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; border: 2px solid var(--border); border-radius: 5px; font-family: var(--mono); font-size: 10px; font-weight: 700; }
+      .bg-cyan { background: var(--signal-cyan); } .bg-yellow { background: var(--signal-yellow); }
+      .bg-green { background: var(--signal-green); } .bg-purple { background: var(--signal-purple); } .bg-pink { background: var(--signal-pink); }
+      .session-copy { min-width: 0; flex: 1; }
+      .session-copy b { display: block; overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+      .session-copy small { display: block; margin-top: 1px; color: var(--muted-foreground); font-family: var(--mono); font-size: 8px; }
+      .sidebar-foot { border-top: 2px solid var(--border); padding: 11px; background: var(--signal-yellow); color: #141111; }
+      .sidebar-foot .row { display: flex; align-items: center; gap: 9px; font-size: 11px; font-weight: 700; }
+
+      /* ---- Chat column ---- */
+      .chat { display: flex; flex-direction: column; overflow: hidden; background: var(--background); min-width: 0; position: relative; }
+      .panel-header { position: relative; display: flex; align-items: center; gap: 8px; height: 48px; flex: 0 0 48px; border-bottom: 2px solid var(--border); background: var(--card); padding: 0 12px; }
+      .panel-header h1 { margin: 0; font-size: 14px; font-weight: 700; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .ph-sub { font-family: var(--mono); font-size: 8px; color: var(--muted-foreground); letter-spacing: 0.04em; }
+      .ph-right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+
+      .messages { flex: 1; overflow: auto; padding: 22px clamp(16px,4vw,44px) 24px; scroll-behavior: smooth; }
+      .msg-inner { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+
+      /* message rows */
+      .msg { display: grid; grid-template-columns: 34px minmax(0,1fr); align-items: start; gap: 12px; }
+      .msg.user { max-width: 100%; }
+      .identity { display: flex; width: 34px; height: 34px; align-items: center; justify-content: center; border: 2px solid var(--border); border-radius: 5px; font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--accent-foreground); box-shadow: var(--hard-shadow-sm); }
+      .identity.you { background: var(--signal-yellow); }
+      .identity.ai { background: var(--signal-cyan); }
+      .user-bubble { align-self: start; border: 2px solid var(--border); border-radius: var(--radius); background: var(--card); padding: 10px 16px; font-size: 14px; line-height: 1.55; box-shadow: var(--hard-shadow-sm); }
+      .ai-body { font-size: 15px; line-height: 1.7; padding-top: 5px; }
+      .ai-body p { margin: 0 0 8px; } .ai-body p:last-child { margin-bottom: 0; }
+
+      /* processing collapsible (assistant thinking header) */
+      .processing { border: 0; }
+      .proc-trigger { display: flex; align-items: center; gap: 7px; width: 100%; border: 0; background: transparent; padding: 4px 0; color: var(--muted-foreground); font-size: 13px; text-align: left; }
+      .proc-trigger .chev { transition: transform .15s; }
+      .proc-trigger.open .chev { transform: rotate(90deg); }
+      .shimmer { background: linear-gradient(90deg, var(--muted-foreground) 30%, var(--foreground) 50%, var(--muted-foreground) 70%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 2s linear infinite; font-weight: 600; }
+      @keyframes shimmer { to { background-position: -200% 0; } }
+      .proc-content { border-left: 2px solid var(--muted); margin: 6px 0 0 6px; padding: 6px 0 2px 14px; }
+      .thinking { font-size: 13px; line-height: 1.6; color: var(--muted-foreground); }
+
+      /* ===== Tool card (对齐 assistant-tool-message.tsx) ===== */
+      .tool-card { border: 2px solid var(--border); border-radius: var(--radius); background: var(--card); box-shadow: var(--hard-shadow); overflow: hidden; }
+      .tool-trigger { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; border: 0; background: transparent; color: inherit; padding: 0; text-align: left; }
+      .tool-tag { display: flex; align-self: stretch; align-items: center; border-right: 2px solid var(--border); background: var(--signal-cyan); padding: 0 9px; font-family: var(--mono); font-size: 8px; font-weight: 700; color: var(--accent-foreground); }
+      .tool-status { font-size: 12px; color: var(--muted-foreground); }
+      .tool-trigger .chev { margin-left: auto; margin-right: 12px; color: var(--muted-foreground); transition: transform .15s; }
+      .tool-trigger.open .chev { transform: rotate(90deg); }
+      .tool-content { border-top: 2px solid var(--border); background: var(--muted); padding: 12px; display: grid; gap: 10px; }
+      .tool-sec { border: 2px solid var(--border); border-radius: var(--radius); background: var(--card); padding: 10px; }
+      .tool-sec .lbl { margin-bottom: 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted-foreground); }
+      .tool-sec pre { margin: 0; overflow-x: auto; white-space: pre-wrap; font-family: var(--mono); font-size: 11px; line-height: 1.6; color: var(--muted-foreground); }
+
+      /* ===== Deep Research block (演进自 SubagentsListBlock) ===== */
+      .dr-block { border: 2px solid var(--border); border-radius: var(--radius); background: var(--card); box-shadow: var(--hard-shadow); overflow: hidden; }
+      .dr-bar { display: flex; align-items: center; gap: 8px; min-height: 44px; border-bottom: 2px solid var(--border); padding: 0 12px 0 0; }
+      .dr-bar-tag { display: flex; align-self: stretch; align-items: center; gap: 6px; border-right: 2px solid var(--border); background: var(--signal-cyan); padding: 0 10px; font-family: var(--mono); font-size: 8px; font-weight: 700; color: var(--accent-foreground); }
+      .dr-bar b { font-size: 12px; font-weight: 600; }
+      .dr-bar .meta { margin-left: auto; display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 8px; font-weight: 700; color: var(--muted-foreground); }
+      .dr-bar .meta .dot { width: 7px; height: 7px; border: 1px solid var(--border); background: var(--signal-yellow); border-radius: 50%; animation: blink 1.1s steps(2) infinite; }
+      @keyframes blink { 50% { opacity: .3; } }
+
+      /* stepper */
+      .dr-steps { display: flex; border-bottom: 2px solid var(--border); background: var(--secondary); }
+      .dr-steps .st { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 4px; border-right: 1px solid color-mix(in srgb, var(--border), transparent 78%); font-family: var(--mono); font-size: 8px; font-weight: 700; letter-spacing: 0.03em; color: var(--muted-foreground); }
+      .dr-steps .st:last-child { border-right: 0; }
+      .dr-steps .st .d { width: 6px; height: 6px; border: 1px solid var(--border); border-radius: 50%; background: var(--card); }
+      .dr-steps .st.done { color: var(--foreground); } .dr-steps .st.done .d { background: var(--signal-green); }
+      .dr-steps .st.active { color: var(--foreground); background: color-mix(in srgb, var(--signal-yellow), transparent 62%); } .dr-steps .st.active .d { background: var(--signal-yellow); }
+
+      .dr-inner { padding: 11px 12px; }
+      .dr-brief { border-left: 3px solid var(--signal-cyan); padding: 2px 0 2px 11px; margin-bottom: 12px; font-size: 12px; line-height: 1.55; color: var(--muted-foreground); }
+      .dr-brief b { color: var(--foreground); }
+
+      /* subagent rows — 对齐 SubagentsListBlock 行样式 */
+      .dr-list { display: flex; flex-direction: column; gap: 4px; }
+      .dr-row { display: flex; align-items: center; gap: 8px; width: 100%; border: 2px solid transparent; border-radius: var(--radius); padding: 8px; background: transparent; color: inherit; text-align: left; transition: background .12s; }
+      .dr-row:hover { background: var(--muted); }
+      .dr-row.clickable { cursor: pointer; }
+      .dr-row.run { border-color: var(--border); background: var(--card); box-shadow: var(--hard-shadow-sm); }
+      .dr-row .st-ic { color: var(--muted-foreground); }
+      .dr-row.done .st-ic { color: var(--signal-green); }
+      .dr-row.run .st-ic { color: var(--signal-cyan); }
+      .dr-row .rc { min-width: 0; flex: 1; }
+      .dr-row .rc .t { display: flex; align-items: center; gap: 8px; }
+      .dr-row .rc .t b { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .dr-row .rc .t .lab { flex: 0 0 auto; margin-left: auto; font-family: var(--mono); font-size: 9px; color: var(--muted-foreground); }
+      .dr-row .rc .p { margin-top: 2px; font-size: 11px; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+      /* reflection */
+      .dr-reflect { margin-top: 11px; border: 1px dashed color-mix(in srgb, var(--border), transparent 45%); border-radius: var(--radius); padding: 9px 11px; background: color-mix(in srgb, var(--signal-purple), transparent 84%); font-size: 11px; line-height: 1.55; }
+      .dr-reflect .tag { font-family: var(--mono); font-size: 8px; font-weight: 700; color: color-mix(in srgb, var(--signal-purple), var(--foreground) 40%); letter-spacing: 0.05em; }
+
+      .dr-foot { display: flex; align-items: center; gap: 8px; border-top: 2px solid var(--border); padding: 9px 12px; background: var(--secondary); }
+      .dr-foot .hint { margin-right: auto; color: var(--muted-foreground); font-family: var(--mono); font-size: 8px; }
+
+      /* clarify options (对齐 permission/ask 选项行) */
+      .opt { display: flex; align-items: center; gap: 9px; width: 100%; border: 2px solid var(--border); border-radius: var(--radius); padding: 8px 10px; background: var(--card); text-align: left; margin-bottom: 7px; box-shadow: var(--hard-shadow-sm); transition: all .1s; }
+      .opt:last-child { margin-bottom: 0; }
+      .opt:hover { background: var(--muted); }
+      .opt.sel { background: color-mix(in srgb, var(--signal-cyan), transparent 80%); }
+      .opt .oi { display: grid; width: 22px; height: 22px; flex: 0 0 22px; place-items: center; border: 1px solid var(--border); border-radius: 4px; background: var(--secondary); font-family: var(--mono); font-size: 9px; font-weight: 700; }
+      .opt.sel .oi { background: var(--signal-cyan); }
+      .opt .oc { flex: 1; min-width: 0; }
+      .opt .oc b { display: block; font-size: 13px; font-weight: 600; }
+      .opt .oc small { display: block; color: var(--muted-foreground); font-size: 11px; margin-top: 1px; }
+      .opt .rec { flex: 0 0 auto; font-family: var(--mono); font-size: 7px; font-weight: 700; color: var(--primary-foreground); background: var(--signal-pink); border: 1px solid var(--border); border-radius: 3px; padding: 2px 5px; }
+
+      /* report card (opens artifact) */
+      .report-card { display: flex; align-items: center; gap: 11px; width: 100%; border: 2px solid var(--border); border-radius: var(--radius); padding: 11px; background: var(--card); box-shadow: var(--hard-shadow); text-align: left; transition: all .12s; }
+      .report-card:hover { transform: translate(1px,1px); box-shadow: var(--hard-shadow-sm); }
+      .report-card .rc-copy { flex: 1; min-width: 0; }
+      .report-card .rc-copy b { display: block; font-size: 13px; font-weight: 600; }
+      .report-card .rc-copy small { display: block; margin-top: 2px; color: var(--muted-foreground); font-family: var(--mono); font-size: 8px; }
+      .report-card .open-tag { font-family: var(--mono); font-size: 8px; font-weight: 700; color: color-mix(in srgb, var(--signal-purple), var(--foreground) 45%); border: 1px solid var(--signal-purple); border-radius: 4px; padding: 4px 7px; }
+
+      /* inline report (mode B) */
+      .report-inline h2 { font-size: 17px; margin: 2px 0 3px; letter-spacing: -0.02em; }
+      .report-inline .rm { color: var(--muted-foreground); font-family: var(--mono); font-size: 8px; margin-bottom: 13px; letter-spacing: 0.04em; }
+      .report-inline h3 { font-size: 14px; margin: 16px 0 6px; padding-bottom: 4px; border-bottom: 1px solid color-mix(in srgb, var(--border), transparent 72%); }
+      .report-inline p { font-size: 14px; line-height: 1.72; margin: 7px 0; }
+      .report-inline ul { margin: 7px 0; padding-left: 18px; } .report-inline li { font-size: 14px; line-height: 1.7; margin: 3px 0; }
+      .cite { display: inline-flex; align-items: center; justify-content: center; min-width: 15px; height: 14px; padding: 0 3px; border: 1px solid var(--signal-cyan); border-radius: 3px; background: color-mix(in srgb, var(--signal-cyan), transparent 80%); font-family: var(--mono); font-size: 8px; font-weight: 700; vertical-align: super; margin: 0 1px; cursor: pointer; color: var(--foreground); text-decoration: none; }
+      .cite:hover { background: var(--signal-cyan); }
+      .report-src { margin-top: 16px; border-top: 2px solid var(--border); padding-top: 11px; }
+      .report-src h4 { font-family: var(--mono); font-size: 9px; letter-spacing: 0.06em; color: var(--muted-foreground); margin: 0 0 8px; text-transform: uppercase; }
+      .src-line { display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: baseline; margin-bottom: 5px; font-size: 11px; }
+      .src-line .n { font-family: var(--mono); font-size: 9px; font-weight: 700; color: color-mix(in srgb, var(--signal-cyan), var(--foreground) 30%); }
+      .src-line .u { color: var(--muted-foreground); font-family: var(--mono); font-size: 8px; }
+      .report-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 13px; }
+
+      /* ===== Composer (对齐 prompt-input/index.tsx) ===== */
+      .composer-dock { border-top: 0; padding: 10px clamp(16px,4vw,44px) 16px; background: linear-gradient(transparent, var(--background) 30%); }
+      .composer { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; border: 2px solid var(--border); border-radius: 8px; background: var(--card); box-shadow: var(--hard-shadow); transition: all .15s; }
+      .composer.focus { border-color: var(--ring); box-shadow: var(--hard-shadow), 0 0 0 2px color-mix(in srgb, var(--ring), transparent 75%); }
+      .composer-edit { position: relative; min-height: 52px; padding: 10px 14px; }
+      .composer-edit textarea { width: 100%; min-height: 30px; max-height: 160px; resize: none; border: 0; background: transparent; outline: 0; font-size: 14px; line-height: 1.5; }
+      .composer-edit textarea::placeholder { color: var(--muted-foreground); }
+      .composer-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; }
+      .composer-foot .left, .composer-foot .right { display: flex; align-items: center; gap: 8px; min-width: 0; }
+      .selector { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border: 2px solid var(--border); border-radius: var(--radius); background: var(--background); font-size: 12px; font-weight: 600; box-shadow: var(--hard-shadow-sm); }
+      .selector .sq { display: grid; width: 18px; height: 18px; place-items: center; border: 1px solid var(--border); border-radius: 3px; }
+      .selector.dr-on { background: var(--signal-cyan); }
+      .send { display: grid; place-items: center; width: 28px; height: 28px; border: 2px solid var(--border); border-radius: var(--radius); background: var(--accent); color: var(--accent-foreground); box-shadow: var(--hard-shadow-sm); }
+      .send:hover { transform: translate(1px,1px); box-shadow: none; }
+      .send.running { background: color-mix(in srgb, var(--destructive), transparent 82%); color: var(--destructive); }
+      .send:disabled { opacity: .4; pointer-events: none; }
+
+      /* slash suggestions panel */
+      .slash-panel { position: absolute; left: 14px; bottom: 100%; margin-bottom: 6px; width: 320px; border: 2px solid var(--border); border-radius: var(--radius); background: var(--popover); box-shadow: var(--hard-shadow); padding: 6px; z-index: 30; }
+      .slash-group { padding: 6px 6px 3px; font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted-foreground); }
+      .slash-item { display: flex; align-items: center; gap: 10px; width: 100%; border: 2px solid transparent; border-radius: 4px; padding: 7px 9px; background: transparent; text-align: left; }
+      .slash-item:hover, .slash-item.hl { background: var(--muted); border-color: var(--border); }
+      .slash-item .si { display: grid; width: 28px; height: 28px; flex: 0 0 28px; place-items: center; border: 2px solid var(--border); border-radius: 4px; background: var(--background); }
+      .slash-item.dr .si { background: var(--signal-cyan); }
+      .slash-item b { font-size: 13px; font-weight: 600; } .slash-item small { display: block; color: var(--muted-foreground); font-size: 11px; margin-top: 1px; }
+
+      /* slash mention chip (inserted into editor) */
+      .mention { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border); border-radius: 4px; background: var(--signal-cyan); padding: 1px 7px; font-size: 13px; font-weight: 700; color: var(--accent-foreground); }
+
+      /* pending messages panel (steering/follow-up) */
+      .pending { max-width: 760px; margin: 0 auto 8px; border: 2px solid var(--border); border-radius: var(--radius); background: var(--card); box-shadow: var(--hard-shadow); overflow: hidden; }
+      .pending-head { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--border); background: var(--signal-yellow); padding: 6px 11px; color: #141111; }
+      .pending-head .t { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+      .pending-row { display: flex; align-items: center; gap: 8px; padding: 7px 11px; font-size: 12px; }
+      .pill { border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-family: var(--mono); font-size: 8px; font-weight: 700; background: var(--secondary); }
+
+      /* ===== Artifact panel (对齐 artifacts/index.tsx) ===== */
+      .artifact { display: flex; flex-direction: column; border-left: 2px solid var(--border); background: var(--background); min-width: 0; }
+      .workspace:not(.artifact-open) .artifact { display: none; }
+      .artifact-header { display: flex; align-items: center; gap: 8px; height: 48px; flex: 0 0 48px; border-bottom: 2px solid var(--border); background: var(--signal-purple); color: #141111; padding: 0 10px; }
+      .artifact-header .am { display: grid; width: 28px; height: 28px; place-items: center; border: 2px solid #141111; border-radius: 5px; background: #fff; box-shadow: 2px 2px 0 #141111; }
+      .artifact-header b { font-size: 13px; font-weight: 700; }
+      .artifact-header .as { display: block; font-family: var(--mono); font-size: 8px; margin-top: 1px; }
+      .artifact-header .ah-right { margin-left: auto; display: flex; gap: 5px; }
+      .a-iconbtn { display: grid; place-items: center; width: 28px; height: 28px; border: 2px solid #141111; border-radius: 5px; background: #fff; color: #141111; box-shadow: 2px 2px 0 #141111; }
+      .a-iconbtn:hover { transform: translate(1px,1px); box-shadow: none; }
+      .artifact-tabs { display: flex; border-bottom: 2px solid var(--border); background: var(--secondary); }
+      .artifact-tab { border: 0; border-right: 1px solid color-mix(in srgb, var(--border), transparent 78%); padding: 8px 13px; background: transparent; color: var(--muted-foreground); font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 0.03em; }
+      .artifact-tab.active { background: var(--background); color: var(--foreground); box-shadow: inset 0 -2px 0 var(--signal-purple); }
+      .artifact-body { flex: 1; overflow: auto; padding: 18px 20px 40px; }
+      .artifact-body h2 { font-size: 18px; margin: 0 0 4px; letter-spacing: -0.02em; }
+      .artifact-body .rm { color: var(--muted-foreground); font-family: var(--mono); font-size: 8px; margin-bottom: 16px; letter-spacing: 0.04em; }
+      .artifact-body h3 { font-size: 14px; margin: 18px 0 6px; padding-bottom: 4px; border-bottom: 1px solid color-mix(in srgb, var(--border), transparent 72%); }
+      .artifact-body p { font-size: 13px; line-height: 1.7; margin: 7px 0; }
+      .artifact-body ul { margin: 7px 0; padding-left: 18px; } .artifact-body li { font-size: 13px; line-height: 1.7; margin: 3px 0; }
+      .source-card { display: grid; grid-template-columns: 22px 1fr; gap: 9px; border: 2px solid var(--border); border-radius: var(--radius); padding: 9px 10px; margin-bottom: 8px; background: var(--card); }
+      .source-card .sn { display: grid; width: 22px; height: 22px; place-items: center; border: 1px solid var(--border); border-radius: 4px; background: var(--signal-cyan); font-family: var(--mono); font-size: 9px; font-weight: 700; }
+      .source-card b { font-size: 12px; font-weight: 600; }
+      .source-card .u { display: block; margin-top: 3px; color: color-mix(in srgb, var(--signal-cyan), var(--foreground) 25%); font-family: var(--mono); font-size: 8px; word-break: break-all; }
+      .source-card .sn-snip { display: block; margin-top: 5px; color: var(--muted-foreground); font-size: 11px; line-height: 1.5; }
+      .source-card.flash { animation: flash 1.2s ease; }
+      @keyframes flash { 0%,100% { background: var(--card); } 30% { background: color-mix(in srgb, var(--signal-yellow), transparent 55%); } }
+
+      /* citation popover (mode B) */
+      .cite-pop { position: fixed; z-index: 60; width: 300px; border: 2px solid var(--border); border-radius: var(--radius); background: var(--popover); box-shadow: var(--hard-shadow); padding: 11px; }
+      .cite-pop .cn { display: inline-grid; width: 20px; height: 20px; place-items: center; border: 1px solid var(--border); border-radius: 4px; background: var(--signal-cyan); font-family: var(--mono); font-size: 9px; font-weight: 700; margin-bottom: 7px; }
+      .cite-pop b { display: block; font-size: 12px; } .cite-pop .u { display: block; margin-top: 4px; color: color-mix(in srgb, var(--signal-cyan), var(--foreground) 25%); font-family: var(--mono); font-size: 8px; word-break: break-all; }
+      .cite-pop .s { display: block; margin-top: 7px; color: var(--muted-foreground); font-size: 11px; line-height: 1.5; }
+
+      /* driver bar */
+      .driver { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 50; display: flex; align-items: center; gap: 8px; border: 2px solid var(--border); border-radius: 8px; background: var(--card); box-shadow: var(--hard-shadow); padding: 7px 9px; max-width: 92vw; }
+      .driver .step-info { font-family: var(--mono); font-size: 9px; color: var(--muted-foreground); min-width: 130px; }
+      .driver .step-info b { color: var(--foreground); font-size: 11px; }
+
+      .fade-in { animation: fadeIn .35s ease; }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+      [hidden] { display: none !important; }
+      .cursor::after { content: "▋"; margin-left: 1px; animation: blink .9s steps(2) infinite; color: var(--signal-cyan); }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <!-- Titlebar -->
+      <div class="titlebar">
+        <div class="brand"><span class="brand-mark">D/</span><span>Divisor Agent</span><span class="proto-badge">DEEP RESEARCH · 可交互交互稿</span></div>
+        <div class="tb-right">
+          <span class="tb-label">报告呈现</span>
+          <div class="segmented" id="modeSwitch" aria-label="报告呈现方式">
+            <button data-mode="artifact" class="active">Artifact 面板</button>
+            <button data-mode="inline">内联消息</button>
+          </div>
+          <div class="segmented"><button id="themeBtn">暗色</button></div>
+        </div>
+      </div>
+
+      <!-- Workspace -->
+      <div class="workspace" id="workspace">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+          <div class="sidebar-new"><button class="btn btn-default new-chat"><span style="display:flex;align-items:center;gap:6px"><svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>新对话</span><span class="kbd">⌘N</span></button></div>
+          <div class="sidebar-scroll">
+            <div class="side-heading">置顶</div>
+            <button class="session active"><span class="badge-sq bg-cyan">DR</span><span class="session-copy"><b>量子计算商业化研究</b><small id="sideStatus">DEEP RESEARCH</small></span></button>
+            <div class="side-heading">今天</div>
+            <button class="session"><span class="badge-sq bg-yellow">EX</span><span class="session-copy"><b>Extension 架构讨论</b><small>14:20</small></span></button>
+            <button class="session"><span class="badge-sq bg-green">FX</span><span class="session-copy"><b>修复会话滚动状态</b><small>11:02</small></span></button>
+          </div>
+          <div class="sidebar-foot"><div class="row"><span class="badge-sq" style="background:#fff;width:26px;height:26px;flex-basis:26px"><svg class="ic ic-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg></span><span>设置与偏好</span></div></div>
+        </aside>
+
+        <!-- Chat -->
+        <section class="chat">
+          <header class="panel-header">
+            <button class="btn btn-ghost btn-icon-sm" title="折叠侧栏" id="toggleSidebar"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></button>
+            <div style="min-width:0"><h1>量子计算商业化研究</h1></div>
+            <div class="ph-right">
+              <button class="btn btn-outline btn-icon-sm" id="toggleArtifact" title="报告面板" hidden><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></button>
+            </div>
+          </header>
+
+          <div class="messages" id="messages">
+            <div class="msg-inner" id="thread">
+              <!-- messages injected by JS -->
+            </div>
+          </div>
+
+          <!-- Composer dock -->
+          <div class="composer-dock">
+            <div class="pending" id="pending" hidden>
+              <div class="pending-head"><span class="t">Pending Messages</span><span class="pill" id="pendingCount">1 pending</span></div>
+              <div class="pending-row"><svg class="ic ic-sm" viewBox="0 0 24 24" style="color:var(--muted-foreground)"><circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/></svg><span class="pill">Steer</span><span id="pendingText" style="color:var(--muted-foreground)">多关注中国厂商的融资数据</span></div>
+            </div>
+            <div class="composer" id="composer">
+              <div class="composer-edit">
+                <div class="slash-panel" id="slashPanel" hidden>
+                  <div class="slash-group">Extensions</div>
+                  <button class="slash-item dr hl" id="slashDR"><span class="si"><svg class="ic ic-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2a10 10 0 0 1 10 10M12 2a10 10 0 0 0-10 10"/></svg></span><span><b>deep-research</b><small>拆解主题并并行深度研究，生成带引用的报告</small></span></button>
+                  <div class="slash-group">Skills</div>
+                  <button class="slash-item"><span class="si"><svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M14 7l-9 9 3 3 9-9M14 7l3-3 3 3-3 3M14 7l3 3"/></svg></span><span><b>shadcn</b><small>shadcn/ui 组件指导 · 项目</small></span></button>
+                </div>
+                <textarea id="input" rows="1" placeholder="给 Agent 发消息，或输入 / 调用工具…"></textarea>
+              </div>
+              <div class="composer-foot">
+                <div class="left">
+                  <span class="selector" id="drChip" title="Deep Research"><span class="sq" style="background:var(--signal-cyan)"><svg class="ic ic-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2a10 10 0 0 1 10 10"/></svg></span><span id="drChipLabel">深度研究</span></span>
+                  <span class="selector"><span class="sq" style="background:var(--signal-green)"><svg class="ic ic-xs" viewBox="0 0 24 24"><path d="M12 2l7 4v6c0 4-3 7-7 8-4-1-7-4-7-8V6z"/><path d="M9 12l2 2 4-4"/></svg></span>默认权限</span>
+                </div>
+                <div class="right">
+                  <span class="selector"><span class="sq bg-purple"><svg class="ic ic-xs" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg></span>Claude Sonnet</span>
+                  <button class="send" id="sendBtn" title="发送"><svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Artifact panel -->
+        <aside class="artifact" id="artifact">
+          <header class="artifact-header">
+            <span class="am"><svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
+            <div><b>研究报告</b><span class="as">DEEP RESEARCH REPORT</span></div>
+            <div class="ah-right">
+              <button class="a-iconbtn" title="导出"><svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg></button>
+              <button class="a-iconbtn" id="closeArtifact" title="关闭"><svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+            </div>
+          </header>
+          <div class="artifact-tabs">
+            <button class="artifact-tab active" data-tab="report">报告</button>
+            <button class="artifact-tab" data-tab="sources">来源 <span id="srcTabCount">0</span></button>
+            <button class="artifact-tab" data-tab="outline">大纲</button>
+          </div>
+          <div class="artifact-body" id="artifactBody">
+            <div class="tabpane" data-pane="report" id="paneReport"></div>
+            <div class="tabpane" data-pane="sources" id="paneSources" hidden></div>
+            <div class="tabpane" data-pane="outline" id="paneOutline" hidden></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <!-- citation popover (inline mode) -->
+    <div class="cite-pop" id="citePop" hidden><span class="cn" id="cpN">1</span><b id="cpT"></b><span class="u" id="cpU"></span><span class="s" id="cpS"></span></div>
+
+    <!-- Driver bar -->
+    <div class="driver" id="driver">
+      <div class="step-info"><b id="stepTitle">开始</b><br><span id="stepDesc">点击「下一步」体验完整流程</span></div>
+      <button class="btn btn-ghost btn-sm" id="btnReset" title="重置"><svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9 9 0 0 0-6 2.3L3 8"/><path d="M3 3v5h5"/></svg>重置</button>
+      <button class="btn btn-default btn-sm" id="btnNext">下一步 <span class="kbd">→</span></button>
+    </div>
+
+    <script>
+      const $ = (s, r=document) => r.querySelector(s);
+      const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+      const thread = $("#thread");
+      const workspace = $("#workspace");
+
+      const SOURCES = {
+        1: ["IBM Unveils Heron Quantum Processor", "research.ibm.com/blog/heron", "IBM 发布 Heron 处理器，双比特门错误率降至 0.1% 以下，为纠错奠定基础。"],
+        2: ["QuEra Neutral-Atom Roadmap 2026", "quera.com/roadmap-2026", "中性原子路线在逻辑比特数量上实现三倍提升，可扩展性成为亮点。"],
+        3: ["McKinsey Quantum Technology Monitor 2026", "mckinsey.com/quantum-2026", "预测量子计算到 2035 年将为金融/化工/制药创造超 1000 亿美元价值。"],
+        4: ["IBM Quantum Roadmap to Fault Tolerance", "ibm.com/quantum/roadmap", "公布到 2029 年实现容错量子计算的技术路线。"],
+        5: ["Google Willow Error-Correction Result", "blog.google/quantum-willow", "Willow 芯片展示逻辑比特错误率随规模下降的关键证据。"],
+        6: ["Quantinuum H2 Fidelity Benchmark", "quantinuum.com/h2", "离子阱系统保真度业界最高，适合早期高价值应用。"],
+        7: ["JPMorgan & Roche Quantum POC", "jpmorgan.com/quantum-poc", "摩根大通、罗氏在组合优化与分子模拟上开展验证。"],
+        8: ["本源悟空上机破两千万次", "originqc.com.cn/wukong", "本源量子第三代超导量子计算机累计上机任务突破两千万次。"],
+      };
+
+      // svg icon helpers (lucide-like)
+      const IC = {
+        circle: '<svg class="ic ic-sm st-ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg>',
+        loader: '<svg class="ic ic-sm st-ic spin" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/></svg>',
+        check: '<svg class="ic ic-sm st-ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>',
+        chev: '<svg class="ic ic-sm chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>',
+      };
+
+      let mode = "artifact"; // artifact | inline
+
+      // ============ Step machine ============
+      let step = 0;
+      const steps = [
+        { title: "1 · 用户输入", desc: "在输入框写研究主题并触发深度研究" },
+        { title: "2 · 澄清范围", desc: "Agent 反问，点选一个答案" },
+        { title: "3 · 生成计划", desc: "查看拆解出的 4 个子任务，确认" },
+        { title: "4 · 并行研究", desc: "子研究者逐步推进，观察进度" },
+        { title: "5 · Supervisor 反思", desc: "评估证据，追加一轮搜索" },
+        { title: "6 · 流式生成报告", desc: "报告逐字打出" },
+        { title: "7 · 完成与溯源", desc: "点击 citation 溯源、导出" },
+      ];
+      function setDriver() {
+        const s = steps[step] || steps[steps.length-1];
+        $("#stepTitle").textContent = s.title;
+        $("#stepDesc").textContent = s.desc;
+        $("#btnNext").hidden = step >= steps.length;
+      }
+      function scrollBottom() { const m = $("#messages"); m.scrollTop = m.scrollHeight; }
+      function addMsg(html) { const d = document.createElement("div"); d.className = "fade-in"; d.innerHTML = html; thread.appendChild(d); scrollBottom(); return d; }
+
+      function aiWrap(inner, headHtml="") {
+        return `<div class="msg"><span class="identity ai">AI</span><div style="min-width:0">${headHtml}${inner}</div></div>`;
+      }
+
+      // ---- Step 0: user prompt ----
+      function stepUserPrompt() {
+        // simulate typing into composer then sending
+        const input = $("#input");
+        const text = "帮我深入研究 2025-2026 年量子计算的商业化进展，重点关注硬件突破、商业落地场景和主要厂商动态。";
+        $("#drChip").classList.add("dr-on");
+        addMsg(`<div class="msg user"><span class="identity you">YOU</span><div style="min-width:0"><div class="user-bubble"><span class="mention">/deep-research</span> ${text}</div></div></div>`);
+        input.value = "";
+      }
+
+      // ---- Step 1: clarify ----
+      function stepClarify() {
+        const inner = `
+          <div class="dr-block">
+            <div class="dr-bar"><span class="dr-bar-tag">DEEP RESEARCH</span><b>澄清研究范围</b><span class="meta"><span>CLARIFY · 1 / 3</span></span></div>
+            <div class="dr-inner">
+              <div class="dr-brief"><b>问题 1</b> · 研究的时间范围以哪个为准？</div>
+              <div id="clarifyOpts">
+                <button class="opt" data-opt="0"><span class="oi">1</span><span class="oc"><b>聚焦 2025-2026</b><small>只覆盖最近两年的新进展</small></span><span class="rec">推荐</span></button>
+                <button class="opt" data-opt="1"><span class="oi">2</span><span class="oc"><b>近五年趋势</b><small>纳入更长期的技术演进背景</small></span></button>
+              </div>
+            </div>
+            <div class="dr-foot"><span class="hint">数字键选择 · Enter 继续</span><button class="btn btn-ghost btn-sm" data-skip>跳过澄清</button><button class="btn btn-default btn-sm" data-clarify-next disabled>继续</button></div>
+          </div>`;
+        const el = addMsg(aiWrap(inner, `<div class="ai-body"><p>启动前，我先确认几个方向，把搜索聚焦到你关心的范围。</p></div>`));
+        let sel = -1;
+        $$(".opt", el).forEach(o => o.addEventListener("click", () => {
+          $$(".opt", el).forEach(x => x.classList.remove("sel"));
+          o.classList.add("sel"); sel = +o.dataset.opt;
+          $("[data-clarify-next]", el).disabled = false;
+        }));
+      }
+
+      // ---- Step 2: plan ----
+      const TASKS = [
+        ["硬件突破与技术路线", "超导 / 离子阱 / 光量子 / 中性原子 的最新里程碑"],
+        ["商业落地场景", "金融 / 制药 / 材料 / 密码学 的实际应用案例"],
+        ["主要厂商动态", "IBM / Google / IonQ / Quantinuum / 本源量子"],
+        ["投融资与市场规模", "融资事件 / 政策资金 / 市场预测"],
+      ];
+      function stepPlan() {
+        const rows = TASKS.map((t,i)=>`<div class="dr-row"><span class="badge-sq" style="width:26px;height:26px;flex-basis:26px;font-size:9px">${i+1}</span><div class="rc"><div class="t"><b>${t[0]}</b><span class="lab">编辑</span></div><div class="p">${t[1]}</div></div></div>`).join("");
+        const inner = `
+          <div class="dr-block">
+            <div class="dr-bar"><span class="dr-bar-tag">DEEP RESEARCH</span><b>研究计划</b><span class="meta"><span>PLAN · 4 子任务</span></span></div>
+            <div class="dr-inner">
+              <div class="dr-brief"><b>研究简报</b> · 调研 2025-2026 全球量子计算商业化进展，覆盖硬件、落地场景、厂商动态，含中国大陆厂商，中文报告。</div>
+              <div class="dr-list">${rows}</div>
+            </div>
+            <div class="dr-foot"><span class="hint">可拖拽排序 · 点击子任务编辑</span><button class="btn btn-ghost btn-sm">+ 添加</button><button class="btn btn-default btn-sm" data-start>开始研究</button></div>
+          </div>`;
+        addMsg(aiWrap(inner, `<div class="ai-body"><p>我把主题拆成 4 个可并行研究的子问题，确认后开始。</p></div>`));
+      }
+
+      // ---- Step 3: research (progress block, manual step advances substasks) ----
+      let researchEl = null;
+      const subStates = ["queued","queued","queued","queued"];
+      const subPhases = ["等待并发槽位","等待并发槽位","等待并发槽位","等待并发槽位"];
+      const subSrc = [0,0,0,0];
+      let srcTotal = 0;
+      function renderResearch(roundLabel, reflectHtml, stepper) {
+        const rows = TASKS.map((t,i)=>{
+          const stt = subStates[i];
+          const ic = stt==="done"?IC.check : stt==="run"?IC.loader : IC.circle;
+          const label = stt==="done"?"完成": stt==="run"?"进行中":"排队";
+          return `<div class="dr-row ${stt}"><span>${ic}</span><div class="rc"><div class="t"><b>${t[0]}</b><span class="lab">${label}${subSrc[i]?` · ${subSrc[i]} 源`:""}</span></div><div class="p">${subPhases[i]}</div></div></div>`;
+        }).join("");
+        return `
+          <div class="dr-block">
+            <div class="dr-bar"><span class="dr-bar-tag"><svg class="ic ic-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>RESEARCH</span><b>深度研究进行中</b><span class="meta"><span>${roundLabel} · 已检索 ${srcTotal} 源</span><span class="dot"></span><span>运行中</span></span></div>
+            <div class="dr-steps">${stepper}</div>
+            <div class="dr-inner"><div class="dr-list">${rows}</div>${reflectHtml||""}</div>
+            <div class="dr-foot"><span class="hint">研究过程可随时干预（steering）</span><button class="btn btn-ghost btn-sm" data-steer>追加指令</button><button class="btn btn-outline btn-sm">暂停</button></div>
+          </div>`;
+      }
+      const STEPPER = (a) => `
+        <div class="st done"><span class="d"></span>澄清</div>
+        <div class="st done"><span class="d"></span>计划</div>
+        <div class="st ${a==='research'?'active':'done'}"><span class="d"></span>并行研究</div>
+        <div class="st ${a==='reflect'?'active':(a==='report'?'done':'')}"><span class="d"></span>反思</div>
+        <div class="st ${a==='report'?'active':''}"><span class="d"></span>报告</div>`;
+      function stepResearchStart() {
+        subStates[0]="run"; subPhases[0]="正在搜索 IBM Heron gate error rate 2025…"; subSrc[0]=2; srcTotal=2;
+        subStates[1]="run"; subPhases[1]="正在读取 mckinsey.com/quantum-2026…"; subSrc[1]=1; srcTotal=3;
+        const el = addMsg(aiWrap(renderResearch("第 1 轮", "", STEPPER('research')), `<div class="ai-body"><p>正在并行研究 4 个子任务，我会在每轮结束后反思是否需要补充搜索。</p></div>`));
+        researchEl = el;
+      }
+      function updateResearch(reflectHtml, stepper) {
+        const wrap = researchEl.querySelector(".dr-block").parentElement;
+        wrap.innerHTML = renderResearch(reflectHtml? "第 2 轮":"第 1 轮", reflectHtml, stepper);
+        bindResearchButtons(researchEl);
+        scrollBottom();
+      }
+      function bindResearchButtons(el) {
+        const steer = el.querySelector("[data-steer]");
+        steer && steer.addEventListener("click", () => { $("#pending").hidden = false; scrollBottom(); });
+      }
+      function stepResearchProgress() {
+        // advance subtasks
+        subStates[0]="done"; subPhases[0]="已综合 8 个来源，输出 620 字发现"; subSrc[0]=8;
+        subStates[1]="run"; subPhases[1]="正在思考：金融组合优化的实测收益…"; subSrc[1]=5;
+        subStates[2]="run"; subPhases[2]="对比 IBM Condor 与 Heron 路线…"; subSrc[2]=7;
+        subStates[3]="run"; subPhases[3]="搜索 quantum computing funding 2026…"; subSrc[3]=3;
+        srcTotal = 23;
+        updateResearch("", STEPPER('research'));
+      }
+
+      // ---- Step 4: reflect ----
+      function stepReflect() {
+        subStates[1]="done"; subPhases[1]="已综合 9 个来源"; subSrc[1]=9;
+        subStates[2]="done"; subPhases[2]="已综合 11 个来源"; subSrc[2]=11;
+        subStates[3]="done"; subPhases[3]="已综合 6 个来源"; subSrc[3]=6;
+        srcTotal = 34;
+        const reflect = `<div class="dr-reflect"><span class="tag">SUPERVISOR 反思</span> · 硬件与厂商证据充分；落地场景的量化数据偏少，追加一轮针对性搜索补充金融/制药的实测收益数据。</div>`;
+        updateResearch(reflect, STEPPER('reflect'));
+      }
+
+      // ---- Step 5: report streaming ----
+      const KEY_FINDINGS = [
+        ['超导路线仍领先，IBM 与 Google 分别推进纠错里程碑', [1,4]],
+        ['中性原子与离子阱在保真度上快速追赶', [2,6]],
+        ['金融与制药是当前最接近商用的两个场景', [3,7]],
+      ];
+      function reportBodyHtml(withActions) {
+        const fnd = KEY_FINDINGS.map(f=>`<li>${f[0]}${f[1].map(n=>`<a class="cite" data-src="${n}">${n}</a>`).join("")}</li>`).join("");
+        const actions = withActions ? `<div class="report-actions"><button class="btn btn-outline btn-sm">↧ 导出 Markdown</button><button class="btn btn-ghost btn-sm">复制</button><button class="btn btn-ghost btn-sm">查看全部 34 来源</button><button class="btn btn-ghost btn-sm">继续追问</button></div>` : "";
+        return { fnd, actions };
+      }
+      let reportEl = null;
+      function stepReport() {
+        // mark done stepper, then stream
+        updateResearch(`<div class="dr-reflect"><span class="tag">SUPERVISOR</span> · 证据已充分，开始合成报告。</div>`, STEPPER('report'));
+        // finished summary block
+        const finBlock = `
+          <div class="dr-block">
+            <div class="dr-bar"><span class="dr-bar-tag" style="background:var(--signal-green)">✓ DONE</span><b>研究完成</b><span class="meta"><span>2 轮 · 34 来源 · 4 子任务 · 5m47s</span></span></div>
+            <div class="dr-inner"><div class="ai-body" style="font-size:13px"><p style="margin:0 0 6px"><b>关键发现</b></p><ul style="padding-left:18px;margin:0" id="finFindings"></ul></div></div>
+          </div>`;
+        reportEl = addMsg(aiWrap(finBlock, `<div class="ai-body"><p id="reportLead"></p></div>`));
+        // stream lead text
+        const lead = "研究完成，共检索 34 个来源、2 轮迭代。核心结论如下";
+        typeText($("#reportLead", reportEl), lead + (mode==="artifact"?"，完整报告已生成在右侧面板：":"，完整报告如下："), () => {
+          // stream key findings
+          const ul = $("#finFindings", reportEl);
+          const { fnd } = reportBodyHtml(false);
+          ul.innerHTML = fnd;
+          $$(".cite", ul).forEach(bindCite);
+          if (mode === "artifact") {
+            renderArtifact();
+            openArtifact();
+            const card = document.createElement("div"); card.className="fade-in";
+            card.innerHTML = aiWrap(`<button class="report-card" id="reportCard"><span class="badge-sq bg-purple" style="width:38px;height:38px;flex-basis:38px"><svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span><span class="rc-copy"><b>量子计算商业化研究报告.md</b><small>ARTIFACT · 约 3200 字 · 5 章节 · 34 引用</small></span><span class="open-tag">打开 →</span></button>`);
+            thread.appendChild(card); scrollBottom();
+            $("#reportCard").addEventListener("click", openArtifact);
+          } else {
+            renderInlineReport();
+          }
+        });
+      }
+
+      function renderInlineReport() {
+        const { actions } = reportBodyHtml(true);
+        const html = `
+          <div class="report-inline">
+            <h2>2025-2026 量子计算商业化研究报告</h2>
+            <div class="rm">2 ITERATIONS · 34 SOURCES · 4 SUBAGENTS · 用时 5m47s</div>
+            <h3>摘要</h3>
+            <p>2025-2026 年，量子计算正从「实验室原型」加速迈向「早期商业化」。超导路线在纠错上取得关键突破<a class="cite" data-src="1">1</a>，同时中性原子、离子阱等替代路线快速追赶<a class="cite" data-src="2">2</a>。商业落地方面，金融组合优化与制药分子模拟成为最接近实用的两个场景<a class="cite" data-src="3">3</a><a class="cite" data-src="7">7</a>。</p>
+            <h3>1. 硬件突破与技术路线</h3>
+            <p>IBM 于 2025 年发布的 Heron 处理器将双比特门错误率降至新低<a class="cite" data-src="1">1</a>，并公布到 2029 年实现容错量子计算的路线图<a class="cite" data-src="4">4</a>。Google 通过 Willow 芯片首次展示「纠错后逻辑比特错误率随规模下降」的证据<a class="cite" data-src="5">5</a>。</p>
+            <ul><li><b>超导：</b>IBM、Google 领先<a class="cite" data-src="1">1</a></li><li><b>中性原子：</b>QuEra、Pasqal 逻辑比特数快速提升<a class="cite" data-src="2">2</a></li><li><b>离子阱：</b>Quantinuum 保真度业界最高<a class="cite" data-src="6">6</a></li></ul>
+            <h3>2. 商业落地场景</h3>
+            <p>麦肯锡预测量子计算将在 2035 年前为金融、化工、制药创造超千亿美元价值<a class="cite" data-src="3">3</a>。摩根大通、罗氏已开展 POC 验证<a class="cite" data-src="7">7</a>。</p>
+            <div class="report-src"><h4>参考来源（节选）</h4>
+              <div class="src-line"><span class="n">1</span><span>IBM Unveils Heron Quantum Processor<br><span class="u">research.ibm.com/blog/heron</span></span></div>
+              <div class="src-line"><span class="n">3</span><span>McKinsey Quantum Technology Monitor 2026<br><span class="u">mckinsey.com/quantum-2026</span></span></div>
+            </div>
+            ${actions}
+          </div>`;
+        const el = addMsg(aiWrap(html, `<div class="ai-body"></div>`));
+        $$(".cite", el).forEach(bindCite);
+      }
+
+      // typing effect
+      function typeText(node, text, done) {
+        node.classList.add("cursor"); let i=0;
+        const timer = setInterval(()=>{ node.textContent = text.slice(0,++i); scrollBottom(); if(i>=text.length){clearInterval(timer); node.classList.remove("cursor"); done&&done();} }, 22);
+      }
+
+      // ============ Artifact ============
+      function renderArtifact() {
+        const findings = KEY_FINDINGS.map(f=>`<li>${f[0]}${f[1].map(n=>`<a class="cite" data-src="${n}">${n}</a>`).join("")}</li>`).join("");
+        $("#paneReport").innerHTML = `
+          <h2>2025-2026 量子计算商业化研究报告</h2>
+          <div class="rm">GENERATED 2026-07-04 · 2 ITERATIONS · 34 SOURCES · 4 SUBAGENTS</div>
+          <h3>摘要</h3>
+          <p>2025-2026 年，量子计算正从「实验室原型」加速迈向「早期商业化」。超导路线在纠错上取得关键突破<a class="cite" data-src="1">1</a>，同时中性原子、离子阱等替代路线快速追赶<a class="cite" data-src="2">2</a>。商业落地方面，金融组合优化与制药分子模拟成为最接近实用的两个场景<a class="cite" data-src="3">3</a><a class="cite" data-src="7">7</a>。</p>
+          <h3>1. 硬件突破与技术路线</h3>
+          <p>IBM 于 2025 年发布的 Heron 处理器将双比特门错误率降至新低<a class="cite" data-src="1">1</a>，并公布到 2029 年实现容错量子计算的路线图<a class="cite" data-src="4">4</a>。Google 通过 Willow 芯片首次展示纠错后逻辑比特错误率随规模下降的证据<a class="cite" data-src="5">5</a>。</p>
+          <ul><li><b>超导：</b>IBM、Google 领先，主打纠错与规模化<a class="cite" data-src="1">1</a><a class="cite" data-src="5">5</a></li><li><b>中性原子：</b>QuEra、Pasqal 逻辑比特数快速提升<a class="cite" data-src="2">2</a></li><li><b>离子阱：</b>Quantinuum 保真度业界最高<a class="cite" data-src="6">6</a></li></ul>
+          <h3>2. 商业落地场景</h3>
+          <p>麦肯锡预测量子计算将在 2035 年前为金融、化工、制药创造超千亿美元价值<a class="cite" data-src="3">3</a>。摩根大通、罗氏等企业已开展 POC 验证<a class="cite" data-src="7">7</a>。</p>
+          <h3>3. 主要厂商动态</h3>
+          <p>本源量子推出第三代超导量子计算机「本源悟空」，累计上机任务突破两千万次<a class="cite" data-src="8">8</a>。</p>`;
+        $("#paneSources").innerHTML = Object.entries(SOURCES).map(([n,s])=>`<div class="source-card" data-srccard="${n}"><span class="sn">${n}</span><div><b>${s[0]}</b><span class="u">${s[1]}</span><span class="sn-snip">${s[2]}</span></div></div>`).join("");
+        $("#srcTabCount").textContent = Object.keys(SOURCES).length;
+        $("#paneOutline").innerHTML = `<div class="dr-list">
+          <div class="dr-row"><span class="badge-sq bg-green" style="width:24px;height:24px;flex-basis:24px;font-size:9px">§</span><div class="rc"><div class="t"><b>摘要</b><span class="lab">4 引用</span></div></div></div>
+          ${TASKS.map((t,i)=>`<div class="dr-row"><span class="badge-sq bg-green" style="width:24px;height:24px;flex-basis:24px;font-size:9px">${i+1}</span><div class="rc"><div class="t"><b>${t[0]}</b><span class="lab">${[12,9,11,6][i]} 引用</span></div></div></div>`).join("")}
+        </div>`;
+        $$(".cite", $("#paneReport")).forEach(bindCite);
+      }
+      function openArtifact() { workspace.classList.add("artifact-open"); $("#toggleArtifact").hidden = false; }
+      function closeArtifact() { workspace.classList.remove("artifact-open"); }
+      $("#closeArtifact").addEventListener("click", closeArtifact);
+      $("#toggleArtifact").addEventListener("click", () => workspace.classList.toggle("artifact-open"));
+      $$(".artifact-tab").forEach(t => t.addEventListener("click", () => {
+        $$(".artifact-tab").forEach(x=>x.classList.toggle("active", x===t));
+        $$(".tabpane").forEach(p=>p.hidden = p.dataset.pane !== t.dataset.tab);
+      }));
+
+      // citation binding — artifact mode jumps to sources; inline mode shows popover
+      function bindCite(c) {
+        c.addEventListener("click", (e) => {
+          e.preventDefault(); e.stopPropagation();
+          const id = c.dataset.src;
+          if (mode === "artifact") {
+            openArtifact();
+            $$(".artifact-tab").forEach(x=>x.classList.toggle("active", x.dataset.tab==="sources"));
+            $$(".tabpane").forEach(p=>p.hidden = p.dataset.pane!=="sources");
+            const card = $(`[data-srccard="${id}"]`);
+            if (card) { card.classList.remove("flash"); void card.offsetWidth; card.classList.add("flash"); card.scrollIntoView({block:"center"}); }
+          } else {
+            const s = SOURCES[id]; if(!s) return;
+            $("#cpN").textContent=id; $("#cpT").textContent=s[0]; $("#cpU").textContent=s[1]; $("#cpS").textContent=s[2];
+            const pop = $("#citePop"); pop.hidden=false;
+            const r=c.getBoundingClientRect(); let left=r.left; if(left+300>innerWidth-12)left=innerWidth-312;
+            let top=r.bottom+8; if(top+130>innerHeight)top=r.top-138;
+            pop.style.left=left+"px"; pop.style.top=top+"px";
+          }
+        });
+      }
+      document.addEventListener("click", e=>{ if(!e.target.closest(".cite")&&!e.target.closest(".cite-pop")) $("#citePop").hidden=true; });
+
+      // ============ Next-step orchestration ============
+      const runners = [stepUserPrompt, stepClarify, stepPlan, stepResearchStart, stepReflect_wrap, stepReport_wrap];
+      // We need finer control: expand research into start->progress. Re-map:
+      const flow = [
+        stepUserPrompt,        // 0 -> after: step1
+        stepClarify,           // 1
+        stepPlan,              // 2
+        stepResearchStart,     // 3
+        stepResearchProgress,  // (part of 4) — but keep step index aligned; combine below
+        stepReflect,           // 5
+        stepReport,            // 6
+      ];
+      // step index shown in driver uses `steps` (7 entries). Map flow calls:
+      const flowSeq = [
+        {run: stepUserPrompt, driver:1},
+        {run: stepClarify, driver:2},
+        {run: stepPlan, driver:3},
+        {run: ()=>{stepResearchStart();}, driver:3},
+        {run: ()=>{stepResearchProgress();}, driver:4},
+        {run: ()=>{stepReflect();}, driver:5},
+        {run: ()=>{stepReport();}, driver:6},
+      ];
+      let seq = 0;
+      function next() {
+        if (seq >= flowSeq.length) return;
+        const f = flowSeq[seq];
+        f.run();
+        step = f.driver; setDriver();
+        seq++;
+        if (seq >= flowSeq.length) { $("#btnNext").hidden = true; $("#sideStatus").textContent = "DEEP RESEARCH · 已完成"; $("#stepTitle").textContent = "7 · 完成"; $("#stepDesc").textContent = "点击报告中的 citation 溯源来源"; }
+      }
+      // dummy wrappers referenced above (avoid ReferenceError if unused)
+      function stepReflect_wrap(){} function stepReport_wrap(){}
+
+      $("#btnNext").addEventListener("click", next);
+      $("#btnReset").addEventListener("click", () => location.reload());
+      window.addEventListener("keydown", e => {
+        if (e.target.matches("textarea,input")) return;
+        if (e.key === "ArrowRight" || e.key === "Enter") { e.preventDefault(); next(); }
+      });
+
+      // mode switch
+      $$("#modeSwitch button").forEach(b => b.addEventListener("click", () => {
+        $$("#modeSwitch button").forEach(x=>x.classList.toggle("active", x===b));
+        mode = b.dataset.mode;
+        if (mode==="inline") closeArtifact();
+      }));
+
+      // composer: slash trigger + focus ring
+      const input = $("#input"), composer=$("#composer"), slash=$("#slashPanel");
+      input.addEventListener("focus", ()=>composer.classList.add("focus"));
+      input.addEventListener("blur", ()=>{composer.classList.remove("focus"); setTimeout(()=>slash.hidden=true,150);});
+      input.addEventListener("input", ()=>{ slash.hidden = !input.value.startsWith("/"); autoGrow(); });
+      function autoGrow(){ input.style.height="auto"; input.style.height=Math.min(160,input.scrollHeight)+"px"; }
+      $("#slashDR").addEventListener("click", ()=>{ slash.hidden=true; input.value=""; $("#drChip").classList.add("dr-on"); next(); });
+      $("#sendBtn").addEventListener("click", ()=>{ if(seq===0) next(); });
+
+      // theme
+      $("#themeBtn").addEventListener("click", e=>{ const d=document.documentElement.dataset.theme==="dark"; document.documentElement.dataset.theme=d?"light":"dark"; e.target.textContent=d?"暗色":"亮色"; });
+
+      // sidebar toggle
+      $("#toggleSidebar").addEventListener("click", ()=>workspace.classList.toggle("sidebar-collapsed"));
+
+      setDriver();
+    </script>
+  </body>
+</html>
