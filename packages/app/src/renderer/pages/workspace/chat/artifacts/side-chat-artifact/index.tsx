@@ -1,6 +1,7 @@
 import type { AppUserMessage } from "@earendil-works/pi-agent-core";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { isAgentMessageEntry } from "@renderer/lib/is";
+import { summarizeUsage } from "@renderer/lib/token-usage";
 import { sideChatStore } from "@renderer/store/side-chat";
 import type { SideChatArtifactRecord } from "@renderer/store/side-chat/side-chat-slice";
 import { useCallback, useMemo } from "react";
@@ -27,6 +28,9 @@ export function SideChatArtifact({ artifact }: SideChatArtifactProps) {
   );
   const isRunning = entryState.status === "running";
   const inputDisabled = meta?.inputDisabled ?? false;
+  const usageSummary = summarizeUsage(
+    messageEntries.flatMap((entry) => (entry.data.role === "assistant" ? [entry.data] : [])),
+  );
 
   const submitPrompt = useCallback(
     async (submission: PromptSubmission) => {
@@ -88,6 +92,7 @@ export function SideChatArtifact({ artifact }: SideChatArtifactProps) {
           onStop={stopPrompt}
           onSubmit={submitPrompt}
           sessionId={artifact.id}
+          usageSummary={usageSummary}
         />
       </div>
     </div>

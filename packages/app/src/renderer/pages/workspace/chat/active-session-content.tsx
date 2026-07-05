@@ -8,6 +8,7 @@ import {
 } from "@renderer/components/ui/resizable";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
 import { isAgentMessageEntry, isAgentUserMessage } from "@renderer/lib/is";
+import { summarizeUsage } from "@renderer/lib/token-usage";
 import type { ToolExecutionState } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
 import { useQueryClient } from "@tanstack/react-query";
@@ -45,6 +46,7 @@ export function ActiveSessionContent({
     submitPrompt,
     steerPrompt,
     followUpPrompt,
+    usageSummary,
   } = useActiveSessionChat();
 
   const sharedPromptEditor = useSharedPromptEditor();
@@ -132,6 +134,7 @@ export function ActiveSessionContent({
                     sessionId={activeSessionId}
                     onCreate={handlePromptInputCreated}
                     onDestroy={handlePromptInputDestroyed}
+                    usageSummary={usageSummary}
                   />
                 )}
               </div>
@@ -196,6 +199,9 @@ function useActiveSessionChat() {
     : { entries: [], toolStates: EMPTY_TOOL_STATES, status: "idle" as const };
   const entries = entryState.entries;
   const messageEntries = entries.filter(isAgentMessageEntry);
+  const usageSummary = summarizeUsage(
+    messageEntries.flatMap((entry) => (entry.data.role === "assistant" ? [entry.data] : [])),
+  );
   const toolStates = entryState.toolStates;
   const isRunning = entryState.status === "running";
 
@@ -336,5 +342,6 @@ function useActiveSessionChat() {
     submitPrompt,
     steerPrompt,
     followUpPrompt,
+    usageSummary,
   };
 }

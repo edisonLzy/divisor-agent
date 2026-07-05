@@ -3,6 +3,8 @@ export interface AvailableModel {
   providerName: string;
   modelId: string;
   modelName: string;
+  contextWindow?: number;
+  maxTokens?: number;
 }
 
 export interface ModelCostConfig {

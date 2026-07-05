@@ -120,6 +120,7 @@ export class AgentPool
       "runOneTimeAgent",
       "abortPrompt",
       "setHistoryMessages",
+      "getContextUsage",
       "setSessionId",
       "setSessionScope",
       "destroySession",
@@ -172,6 +173,11 @@ export class AgentPool
   ) => {
     const runtime = this.getOrCreateRuntime(sessionId);
     runtime.setHistoryMessages(messages);
+  };
+
+  public getContextUsage: AgentSessionIPC["getContextUsage"] = async (sessionId) => {
+    const runtime = this.getOrCreateRuntime(sessionId);
+    return runtime.getContextUsage();
   };
 
   public setPermissionMode: AgentSessionIPC["setPermissionMode"] = async (sessionId, mode) => {
@@ -291,6 +297,8 @@ export class AgentPool
         providerId: m.provider,
         providerName: m.provider,
         modelName: m.name ?? m.id,
+        contextWindow: m.contextWindow,
+        maxTokens: m.maxTokens,
       };
     });
   };
