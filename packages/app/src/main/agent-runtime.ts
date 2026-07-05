@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import type {
   ExtensionAgentModel,
   ExtensionAgentToolOptions,
@@ -14,8 +12,8 @@ import type { PermissionMode } from "../shared/permissions-ipc.js";
 import type { AgentSessionIPC } from "../shared/session-ipc.js";
 import type { AgentSkillsIPC } from "../shared/skills-ipc.js";
 import { ExtensionService } from "./extensions/extension-service.js";
+import { PermissionService } from "./human-in-the-loop/index.js";
 import { ModelRegistry } from "./models/index.js";
-import { PermissionService } from "./permissions/index.js";
 import { SystemPromptService } from "./prompt/index.js";
 import { SkillService } from "./skills/index.js";
 import type { AppTool } from "./tools/index.js";
@@ -55,6 +53,7 @@ export type AgentRuntimeDelegate = {
     | "setSessionScope"
     | "destroySession"
     | "runOneTimeAgent"
+    | "resolveAskUserQuestion"
     | "listSkills"
     | "setSkillEnabled"
     ? never
@@ -155,13 +154,11 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
         }
 
         const permissionRequest = {
-          requestId: randomUUID(),
           toolCallId: context.toolCall.id,
           toolName: context.toolCall.name,
           toolLabel: tool?.label ?? context.toolCall.name,
           operation: context.toolCall.name,
           args,
-          createdAt: Date.now(),
         };
 
         if (this.permissionService.shouldAutoApprove(permissionRequest)) {
@@ -189,6 +186,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
           ...this.extensionService.getToolsForRuntime(
             {
               getModel: () => this.getCurrentModel(),
+              getScope: () => this.scope,
               getSessionId: () => this.sessionId,
             },
             this.options.extensionTools,
@@ -266,6 +264,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
   };
 
   public abortPrompt: AgentRuntimeDelegate["abortPrompt"] = async () => {
+    this.permissionService.cancelAll("Agent prompt aborted");
     this.agent.abort();
   };
 
@@ -298,6 +297,7 @@ export class AgentRuntime extends Emittery<AgentRuntimeEvents> implements AgentR
   };
 
   public destroy() {
+    this.permissionService.cancelAll("Agent runtime destroyed");
     this.clearListeners();
   }
 

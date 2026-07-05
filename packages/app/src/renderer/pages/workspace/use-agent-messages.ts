@@ -288,6 +288,11 @@ export function useAgentMessages() {
           approvalStatus: "pending",
         });
       },
+
+      ask_user_question_requested: (event) => {
+        const { sessionId, type: _type, ...request } = event;
+        mainStore.getState().enqueueAskUserQuestionRequest(sessionId, request);
+      },
     },
     {
       shouldHandleEvent: (event) => {

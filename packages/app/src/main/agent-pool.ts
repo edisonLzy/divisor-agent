@@ -12,6 +12,7 @@ import { AbstractAgentIPCHandler } from "./agent-ipc.js";
 import { AgentRuntime } from "./agent-runtime.js";
 import { ExtensionService } from "./extensions/index.js";
 import { ExtensionRuntimeService } from "./extensions/runtime-service.js";
+import { AskUserQuestionService } from "./human-in-the-loop/index.js";
 import { ModelRegistry } from "./models/index.js";
 import { SkillService } from "./skills/index.js";
 
@@ -33,6 +34,7 @@ export class AgentPool
   private skillService: SkillService;
   private extensionService: ExtensionService;
   private extensionRuntimeService: ExtensionRuntimeService;
+  private askUserQuestionService: AskUserQuestionService;
 
   constructor(browserWindow: BrowserWindow) {
     super(browserWindow);
@@ -40,10 +42,22 @@ export class AgentPool
     this.modelRegistry = new ModelRegistry();
     this.runtimes = new Map();
     this.skillService = new SkillService();
+    this.askUserQuestionService = new AskUserQuestionService();
     this.extensionRuntimeService = new ExtensionRuntimeService(
       this.modelRegistry,
       this.skillService,
+      this.askUserQuestionService,
     );
+    this.askUserQuestionService.on("human-in-the-loop", ({ data }) => {
+      const { payload, ...request } = data;
+      void this.events.emit("ask_user_question_requested", {
+        type: "ask_user_question_requested",
+        scope: payload.scope,
+        sessionId: payload.sessionId,
+        ...request,
+        ...payload.input,
+      });
+    });
     this.extensionRuntimeService.onAny(({ name, data }) => {
       if (typeof name !== "string") return;
 
@@ -87,6 +101,7 @@ export class AgentPool
   }
 
   async destroyAgent(sessionId: string) {
+    this.askUserQuestionService.cancelForSession(sessionId, "Agent session destroyed");
     const runtime = this.runtimes.get(sessionId);
     if (!runtime) return;
 
@@ -99,6 +114,7 @@ export class AgentPool
       await this.destroyAgent(sessionId);
     }
     this.extensionRuntimeService.destroyAll();
+    this.askUserQuestionService.cancelAll("Agent pool destroyed");
     this.extensionService.dispose();
     this.events.clearListeners();
     this.unbind?.();
@@ -125,6 +141,7 @@ export class AgentPool
       "destroySession",
       "setPermissionMode",
       "resolvePermissionRequest",
+      "resolveAskUserQuestion",
       "listSkills",
       "setSkillEnabled",
     ] as const;
@@ -185,6 +202,14 @@ export class AgentPool
   ) => {
     const runtime = this.getOrCreateRuntime(sessionId);
     await runtime.resolvePermissionRequest(requestId, resolution);
+  };
+
+  public resolveAskUserQuestion: AgentSessionIPC["resolveAskUserQuestion"] = async (
+    sessionId,
+    requestId,
+    resolution,
+  ) => {
+    this.askUserQuestionService.resolveForSession(sessionId, requestId, resolution);
   };
 
   public prompt: AgentSessionIPC["prompt"] = async (sessionId, message) => {
@@ -255,6 +280,7 @@ export class AgentPool
   };
 
   public abortPrompt: AgentSessionIPC["abortPrompt"] = async (sessionId) => {
+    this.askUserQuestionService.cancelForSession(sessionId, "Agent prompt aborted");
     const runtime = this.runtimes.get(sessionId);
     if (!runtime) {
       await this.extensionRuntimeService.abortAgent(sessionId);

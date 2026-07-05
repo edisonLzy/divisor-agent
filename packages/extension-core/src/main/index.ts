@@ -13,6 +13,7 @@ export type {
   ExtensionAgentScope,
   ExtensionAgentToolOptions,
   HostMainExtensionContextValues,
+  MainHumanInTheLoopAPI,
   MainExtensionContext,
   MainExtensionDefinition,
   MainExtensionRuntimeAPI,

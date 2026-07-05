@@ -12,6 +12,7 @@ import { ExtensionRuntimeService } from "./runtime-service.js";
 
 export interface ExtensionToolRuntimeContext {
   getModel(): ExtensionAgentModel | undefined;
+  getScope(): "main" | "side-chat";
   getSessionId(): string | undefined;
 }
 
@@ -25,6 +26,7 @@ export class ExtensionService extends MainExtensionBridge implements SystemPromp
     super(installedMainExtensions, {
       extensionRuntime: runtimeService,
       getBrowserWindow,
+      humanInTheLoop: runtimeService,
     });
     this.runtimeService = runtimeService;
     runtimeService.setExtensionService(this);

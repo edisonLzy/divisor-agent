@@ -18,10 +18,12 @@ import { useCallback } from "react";
 import { useStore } from "zustand";
 
 import { ArtifactsPanel } from "./artifacts";
+import { AskUserQuestionPanel } from "./ask-user-question";
 import { ChatMessages } from "./messages";
 import { FixedActions, PanelHeader } from "./panel-header";
 import { PendingMessagesPanel } from "./pending-messages";
 import { PermissionApprovalPanel } from "./permission";
+import { selectPromptAreaContent } from "./prompt-area-content";
 import { PromptInput, PromptInputProps } from "./prompt-input";
 import type { PromptSubmission } from "./prompt-types";
 import { createSessionTitleFromPrompt, shouldAutoRenameSession } from "./session-title";
@@ -62,9 +64,18 @@ export function ActiveSessionContent({
     if (!activeSessionId) {
       return null;
     }
-
     return state.getPermissionState(activeSessionId).requests[0] ?? null;
   });
+  const pendingAskUserQuestionRequest = useStore(mainStore, (state) => {
+    if (!activeSessionId) {
+      return null;
+    }
+    return state.getAskUserQuestionState(activeSessionId).requests[0] ?? null;
+  });
+  const promptAreaContent = selectPromptAreaContent(
+    Boolean(pendingPermissionRequest),
+    Boolean(pendingAskUserQuestionRequest),
+  );
   const sessionName = activeSession?.name.trim() || "untitled";
 
   const handlePromptInputCreated: PromptInputProps["onCreate"] = ({ editor }) => {
@@ -116,8 +127,10 @@ export function ActiveSessionContent({
             >
               <div className="mx-auto flex w-full max-w-4xl flex-col gap-2">
                 {activeSessionId ? <PendingMessagesPanel sessionId={activeSessionId} /> : null}
-                {activeSessionId && pendingPermissionRequest ? (
+                {activeSessionId && promptAreaContent === "permission" ? (
                   <PermissionApprovalPanel sessionId={activeSessionId} />
+                ) : activeSessionId && promptAreaContent === "ask-user-question" ? (
+                  <AskUserQuestionPanel sessionId={activeSessionId} />
                 ) : (
                   <PromptInput
                     disabled={false}

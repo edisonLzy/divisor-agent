@@ -67,6 +67,7 @@ describe("extension-core", () => {
     const bridge = new MainExtensionBridge([extension], {
       extensionRuntime: createAgentRuntime(),
       getBrowserWindow,
+      humanInTheLoop: { askUserQuestion: vi.fn() },
     });
 
     bridge.initialize();
@@ -313,6 +314,7 @@ function createContextValues(): HostMainExtensionContextValues {
   return {
     extensionRuntime: createAgentRuntime(),
     getBrowserWindow: () => null,
+    humanInTheLoop: { askUserQuestion: vi.fn() },
   };
 }
 

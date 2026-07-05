@@ -1,4 +1,11 @@
 export * from "./ipc/index.js";
+export type {
+  AskUserQuestion,
+  AskUserQuestionAnswer,
+  AskUserQuestionInput,
+  AskUserQuestionOption,
+  AskUserQuestionResult,
+} from "./human-in-the-loop.js";
 
 export const DIVISOR_BLOCK_LANGUAGE = "divisor-block";
 export const DIVISOR_ARTIFACT_LANGUAGE = "divisor-artifact";

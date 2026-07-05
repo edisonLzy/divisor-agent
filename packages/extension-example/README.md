@@ -10,6 +10,7 @@
 | ----------------- | --------------------------- | --------------------------------------------------------------------- |
 | `systemPrompt`    | `example.prompt`            | 告诉主 Agent 何时发出 `divisor-block` / `divisor-artifact` 围栏代码块 |
 | `tools`           | `example/hello`             | 最简单的工具:接收 `name`,返回 `Hello, <name>`                         |
+| `humanInTheLoop`  | `example/ask-user-question` | 暂停 Extension Tool,收集多题结构化反馈后继续执行                      |
 | `slashCommands`   | `example.insert-card`       | 在输入框输入 `/Insert example card`,插入一段提示模板                  |
 | `assistantBlocks` | `example.card`              | 渲染端注册一个 assistant 区块类型,展示 `title` 字段                   |
 | `artifacts`       | `example.artifact`          | 注册一个 artifact 类型,在右侧面板里渲染                               |
@@ -25,6 +26,9 @@
        → 告诉 Agent 在合适的时候用围栏格式输出 UI
   ─ tools.register("example/hello")
        → 用户在对话中触发时,主 Agent 拿到 "Hello, ..." 的工具结果
+  ─ tools.register("example/ask-user-question")
+       → ctx.humanInTheLoop.askUserQuestion(...) 暂停工具
+       → 用户完成单选、多选、Other 和补充说明后返回结构化结果
 
 渲染进程 (src/renderer.tsx)
   ─ slashCommands.register("example.insert-card")
@@ -53,8 +57,9 @@
 1. 启动 dev server:`pnpm dev:app`
 2. 在输入框输入 `/` → 看到 "Insert example card",选中后在编辑器里出现模板文字
 3. 提交这条消息 → 主 Agent 会调用 `example/hello` 工具,输出 `Hello, World` 之类的文本
-4. 让 Agent 输出一段 `divisor-block` 围栏(`type: "example.card"`)→ 聊天流里出现一个简单的卡片
-5. 让 Agent 输出一段 `divisor-artifact` 围栏(`type: "example.artifact"`)→ 右侧面板打开对应 artifact
+4. 要求 Agent 调用 `example/ask-user-question` → Prompt Input 被问题面板替换,提交后工具收到结构化结果
+5. 让 Agent 输出一段 `divisor-block` 围栏(`type: "example.card"`)→ 聊天流里出现一个简单的卡片
+6. 让 Agent 输出一段 `divisor-artifact` 围栏(`type: "example.artifact"`)→ 右侧面板打开对应 artifact
 
 ## 用作模板
 

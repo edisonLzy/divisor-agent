@@ -2,6 +2,7 @@ import type { AgentEvent, AgentTool, AppUserMessage } from "@earendil-works/pi-a
 import type { TSchema } from "@earendil-works/pi-ai";
 import type { BrowserWindow } from "electron";
 
+import type { AskUserQuestionInput, AskUserQuestionResult } from "../common/human-in-the-loop.js";
 import type {
   AnyExtensionIPCFunction,
   ExtensionDisposer,
@@ -61,9 +62,14 @@ export interface MainExtensionRuntimeAPI {
   ): () => void;
 }
 
+export interface MainHumanInTheLoopAPI {
+  askUserQuestion(input: AskUserQuestionInput): Promise<AskUserQuestionResult>;
+}
+
 export interface HostMainExtensionContextValues {
   getBrowserWindow(): BrowserWindow | null;
   extensionRuntime: MainExtensionRuntimeAPI;
+  humanInTheLoop: MainHumanInTheLoopAPI;
 }
 
 export interface MainExtensionContext<

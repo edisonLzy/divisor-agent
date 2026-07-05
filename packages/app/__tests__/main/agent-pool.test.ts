@@ -194,6 +194,55 @@ describe("AgentPool", () => {
     await expect(resultPromise).resolves.toBe("");
     expect(agentMockState.instances[0].abort).toHaveBeenCalledOnce();
   });
+
+  it("lets extension-example collect structured feedback through humanInTheLoop", async () => {
+    const send = vi.fn();
+    const pool = new AgentPool({
+      isDestroyed: () => false,
+      webContents: { isDestroyed: () => false, send },
+    } as never);
+    await pool.setSessionId("session-example-ask");
+
+    const exampleTool = agentMockState.configs[0].initialState.tools.find(
+      (tool: { name: string }) => tool.name === "example/ask-user-question",
+    );
+    const toolResultPromise = exampleTool.execute("tool-call-example-ask", {});
+
+    await vi.waitFor(() =>
+      expect(send).toHaveBeenCalledWith(
+        "ask_user_question_requested",
+        expect.objectContaining({
+          sessionId: "session-example-ask",
+          questions: expect.arrayContaining([
+            expect.objectContaining({ question: "How should the extension present the result?" }),
+          ]),
+        }),
+      ),
+    );
+    const request = send.mock.calls.find(([name]) => name === "ask_user_question_requested")?.[1];
+    await pool.resolveAskUserQuestion("session-example-ask", request.requestId, {
+      answers: [
+        {
+          question: "How should the extension present the result?",
+          selectedOptions: ["Concise summary"],
+        },
+        {
+          question: "Which sections should the extension include?",
+          selectedOptions: ["Architecture", "Test plan"],
+        },
+      ],
+      additionalNote: "Prefer runnable examples.",
+    });
+
+    await expect(toolResultPromise).resolves.toMatchObject({
+      content: [{ type: "text", text: expect.stringContaining("Prefer runnable examples") }],
+      details: {
+        humanInTheLoopResult: expect.objectContaining({
+          additionalNote: "Prefer runnable examples.",
+        }),
+      },
+    });
+  });
 });
 
 function createUserMessage(content: string): AppUserMessage {

@@ -36,14 +36,18 @@ export function getPermissionCommandPrefix(commandText: string) {
   return segments.slice(0, Math.min(3, segments.length)).join(" ");
 }
 
-export interface PermissionRequest {
-  requestId: string;
+export interface PermissionPayload {
   toolCallId: string;
   toolName: string;
   toolLabel: string;
   operation: string;
   args: Record<string, unknown>;
+}
+
+export interface PermissionRequest extends PermissionPayload {
+  requestId: string;
   createdAt: number;
+  kind: "permission";
 }
 
 export interface PermissionResolution {
