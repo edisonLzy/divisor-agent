@@ -28,6 +28,7 @@ export default defineConfig({
           "@divisor-agent/extension-example",
           "@divisor-agent/extension-subagents",
           "@divisor-agent/extension-files",
+          "@divisor-agent/extension-deep-research",
         ],
       },
     },
