@@ -125,6 +125,7 @@ export class AgentPool
       "destroySession",
       "setPermissionMode",
       "resolvePermissionRequest",
+      "resolveAskUserQuestion",
       "listSkills",
       "setSkillEnabled",
     ] as const;
@@ -185,6 +186,15 @@ export class AgentPool
   ) => {
     const runtime = this.getOrCreateRuntime(sessionId);
     await runtime.resolvePermissionRequest(requestId, resolution);
+  };
+
+  public resolveAskUserQuestion: AgentSessionIPC["resolveAskUserQuestion"] = async (
+    sessionId,
+    requestId,
+    resolution,
+  ) => {
+    const runtime = this.getOrCreateRuntime(sessionId);
+    await runtime.resolveAskUserQuestion(requestId, resolution);
   };
 
   public prompt: AgentSessionIPC["prompt"] = async (sessionId, message) => {

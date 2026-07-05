@@ -1,5 +1,6 @@
 import type { AgentMessage, AppUserMessage } from "@earendil-works/pi-agent-core";
 
+import type { AskUserQuestionResolution } from "./ask-user-question-ipc";
 import type { AgentSessionScope } from "./events-ipc";
 import type { AvailableModel } from "./models-ipc";
 import type { PermissionMode, PermissionResolution } from "./permissions-ipc";
@@ -25,5 +26,10 @@ export interface AgentSessionIPC {
     sessionId: string,
     requestId: string,
     resolution: PermissionResolution,
+  ) => Promise<void>;
+  resolveAskUserQuestion: (
+    sessionId: string,
+    requestId: string,
+    resolution: AskUserQuestionResolution,
   ) => Promise<void>;
 }

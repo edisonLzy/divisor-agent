@@ -2,6 +2,7 @@ import type { AgentEvent, AgentTool, AppUserMessage } from "@earendil-works/pi-a
 import type { TSchema } from "@earendil-works/pi-ai";
 import type { BrowserWindow } from "electron";
 
+import type { AskUserQuestionInput, AskUserQuestionResult } from "../common/human-in-the-loop.js";
 import type {
   AnyExtensionIPCFunction,
   ExtensionDisposer,
@@ -51,6 +52,7 @@ export type ExtensionAgentEvent = AgentEvent;
 
 export interface MainExtensionRuntimeAPI {
   abortAgent(agentId: string): Promise<void>;
+  askUserQuestion(input: AskUserQuestionInput): Promise<AskUserQuestionResult>;
   createAgent(input?: CreateExtensionAgentInput): Promise<ExtensionAgentHandle>;
   destroyAgent(agentId: string): Promise<void>;
   getCurrentAgentContext(): ExtensionCurrentAgentContext | undefined;

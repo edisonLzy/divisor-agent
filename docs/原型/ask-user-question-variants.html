@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ask User Question — Divisor 交互方案</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap");
+
+      :root {
+        color-scheme: light;
+        --background: #fffaf0;
+        --foreground: #141111;
+        --card: #fffdf8;
+        --muted: #eee9de;
+        --muted-foreground: #716b64;
+        --accent: #ffd440;
+        --cyan: #27ccf3;
+        --green: #a8df72;
+        --pink: #fe7da8;
+        --purple: #bbb0e6;
+        --destructive: #df5148;
+        --border: #141111;
+        --sidebar: #fffaf0;
+        --shadow: 3px 3px 0 var(--border);
+        --shadow-sm: 2px 2px 0 var(--border);
+        --radius: 6px;
+      }
+
+      [data-theme="dark"] {
+        color-scheme: dark;
+        --background: #11100f;
+        --foreground: #f3eee5;
+        --card: #191715;
+        --muted: #24211e;
+        --muted-foreground: #aaa39a;
+        --accent: #d7ad2f;
+        --cyan: #31b6d6;
+        --green: #91c866;
+        --pink: #dc6e98;
+        --purple: #9f92d0;
+        --destructive: #ef7469;
+        --border: #f3eee5;
+        --sidebar: #151311;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-width: 920px;
+        min-height: 100vh;
+        overflow: hidden;
+        background: var(--background);
+        color: var(--foreground);
+        font-family: "Space Grotesk", "PingFang SC", sans-serif;
+      }
+      button, textarea { font: inherit; color: inherit; }
+      button { cursor: pointer; }
+      button:focus-visible, textarea:focus-visible {
+        outline: 3px solid var(--cyan);
+        outline-offset: 2px;
+      }
+      button:disabled { cursor: not-allowed; opacity: .42; }
+
+      .app { display: grid; grid-template-columns: 252px minmax(0, 1fr); height: 100vh; }
+      .sidebar { display: flex; flex-direction: column; border-right: 2px solid var(--border); background: var(--sidebar); }
+      .side-header { height: 48px; border-bottom: 2px solid var(--border); padding: 9px 12px 9px 80px; }
+      .new-chat, .button {
+        min-height: 30px; border: 2px solid var(--border); border-radius: var(--radius); background: var(--card);
+        padding: 5px 10px; font-size: 12px; font-weight: 700; box-shadow: var(--shadow-sm);
+      }
+      .new-chat { width: 100%; background: var(--pink); }
+      .new-chat:hover, .button:hover:not(:disabled) { transform: translate(1px, 1px); box-shadow: none; }
+      .side-body { padding: 18px 12px; }
+      .side-label { margin: 0 8px 8px; font: 700 10px/1.2 "Space Mono", monospace; letter-spacing: .12em; color: var(--muted-foreground); }
+      .session { width: 100%; border: 0; border-radius: var(--radius); background: transparent; padding: 9px 10px; text-align: left; font-size: 13px; }
+      .session.active { border: 2px solid var(--border); background: var(--card); font-weight: 700; }
+      .settings { margin-top: auto; border-top: 2px solid var(--border); background: var(--accent); padding: 14px; font-size: 12px; font-weight: 700; }
+
+      .workspace { min-width: 0; min-height: 0; display: grid; grid-template-rows: 48px minmax(0, 1fr) auto; }
+      .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 2px solid var(--border); padding: 0 16px; }
+      .chat-title { min-width: 0; font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .top-actions, .variants, .theme-switch { display: flex; align-items: center; gap: 6px; }
+      .segmented { display: flex; border: 2px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--card); }
+      .segmented button { border: 0; border-right: 2px solid var(--border); background: transparent; padding: 6px 9px; font-size: 11px; font-weight: 700; }
+      .segmented button:last-child { border-right: 0; }
+      .segmented button.active { background: var(--accent); }
+
+      .chat { position: relative; min-height: 0; overflow: auto; padding: 34px 36px 42px; }
+      .conversation { width: min(100%, 860px); margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+      .message { display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: start; gap: 12px; }
+      .identity { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 2px solid var(--border); border-radius: 4px; background: var(--cyan); box-shadow: var(--shadow-sm); font: 700 9px/1 "Space Mono", monospace; }
+      .identity.you { background: var(--accent); }
+      .bubble { width: fit-content; max-width: 700px; border: 2px solid var(--border); border-radius: var(--radius); background: var(--card); padding: 10px 14px; box-shadow: var(--shadow-sm); font-size: 14px; line-height: 1.6; }
+      .agent-copy { max-width: 720px; padding-top: 5px; font-size: 14px; line-height: 1.65; }
+
+      .ask-card { border: 2px solid var(--border); border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); overflow: hidden; }
+      .ask-strip { height: 8px; background: var(--cyan); border-bottom: 2px solid var(--border); }
+      .ask-head { display: grid; grid-template-columns: 1fr auto; gap: 16px; padding: 14px 16px 12px; }
+      .eyebrow { margin-bottom: 5px; font: 700 10px/1.2 "Space Mono", monospace; letter-spacing: .11em; color: var(--muted-foreground); }
+      h2 { margin: 0; font-size: 17px; line-height: 1.35; }
+      .description { margin: 5px 0 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
+      .progress { align-self: start; border: 2px solid var(--border); border-radius: 4px; background: var(--muted); padding: 4px 7px; font: 700 10px/1 "Space Mono", monospace; }
+      .question-body { padding: 4px 16px 16px; }
+      .option-list { display: flex; flex-direction: column; gap: 8px; }
+      .option { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: start; width: 100%; border: 2px solid var(--border); border-radius: 4px; background: var(--background); padding: 10px; text-align: left; }
+      .option:hover { background: var(--muted); }
+      .option.selected { background: var(--accent); box-shadow: var(--shadow-sm); transform: translate(-1px, -1px); }
+      .option-index { display: flex; align-items: center; justify-content: center; width: 25px; height: 25px; border: 2px solid var(--border); border-radius: 3px; background: var(--card); font: 700 11px/1 "Space Mono", monospace; }
+      .option-title { font-size: 13px; font-weight: 700; }
+      .option-desc { margin-top: 2px; color: var(--muted-foreground); font-size: 12px; line-height: 1.45; }
+      .option.selected .option-desc { color: var(--foreground); opacity: .74; }
+      .recommended { border: 2px solid var(--border); border-radius: 3px; background: var(--green); padding: 2px 5px; font: 700 9px/1.1 "Space Mono", monospace; }
+      .custom { width: 100%; min-height: 84px; resize: vertical; border: 2px solid var(--border); border-radius: 4px; background: var(--background); padding: 10px 12px; font-size: 13px; line-height: 1.55; }
+      .inline-custom { margin-top: 8px; border-left: 6px solid var(--cyan); padding-left: 10px; }
+      .inline-custom-label { display: block; margin-bottom: 5px; font: 700 10px/1.3 "Space Mono", monospace; color: var(--muted-foreground); }
+      .ask-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; border-top: 2px solid var(--border); background: var(--muted); padding: 10px 14px; }
+      .key-hint { color: var(--muted-foreground); font: 400 10px/1.4 "Space Mono", monospace; }
+      .actions { display: flex; gap: 8px; }
+      .button.primary { background: var(--foreground); color: var(--background); }
+      .button.flat { box-shadow: none; }
+      .button.danger { background: var(--destructive); color: white; }
+      .button.linklike { border-color: transparent; background: transparent; box-shadow: none; color: var(--muted-foreground); }
+
+      .batch-card .ask-head { border-bottom: 2px solid var(--border); }
+      .batch-list { display: flex; flex-direction: column; }
+      .batch-question { display: grid; grid-template-columns: 128px minmax(0, 1fr); border-bottom: 2px solid var(--border); }
+      .batch-question:last-child { border-bottom: 0; }
+      .batch-meta { padding: 14px; border-right: 2px solid var(--border); background: var(--muted); }
+      .batch-number { font: 700 20px/1 "Space Mono", monospace; }
+      .batch-meta p { margin: 8px 0 0; color: var(--muted-foreground); font-size: 11px; }
+      .batch-content { padding: 14px; }
+      .batch-content h3 { margin: 0 0 9px; font-size: 14px; }
+      .compact-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+      .compact-options .option { grid-template-columns: 24px 1fr; padding: 8px; }
+
+      .composer-slot { border-top: 2px solid var(--border); background: var(--background); padding: 12px 24px 18px; }
+      .composer-frame { width: min(100%, 880px); max-height: min(66vh, 640px); margin: 0 auto; overflow: auto; }
+      .composer-context { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 7px; color: var(--muted-foreground); font: 700 10px/1.3 "Space Mono", monospace; }
+      .composer-context strong { color: var(--foreground); }
+      .dock .ask-card { display: grid; grid-template-columns: 6px minmax(0, 1fr); }
+      .dock .ask-strip { height: auto; border: 0; border-right: 2px solid var(--border); }
+      .dock-main { min-width: 0; }
+      .dock .ask-head { padding: 10px 12px 7px; }
+      .dock .question-body { padding: 0 12px 10px; }
+      .dock .compact-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .dock .option { min-height: 66px; }
+      .dock .ask-foot { padding: 8px 10px; }
+      .prompt-composer { border: 2px solid var(--border); border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); overflow: hidden; }
+      .prompt-composer textarea { display: block; width: 100%; min-height: 62px; resize: none; border: 0; background: transparent; padding: 12px 14px; color: var(--foreground); outline: 0; }
+      .prompt-footer { display: flex; align-items: center; justify-content: space-between; border-top: 2px solid var(--border); padding: 8px 10px; background: var(--muted); }
+      .submitted-note { margin-bottom: 8px; border: 2px solid var(--border); border-radius: var(--radius); background: var(--green); padding: 8px 10px; font-size: 12px; font-weight: 700; }
+      .permission-card .ask-strip { background: var(--accent); }
+      .tool-details { margin: 0 16px 12px; border: 2px solid var(--border); border-radius: 4px; background: var(--background); overflow: hidden; }
+      .tool-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; border: 0; background: var(--muted); padding: 9px 10px; text-align: left; }
+      .tool-summary strong { font: 700 10px/1.3 "Space Mono", monospace; }
+      .tool-code { margin: 0; border-top: 2px solid var(--border); background: #171615; padding: 10px; color: #eee8de; white-space: pre-wrap; word-break: break-all; font: 400 11px/1.55 "Space Mono", monospace; }
+      .deny-reason { margin: 8px 16px 14px; }
+
+      .summary { padding: 16px; }
+      .success { display: flex; align-items: center; gap: 12px; border: 2px solid var(--border); border-radius: 4px; background: var(--green); padding: 11px 12px; }
+      .success-mark { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 2px solid var(--border); border-radius: 3px; background: var(--card); font: 700 12px/1 "Space Mono", monospace; }
+      .success strong { display: block; font-size: 13px; }
+      .success span { font-size: 11px; }
+      .answer-summary { margin-top: 10px; border: 2px solid var(--border); border-radius: 4px; overflow: hidden; }
+      .answer-row { display: grid; grid-template-columns: 128px 1fr; border-bottom: 2px solid var(--border); font-size: 12px; }
+      .answer-row:last-child { border-bottom: 0; }
+      .answer-row b, .answer-row span { padding: 8px 10px; }
+      .answer-row b { border-right: 2px solid var(--border); background: var(--muted); }
+
+      .prototype-note { width: min(100%, 860px); margin: 0 auto 18px; border: 2px solid var(--border); border-radius: var(--radius); background: var(--purple); padding: 8px 11px; font-size: 11px; font-weight: 700; }
+      .hidden { display: none !important; }
+      @media (max-width: 1050px) { .app { grid-template-columns: 214px minmax(0, 1fr); } .variants button { padding-inline: 6px; } .batch-question { grid-template-columns: 100px minmax(0, 1fr); } }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <aside class="sidebar">
+        <header class="side-header"><button class="new-chat">新对话</button></header>
+        <div class="side-body">
+          <p class="side-label">置顶</p>
+          <button class="session active">Agent 反馈交互设计</button>
+          <p class="side-label" style="margin-top:24px">今天</p>
+          <button class="session">Extension 架构讨论</button>
+          <button class="session">修复会话滚动状态</button>
+        </div>
+        <div class="settings">设置与偏好</div>
+      </aside>
+
+      <section class="workspace">
+        <header class="topbar">
+          <div class="chat-title">Agent 反馈交互设计</div>
+          <div class="top-actions">
+            <div class="segmented surface-switch" aria-label="请求场景">
+              <button data-surface="ask" class="active">Ask</button>
+              <button data-surface="permission">Permission</button>
+            </div>
+            <div class="segmented variants" aria-label="原型方案">
+              <button data-variant="focus" class="active">01 分步卡片</button>
+              <button data-variant="batch">02 批量表单</button>
+              <button data-variant="dock">03 紧凑横向</button>
+            </div>
+            <div class="segmented theme-switch"><button id="themeButton">暗色</button></div>
+          </div>
+        </header>
+
+        <section class="chat" id="chat">
+          <div class="prototype-note" id="prototypeNote"></div>
+          <div class="conversation">
+            <article class="message">
+              <span class="identity you">YOU</span>
+              <div class="bubble">新增 Ask User Question 能力，让 Agent 在存在多个合理方向时先向用户确认。</div>
+            </article>
+            <article class="message">
+              <span class="identity">AI</span>
+              <div class="agent-copy">我梳理了当前的 IPC 与扩展边界。开始实现前还有几个会影响底层协议与交互方式的决定，希望你确认一下。</div>
+            </article>
+          </div>
+        </section>
+        <section class="composer-slot" aria-label="输入与问题收集区域">
+          <div class="composer-frame">
+            <div class="composer-context"><strong id="slotTitle">等待你的回答</strong><span>问题面板与 Prompt Input 互斥展示</span></div>
+            <div id="prototypeRoot"></div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script>
+      const questions = [
+        { id: "architecture", label: "实现边界", title: "Permission 与 Ask User Question 应如何复用？", hint: "这个决定会影响事件协议和后续扩展成本。", type: "single", options: [
+          ["共享交互内核，双适配器", "复用选择、键盘和状态逻辑，同时保留各自业务语义。", true],
+          ["完全共用一套实现", "交付更快，但权限语义会逐渐变成条件分支。"],
+          ["分别独立实现", "边界最清楚，但会重复维护交互与无障碍逻辑。"],
+          ["其他，请说明", "输入一个未被以上选项覆盖的实现方式。", false, true] ] },
+        { id: "capabilities", label: "问题能力", title: "首个版本需要支持哪些回答类型？", hint: "可以选择多个；建议先覆盖高频澄清场景。", type: "multi", options: [
+          ["单选", "互斥方案与方向确认。"], ["多选", "范围、能力与偏好收集。"], ["自由输入", "补充未被选项覆盖的约束。"], ["其他能力", "选择后补充首版还需要支持的类型。", false, true] ] },
+        { id: "notes", label: "协议行为", title: "协议层优先保留哪类扩展能力？", hint: "先选择最重要的一项；如未覆盖，可直接输入自己的答案。", type: "single", options: [
+          ["超时与默认值", "无人响应时允许按明确的默认策略继续。", true],
+          ["动态追加问题", "Agent 可根据前序回答继续补充相关问题。"],
+          ["回答修改记录", "保留用户返回修改前后的答案变化。"],
+          ["其他，请说明", "输入一个未被以上选项覆盖的协议能力。", false, true] ] }
+      ];
+      const state = { surface: "ask", variant: "focus", index: 0, submitted: false, permissionDetailsOpen: true, permissionChoice: 0, denyReason: "", finalNote: "", answers: { architecture: [0], capabilities: [0,1,2], notes: [0] }, customAnswers: { architecture: "", capabilities: "", notes: "" } };
+      const root = document.querySelector("#prototypeRoot");
+      const note = document.querySelector("#prototypeNote");
+
+      function optionHtml(question, index, compact = false) {
+        const option = question.options[index];
+        const selected = (state.answers[question.id] || []).includes(index);
+        return `<button class="option ${selected ? "selected" : ""}" data-question="${question.id}" data-option="${index}" aria-pressed="${selected}">
+          <span class="option-index">${question.type === "multi" && selected ? "✓" : index + 1}</span>
+          <span><span class="option-title">${option[0]}</span><span class="option-desc">${option[1]}</span></span>
+          ${option[2] && !compact ? '<span class="recommended">推荐</span>' : ""}
+        </button>`;
+      }
+      function optionsHtml(question, compact = false) {
+        const customIndex = question.options.findIndex(option => option[3]);
+        const customSelected = customIndex >= 0 && (state.answers[question.id] || []).includes(customIndex);
+        return `<div class="${compact ? "compact-options" : "option-list"}">${question.options.map((_, i) => optionHtml(question, i, compact)).join("")}</div>${customSelected ? `<div class="inline-custom"><label class="inline-custom-label" for="custom-${question.id}">${question.type === "multi" ? "补充其他需要支持的能力" : "输入你的实现建议"}</label><textarea id="custom-${question.id}" class="custom" data-custom="${question.id}" maxlength="300" placeholder="请具体说明…">${state.customAnswers[question.id] || ""}</textarea></div>` : ""}`;
+      }
+      function footerHtml(last = false) {
+        return `<footer class="ask-foot"><span class="key-hint">数字键选择 · Enter 继续 · Esc 稍后回答</span><div class="actions">
+          <button class="button linklike" data-action="skip">稍后回答</button>
+          ${state.index > 0 && state.variant === "focus" ? '<button class="button flat" data-action="prev">上一步</button>' : ""}
+          <button class="button primary" data-action="${last ? "submit" : "next"}">${last ? "提交回答" : "继续"}</button>
+        </div></footer>`;
+      }
+      function composerHtml() {
+        return `<section class="prompt-composer">
+          <textarea placeholder="继续向 Agent 补充信息…"></textarea>
+          <footer class="prompt-footer"><span class="key-hint">权限：默认 · 模型：Claude Sonnet</span><div class="actions"><button class="button primary">发送</button></div></footer>
+        </section>`;
+      }
+      function answerText(question) {
+        const selected = state.answers[question.id] || [];
+        return selected.map(index => {
+          const option = question.options[index];
+          return option[3] ? (state.customAnswers[question.id] || "其他（未填写）") : option[0];
+        }).join("、") || "未选择";
+      }
+      function askSummaryHtml() {
+        return `<section class="ask-card"><div class="ask-strip"></div><header class="ask-head"><div><div class="eyebrow">ASK USER QUESTION · 回答汇总</div><h2>请确认你的回答</h2><p class="description">Agent 尚未继续执行，你可以返回修改任意问题。</p></div><span class="progress">3 / 3</span></header>
+          <div class="summary"><div class="success"><span class="success-mark">✓</span><div><strong>三个问题均已回答</strong><span>确认后，Agent 将使用这些信息继续工作。</span></div></div>
+          <div class="answer-summary">${questions.map((question, index) => `<div class="answer-row"><b>0${index + 1} · ${question.label}</b><span>${answerText(question)}</span></div>`).join("")}</div>
+          <div class="inline-custom"><label class="inline-custom-label" for="finalNote">还有什么想补充给 Agent？（可选）</label><textarea id="finalNote" class="custom" data-final-note maxlength="500" placeholder="补充跨问题的约束、背景或期望结果…">${state.finalNote}</textarea></div></div>
+          <footer class="ask-foot"><span class="key-hint">提交前可返回逐题修改</span><div class="actions"><button class="button flat" data-action="edit">返回修改</button><button class="button primary" data-action="confirm-answers">确认并继续</button></div></footer>
+        </section>`;
+      }
+      function focusHtml() {
+        const q = questions[state.index];
+        return `<section class="ask-card"><div class="ask-strip"></div><header class="ask-head"><div><div class="eyebrow">ASK USER QUESTION · ${q.label}</div><h2>${q.title}</h2><p class="description">${q.hint}</p></div><span class="progress">${state.index + 1} / ${questions.length}</span></header><div class="question-body">${optionsHtml(q)}</div>${footerHtml(state.index === questions.length - 1)}</section>`;
+      }
+      function batchHtml() {
+        return `<section class="ask-card batch-card"><div class="ask-strip"></div><header class="ask-head"><div><div class="eyebrow">ASK USER QUESTION · 需要你的反馈</div><h2>确认实现范围</h2><p class="description">一次完成所有问题，提交前仍可修改；每题都可以直接输入其他答案。</p></div><span class="progress">3 个问题</span></header><div class="batch-list">${questions.map((q, qi) => `<section class="batch-question"><aside class="batch-meta"><div class="batch-number">0${qi+1}</div><p>${q.label}<br>${q.type === "multi" ? "可多选" : "单选"}</p></aside><div class="batch-content"><h3>${q.title}</h3>${optionsHtml(q, true)}</div></section>`).join("")}</div>${footerHtml(true)}</section>`;
+      }
+      function dockHtml() {
+        const q = questions[state.index];
+        return `<div class="dock"><section class="ask-card"><div class="ask-strip"></div><div class="dock-main"><header class="ask-head"><div><div class="eyebrow">AGENT 正在等待 · ${q.label}</div><h2>${q.title}</h2></div><span class="progress">${state.index + 1} / 3</span></header><div class="question-body">${optionsHtml(q, q.type !== "text")}</div>${footerHtml(state.index === 2)}</div></section></div>`;
+      }
+      function permissionHtml() {
+        const choices = [
+          ["允许一次", "仅批准本次执行，不保存规则。"],
+          ["允许并记住", "以后以 pnpm vitest 开头的命令无需再次询问。"],
+          ["拒绝", "阻止本次执行，并可告诉 Agent 如何调整。"]
+        ];
+        return `<section class="ask-card permission-card"><div class="ask-strip"></div><header class="ask-head"><div><div class="eyebrow">PERMISSION · TERMINAL</div><h2>允许 Agent 运行测试命令吗？</h2><p class="description">此操作将在当前项目目录执行，不会访问工作区之外的文件。</p></div><span class="progress">需要授权</span></header>
+          <section class="tool-details"><button class="tool-summary" data-action="toggle-details"><span><strong>COMMAND</strong><br><span class="option-desc">pnpm vitest run packages/app/…</span></span><span>${state.permissionDetailsOpen ? "收起" : "查看详情"}</span></button>${state.permissionDetailsOpen ? '<pre class="tool-code">pnpm vitest run packages/app/__tests__/ask-user-question.test.ts\n\n工作目录：/Users/zhiyu/Desktop/coding/divisor-agent</pre>' : ""}</section>
+          <div class="question-body"><div class="option-list">${choices.map((choice, index) => `<button class="option ${state.permissionChoice === index ? "selected" : ""}" data-permission="${index}" aria-pressed="${state.permissionChoice === index}"><span class="option-index">${index + 1}</span><span><span class="option-title">${choice[0]}</span><span class="option-desc">${choice[1]}</span></span></button>`).join("")}</div></div>
+          ${state.permissionChoice === 2 ? `<div class="deny-reason"><label class="inline-custom-label" for="denyReason">告诉 Agent 拒绝原因（可选）</label><textarea id="denyReason" class="custom" data-deny maxlength="300" placeholder="例如：请先只运行相关单测…">${state.denyReason}</textarea></div>` : ""}
+          <footer class="ask-foot"><span class="key-hint">数字键选择 · Enter 确认 · Esc 拒绝</span><div class="actions"><button class="button ${state.permissionChoice === 2 ? "danger" : "primary"}" data-action="permission-submit">${state.permissionChoice === 2 ? "确认拒绝" : "确认授权"}</button></div></footer>
+        </section>`;
+      }
+      function render() {
+        note.textContent = state.surface === "permission" ? "Permission 适配器 · 与 Ask 共享 Composer 槽位和选择内核，但保留授权详情与风险语义。" : state.variant === "focus" ? "方案 01 · 分步卡片：在 Composer 槽位逐题回答，最低认知负担。" : state.variant === "batch" ? "方案 02 · 批量表单：在 Composer 槽位一次展开全部问题。" : "方案 03 · 紧凑横向：在 Composer 槽位压缩呈现，最大化会话阅读空间。";
+        document.querySelector("#slotTitle").textContent = state.submitted && state.surface === "ask" ? "回答汇总" : state.submitted ? "输入消息" : state.surface === "permission" ? "Agent 正在等待授权" : "Agent 正在等待你的回答";
+        root.innerHTML = state.submitted ? (state.surface === "ask" ? askSummaryHtml() : composerHtml()) : state.surface === "permission" ? permissionHtml() : state.variant === "focus" ? focusHtml() : state.variant === "batch" ? batchHtml() : dockHtml();
+      }
+      function choose(questionId, optionIndex) {
+        const q = questions.find(item => item.id === questionId);
+        const current = state.answers[questionId] || [];
+        if (q.type === "multi") state.answers[questionId] = current.includes(optionIndex) ? current.filter(i => i !== optionIndex) : [...current, optionIndex];
+        else state.answers[questionId] = [optionIndex];
+        render();
+      }
+      root.addEventListener("click", event => {
+        const option = event.target.closest("[data-option]");
+        if (option) return choose(option.dataset.question, Number(option.dataset.option));
+        const permission = event.target.closest("[data-permission]");
+        if (permission) { state.permissionChoice = Number(permission.dataset.permission); return render(); }
+        const action = event.target.closest("[data-action]")?.dataset.action;
+        if (action === "next") { state.index = Math.min(2, state.index + 1); render(); }
+        if (action === "prev") { state.index = Math.max(0, state.index - 1); render(); }
+        if (action === "submit") { state.submitted = true; render(); }
+        if (action === "edit") { state.submitted = false; render(); }
+        if (action === "skip") { state.submitted = true; render(); }
+        if (action === "permission-submit") { state.submitted = true; render(); }
+        if (action === "confirm-answers") { document.querySelector("#slotTitle").textContent = "输入消息"; root.innerHTML = composerHtml(); }
+        if (action === "toggle-details") { state.permissionDetailsOpen = !state.permissionDetailsOpen; render(); }
+      });
+      root.addEventListener("input", event => {
+        if (event.target.matches("[data-custom]")) state.customAnswers[event.target.dataset.custom] = event.target.value;
+        if (event.target.matches("[data-deny]")) state.denyReason = event.target.value;
+        if (event.target.matches("[data-final-note]")) state.finalNote = event.target.value;
+      });
+      document.querySelector(".surface-switch").addEventListener("click", event => {
+        const button = event.target.closest("[data-surface]"); if (!button) return;
+        state.surface = button.dataset.surface; state.submitted = false; state.index = 0;
+        document.querySelectorAll("[data-surface]").forEach(el => el.classList.toggle("active", el === button));
+        document.querySelector(".variants").classList.toggle("hidden", state.surface === "permission"); render();
+      });
+      document.querySelector(".variants").addEventListener("click", event => {
+        const button = event.target.closest("[data-variant]"); if (!button) return;
+        state.variant = button.dataset.variant; state.index = 0; state.submitted = false;
+        document.querySelectorAll("[data-variant]").forEach(el => el.classList.toggle("active", el === button)); render();
+      });
+      document.querySelector("#themeButton").addEventListener("click", event => {
+        const dark = document.documentElement.dataset.theme === "dark";
+        document.documentElement.dataset.theme = dark ? "light" : "dark"; event.target.textContent = dark ? "暗色" : "亮色";
+      });
+      window.addEventListener("keydown", event => {
+        if (event.target.matches("textarea")) return;
+        if (state.surface === "permission" && !state.submitted) {
+          if (/^[1-3]$/.test(event.key)) { state.permissionChoice = Number(event.key) - 1; render(); }
+          if (event.key === "Enter") { state.submitted = true; render(); }
+          if (event.key === "Escape") { state.permissionChoice = 2; render(); }
+          return;
+        }
+        if (/^[1-4]$/.test(event.key) && !state.submitted) { const q = questions[state.variant === "batch" ? 0 : state.index]; if (q.type !== "text" && Number(event.key) <= q.options.length) choose(q.id, Number(event.key)-1); }
+        if (event.key === "Enter" && !state.submitted && state.variant !== "batch") { state.index === 2 ? state.submitted = true : state.index++; render(); }
+        if (event.key === "Escape" && !state.submitted) { state.submitted = true; render(); }
+      });
+      render();
+    </script>
+  </body>
+</html>

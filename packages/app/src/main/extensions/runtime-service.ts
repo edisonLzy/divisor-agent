@@ -1,6 +1,10 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
 import type {
+  AskUserQuestionInput,
+  AskUserQuestionResult,
+} from "@divisor-agent/extension-core/common";
+import type {
   CreateExtensionAgentInput,
   ExtensionCurrentAgentContext,
   ExtensionAgentEvent,
@@ -48,6 +52,14 @@ export class ExtensionRuntimeService
       model: context.getModel(),
       sessionId: context.getSessionId(),
     };
+  }
+
+  async askUserQuestion(input: AskUserQuestionInput): Promise<AskUserQuestionResult> {
+    const context = this.runtimeContextStorage.getStore();
+    if (!context) {
+      throw new Error("Ask user question can only be called while an extension tool is executing");
+    }
+    return context.askUserQuestion(input);
   }
 
   async createAgent(input: CreateExtensionAgentInput = {}): Promise<ExtensionAgentHandle> {
