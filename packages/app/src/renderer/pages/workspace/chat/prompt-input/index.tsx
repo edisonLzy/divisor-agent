@@ -13,25 +13,14 @@ import {
   PopoverTrigger,
 } from "@renderer/components/ui/popover";
 import { Progress } from "@renderer/components/ui/progress";
-import { Separator } from "@renderer/components/ui/separator";
-import { Spinner } from "@renderer/components/ui/spinner";
-import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
-import { estimateDraftTokens, formatPercentage, formatTokenCount } from "@renderer/lib/token-usage";
-import type { SessionUsageSummary } from "@renderer/lib/token-usage";
+import { isAgentMessageEntry } from "@renderer/lib/is";
+import { estimateDraftTokens, formatTokenCount, summarizeUsage } from "@renderer/lib/token-usage";
 import { cn } from "@renderer/lib/utils";
+import type { EntryState } from "@renderer/store/entries-slice";
 import type { AvailableModel } from "@shared/models-ipc";
-import type { ContextUsageBreakdown, ContextUsageSnapshot } from "@shared/token-usage";
 import { matchesKeyboardEvent } from "@tanstack/react-hotkeys";
 import { EditorContent } from "@tiptap/react";
-import {
-  ArrowUp,
-  ChevronRight,
-  MessageSquareText,
-  Settings2,
-  Sparkles,
-  Square,
-  Wrench,
-} from "lucide-react";
+import { ArrowUp, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { INSERT_PROMPT_TEXT_EVENT } from "../prompt-insert-event";
@@ -49,7 +38,7 @@ export interface PromptInputProps extends Pick<UseChatEditorOptions, "onCreate" 
   onFollowUp?: (submission: PromptSubmission) => Promise<void> | void;
   onStop?: () => Promise<void> | void;
   sessionId: string | null;
-  usageSummary?: SessionUsageSummary;
+  getEntryState: (sessionId: string) => EntryState;
 }
 
 export function PromptInput({
@@ -63,7 +52,7 @@ export function PromptInput({
   onCreate,
   onDestroy,
   sessionId,
-  usageSummary,
+  getEntryState,
 }: PromptInputProps) {
   const modelSelectorProps = useModalSelector(initialModel);
 
@@ -207,7 +196,7 @@ export function PromptInput({
             draftText={text}
             model={modelSelectorProps.value}
             sessionId={sessionId}
-            usageSummary={usageSummary}
+            getEntryState={getEntryState}
           />
 
           <ModalSelector {...modelSelectorProps} />
@@ -248,25 +237,35 @@ interface ContextUsageControlProps {
   draftText: string;
   model: AvailableModel | null;
   sessionId: string | null;
-  usageSummary?: SessionUsageSummary;
+  getEntryState: (sessionId: string) => EntryState;
 }
 
 function ContextUsageControl({
   draftText,
   model,
   sessionId,
-  usageSummary,
+  getEntryState,
 }: ContextUsageControlProps) {
-  const { invoke } = useElectronIPC();
   const [open, setOpen] = useState(false);
-  const [snapshot, setSnapshot] = useState<ContextUsageSnapshot | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
 
   if (!sessionId || !model) return null;
 
+  const entryState = getEntryState(sessionId);
+  const assistantMessages = entryState.entries
+    .filter(isAgentMessageEntry)
+    .flatMap((entry) => (entry.data.role === "assistant" ? [entry.data] : []));
+  const { sessionUsage } = summarizeUsage(assistantMessages);
+  // Ring fill: the most recent request's input side. Since entry.usage accumulates
+  // across all LLM calls in a turn, we use the last entry's input-side tokens
+  // (input + cacheRead + cacheWrite). The Math.min clamp on the ring caps it at
+  // 100% even when accumulated tokens exceed contextWindow.
+  const lastAssistant = assistantMessages[assistantMessages.length - 1];
+  const lastRequestInputTokens = lastAssistant
+    ? lastAssistant.usage.input + lastAssistant.usage.cacheRead + lastAssistant.usage.cacheWrite
+    : 0;
   const draftTokens = estimateDraftTokens(draftText);
-  const measuredTokens = usageSummary?.latestRequestUsage?.totalTokens ?? snapshot?.usedTokens ?? 0;
-  const contextWindow = model.contextWindow || snapshot?.contextWindow || 128_000;
+  const measuredTokens = lastRequestInputTokens;
+  const contextWindow = model.contextWindow || 128_000;
   const usedTokens = Math.min(contextWindow, measuredTokens + draftTokens);
   const usageRatio = contextWindow > 0 ? usedTokens / contextWindow : 0;
   const usagePercentage = Math.min(100, Math.round(usageRatio * 100));
@@ -279,21 +278,8 @@ function ContextUsageControl({
         ? "var(--signal-yellow)"
         : "var(--signal-cyan)";
 
-  const handleOpenChange = (nextOpen: boolean) => {
-    setOpen(nextOpen);
-    if (!nextOpen) return;
-
-    setIsLoading(true);
-    void invoke("getContextUsage", sessionId)
-      .then((nextSnapshot) => setSnapshot(nextSnapshot))
-      .catch((error) => {
-        console.error("Failed to load context usage", error);
-      })
-      .finally(() => setIsLoading(false));
-  };
-
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         aria-label={`上下文窗口已使用 ${usagePercentage}%`}
         className="flex h-7 items-center gap-1.5 rounded-sm border-2 border-border bg-card px-2 text-muted-foreground shadow-[var(--hard-shadow-sm)] transition-all hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 data-popup-open:bg-accent"
@@ -347,79 +333,16 @@ function ContextUsageControl({
           </p>
         </div>
 
-        <Separator />
-
-        {isLoading && !snapshot ? (
-          <div className="flex items-center justify-center py-5 text-muted-foreground">
-            <Spinner />
-          </div>
-        ) : snapshot ? (
-          <ContextBreakdownList
-            breakdown={snapshot.breakdown}
-            draftTokens={draftTokens}
-            totalTokens={Math.max(usedTokens, 1)}
-          />
-        ) : (
-          <p className="m-0 py-3 text-center text-[11px] text-muted-foreground">
-            暂时无法读取上下文构成
-          </p>
-        )}
-
-        <Separator />
-
-        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+        <div className="mt-3 flex items-center justify-between text-[10px] text-muted-foreground">
           <span>
             Session 总消耗{" "}
             <span className="font-mono tabular-nums">
-              {formatTokenCount(usageSummary?.sessionUsage.totalTokens ?? 0)}
+              {formatTokenCount(sessionUsage.totalTokens)}
             </span>
           </span>
-          <span>{snapshot?.estimated ? "构成为估算值" : "随会话自动更新"}</span>
         </div>
       </PopoverContent>
     </Popover>
-  );
-}
-
-function ContextBreakdownList({
-  breakdown,
-  draftTokens,
-  totalTokens,
-}: {
-  breakdown: ContextUsageBreakdown;
-  draftTokens: number;
-  totalTokens: number;
-}) {
-  const items = [
-    { icon: MessageSquareText, label: "对话消息", value: breakdown.conversation },
-    { icon: Wrench, label: "工具结果", value: breakdown.toolResults },
-    { icon: Sparkles, label: "系统指令", value: breakdown.systemPrompt },
-    { icon: Settings2, label: "工具定义", value: breakdown.toolDefinitions },
-    { icon: ChevronRight, label: "当前输入", value: draftTokens },
-  ];
-
-  return (
-    <div className="flex flex-col gap-2.5">
-      {items.map((item) => {
-        const Icon = item.icon;
-        const percentage = Math.min(100, (item.value / totalTokens) * 100);
-
-        return (
-          <div key={item.label} className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between gap-3 text-[11px]">
-              <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
-                <Icon className="size-3 shrink-0" />
-                <span className="truncate">{item.label}</span>
-              </span>
-              <span className="shrink-0 font-mono tabular-nums text-foreground">
-                {formatTokenCount(item.value)} · {formatPercentage(percentage / 100)}
-              </span>
-            </div>
-            <Progress value={percentage} />
-          </div>
-        );
-      })}
-    </div>
   );
 }
 

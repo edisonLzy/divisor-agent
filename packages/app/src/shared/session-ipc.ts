@@ -4,7 +4,6 @@ import type { AskUserQuestionResolution } from "./ask-user-question-ipc";
 import type { AgentSessionScope } from "./events-ipc";
 import type { AvailableModel } from "./models-ipc";
 import type { PermissionMode, PermissionResolution } from "./permissions-ipc";
-import type { ContextUsageSnapshot } from "./token-usage";
 
 export interface AgentSessionIPC {
   prompt: (sessionId: string, message: AppUserMessage) => Promise<void>;
@@ -22,7 +21,6 @@ export interface AgentSessionIPC {
   setSessionId: (sessionId: string) => Promise<void>;
   setSessionScope: (sessionId: string, scope: AgentSessionScope) => Promise<void>;
   destroySession: (sessionId: string) => Promise<void>;
-  getContextUsage: (sessionId: string) => Promise<ContextUsageSnapshot>;
   setPermissionMode: (sessionId: string, mode: PermissionMode) => Promise<void>;
   resolvePermissionRequest: (
     sessionId: string,

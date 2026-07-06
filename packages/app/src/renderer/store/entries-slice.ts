@@ -2,7 +2,6 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { Entry } from "@renderer/apis/sessions";
 import { isAgentMessageEntry } from "@renderer/lib/is";
-import type { AppAssistantMessage } from "@shared/token-usage";
 import { v4 as uuidv4 } from "uuid";
 import type { StateCreator } from "zustand/vanilla";
 
@@ -30,7 +29,7 @@ export interface ToolExecutionState {
   approvalStatus?: ToolApprovalStatus;
 }
 
-export type AgentMessageData = Exclude<AgentMessage, AssistantMessage> | AppAssistantMessage;
+export type AgentMessageData = AgentMessage;
 
 interface AgentMessageEntry extends Omit<Entry, "type" | "data"> {
   type: "message";
@@ -68,7 +67,7 @@ export interface EntriesSlice {
   getEntryState: (sessionId: string) => EntryState;
 
   appendMessageEntry: (sessionId: string, message: AgentMessageData) => string;
-  updateMessageEntry: (sessionId: string, entryId: string, message: AppAssistantMessage) => void;
+  updateMessageEntry: (sessionId: string, entryId: string, message: AssistantMessage) => void;
   setEntryStatus: (sessionId: string, entryIds: string[], status: EntryStatus) => void;
   setStreamingEntryId: (sessionId: string, id: string | undefined) => void;
   setStreamingEntryCompletedAt: (sessionId: string, completedAt: number) => void;
@@ -79,10 +78,10 @@ export interface EntriesSlice {
   removeEntryState: (sessionId: string) => void;
 }
 
-const EMPTY_ENTRY_STATE = {
+export const EMPTY_ENTRY_STATE: EntryState = {
   entries: [],
   toolStates: new Map(),
-  status: "idle" as const,
+  status: "idle",
 };
 
 function getOrCreateEntryState(

@@ -1,4 +1,10 @@
-import type { TextContent, ThinkingContent, ToolCall, Usage } from "@earendil-works/pi-ai";
+import type {
+  AssistantMessage as AssistantMessageType,
+  TextContent,
+  ThinkingContent,
+  ToolCall,
+  Usage,
+} from "@earendil-works/pi-ai";
 import { Message } from "@renderer/components/ai-elements/message";
 import { Shimmer } from "@renderer/components/ai-elements/shimmer";
 import {
@@ -17,10 +23,9 @@ import {
 import { Progress } from "@renderer/components/ui/progress";
 import { Separator } from "@renderer/components/ui/separator";
 import { formatPercentage, formatTokenCount } from "@renderer/lib/token-usage";
+import { getCacheHitRate } from "@renderer/lib/token-usage";
 import { cn } from "@renderer/lib/utils";
 import type { SessionEntry, ToolExecutionState } from "@renderer/store/entries-slice";
-import { getCacheHitRate } from "@shared/token-usage";
-import type { AppAssistantMessage } from "@shared/token-usage";
 import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -37,7 +42,7 @@ interface AssistantMessageProps {
   entries: SessionEntry[];
   entryId: string;
   isStreaming: boolean;
-  message: AppAssistantMessage;
+  message: AssistantMessageType;
   sessionId: string;
   startedAt: number;
   toolStates: Map<string, ToolExecutionState>;
@@ -150,7 +155,7 @@ export function AssistantMessage({
             <MessageToolbar align="start">
               <CopyMessageButton text={assistantText} />
               <ForkMessageButton sessionId={sessionId} entries={entries} targetEntryId={entryId} />
-              <MessageUsage usage={message.turnUsage ?? message.usage} />
+              <MessageUsage usage={message.usage} />
             </MessageToolbar>
           ) : null}
         </FloatingToolbar>
