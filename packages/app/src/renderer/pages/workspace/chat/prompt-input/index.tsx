@@ -1,28 +1,21 @@
 import type { AppUserMessage } from "@earendil-works/pi-agent-core";
+import type { EntryTokenUsage } from "@renderer/apis/sessions";
 import {
   getSelectedCommandIds,
   slashCommandSuggestionPluginKey,
 } from "@renderer/components/richtext/extensions/slash-commands";
 import { Button } from "@renderer/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from "@renderer/components/ui/popover";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@renderer/components/ui/hover-card";
 import { Progress } from "@renderer/components/ui/progress";
-import { isAgentMessageEntry } from "@renderer/lib/is";
-import { estimateDraftTokens, formatTokenCount, summarizeUsage } from "@renderer/lib/token-usage";
+import { formatTokenCount } from "@renderer/lib/token-usage";
 import { cn } from "@renderer/lib/utils";
-import type { EntryState } from "@renderer/store/entries-slice";
 import type { AvailableModel } from "@shared/models-ipc";
 import { matchesKeyboardEvent } from "@tanstack/react-hotkeys";
 import { EditorContent } from "@tiptap/react";
 import { ArrowUp, Square } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
+import { getCurrentContextTokens } from "../../use-agent-token-usage";
 import { INSERT_PROMPT_TEXT_EVENT } from "../prompt-insert-event";
 import type { PromptSubmission } from "../prompt-types";
 import { useChatEditor, UseChatEditorOptions } from "../use-chat-editor";
@@ -38,7 +31,7 @@ export interface PromptInputProps extends Pick<UseChatEditorOptions, "onCreate" 
   onFollowUp?: (submission: PromptSubmission) => Promise<void> | void;
   onStop?: () => Promise<void> | void;
   sessionId: string | null;
-  getEntryState: (sessionId: string) => EntryState;
+  tokenUsage?: EntryTokenUsage;
 }
 
 export function PromptInput({
@@ -52,7 +45,7 @@ export function PromptInput({
   onCreate,
   onDestroy,
   sessionId,
-  getEntryState,
+  tokenUsage,
 }: PromptInputProps) {
   const modelSelectorProps = useModalSelector(initialModel);
 
@@ -60,7 +53,7 @@ export function PromptInput({
 
   const editorContainerRef = useRef<HTMLDivElement | null>(null);
 
-  const { editor, hasContent, text } = useChatEditor({
+  const { editor, hasContent } = useChatEditor({
     // Note: we intentionally do NOT include `isRunning` in `disabled` so the user
     // can type steer/follow-up prompts while the agent is processing.
     disabled,
@@ -192,12 +185,9 @@ export function PromptInput({
         </div>
 
         <div className="flex items-center justify-end gap-2">
-          <ContextUsageControl
-            draftText={text}
-            model={modelSelectorProps.value}
-            sessionId={sessionId}
-            getEntryState={getEntryState}
-          />
+          {tokenUsage ? (
+            <ContextUsageControl model={modelSelectorProps.value} tokenUsage={tokenUsage} />
+          ) : null}
 
           <ModalSelector {...modelSelectorProps} />
 
@@ -234,39 +224,16 @@ export function PromptInput({
 }
 
 interface ContextUsageControlProps {
-  draftText: string;
   model: AvailableModel | null;
-  sessionId: string | null;
-  getEntryState: (sessionId: string) => EntryState;
+  tokenUsage: EntryTokenUsage;
 }
 
-function ContextUsageControl({
-  draftText,
-  model,
-  sessionId,
-  getEntryState,
-}: ContextUsageControlProps) {
-  const [open, setOpen] = useState(false);
+function ContextUsageControl({ model, tokenUsage }: ContextUsageControlProps) {
+  if (!model) return null;
 
-  if (!sessionId || !model) return null;
-
-  const entryState = getEntryState(sessionId);
-  const assistantMessages = entryState.entries
-    .filter(isAgentMessageEntry)
-    .flatMap((entry) => (entry.data.role === "assistant" ? [entry.data] : []));
-  const { sessionUsage } = summarizeUsage(assistantMessages);
-  // Ring fill: the most recent request's input side. Since entry.usage accumulates
-  // across all LLM calls in a turn, we use the last entry's input-side tokens
-  // (input + cacheRead + cacheWrite). The Math.min clamp on the ring caps it at
-  // 100% even when accumulated tokens exceed contextWindow.
-  const lastAssistant = assistantMessages[assistantMessages.length - 1];
-  const lastRequestInputTokens = lastAssistant
-    ? lastAssistant.usage.input + lastAssistant.usage.cacheRead + lastAssistant.usage.cacheWrite
-    : 0;
-  const draftTokens = estimateDraftTokens(draftText);
-  const measuredTokens = lastRequestInputTokens;
+  const measuredTokens = getCurrentContextTokens(tokenUsage);
   const contextWindow = model.contextWindow || 128_000;
-  const usedTokens = Math.min(contextWindow, measuredTokens + draftTokens);
+  const usedTokens = Math.min(contextWindow, measuredTokens);
   const usageRatio = contextWindow > 0 ? usedTokens / contextWindow : 0;
   const usagePercentage = Math.min(100, Math.round(usageRatio * 100));
   // Signal-token thresholds (spec §3): cyan = healthy/info, yellow = approaching,
@@ -279,10 +246,10 @@ function ContextUsageControl({
         : "var(--signal-cyan)";
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
+    <HoverCard>
+      <HoverCardTrigger
         aria-label={`上下文窗口已使用 ${usagePercentage}%`}
-        className="flex h-7 items-center gap-1.5 rounded-sm border-2 border-border bg-card px-2 text-muted-foreground shadow-[var(--hard-shadow-sm)] transition-all hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 data-popup-open:bg-accent"
+        className="flex size-6 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
       >
         <span
           className="flex size-[14px] items-center justify-center rounded-full"
@@ -292,57 +259,42 @@ function ContextUsageControl({
         >
           <span className="size-2 rounded-full bg-card" />
         </span>
-        <span className="font-mono text-[11px] tabular-nums">{usagePercentage}%</span>
-      </PopoverTrigger>
+      </HoverCardTrigger>
 
-      <PopoverContent
+      <HoverCardContent
         align="end"
         side="top"
-        sideOffset={10}
-        className="w-80 rounded-md border-2 border-border bg-popover p-4 shadow-[var(--hard-shadow)]"
+        sideOffset={8}
+        className="flex w-64 flex-col gap-2.5 p-3"
       >
-        <PopoverHeader>
-          <PopoverDescription>上下文窗口</PopoverDescription>
-          <div className="flex items-baseline gap-1.5">
-            <PopoverTitle className="font-mono text-lg tabular-nums">
-              {formatTokenCount(usedTokens)}
-            </PopoverTitle>
-            <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
-              / {formatTokenCount(contextWindow)} tokens
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[10px] text-muted-foreground">上下文窗口</span>
+          <span className="font-mono text-sm font-medium tabular-nums text-foreground">
+            {formatTokenCount(usedTokens)}
+            <span className="text-[10px] font-normal text-muted-foreground">
+              {" "}
+              / {formatTokenCount(contextWindow)} · {usagePercentage}%
             </span>
-          </div>
-        </PopoverHeader>
+          </span>
+        </div>
 
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between text-[11px]">
-            <span className="text-muted-foreground">
-              剩余约 {formatTokenCount(Math.max(0, contextWindow - usedTokens))} tokens
-            </span>
-            <span className="font-mono font-medium tabular-nums text-foreground">
-              {usagePercentage}%
-            </span>
-          </div>
-          <Progress value={usagePercentage} />
-          <p
+        <Progress value={usagePercentage} />
+
+        <div className="flex items-center justify-between gap-3 text-[10px]">
+          <span
             className={cn(
-              "m-0 text-[10px] text-muted-foreground",
+              "truncate text-muted-foreground",
               usageRatio >= 0.85 && "text-destructive",
             )}
           >
             {getContextStatusMessage(usageRatio)}
-          </p>
-        </div>
-
-        <div className="mt-3 flex items-center justify-between text-[10px] text-muted-foreground">
-          <span>
-            Session 总消耗{" "}
-            <span className="font-mono tabular-nums">
-              {formatTokenCount(sessionUsage.totalTokens)}
-            </span>
+          </span>
+          <span className="shrink-0 font-mono tabular-nums text-muted-foreground">
+            剩余 {formatTokenCount(Math.max(0, contextWindow - usedTokens))}
           </span>
         </div>
-      </PopoverContent>
-    </Popover>
+      </HoverCardContent>
+    </HoverCard>
   );
 }
 

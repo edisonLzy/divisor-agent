@@ -10,7 +10,6 @@ import {
 } from "@renderer/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@renderer/components/ui/popover";
 import { useElectronIPC } from "@renderer/context/ElectronIPCProvider";
-import { EMPTY_ENTRY_STATE } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
 import { Check, ChevronDown, Folder, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
@@ -108,12 +107,7 @@ export function PendingSessionContent({
           </h1>
 
           <div className="w-full max-w-3xl">
-            <PromptInput
-              disabled={isLoading}
-              getEntryState={() => EMPTY_ENTRY_STATE}
-              onSubmit={submitPrompt}
-              sessionId={null}
-            />
+            <PromptInput disabled={isLoading} onSubmit={submitPrompt} sessionId={null} />
             <SessionProfile />
           </div>
         </div>

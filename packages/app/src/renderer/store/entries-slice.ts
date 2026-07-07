@@ -1,6 +1,6 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
-import type { Entry } from "@renderer/apis/sessions";
+import type { Entry, EntryTokenUsage } from "@renderer/apis/sessions";
 import { isAgentMessageEntry } from "@renderer/lib/is";
 import { v4 as uuidv4 } from "uuid";
 import type { StateCreator } from "zustand/vanilla";
@@ -36,6 +36,7 @@ interface AgentMessageEntry extends Omit<Entry, "type" | "data"> {
   data: AgentMessageData;
   status: EntryStatus;
   completedAt?: number;
+  tokenUsage?: EntryTokenUsage;
 }
 
 export interface ModelChangedData {
@@ -68,6 +69,11 @@ export interface EntriesSlice {
 
   appendMessageEntry: (sessionId: string, message: AgentMessageData) => string;
   updateMessageEntry: (sessionId: string, entryId: string, message: AssistantMessage) => void;
+  setMessageEntryTokenUsage: (
+    sessionId: string,
+    entryId: string,
+    tokenUsage: EntryTokenUsage,
+  ) => void;
   setEntryStatus: (sessionId: string, entryIds: string[], status: EntryStatus) => void;
   setStreamingEntryId: (sessionId: string, id: string | undefined) => void;
   setStreamingEntryCompletedAt: (sessionId: string, completedAt: number) => void;
@@ -145,6 +151,24 @@ export const createEntriesSlice: StateCreator<EntriesSlice, [], [], EntriesSlice
       const current = getOrCreateEntryState(entryStates, sessionId);
       const entries = [...current.entries];
       entries[entryIndex] = { ...existingEntry, data: message };
+      entryStates.set(sessionId, { ...current, entries });
+      return { entryStates };
+    });
+  },
+
+  setMessageEntryTokenUsage: (sessionId, entryId, tokenUsage) => {
+    const state = get().getEntryState(sessionId);
+    const entryIndex = state.entries.findIndex((entry) => entry.id === entryId);
+    if (entryIndex < 0) return;
+
+    const existingEntry = state.entries[entryIndex];
+    if (!isAgentMessageEntry(existingEntry)) return;
+
+    set((prev) => {
+      const entryStates = new Map(prev.entryStates);
+      const current = getOrCreateEntryState(entryStates, sessionId);
+      const entries = [...current.entries];
+      entries[entryIndex] = { ...existingEntry, tokenUsage };
       entryStates.set(sessionId, { ...current, entries });
       return { entryStates };
     });

@@ -107,6 +107,7 @@ export function ChatMessages({
                       message={message}
                       sessionId={sessionId}
                       startedAt={entry.timestamp}
+                      tokenUsage={entry.tokenUsage}
                       toolStates={toolStates}
                     />
                   ) : null}

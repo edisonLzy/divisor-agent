@@ -9,12 +9,9 @@ import {
   isAgentUserMessage,
   isFailedAssistantMessage,
 } from "@renderer/lib/is";
-import { addUsage } from "@renderer/lib/token-usage";
 import { EntryStatus, type SessionEntry } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
 import { useRef } from "react";
-
-import { useHumanInTheLoopMessages } from "./use-human-in-the-loop-messages";
 
 function getToolState(sessionId: string, toolCallId: string) {
   return mainStore.getState().getEntryState(sessionId).toolStates.get(toolCallId);
@@ -40,8 +37,6 @@ export function useAgentMessages() {
   const extensionsApi = useExtensionsContextAPI();
   const turnContentStartIndicesRef = useRef<Record<string, number>>({});
   const hasPersistedRef = useRef<Record<string, boolean>>({});
-
-  useHumanInTheLoopMessages();
 
   useSubscribeAgentEvents(
     {
@@ -86,6 +81,7 @@ export function useAgentMessages() {
                   parentId: entry.parentId,
                   type: entry.type,
                   data: entry.data as unknown as Record<string, unknown>,
+                  tokenUsage: isAgentMessageEntry(entry) ? entry.tokenUsage : undefined,
                 })),
               });
               mainStore.getState().setEntryStatus(sessionId, entryIds, EntryStatus.Synced);
@@ -173,13 +169,9 @@ export function useAgentMessages() {
           mainStore.getState().updateMessageEntry(sessionId, streamingEntryId, message);
         } else {
           const existingContent = entry.data.content ?? [];
-          // Merge path: a later LLM call in the same turn. Accumulate usage into
-          // entry.data.usage at message_end (not here — message.usage is a partial
-          // during streaming), so preserve the existing accumulated usage here and
-          // only splice in the new content.
+          // Merge a later LLM call's content into the same visible assistant entry.
           mainStore.getState().updateMessageEntry(sessionId, streamingEntryId, {
             ...message,
-            usage: entry.data.usage,
             content: [
               ...existingContent.slice(0, turnStartIdx),
               ...message.content,
@@ -220,11 +212,8 @@ export function useAgentMessages() {
           mainStore.getState().updateMessageEntry(sessionId, streamingEntryId, message);
         } else {
           const existingContent = entry.data.content ?? [];
-          // Merge path: accumulate this LLM call's final usage into the turn total
-          // stored on entry.data.usage.
           mainStore.getState().updateMessageEntry(sessionId, streamingEntryId, {
             ...message,
-            usage: addUsage(entry.data.usage, message.usage),
             content: [
               ...existingContent.slice(0, turnStartIdx),
               ...message.content,

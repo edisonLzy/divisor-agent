@@ -46,6 +46,7 @@ export function SessionItem({ session }: SessionItemProps) {
                   ...entry,
                   type: "message" as const,
                   data: entry.data as unknown as AgentMessageData,
+                  tokenUsage: entry.tokenUsage ?? undefined,
                   status: EntryStatus.Synced,
                 };
               }

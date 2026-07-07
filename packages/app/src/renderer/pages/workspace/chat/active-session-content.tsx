@@ -45,7 +45,7 @@ export function ActiveSessionContent({
     submitPrompt,
     steerPrompt,
     followUpPrompt,
-    getEntryState,
+    tokenUsage,
   } = useActiveSessionChat();
 
   const sharedPromptEditor = useSharedPromptEditor();
@@ -133,7 +133,7 @@ export function ActiveSessionContent({
                     sessionId={activeSessionId}
                     onCreate={handlePromptInputCreated}
                     onDestroy={handlePromptInputDestroyed}
-                    getEntryState={getEntryState}
+                    tokenUsage={tokenUsage}
                   />
                 )}
               </div>
@@ -200,11 +200,7 @@ function useActiveSessionChat() {
   const messageEntries = entries.filter(isAgentMessageEntry);
   const toolStates = entryState.toolStates;
   const isRunning = entryState.status === "running";
-
-  const getEntryState = useCallback(
-    (sessionId: string) => mainStore.getState().getEntryState(sessionId),
-    [],
-  );
+  const tokenUsage = messageEntries.findLast((entry) => entry.tokenUsage)?.tokenUsage;
 
   const submitPrompt = useCallback(
     async (submission: PromptSubmission) => {
@@ -343,6 +339,6 @@ function useActiveSessionChat() {
     submitPrompt,
     steerPrompt,
     followUpPrompt,
-    getEntryState,
+    tokenUsage,
   };
 }

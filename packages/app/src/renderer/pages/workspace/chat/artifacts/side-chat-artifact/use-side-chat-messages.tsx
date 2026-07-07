@@ -7,7 +7,6 @@ import {
   isAgentUserMessage,
   isFailedAssistantMessage,
 } from "@renderer/lib/is";
-import { addUsage } from "@renderer/lib/token-usage";
 import { sideChatStore } from "@renderer/store/side-chat";
 import { useRef } from "react";
 
@@ -83,11 +82,8 @@ export function useSideChatMessages() {
           sideChatStore.getState().updateMessageEntry(sessionId, streamingEntryId, message);
         } else {
           const existingContent = entry.data.content ?? [];
-          // Merge path: preserve the accumulated turn usage on entry.data.usage
-          // (message.usage is a partial during streaming); only splice new content.
           sideChatStore.getState().updateMessageEntry(sessionId, streamingEntryId, {
             ...message,
-            usage: entry.data.usage,
             content: [
               ...existingContent.slice(0, turnStartIdx),
               ...message.content,
@@ -128,10 +124,8 @@ export function useSideChatMessages() {
           sideChatStore.getState().updateMessageEntry(sessionId, streamingEntryId, message);
         } else {
           const existingContent = entry.data.content ?? [];
-          // Merge path: accumulate this LLM call's final usage into the turn total.
           sideChatStore.getState().updateMessageEntry(sessionId, streamingEntryId, {
             ...message,
-            usage: addUsage(entry.data.usage, message.usage),
             content: [
               ...existingContent.slice(0, turnStartIdx),
               ...message.content,

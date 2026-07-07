@@ -10,6 +10,7 @@ import { Sessions } from "./sessions";
 import { useToggleSidebarButton } from "./toggle-sidebar-button";
 import { useAgentMessages } from "./use-agent-messages";
 import { useAgentSessions } from "./use-agent-sessions";
+import { useAgentTokenUsage } from "./use-agent-token-usage";
 import { useHumanInTheLoopMessages } from "./use-human-in-the-loop-messages";
 
 export function WorkspacePage() {
@@ -22,6 +23,8 @@ export function WorkspacePage() {
   void useAgentSessions();
 
   void useHumanInTheLoopMessages();
+
+  void useAgentTokenUsage();
 
   return (
     <div className="h-screen w-full overflow-hidden bg-background font-sans text-foreground">

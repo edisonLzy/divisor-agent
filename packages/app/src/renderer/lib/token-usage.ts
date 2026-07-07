@@ -1,26 +1,4 @@
-import type { AssistantMessage, Usage } from "@earendil-works/pi-ai";
-
-export interface SessionUsageSummary {
-  latestRequestUsage?: Usage;
-  sessionUsage: Usage;
-}
-
-export function createEmptyUsage(): Usage {
-  return {
-    input: 0,
-    output: 0,
-    cacheRead: 0,
-    cacheWrite: 0,
-    totalTokens: 0,
-    cost: {
-      input: 0,
-      output: 0,
-      cacheRead: 0,
-      cacheWrite: 0,
-      total: 0,
-    },
-  };
-}
+import type { Usage } from "@earendil-works/pi-ai";
 
 export function addUsage(left: Usage, right: Usage): Usage {
   return {
@@ -47,33 +25,6 @@ export function getCacheHitRate(usage: Usage): number | null {
   const promptTokens = getPromptTokens(usage);
   if (promptTokens === 0) return null;
   return usage.cacheRead / promptTokens;
-}
-
-export function summarizeUsage(
-  messages: AssistantMessage[],
-  latestRequestUsage?: Usage,
-): SessionUsageSummary {
-  let sessionUsage = createEmptyUsage();
-  for (const message of messages) {
-    sessionUsage = addUsage(sessionUsage, message.usage);
-  }
-  return { latestRequestUsage, sessionUsage };
-}
-
-export function estimateDraftTokens(text: string): number {
-  if (!text) return 0;
-
-  let cjkCharacters = 0;
-  for (const character of text) {
-    if (
-      /\p{Script=Han}|\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Hangul}/u.test(character)
-    ) {
-      cjkCharacters += 1;
-    }
-  }
-
-  const nonCjkCharacters = Math.max(0, text.length - cjkCharacters);
-  return Math.ceil(cjkCharacters + nonCjkCharacters / 4);
 }
 
 export function formatTokenCount(value: number): string {
