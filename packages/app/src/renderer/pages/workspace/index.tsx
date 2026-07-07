@@ -10,13 +10,18 @@ import { Sessions } from "./sessions";
 import { useToggleSidebarButton } from "./toggle-sidebar-button";
 import { useAgentMessages } from "./use-agent-messages";
 import { useAgentSessions } from "./use-agent-sessions";
+import { useHumanInTheLoopMessages } from "./use-human-in-the-loop-messages";
 
 export function WorkspacePage() {
   const { isCollapsed, panelRef, setIsCollapsed, toggle } = useToggleSidebarButton();
 
   void useAgentMessages();
+
   void useSideChatMessages();
+
   void useAgentSessions();
+
+  void useHumanInTheLoopMessages();
 
   return (
     <div className="h-screen w-full overflow-hidden bg-background font-sans text-foreground">
