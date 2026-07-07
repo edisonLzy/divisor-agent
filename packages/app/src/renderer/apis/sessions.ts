@@ -1,3 +1,4 @@
+import type { Usage } from "@earendil-works/pi-ai";
 import { request } from "@renderer/lib/request";
 
 // ── Shared Types ────────────────────────────────────────────────────────────
@@ -14,6 +15,11 @@ export interface Session {
   isTop: boolean;
 }
 
+export interface EntryTokenUsage {
+  turn: Usage;
+  latestCall: Usage;
+}
+
 export interface Entry {
   id: string;
   sessionId: string;
@@ -21,6 +27,7 @@ export interface Entry {
   type: "message" | "model_change";
   timestamp: number;
   data: Record<string, unknown>;
+  tokenUsage?: EntryTokenUsage | null;
 }
 
 // ── Workspace Types ──────────────────────────────────────────────────────────
@@ -170,6 +177,7 @@ export interface AppendEntriesRequest {
     parentId: string | null;
     type: "message" | "model_change";
     data: Record<string, unknown>;
+    tokenUsage?: EntryTokenUsage;
   }>;
 }
 

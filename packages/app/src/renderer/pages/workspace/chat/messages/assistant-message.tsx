@@ -3,15 +3,22 @@ import type {
   TextContent,
   ThinkingContent,
   ToolCall,
+  Usage,
 } from "@earendil-works/pi-ai";
+import type { EntryTokenUsage } from "@renderer/apis/sessions";
 import { Message } from "@renderer/components/ai-elements/message";
 import { Shimmer } from "@renderer/components/ai-elements/shimmer";
+import { Badge } from "@renderer/components/ui/badge";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@renderer/components/ui/collapsible";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@renderer/components/ui/hover-card";
+import { Progress } from "@renderer/components/ui/progress";
 import { Separator } from "@renderer/components/ui/separator";
+import { formatPercentage, formatTokenCount } from "@renderer/lib/token-usage";
+import { getCacheHitRate } from "@renderer/lib/token-usage";
 import { cn } from "@renderer/lib/utils";
 import type { SessionEntry, ToolExecutionState } from "@renderer/store/entries-slice";
 import { ChevronRightIcon } from "lucide-react";
@@ -33,6 +40,7 @@ interface AssistantMessageProps {
   message: AssistantMessageType;
   sessionId: string;
   startedAt: number;
+  tokenUsage?: EntryTokenUsage;
   toolStates: Map<string, ToolExecutionState>;
 }
 
@@ -44,6 +52,7 @@ export function AssistantMessage({
   message,
   sessionId,
   startedAt,
+  tokenUsage,
   toolStates,
 }: AssistantMessageProps) {
   const contentArray = Array.isArray(message.content) ? message.content : [];
@@ -139,16 +148,126 @@ export function AssistantMessage({
             </div>
           ) : null}
 
-          {!hasError ? (
+          {!hasError && !isStreaming ? (
             <MessageToolbar align="start">
               <CopyMessageButton text={assistantText} />
               <ForkMessageButton sessionId={sessionId} entries={entries} targetEntryId={entryId} />
+              {tokenUsage ? <MessageUsage usage={tokenUsage.turn} /> : null}
             </MessageToolbar>
           ) : null}
         </FloatingToolbar>
       </Message>
     </div>
   );
+}
+
+function MessageUsage({ usage }: { usage: Usage }) {
+  if (usage.totalTokens <= 0) return null;
+
+  const cacheHitRate = getCacheHitRate(usage);
+  const cacheTone = getCacheTone(cacheHitRate);
+
+  return (
+    <HoverCard>
+      <HoverCardTrigger
+        render={
+          <Badge variant="ghost" className="h-5 cursor-default gap-1 border-transparent px-1.5" />
+        }
+      >
+        <span className="text-foreground">{formatTokenCount(usage.totalTokens)}</span>
+        {cacheHitRate !== null ? (
+          <>
+            <span aria-hidden="true" className="text-border/80">
+              ·
+            </span>
+            <span className={cacheTone.textClassName}>{formatPercentage(cacheHitRate)} cache</span>
+          </>
+        ) : null}
+      </HoverCardTrigger>
+
+      <HoverCardContent
+        align="start"
+        side="top"
+        sideOffset={8}
+        className="flex w-64 flex-col gap-2.5 p-3"
+      >
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[10px] text-muted-foreground">本轮 Token 用量</span>
+          <span className="font-mono text-sm font-medium tabular-nums text-foreground">
+            {usage.totalTokens.toLocaleString()}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+          <UsageMetric label="输入" value={usage.input} />
+          <UsageMetric label="输出" value={usage.output} />
+          <UsageMetric label="缓存读取" value={usage.cacheRead} />
+          <UsageMetric label="缓存写入" value={usage.cacheWrite} />
+        </div>
+
+        {cacheHitRate !== null ? (
+          <div className="flex flex-col gap-2">
+            <Separator />
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-muted-foreground">缓存命中率</span>
+              <div className="flex items-center gap-1.5">
+                <span className={cn("text-[10px] font-medium", cacheTone.textClassName)}>
+                  {cacheTone.label}
+                </span>
+                <span className="font-mono font-medium tabular-nums text-foreground">
+                  {formatPercentage(cacheHitRate)}
+                </span>
+              </div>
+            </div>
+            <Progress value={cacheHitRate * 100} className={cacheTone.progressClassName} />
+          </div>
+        ) : null}
+      </HoverCardContent>
+    </HoverCard>
+  );
+}
+
+function UsageMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2 border-b border-border/60 py-1">
+      <span className="text-[10px] text-muted-foreground">{label}</span>
+      <span className="font-mono text-[10px] font-medium tabular-nums text-foreground">
+        {value.toLocaleString()}
+      </span>
+    </div>
+  );
+}
+
+function getCacheTone(cacheHitRate: number | null) {
+  if (cacheHitRate === null) {
+    return {
+      label: "无数据",
+      textClassName: "text-muted-foreground",
+      progressClassName: "[&_[data-slot=progress-indicator]]:bg-muted-foreground",
+    };
+  }
+
+  if (cacheHitRate >= 0.8) {
+    return {
+      label: "高",
+      textClassName: "text-signal-green",
+      progressClassName: "[&_[data-slot=progress-indicator]]:bg-signal-green",
+    };
+  }
+
+  if (cacheHitRate >= 0.5) {
+    return {
+      label: "中",
+      textClassName: "text-signal-yellow",
+      progressClassName: "[&_[data-slot=progress-indicator]]:bg-signal-yellow",
+    };
+  }
+
+  return {
+    label: "低",
+    textClassName: "text-destructive",
+    progressClassName: "[&_[data-slot=progress-indicator]]:bg-destructive",
+  };
 }
 
 interface ProcessingTipProps {

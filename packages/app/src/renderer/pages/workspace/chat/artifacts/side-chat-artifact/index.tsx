@@ -27,6 +27,7 @@ export function SideChatArtifact({ artifact }: SideChatArtifactProps) {
   );
   const isRunning = entryState.status === "running";
   const inputDisabled = meta?.inputDisabled ?? false;
+  const tokenUsage = messageEntries.findLast((entry) => entry.tokenUsage)?.tokenUsage;
 
   const submitPrompt = useCallback(
     async (submission: PromptSubmission) => {
@@ -88,6 +89,7 @@ export function SideChatArtifact({ artifact }: SideChatArtifactProps) {
           onStop={stopPrompt}
           onSubmit={submitPrompt}
           sessionId={artifact.id}
+          tokenUsage={tokenUsage}
         />
       </div>
     </div>
