@@ -291,6 +291,8 @@ export class AgentPool
         providerId: m.provider,
         providerName: m.provider,
         modelName: m.name ?? m.id,
+        contextWindow: m.contextWindow,
+        maxTokens: m.maxTokens,
       };
     });
   };

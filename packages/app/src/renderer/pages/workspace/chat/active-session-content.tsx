@@ -45,6 +45,7 @@ export function ActiveSessionContent({
     submitPrompt,
     steerPrompt,
     followUpPrompt,
+    tokenUsage,
   } = useActiveSessionChat();
 
   const sharedPromptEditor = useSharedPromptEditor();
@@ -132,6 +133,7 @@ export function ActiveSessionContent({
                     sessionId={activeSessionId}
                     onCreate={handlePromptInputCreated}
                     onDestroy={handlePromptInputDestroyed}
+                    tokenUsage={tokenUsage}
                   />
                 )}
               </div>
@@ -198,6 +200,7 @@ function useActiveSessionChat() {
   const messageEntries = entries.filter(isAgentMessageEntry);
   const toolStates = entryState.toolStates;
   const isRunning = entryState.status === "running";
+  const tokenUsage = messageEntries.findLast((entry) => entry.tokenUsage)?.tokenUsage;
 
   const submitPrompt = useCallback(
     async (submission: PromptSubmission) => {
@@ -336,5 +339,6 @@ function useActiveSessionChat() {
     submitPrompt,
     steerPrompt,
     followUpPrompt,
+    tokenUsage,
   };
 }

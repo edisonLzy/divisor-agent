@@ -13,8 +13,6 @@ import { EntryStatus, type SessionEntry } from "@renderer/store/entries-slice";
 import { mainStore } from "@renderer/store/main";
 import { useRef } from "react";
 
-import { useHumanInTheLoopMessages } from "./use-human-in-the-loop-messages";
-
 function getToolState(sessionId: string, toolCallId: string) {
   return mainStore.getState().getEntryState(sessionId).toolStates.get(toolCallId);
 }
@@ -39,8 +37,6 @@ export function useAgentMessages() {
   const extensionsApi = useExtensionsContextAPI();
   const turnContentStartIndicesRef = useRef<Record<string, number>>({});
   const hasPersistedRef = useRef<Record<string, boolean>>({});
-
-  useHumanInTheLoopMessages();
 
   useSubscribeAgentEvents(
     {
@@ -85,6 +81,7 @@ export function useAgentMessages() {
                   parentId: entry.parentId,
                   type: entry.type,
                   data: entry.data as unknown as Record<string, unknown>,
+                  tokenUsage: isAgentMessageEntry(entry) ? entry.tokenUsage : undefined,
                 })),
               });
               mainStore.getState().setEntryStatus(sessionId, entryIds, EntryStatus.Synced);
@@ -104,7 +101,10 @@ export function useAgentMessages() {
         const { sessionId } = event;
 
         const streamingEntryId = mainStore.getState().streamingEntryIds.get(sessionId);
-        if (!streamingEntryId) return;
+        if (!streamingEntryId) {
+          turnContentStartIndicesRef.current[sessionId] = 0;
+          return;
+        }
 
         const entries = mainStore.getState().getEntryState(sessionId).entries;
         const entry = entries.find((item) => item.id === streamingEntryId);
@@ -169,6 +169,7 @@ export function useAgentMessages() {
           mainStore.getState().updateMessageEntry(sessionId, streamingEntryId, message);
         } else {
           const existingContent = entry.data.content ?? [];
+          // Merge a later LLM call's content into the same visible assistant entry.
           mainStore.getState().updateMessageEntry(sessionId, streamingEntryId, {
             ...message,
             content: [
@@ -207,16 +208,15 @@ export function useAgentMessages() {
         if (!entry || !isAgentMessageEntry(entry) || entry.data.role !== "assistant") return;
 
         const turnStartIdx = turnContentStartIndicesRef.current[sessionId] ?? 0;
-        const assistantMsg = message as AssistantMessage;
         if (turnStartIdx === 0) {
-          mainStore.getState().updateMessageEntry(sessionId, streamingEntryId, assistantMsg);
+          mainStore.getState().updateMessageEntry(sessionId, streamingEntryId, message);
         } else {
           const existingContent = entry.data.content ?? [];
           mainStore.getState().updateMessageEntry(sessionId, streamingEntryId, {
-            ...assistantMsg,
+            ...message,
             content: [
               ...existingContent.slice(0, turnStartIdx),
-              ...assistantMsg.content,
+              ...message.content,
             ] as AssistantMessage["content"],
           });
         }

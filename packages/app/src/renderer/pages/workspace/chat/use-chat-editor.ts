@@ -114,13 +114,15 @@ export function useChatEditor({
       editable: !disabled,
       onCreate: ({ editor: nextEditor }) => {
         onCreateFromUser?.({ editor: nextEditor });
-        setHasContent(nextEditor.getText().trim().length > 0);
+        const nextText = nextEditor.getText({ blockSeparator: "\n" });
+        setHasContent(nextText.trim().length > 0);
       },
       onDestroy: () => {
         onDestroyFromUser?.();
       },
       onUpdate: ({ editor: nextEditor }) => {
-        setHasContent(nextEditor.getText().trim().length > 0);
+        const nextText = nextEditor.getText({ blockSeparator: "\n" });
+        setHasContent(nextText.trim().length > 0);
       },
     },
     [content],

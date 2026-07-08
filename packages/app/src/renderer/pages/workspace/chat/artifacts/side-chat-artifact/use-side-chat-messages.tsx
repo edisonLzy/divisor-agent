@@ -39,7 +39,10 @@ export function useSideChatMessages() {
 
       turn_start: (event) => {
         const streamingEntryId = sideChatStore.getState().streamingEntryIds.get(event.sessionId);
-        if (!streamingEntryId) return;
+        if (!streamingEntryId) {
+          turnContentStartIndicesRef.current[event.sessionId] = 0;
+          return;
+        }
 
         const entryState = sideChatStore.getState().getEntryState(event.sessionId);
         const entry = entryState.entries.find((item) => item.id === streamingEntryId);
@@ -117,16 +120,15 @@ export function useSideChatMessages() {
         if (!entry || !isAgentMessageEntry(entry) || entry.data.role !== "assistant") return;
 
         const turnStartIdx = turnContentStartIndicesRef.current[sessionId] ?? 0;
-        const assistantMsg = message as AssistantMessage;
         if (turnStartIdx === 0) {
-          sideChatStore.getState().updateMessageEntry(sessionId, streamingEntryId, assistantMsg);
+          sideChatStore.getState().updateMessageEntry(sessionId, streamingEntryId, message);
         } else {
           const existingContent = entry.data.content ?? [];
           sideChatStore.getState().updateMessageEntry(sessionId, streamingEntryId, {
-            ...assistantMsg,
+            ...message,
             content: [
               ...existingContent.slice(0, turnStartIdx),
-              ...assistantMsg.content,
+              ...message.content,
             ] as AssistantMessage["content"],
           });
         }
