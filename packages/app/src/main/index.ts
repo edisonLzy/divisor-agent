@@ -6,8 +6,13 @@ import { AgentPool } from "./agent-pool.js";
 import { AppUpdateManager } from "./app-updater.js";
 import { BrowserWindowManager } from "./browser-window/index.js";
 import { FileSystemManager } from "./file-system/index.js";
+import { registerDeepgramAuth } from "./stt/index.js";
 
 app.whenReady().then(() => {
+  // Inject the Deepgram Authorization header into renderer WebSocket upgrades
+  // (see src/main/stt). Must be registered before the renderer can connect.
+  registerDeepgramAuth();
+
   let browserWindow: BrowserWindow | null = createWindow();
 
   const agentPool = new AgentPool(browserWindow);
@@ -71,6 +76,31 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
+
+  // Allow microphone-only media access for voice input (Deepgram STT).
+  // Rejects video requests to avoid unintentional camera access.
+  mainWindow.webContents.session.setPermissionCheckHandler(
+    (webContents, permission, _requestingOrigin, details) => {
+      return (
+        webContents === mainWindow.webContents &&
+        permission === "media" &&
+        details.mediaType === "audio"
+      );
+    },
+  );
+
+  mainWindow.webContents.session.setPermissionRequestHandler(
+    (webContents, permission, callback, details) => {
+      const mediaTypes = "mediaTypes" in details ? details.mediaTypes : undefined;
+      const allowMicrophone =
+        webContents === mainWindow.webContents &&
+        permission === "media" &&
+        mediaTypes?.includes("audio") === true &&
+        !mediaTypes.includes("video");
+
+      callback(allowMicrophone);
+    },
+  );
 
   if (process.env.ELECTRON_RENDERER_URL) {
     void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);

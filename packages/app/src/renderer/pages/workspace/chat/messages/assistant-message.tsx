@@ -104,13 +104,10 @@ export function AssistantMessage({
             </div>
 
             <CollapsibleContent className="mt-2 flex flex-col gap-2">
-              {processingContent.map((block) => {
+              {processingContent.map((block, index) => {
                 if (block.type === "thinking") {
                   return (
-                    <AssistantThinkingMessage
-                      key={`thinking-${block.thinking.slice(0, 20)}`}
-                      content={block.thinking}
-                    />
+                    <AssistantThinkingMessage key={`thinking-${index}`} content={block.thinking} />
                   );
                 }
 
