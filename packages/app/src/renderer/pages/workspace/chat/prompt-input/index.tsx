@@ -7,19 +7,12 @@ import {
 import { Button } from "@renderer/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@renderer/components/ui/hover-card";
 import { Progress } from "@renderer/components/ui/progress";
-import { Spinner } from "@renderer/components/ui/spinner";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@renderer/components/ui/tooltip";
 import { formatTokenCount } from "@renderer/lib/token-usage";
 import { cn } from "@renderer/lib/utils";
 import type { AvailableModel } from "@shared/models-ipc";
 import { matchesKeyboardEvent } from "@tanstack/react-hotkeys";
 import { EditorContent } from "@tiptap/react";
-import { ArrowUp, Mic, Square } from "lucide-react";
+import { ArrowUp, Square } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 
@@ -30,6 +23,7 @@ import { useChatEditor, UseChatEditorOptions } from "../use-chat-editor";
 import { ModalSelector, useModalSelector } from "./modal-selector";
 import { PermissionSelector, usePermissionSelector } from "./permission-selector";
 import { useVoiceInput } from "./use-voice-input";
+import { VoiceInputButton } from "./voice-input-button";
 
 export interface PromptInputProps extends Pick<UseChatEditorOptions, "onCreate" | "onDestroy"> {
   disabled?: boolean;
@@ -184,32 +178,20 @@ export function PromptInput({
     };
   }, [editor, handleSubmit, isRunning, onFollowUp]);
 
-  const handleStopVoiceInput = useCallback(async () => {
-    const transcript = await voiceInput.stop();
-    if (!editor) return;
+  const handleVoiceStop = useCallback(
+    (transcript: string) => {
+      if (!editor) return;
 
-    if (transcript) {
-      editor.chain().focus().insertContentAt(editor.state.doc.content.size, transcript).run();
-    } else {
-      toast.info("未识别到新的语音内容，已保留原有文字");
-    }
-  }, [editor, voiceInput]);
-
-  const handleSendVoiceInput = useCallback(async () => {
-    const transcript = await voiceInput.stop();
-    if (!editor) return;
-
-    if (transcript) {
-      editor.chain().focus().insertContentAt(editor.state.doc.content.size, transcript).run();
-    }
-
-    if (!editor.getText({ blockSeparator: "\n" }).trim()) {
-      toast.info("没有识别到可发送的语音");
-      return;
-    }
-
-    await handleSubmit();
-  }, [editor, handleSubmit, voiceInput]);
+      if (transcript) {
+        // Insert at the cursor (TipTap keeps the selection in editor.state across
+        // blur / setEditable, so this lands where the user was when recording began).
+        editor.chain().focus().insertContent(transcript).run();
+      } else {
+        toast.info("未识别到新的语音内容，已保留原有文字");
+      }
+    },
+    [editor],
+  );
 
   // Suppress Enter keydown during recording
   useEffect(() => {
@@ -239,23 +221,18 @@ export function PromptInput({
       )}
     >
       <div ref={editorContainerRef} className="relative min-h-14 px-3.5 py-2.5">
-        {voiceInput.isRecording ? (
-          <VoiceTranscriptPreview
-            existingText={editor?.getText({ blockSeparator: "\n" }) ?? ""}
-            transcript={voiceInput.transcript}
-          />
-        ) : (
-          <EditorContent editor={editor} className="prompt-editor max-w-none" />
-        )}
+        <EditorContent editor={editor} className="prompt-editor max-w-none" />
       </div>
 
       {voiceInput.isRecording ? (
-        <VoiceRecordingControls
+        <VoiceInputButton
           analyser={voiceInput.analyser}
-          canSend={hasModel && (hasContent || voiceInput.transcript.trim().length > 0)}
           elapsedSeconds={voiceInput.elapsedSeconds}
-          onSend={() => void handleSendVoiceInput()}
-          onStop={() => void handleStopVoiceInput()}
+          isRecording={voiceInput.isRecording}
+          isStarting={voiceInput.isStarting}
+          onStop={handleVoiceStop}
+          start={() => void voiceInput.start()}
+          stop={voiceInput.stop}
         />
       ) : (
         <div className="flex items-center justify-between gap-3 px-3 py-3">
@@ -270,26 +247,14 @@ export function PromptInput({
 
             <ModalSelector {...modelSelectorProps} />
 
-            <TooltipProvider delay={120}>
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="rounded-md"
-                      onClick={() => void voiceInput.start()}
-                      disabled={disabled || isRunning || voiceInput.isStarting}
-                      aria-label="Start voice input"
-                    />
-                  }
-                >
-                  {voiceInput.isStarting ? <Spinner /> : <Mic className="size-4" />}
-                </TooltipTrigger>
-                <TooltipContent side="top">语音输入</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <VoiceInputButton
+              disabled={disabled || isRunning}
+              isRecording={voiceInput.isRecording}
+              isStarting={voiceInput.isStarting}
+              onStop={handleVoiceStop}
+              start={() => void voiceInput.start()}
+              stop={voiceInput.stop}
+            />
 
             <Button
               type="button"
@@ -404,168 +369,4 @@ function getContextStatusMessage(usageRatio: number): string {
   if (usageRatio >= 0.85) return "上下文使用较高，长任务可能需要压缩历史。";
   if (usageRatio >= 0.65) return "上下文接近提醒阈值，当前仍可继续。";
   return "上下文空间充足，可继续当前任务。";
-}
-
-// ── Voice input components ──────────────────────────────────────────────────
-
-interface VoiceRecordingControlsProps {
-  analyser: AnalyserNode | null;
-  canSend: boolean;
-  elapsedSeconds: number;
-  onSend: () => void;
-  onStop: () => void;
-}
-
-function VoiceRecordingControls({
-  analyser,
-  canSend,
-  elapsedSeconds,
-  onSend,
-  onStop,
-}: VoiceRecordingControlsProps) {
-  return (
-    <div className="flex items-center gap-2.5 px-3 py-3">
-      <VoiceWaveform analyser={analyser} />
-      <span
-        className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground"
-        aria-live="polite"
-      >
-        {formatDuration(elapsedSeconds)}
-      </span>
-
-      <TooltipProvider delay={120}>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                type="button"
-                variant="secondary"
-                size="icon-sm"
-                className="rounded-md"
-                onClick={onStop}
-                aria-label="Stop voice input and keep transcript"
-              />
-            }
-          >
-            <Square className="size-3.5" fill="currentColor" />
-          </TooltipTrigger>
-          <TooltipContent side="top">停止录音并保留文字</TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                type="button"
-                size="icon-sm"
-                className="rounded-md"
-                onClick={onSend}
-                disabled={!canSend}
-                aria-label="Stop voice input and send"
-              />
-            }
-          >
-            <ArrowUp className="size-3.5" />
-          </TooltipTrigger>
-          <TooltipContent side="top">发送语音转写结果</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    </div>
-  );
-}
-
-function VoiceTranscriptPreview({
-  existingText,
-  transcript,
-}: {
-  existingText: string;
-  transcript: string;
-}) {
-  const preview = [existingText.trim(), transcript.trim()].filter(Boolean).join(" ");
-
-  return (
-    <div className="min-h-12 whitespace-pre-wrap text-[14px] leading-6 text-foreground">
-      {preview || <span className="text-muted-foreground">正在聆听…</span>}
-    </div>
-  );
-}
-
-function VoiceWaveform({ analyser }: { analyser: AnalyserNode | null }) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !analyser) return;
-
-    const context = canvas.getContext("2d");
-    if (!context) return;
-
-    const waveformCanvas = canvas;
-    const waveformContext = context;
-    const waveformAnalyser = analyser;
-    const samples = new Uint8Array(analyser.frequencyBinCount);
-    let animationFrame = 0;
-
-    function resizeCanvas() {
-      const ratio = window.devicePixelRatio || 1;
-      const width = Math.max(waveformCanvas.clientWidth, 1);
-      const height = Math.max(waveformCanvas.clientHeight, 1);
-      waveformCanvas.width = Math.round(width * ratio);
-      waveformCanvas.height = Math.round(height * ratio);
-      waveformContext.setTransform(ratio, 0, 0, ratio, 0, 0);
-    }
-
-    function draw() {
-      const width = waveformCanvas.clientWidth;
-      const height = waveformCanvas.clientHeight;
-      waveformAnalyser.getByteTimeDomainData(samples);
-      waveformContext.clearRect(0, 0, width, height);
-      waveformContext.strokeStyle = getComputedStyle(waveformCanvas).color;
-      waveformContext.globalAlpha = 0.78;
-      waveformContext.lineWidth = 1.5;
-      waveformContext.lineCap = "round";
-
-      const barCount = Math.max(Math.floor(width / 6), 12);
-      const step = Math.max(Math.floor(samples.length / barCount), 1);
-      const gap = width / barCount;
-
-      for (let index = 0; index < barCount; index += 1) {
-        const amplitude = Math.abs(samples[index * step] - 128) / 128;
-        const barHeight = Math.max(2, amplitude * height * 1.8);
-        const x = gap * index + gap / 2;
-
-        waveformContext.beginPath();
-        waveformContext.moveTo(x, height / 2 - barHeight / 2);
-        waveformContext.lineTo(x, height / 2 + barHeight / 2);
-        waveformContext.stroke();
-      }
-
-      animationFrame = window.requestAnimationFrame(draw);
-    }
-
-    resizeCanvas();
-    const resizeObserver = new ResizeObserver(resizeCanvas);
-    resizeObserver.observe(waveformCanvas);
-    draw();
-
-    return () => {
-      window.cancelAnimationFrame(animationFrame);
-      resizeObserver.disconnect();
-    };
-  }, [analyser]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      className="h-8 min-w-0 flex-1 text-foreground"
-      role="img"
-      aria-label="Live microphone waveform"
-    />
-  );
-}
-
-function formatDuration(totalSeconds: number) {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
