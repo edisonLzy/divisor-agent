@@ -11,8 +11,6 @@ export interface STTConfig {
   model?: string;
   /** BCP-47 language tag, e.g. "zh-CN" or "en" */
   language?: string;
-  /** API key for the provider */
-  apiKey: string;
 }
 
 export interface SpeechToTextAdapter {

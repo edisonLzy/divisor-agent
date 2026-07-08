@@ -8,7 +8,6 @@ type VoiceInputStatus = "idle" | "starting" | "recording";
 
 export interface VoiceInputConfig {
   provider?: STTProvider;
-  apiKey?: string;
   model?: string;
   language?: string;
 }
@@ -61,12 +60,6 @@ export function useVoiceInput(config: VoiceInputConfig = {}) {
       return false;
     }
 
-    const apiKey = config.apiKey ?? "";
-    if (!apiKey) {
-      toast.error("请先配置语音识别 API Key");
-      return false;
-    }
-
     activeRef.current = true;
     setStatus("starting");
     setElapsedSeconds(0);
@@ -101,9 +94,8 @@ export function useVoiceInput(config: VoiceInputConfig = {}) {
 
       // 4. Create STT adapter
       const adapter = createSTTAdapter(config.provider ?? "deepgram", {
-        apiKey,
         model: config.model ?? "nova-3",
-        language: config.language ?? navigator.language ?? "zh-CN",
+        language: config.language ?? "zh-CN",
       });
       adapterRef.current = adapter;
 

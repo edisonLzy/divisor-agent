@@ -56,9 +56,7 @@ export function PromptInput({
 
   const editorContainerRef = useRef<HTMLDivElement | null>(null);
 
-  const voiceInput = useVoiceInput({
-    apiKey: import.meta.env.VITE_DEEPGRAM_API_KEY,
-  });
+  const voiceInput = useVoiceInput();
 
   const { editor, hasContent } = useChatEditor({
     // Note: we intentionally do NOT include `isRunning` in `disabled` so the user
