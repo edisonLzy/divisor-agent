@@ -16,7 +16,12 @@ interface DeepgramResult {
 /**
  * Deepgram real-time STT adapter using raw WebSocket.
  *
- * Auth: API key passed as a query parameter (`?token=...`).
+ * Auth: the API key is NOT sent in the URL. The renderer opens the WebSocket
+ * without a token and the Electron main process injects the
+ * `Authorization: Token <key>` header via `session.webRequest` (see
+ * `src/main/stt`). Deepgram rejects raw keys passed as `?token=` (INVALID_AUTH)
+ * and the browser WebSocket API cannot set request headers, so header injection
+ * from the main process is the only way to authenticate a renderer-side WS.
  * Audio: PCM16 linear16, mono, sent as binary WebSocket messages.
  * Results: JSON text messages with interim + final transcripts.
  */
@@ -44,7 +49,10 @@ export class DeepgramAdapter implements SpeechToTextAdapter {
     if (this._isConnected) return;
 
     const url = new URL(DEEPGRAM_WS_URL);
-    url.searchParams.set("token", this.config.apiKey);
+    // No `?token=` here: Deepgram rejects raw API keys as a query param and the
+    // browser WebSocket API can't set headers. The main process injects the
+    // `Authorization: Token <key>` header via session.webRequest (see
+    // src/main/stt). Keep all other streaming params.
     url.searchParams.set("model", this.config.model ?? "nova-3");
     url.searchParams.set("language", this.config.language ?? "zh-CN");
     url.searchParams.set("interim_results", "true");

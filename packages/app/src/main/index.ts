@@ -6,8 +6,13 @@ import { AgentPool } from "./agent-pool.js";
 import { AppUpdateManager } from "./app-updater.js";
 import { BrowserWindowManager } from "./browser-window/index.js";
 import { FileSystemManager } from "./file-system/index.js";
+import { registerDeepgramAuth } from "./stt/index.js";
 
 app.whenReady().then(() => {
+  // Inject the Deepgram Authorization header into renderer WebSocket upgrades
+  // (see src/main/stt). Must be registered before the renderer can connect.
+  registerDeepgramAuth();
+
   let browserWindow: BrowserWindow | null = createWindow();
 
   const agentPool = new AgentPool(browserWindow);
