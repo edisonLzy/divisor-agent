@@ -15,7 +15,6 @@ import {
   SelectValue,
 } from "@renderer/components/ui/select";
 import { Separator } from "@renderer/components/ui/separator";
-import { Textarea } from "@renderer/components/ui/textarea";
 import { cn } from "@renderer/lib/utils";
 import {
   ArrowLeft,
@@ -33,15 +32,20 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   BROWSER_ARTIFACT_TYPE,
   BROWSER_EXTENSION,
+  type BrowserAnnotationIntent,
+  type BrowserAnnotationViewportBridgeMarker,
   type BrowserElementSelection,
   type BrowserExposeEvents,
+  type BrowserGrabScreenshot,
   type BrowserInvokeEvents,
+  type BrowserPageAnnotation,
   type BrowserProfile,
   type BrowserState,
   type BrowserTab,
   type DetectedChromiumProfile,
 } from "./common/types";
 import { browserCommentExtension } from "./renderer/browser-comment";
+import GrabConfirmationSheet, { formatGrabPayloadAsText } from "./renderer/grab-confirmation";
 
 const useBrowserIPC = createExtensionIPC<BrowserInvokeEvents, BrowserExposeEvents>(
   BROWSER_EXTENSION.id,
@@ -70,6 +74,8 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
   const [selection, setSelection] = useState<BrowserElementSelection | null>(null);
   const [selectingTabId, setSelectingTabId] = useState<string | null>(null);
   const [comment, setComment] = useState("");
+  const [intent, setIntent] = useState<BrowserAnnotationIntent>("change");
+  const [annotations, setAnnotations] = useState<BrowserPageAnnotation[]>([]);
   const [error, setError] = useState<string | null>(null);
   const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId) ?? null;
   const activeTabUrl = activeTab?.url;
@@ -101,7 +107,7 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
   useEffect(() => {
     const element = viewportRef.current;
     const tabId = activeTab?.id;
-    const visible = Boolean(element && tabId && !panel && !selection);
+    const visible = Boolean(element && tabId && !panel);
     if (!visible || !element || !tabId) {
       void ipc.invoke("setSurface", { sessionId, visible: false });
       return;
@@ -135,6 +141,25 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
     };
   }, [ipc, selectingTabId, sessionId]);
 
+  // Sync annotation markers when active tab changes
+  useEffect(() => {
+    if (!activeTab) return;
+    const tabAnnotations = annotations.filter((a) => a.browserPageId === activeTab.id);
+    updateViewportMarkers(activeTab.id, tabAnnotations);
+    return () => {
+      // Remove markers when tab changes
+      if (activeTab) {
+        void ipc.invoke("setAnnotationViewportBridge", {
+          browserPageId: activeTab.id,
+          enabled: false,
+          markers: [],
+          token: "",
+        });
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab?.id]);
+
   const navigate = (action: "back" | "forward" | "goto" | "reload", url?: string) => {
     if (!activeTab) return;
     setError(null);
@@ -158,6 +183,7 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
         tabId: activeTab.id,
       });
       setSelection(result);
+      setIntent("change");
     } catch (cause) {
       if (!/cancel/i.test(messageFrom(cause))) setError(messageFrom(cause));
     } finally {
@@ -166,7 +192,7 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
   };
 
   const attachComment = () => {
-    if (!selection) return;
+    if (!selection || !activeTab) return;
     const editor = api.sharedPromptEditor.editor;
     if (!editor) {
       setError("The prompt editor is not available");
@@ -177,13 +203,92 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
       .focus()
       .insertContent({
         type: "browserComment",
-        attrs: { comment: comment.trim(), context: selection.payload },
+        attrs: {
+          comment: comment.trim() || "Selected element",
+          context: selection.payload,
+          intent,
+        },
       })
       .insertContent(" ")
       .run();
+    // Add to annotations and update viewport bridge markers
+    const newAnnotation: BrowserPageAnnotation = {
+      id: crypto.randomUUID(),
+      browserPageId: activeTab.id,
+      comment: comment.trim() || "Selected element",
+      intent,
+      priority: "suggestion",
+      createdAt: new Date().toISOString(),
+      payload: { ...selection.payload, screenshot: null },
+    };
+    const updatedAnnotations = [...annotations, newAnnotation];
+    setAnnotations(updatedAnnotations);
+    updateViewportMarkers(activeTab.id, updatedAnnotations);
     setSelection(null);
     setComment("");
   };
+
+  const updateViewportMarkers = (tabId: string, pageAnnotations: BrowserPageAnnotation[]) => {
+    const markers: BrowserAnnotationViewportBridgeMarker[] = pageAnnotations
+      .filter((a) => a.browserPageId === tabId)
+      .map((a, index) => ({
+        id: a.id,
+        index,
+        rectPage: a.payload.target.rectPage,
+        rectViewport: a.payload.target.rectViewport,
+        isFixed: a.payload.target.isFixed ?? false,
+      }));
+    const token = crypto.randomUUID().replaceAll("-", "").slice(0, 40);
+    void ipc.invoke("setAnnotationViewportBridge", {
+      browserPageId: tabId,
+      enabled: markers.length > 0,
+      markers,
+      token,
+    });
+  };
+
+  const handleCopy = () => {
+    if (!selection) return;
+    const text = formatGrabPayloadAsText(selection.payload);
+    void navigator.clipboard.writeText(text);
+    // Re-arm for another pick
+    setSelection(null);
+    setComment("");
+    setError(null);
+  };
+
+  const handleCopyScreenshot = () => {
+    if (!selection) return;
+    const img = new Image();
+    img.src = selection.screenshotDataUrl;
+    void (async () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0);
+        const blob = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, "image/png"),
+        );
+        if (blob) {
+          await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+        }
+      } catch {
+        // Clipboard write may fail — not critical
+      }
+    })();
+  };
+
+  const screenshot: BrowserGrabScreenshot | null = selection
+    ? {
+        mimeType: "image/png" as const,
+        dataUrl: selection.screenshotDataUrl,
+        width: Math.round(selection.payload.target.rectViewport.width),
+        height: Math.round(selection.payload.target.rectViewport.height),
+      }
+    : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-md border-2 border-border bg-background">
@@ -241,7 +346,10 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
         </div>
       ) : null}
       <div className="relative min-h-0 flex-1 bg-muted/20">
-        <div ref={viewportRef} className="absolute inset-0" />
+        <div
+          ref={viewportRef}
+          className={selection ? "absolute inset-0 bottom-[42%]" : "absolute inset-0"}
+        />
         {!activeTab ? (
           <div className="absolute inset-0 grid place-items-center text-sm text-muted-foreground">
             No browser tab
@@ -257,15 +365,18 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
           />
         ) : null}
         {selection ? (
-          <CommentPanel
-            comment={comment}
+          <GrabConfirmationSheet
+            intent={intent}
+            onIntentChange={setIntent}
+            onCopy={handleCopy}
+            onCopyScreenshot={handleCopyScreenshot}
             onAttach={attachComment}
             onCancel={() => {
               setSelection(null);
               setComment("");
             }}
-            onCommentChange={setComment}
-            selection={selection}
+            payload={selection.payload}
+            screenshot={screenshot}
           />
         ) : null}
       </div>
@@ -390,7 +501,9 @@ function ProfilePanel({
       profileId: activeProfileId,
       sourceId,
     });
-    setMessage(`Imported ${result.imported} cookies`);
+    setMessage(
+      `Imported ${result.imported} of ${result.total} cookies (${result.skipped} skipped) from ${result.domains.length} domains`,
+    );
   };
 
   return (
@@ -509,70 +622,6 @@ function ProfilePanel({
             </div>
           ) : null}
           {message ? <p className="text-xs text-muted-foreground">{message}</p> : null}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CommentPanel({
-  comment,
-  onAttach,
-  onCancel,
-  onCommentChange,
-  selection,
-}: {
-  comment: string;
-  onAttach(): void;
-  onCancel(): void;
-  onCommentChange(value: string): void;
-  selection: BrowserElementSelection;
-}) {
-  const payload = selection.payload;
-  return (
-    <div className="absolute inset-0 z-10 overflow-auto bg-background p-4">
-      <div className="mx-auto flex max-w-xl flex-col gap-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="text-sm font-bold">Attach browser comment</h3>
-            <p className="truncate text-xs text-muted-foreground">
-              {payload.title} · {payload.url}
-            </p>
-          </div>
-          <ToolbarButton label="Cancel comment" onClick={onCancel}>
-            <X />
-          </ToolbarButton>
-        </div>
-        <img
-          alt="Selected browser element"
-          className="max-h-52 w-full rounded-md border-2 border-border bg-muted object-contain"
-          src={selection.screenshotDataUrl}
-        />
-        <div className="rounded-md border-2 border-border bg-muted/30 p-3 text-xs">
-          <div className="font-mono font-bold">
-            &lt;{payload.tagName}&gt; {payload.accessibility.role}
-          </div>
-          <div className="mt-1 break-all font-mono text-[10px] text-muted-foreground">
-            {payload.selector}
-          </div>
-          {payload.text ? (
-            <div className="mt-2 max-h-24 overflow-auto whitespace-pre-wrap">{payload.text}</div>
-          ) : null}
-        </div>
-        <Textarea
-          autoFocus
-          className="min-h-28 resize-y text-xs"
-          onChange={(event) => onCommentChange(event.target.value)}
-          placeholder="What should the agent know or change about this element?"
-          value={comment}
-        />
-        <div className="flex justify-end gap-2">
-          <Button onClick={onCancel} size="sm" variant="outline">
-            Cancel
-          </Button>
-          <Button onClick={onAttach} size="sm">
-            Attach to prompt
-          </Button>
         </div>
       </div>
     </div>

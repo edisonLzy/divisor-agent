@@ -13,6 +13,7 @@ import {
 } from "electron";
 
 import type {
+  BrowserAnnotationViewportBridgeMarker,
   BrowserGetProperty,
   BrowserNavigationAction,
   BrowserProfile,
@@ -21,6 +22,7 @@ import type {
   BrowserTab,
   DetectedChromiumProfile,
 } from "../common/types";
+import { buildBrowserAnnotationViewportBridgeScript } from "./annotation-viewport-bridge";
 import { detectChromiumProfiles, importChromiumCookies } from "./cookie-import";
 import { cancelElementSelection, selectElement } from "./element-selection";
 import { SnapshotService } from "./snapshot";
@@ -222,8 +224,8 @@ export class BrowserManager {
       message: "Import browser cookies?",
       type: "warning",
     });
-    if (confirmation.response !== 0) return { imported: 0 };
-    return { imported: await importChromiumCookies(source, profile) };
+    if (confirmation.response !== 0) return { imported: 0, total: 0, skipped: 0, domains: [] };
+    return importChromiumCookies(source, profile);
   }
 
   async snapshot(sessionId: string, tabId?: string) {
@@ -270,20 +272,34 @@ export class BrowserManager {
 
   async startElementSelection(sessionId: string, tabId: string) {
     const tab = this.requireOwnedTab(sessionId, tabId);
-    const { image, payload } = await selectElement(tab.view.webContents);
-    const directory = join(app.getPath("userData"), "browser-captures");
-    mkdirSync(directory, { recursive: true });
-    const screenshotPath = join(directory, `selection-${tabId}-${Date.now()}.png`);
-    writeFileSync(screenshotPath, image.toPNG());
+    const result = await selectElement(tab.view.webContents);
     return {
-      payload: { ...payload, screenshotPath },
-      screenshotDataUrl: image.toDataURL(),
+      kind: result.kind,
+      payload: result.payload,
+      screenshotDataUrl: result.screenshotDataUrl,
     };
   }
 
   async cancelElementSelection(sessionId: string, tabId: string) {
     const tab = this.requireOwnedTab(sessionId, tabId);
     await cancelElementSelection(tab.view.webContents);
+  }
+
+  async setAnnotationViewportBridge(
+    browserPageId: string,
+    enabled: boolean,
+    markers: BrowserAnnotationViewportBridgeMarker[],
+    token: string,
+  ) {
+    const tab = this.tabs.get(browserPageId);
+    if (!tab || tab.view.webContents.isDestroyed()) return;
+    const script = buildBrowserAnnotationViewportBridgeScript({
+      emitViewport: false,
+      enabled,
+      markers,
+      token,
+    });
+    await tab.view.webContents.executeJavaScript(script, true).catch(() => {});
   }
 
   destroy() {

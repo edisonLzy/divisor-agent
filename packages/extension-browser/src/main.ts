@@ -51,6 +51,9 @@ export default defineMainExtension<BrowserInvokeEvents, BrowserExposeEvents>({
     ctx.ipc.handle("cancelElementSelection", ({ sessionId, tabId }) =>
       manager.cancelElementSelection(sessionId, tabId),
     );
+    ctx.ipc.handle("setAnnotationViewportBridge", ({ browserPageId, enabled, markers, token }) =>
+      manager.setAnnotationViewportBridge(browserPageId, enabled, markers, token),
+    );
 
     ctx.systemPrompt.register({
       id: "browser.read-only",

@@ -2,11 +2,12 @@ import { mergeAttributes, Node } from "@tiptap/core";
 import { NodeViewWrapper, ReactNodeViewRenderer, type NodeViewProps } from "@tiptap/react";
 import { Globe2 } from "lucide-react";
 
-import type { BrowserElementPayload } from "../common/types";
+import type { BrowserAnnotationIntent, BrowserGrabPayload } from "../common/types";
 
 export interface BrowserCommentAttrs {
   comment: string;
-  context: BrowserElementPayload;
+  context: BrowserGrabPayload;
+  intent?: BrowserAnnotationIntent;
 }
 
 export const browserCommentExtension = Node.create({
@@ -20,6 +21,7 @@ export const browserCommentExtension = Node.create({
     return {
       comment: { default: "" },
       context: { default: null },
+      intent: { default: "change" },
     };
   },
 
@@ -32,7 +34,7 @@ export const browserCommentExtension = Node.create({
     return [
       "span",
       mergeAttributes(HTMLAttributes, { "data-browser-comment": "" }),
-      `Browser comment · ${attrs.context.title || attrs.context.url} · ${preview(attrs.comment)}`,
+      `Browser comment · ${attrs.context.page.title || attrs.context.page.sanitizedUrl} · ${preview(attrs.comment)}`,
     ];
   },
 
@@ -47,14 +49,27 @@ export const browserCommentExtension = Node.create({
 
 function BrowserCommentNode({ node }: NodeViewProps) {
   const attrs = node.attrs as BrowserCommentAttrs;
+  const intentColor =
+    attrs.intent === "fix"
+      ? "var(--signal-amber)"
+      : attrs.intent === "question"
+        ? "var(--signal-purple)"
+        : attrs.intent === "approve"
+          ? "var(--signal-green)"
+          : "var(--signal-blue)";
   return (
     <NodeViewWrapper as="span" className="inline-flex" contentEditable={false}>
       <span
-        className="mx-0.75 inline-flex max-w-72 items-center gap-1.5 rounded-[5px] border-2 border-border bg-[color-mix(in_srgb,var(--signal-purple)_35%,var(--card))] px-1.5 py-0.5 align-middle text-[11px] font-bold"
-        title={`${attrs.context.url}\n${attrs.context.selector}\n${attrs.comment}`}
+        className="mx-0.75 inline-flex max-w-72 items-center gap-1.5 rounded-[5px] border-2 border-border px-1.5 py-0.5 align-middle text-[11px] font-bold"
+        style={{
+          backgroundColor: `color-mix(in_srgb, ${intentColor} 35%, var(--card))`,
+        }}
+        title={`${attrs.context.page.sanitizedUrl}\n${attrs.context.target.selector}\n${attrs.comment}`}
       >
         <Globe2 className="size-3.5 shrink-0" />
-        <span className="truncate">{attrs.context.title || attrs.context.url}</span>
+        <span className="truncate">
+          {attrs.context.page.title || attrs.context.page.sanitizedUrl}
+        </span>
         <span className="truncate text-muted-foreground">· {preview(attrs.comment)}</span>
       </span>
     </NodeViewWrapper>
@@ -63,7 +78,9 @@ function BrowserCommentNode({ node }: NodeViewProps) {
 
 export function serializeBrowserComment(attrs: BrowserCommentAttrs) {
   const context = attrs.context;
-  return `<browser-comment url="${escapeAttribute(context.url)}" title="${escapeAttribute(context.title)}" selector="${escapeAttribute(context.selector)}" screenshot="${escapeAttribute(context.screenshotPath ?? "")}"><comment>${escapeText(attrs.comment)}</comment><element tag="${escapeAttribute(context.tagName)}" role="${escapeAttribute(context.accessibility.role)}" name="${escapeAttribute(context.accessibility.name)}"><text>${escapeText(context.text)}</text><html>${escapeText(context.html)}</html><nearby>${escapeText(context.nearbyText.join("\n"))}</nearby></element></browser-comment>`;
+  const target = context.target;
+  const intent = attrs.intent || "change";
+  return `<browser-comment url="${escapeAttribute(context.page.sanitizedUrl)}" title="${escapeAttribute(context.page.title)}" selector="${escapeAttribute(target.selector)}" intent="${intent}"><comment>${escapeText(attrs.comment)}</comment><element tag="${escapeAttribute(target.tagName)}" role="${escapeAttribute(target.accessibility.role ?? "")}" name="${escapeAttribute(target.accessibility.accessibleName ?? "")}"><text>${escapeText(target.textSnippet)}</text><html>${escapeText(target.htmlSnippet)}</html><nearby>${escapeText(context.nearbyText.join("\n"))}</nearby></element></browser-comment>`;
 }
 
 function preview(value: string) {
