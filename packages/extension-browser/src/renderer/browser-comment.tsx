@@ -51,12 +51,12 @@ function BrowserCommentNode({ node }: NodeViewProps) {
   const attrs = node.attrs as BrowserCommentAttrs;
   const intentColor =
     attrs.intent === "fix"
-      ? "var(--signal-amber)"
+      ? "var(--signal-yellow)"
       : attrs.intent === "question"
         ? "var(--signal-purple)"
         : attrs.intent === "approve"
           ? "var(--signal-green)"
-          : "var(--signal-blue)";
+          : "var(--signal-cyan)";
   return (
     <NodeViewWrapper as="span" className="inline-flex" contentEditable={false}>
       <span

@@ -33,6 +33,7 @@ import {
   BROWSER_ARTIFACT_TYPE,
   BROWSER_EXTENSION,
   type BrowserAnnotationIntent,
+  type BrowserAnnotationViewportBridgeEvent,
   type BrowserAnnotationViewportBridgeMarker,
   type BrowserElementSelection,
   type BrowserExposeEvents,
@@ -141,6 +142,14 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
     };
   }, [ipc, selectingTabId, sessionId]);
 
+  useEffect(() => {
+    return ipc.on("annotationViewportEvent", (event) => {
+      if (!activeTab || event.browserPageId !== activeTab.id) return;
+      handleAnnotationViewportEvent(event);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab?.id, annotations, ipc]);
+
   // Sync annotation markers when active tab changes
   useEffect(() => {
     if (!activeTab) return;
@@ -176,14 +185,14 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
   const startSelection = async () => {
     if (!activeTab) return;
     setError(null);
+    setIntent("change");
     setSelectingTabId(activeTab.id);
     try {
       const result = await ipc.invoke("startElementSelection", {
         sessionId,
         tabId: activeTab.id,
       });
-      setSelection(result);
-      setIntent("change");
+      attachSelectionResult(result, "change");
     } catch (cause) {
       if (!/cancel/i.test(messageFrom(cause))) setError(messageFrom(cause));
     } finally {
@@ -193,8 +202,28 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
 
   const attachComment = () => {
     if (!selection || !activeTab) return;
+    attachSelectionResult(
+      {
+        ...selection,
+        comment: comment.trim() || "Selected element",
+      },
+      intent,
+    );
+    setSelection(null);
+    setComment("");
+  };
+
+  const attachSelectionResult = (
+    result: BrowserElementSelection,
+    annotationIntent: BrowserAnnotationIntent,
+  ) => {
+    if (!activeTab) return;
+    const annotationComment = result.comment.trim() || "Selected element";
     const editor = api.sharedPromptEditor.editor;
     if (!editor) {
+      setSelection(result);
+      setComment(annotationComment);
+      setIntent(annotationIntent);
       setError("The prompt editor is not available");
       return;
     }
@@ -204,9 +233,9 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
       .insertContent({
         type: "browserComment",
         attrs: {
-          comment: comment.trim() || "Selected element",
-          context: selection.payload,
-          intent,
+          comment: annotationComment,
+          context: result.payload,
+          intent: annotationIntent,
         },
       })
       .insertContent(" ")
@@ -215,17 +244,37 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
     const newAnnotation: BrowserPageAnnotation = {
       id: crypto.randomUUID(),
       browserPageId: activeTab.id,
-      comment: comment.trim() || "Selected element",
-      intent,
+      comment: annotationComment,
+      intent: annotationIntent,
       priority: "suggestion",
       createdAt: new Date().toISOString(),
-      payload: { ...selection.payload, screenshot: null },
+      payload: { ...result.payload, screenshot: null },
     };
     const updatedAnnotations = [...annotations, newAnnotation];
     setAnnotations(updatedAnnotations);
     updateViewportMarkers(activeTab.id, updatedAnnotations);
-    setSelection(null);
-    setComment("");
+  };
+
+  const handleAnnotationViewportEvent = (event: BrowserAnnotationViewportBridgeEvent) => {
+    if (!activeTab || event.browserPageId !== activeTab.id) return;
+    if (event.type === "open") return;
+    if (event.type === "delete") {
+      const updatedAnnotations = annotations.filter(
+        (annotation) => annotation.id !== event.markerId,
+      );
+      setAnnotations(updatedAnnotations);
+      updateViewportMarkers(activeTab.id, updatedAnnotations);
+      return;
+    }
+    if (event.type === "save") {
+      const updatedAnnotations = annotations.map((annotation) =>
+        annotation.id === event.markerId
+          ? { ...annotation, comment: (event.comment ?? "").trim() || "Selected element" }
+          : annotation,
+      );
+      setAnnotations(updatedAnnotations);
+      updateViewportMarkers(activeTab.id, updatedAnnotations);
+    }
   };
 
   const updateViewportMarkers = (tabId: string, pageAnnotations: BrowserPageAnnotation[]) => {
@@ -234,6 +283,10 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
       .map((a, index) => ({
         id: a.id,
         index,
+        comment: a.comment,
+        computedStyles: a.payload.target.computedStyles,
+        intent: a.intent,
+        tagName: a.payload.target.tagName,
         rectPage: a.payload.target.rectPage,
         rectViewport: a.payload.target.rectViewport,
         isFixed: a.payload.target.isFixed ?? false,
@@ -366,7 +419,9 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
         ) : null}
         {selection ? (
           <GrabConfirmationSheet
+            comment={comment}
             intent={intent}
+            onCommentChange={setComment}
             onIntentChange={setIntent}
             onCopy={handleCopy}
             onCopyScreenshot={handleCopyScreenshot}

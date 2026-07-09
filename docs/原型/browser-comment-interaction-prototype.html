@@ -1,0 +1,1957 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Browser Comment Interaction · Divisor Prototype</title>
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap");
+
+      :root {
+        color-scheme: light;
+        --background: #fffaf0;
+        --foreground: #141111;
+        --card: #fffdf8;
+        --card-foreground: #141111;
+        --popover: #fffdf8;
+        --popover-foreground: #141111;
+        --secondary: #f1ede3;
+        --secondary-foreground: #141111;
+        --muted: #eee9de;
+        --muted-foreground: #716b64;
+        --accent: #ffd440;
+        --accent-foreground: #141111;
+        --destructive: #df5148;
+        --border: #141111;
+        --ring: #27ccf3;
+        --sidebar: #fffaf0;
+        --sidebar-primary: #fe7da8;
+        --signal-yellow: #ffd440;
+        --signal-pink: #fe7da8;
+        --signal-cyan: #27ccf3;
+        --signal-green: #a8df72;
+        --signal-purple: #bbb0e6;
+        --hard-shadow: 3px 3px 0 var(--border);
+        --hard-shadow-sm: 2px 2px 0 var(--border);
+        --radius: 6px;
+        --google-blue: #1a0dab;
+        --google-text: #3c4043;
+      }
+
+      html[data-theme="dark"] {
+        color-scheme: dark;
+        --background: #11100f;
+        --foreground: #f3eee5;
+        --card: #191715;
+        --card-foreground: #f3eee5;
+        --popover: #191715;
+        --popover-foreground: #f3eee5;
+        --secondary: #24211e;
+        --secondary-foreground: #f3eee5;
+        --muted: #24211e;
+        --muted-foreground: #aaa39a;
+        --accent: #d7ad2f;
+        --accent-foreground: #141111;
+        --destructive: #ef7469;
+        --border: #f3eee5;
+        --ring: #31b6d6;
+        --sidebar: #151311;
+        --sidebar-primary: #dc6e98;
+        --signal-yellow: #d7ad2f;
+        --signal-pink: #dc6e98;
+        --signal-cyan: #31b6d6;
+        --signal-green: #91c866;
+        --signal-purple: #9f92d0;
+        --hard-shadow: 3px 3px 0 #000;
+        --hard-shadow-sm: 2px 2px 0 #000;
+        --google-blue: #8ab4f8;
+        --google-text: #c8c3bc;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-height: 100%;
+      }
+
+      body {
+        margin: 0;
+        min-width: 980px;
+        min-height: 100vh;
+        overflow: hidden;
+        background: var(--background);
+        color: var(--foreground);
+        font-family: "Space Grotesk", "PingFang SC", sans-serif;
+        font-size: 14px;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      button,
+      input,
+      textarea {
+        color: inherit;
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      button:focus-visible,
+      input:focus-visible,
+      textarea:focus-visible,
+      [tabindex]:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--ring) 56%, transparent);
+        outline-offset: 2px;
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.45;
+      }
+
+      .icon {
+        width: 15px;
+        height: 15px;
+        flex: 0 0 auto;
+        stroke-width: 2.4;
+      }
+
+      .prototype-bar {
+        display: flex;
+        height: 48px;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 2px solid var(--border);
+        padding: 0 14px;
+        background: var(--accent);
+        color: #141111;
+      }
+
+      .prototype-bar strong {
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .prototype-chip {
+        border: 1px solid #141111;
+        padding: 2px 5px;
+        background: #fffdf8;
+        color: #141111;
+        font: 700 9px/1.2 "Space Mono", monospace;
+        letter-spacing: 0.08em;
+      }
+
+      .prototype-actions {
+        display: flex;
+        margin-left: auto;
+        align-items: center;
+        gap: 7px;
+      }
+
+      .segmented {
+        display: flex;
+        overflow: hidden;
+        border: 2px solid #141111;
+        border-radius: var(--radius);
+        background: #fffdf8;
+        color: #141111;
+        box-shadow: 2px 2px 0 #141111;
+      }
+
+      .segmented button {
+        min-height: 28px;
+        border: 0;
+        border-right: 2px solid #141111;
+        padding: 0 9px;
+        background: transparent;
+        color: #141111;
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .segmented button:last-child {
+        border-right: 0;
+      }
+
+      .segmented button.active {
+        background: var(--signal-cyan);
+      }
+
+      .button,
+      .icon-button {
+        display: inline-flex;
+        min-height: 30px;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--card);
+        box-shadow: var(--hard-shadow-sm);
+        color: var(--foreground);
+        font-size: 12px;
+        font-weight: 800;
+        transition:
+          transform 120ms ease,
+          box-shadow 120ms ease,
+          background 120ms ease;
+      }
+
+      .button {
+        padding: 0 10px;
+      }
+
+      .icon-button {
+        width: 30px;
+        padding: 0;
+      }
+
+      .button:hover:not(:disabled),
+      .icon-button:hover:not(:disabled) {
+        transform: translate(1px, 1px);
+        box-shadow: none;
+      }
+
+      .button.primary {
+        background: var(--foreground);
+        color: var(--background);
+      }
+
+      .button.pink {
+        background: var(--sidebar-primary);
+        color: #141111;
+      }
+
+      .button.ghost,
+      .icon-button.ghost {
+        border-color: transparent;
+        background: transparent;
+        box-shadow: none;
+      }
+
+      .app {
+        display: grid;
+        grid-template-columns: 246px minmax(0, 1fr);
+        height: calc(100vh - 48px);
+        min-height: 0;
+      }
+
+      .sidebar {
+        display: flex;
+        min-width: 0;
+        min-height: 0;
+        flex-direction: column;
+        border-right: 2px solid var(--border);
+        background: var(--sidebar);
+      }
+
+      .side-header {
+        display: flex;
+        height: 48px;
+        align-items: center;
+        border-bottom: 2px solid var(--border);
+        padding: 8px 10px 8px 78px;
+      }
+
+      .side-body {
+        min-height: 0;
+        flex: 1;
+        overflow: auto;
+        padding: 16px 10px;
+      }
+
+      .side-label {
+        margin: 0 7px 8px;
+        color: var(--muted-foreground);
+        font: 700 10px/1.2 "Space Mono", monospace;
+        letter-spacing: 0.11em;
+      }
+
+      .session-item {
+        display: flex;
+        width: 100%;
+        min-height: 38px;
+        align-items: center;
+        gap: 8px;
+        border: 2px solid transparent;
+        border-radius: var(--radius);
+        background: transparent;
+        padding: 7px 8px;
+        text-align: left;
+      }
+
+      .session-item.active {
+        border-color: var(--border);
+        background: var(--card);
+        box-shadow: var(--hard-shadow-sm);
+        font-weight: 800;
+      }
+
+      .side-footer {
+        border-top: 2px solid var(--border);
+        background: var(--accent);
+        padding: 12px;
+        color: #141111;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .workspace {
+        display: grid;
+        min-width: 0;
+        min-height: 0;
+        grid-template-rows: 48px minmax(0, 1fr);
+      }
+
+      .workspace-header {
+        display: flex;
+        height: 48px;
+        align-items: center;
+        gap: 10px;
+        border-bottom: 2px solid var(--border);
+        background: var(--card);
+        padding: 0 12px;
+      }
+
+      .workspace-title {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .workspace-title b {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 14px;
+      }
+
+      .workspace-title span {
+        display: block;
+        overflow: hidden;
+        color: var(--muted-foreground);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 11px;
+      }
+
+      .stage {
+        display: grid;
+        min-width: 0;
+        min-height: 0;
+        grid-template-columns: minmax(360px, 56%) minmax(340px, 44%);
+      }
+
+      .chat-panel,
+      .artifact-panel {
+        min-width: 0;
+        min-height: 0;
+      }
+
+      .chat-panel {
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) auto;
+        border-right: 2px solid var(--border);
+        background: var(--background);
+      }
+
+      .conversation {
+        min-height: 0;
+        overflow: auto;
+        padding: 30px 28px 18px;
+      }
+
+      .conversation-inner {
+        display: flex;
+        width: min(100%, 760px);
+        margin: 0 auto;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .message {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr);
+        gap: 11px;
+      }
+
+      .identity {
+        display: grid;
+        width: 32px;
+        height: 32px;
+        place-items: center;
+        border: 2px solid var(--border);
+        border-radius: 4px;
+        background: var(--signal-cyan);
+        box-shadow: var(--hard-shadow-sm);
+        color: #141111;
+        font: 800 9px/1 "Space Mono", monospace;
+      }
+
+      .identity.user {
+        background: var(--accent);
+      }
+
+      .bubble {
+        width: fit-content;
+        max-width: 620px;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--card);
+        box-shadow: var(--hard-shadow-sm);
+        padding: 9px 12px;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .agent-copy {
+        max-width: 620px;
+        padding-top: 4px;
+        color: var(--muted-foreground);
+        font-size: 13px;
+        line-height: 1.65;
+      }
+
+      .agent-copy strong {
+        color: var(--foreground);
+      }
+
+      .composer-wrap {
+        padding: 12px 22px 18px;
+      }
+
+      .composer {
+        width: min(100%, 760px);
+        margin: 0 auto;
+        overflow: hidden;
+        border: 2px solid var(--border);
+        border-radius: 8px;
+        background: var(--card);
+        box-shadow: var(--hard-shadow);
+      }
+
+      .context-strip {
+        display: none;
+        flex-wrap: wrap;
+        gap: 7px;
+        border-bottom: 2px solid var(--border);
+        background: var(--secondary);
+        padding: 8px 10px;
+      }
+
+      .context-strip.has-comments {
+        display: flex;
+      }
+
+      .browser-chip {
+        display: inline-flex;
+        max-width: 270px;
+        align-items: center;
+        gap: 6px;
+        border: 2px solid var(--border);
+        border-radius: 5px;
+        background: color-mix(in srgb, var(--chip-color, var(--signal-cyan)) 32%, var(--card));
+        box-shadow: var(--hard-shadow-sm);
+        padding: 3px 6px;
+        font-size: 11px;
+        font-weight: 800;
+        vertical-align: middle;
+      }
+
+      .browser-chip .number {
+        display: grid;
+        width: 18px;
+        height: 18px;
+        place-items: center;
+        border: 2px solid var(--border);
+        border-radius: 999px;
+        background: var(--chip-color, var(--signal-cyan));
+        color: #141111;
+        font: 700 9px/1 "Space Mono", monospace;
+      }
+
+      .browser-chip .label,
+      .browser-chip .preview {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .browser-chip .preview {
+        color: var(--muted-foreground);
+        font-weight: 700;
+      }
+
+      .editor {
+        min-height: 76px;
+        padding: 12px 14px;
+        color: var(--muted-foreground);
+        font-size: 14px;
+        line-height: 1.65;
+      }
+
+      .editor strong {
+        color: var(--foreground);
+      }
+
+      .composer-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border-top: 2px solid color-mix(in srgb, var(--border) 28%, transparent);
+        background: var(--card);
+        padding: 8px 10px;
+      }
+
+      .footer-group {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+
+      .mini-label {
+        color: var(--muted-foreground);
+        font: 700 10px/1.2 "Space Mono", monospace;
+      }
+
+      .send {
+        display: grid;
+        width: 30px;
+        height: 30px;
+        place-items: center;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--accent);
+        box-shadow: var(--hard-shadow-sm);
+        color: #141111;
+      }
+
+      .artifact-panel {
+        display: grid;
+        grid-template-rows: 48px minmax(0, 1fr);
+        background: var(--background);
+      }
+
+      .artifact-header {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        border-bottom: 2px solid var(--border);
+        background: var(--signal-purple);
+        padding: 0 10px;
+        color: #141111;
+      }
+
+      .artifact-header b {
+        min-width: 0;
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 13px;
+      }
+
+      .browser-shell {
+        display: flex;
+        min-width: 0;
+        min-height: 0;
+        flex-direction: column;
+        margin: 12px;
+        overflow: hidden;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--background);
+      }
+
+      .tabs {
+        display: flex;
+        height: 34px;
+        flex: 0 0 34px;
+        align-items: end;
+        gap: 5px;
+        overflow-x: auto;
+        border-bottom: 2px solid var(--border);
+        background: var(--muted);
+        padding: 5px 6px 0;
+      }
+
+      .tab {
+        display: flex;
+        max-width: 210px;
+        height: 27px;
+        align-items: center;
+        gap: 6px;
+        border: 2px solid var(--border);
+        border-bottom: 0;
+        border-radius: 6px 6px 0 0;
+        background: var(--background);
+        padding: 0 8px;
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .tab span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .browser-toolbar {
+        display: flex;
+        height: 40px;
+        flex: 0 0 40px;
+        align-items: center;
+        gap: 6px;
+        border-bottom: 2px solid var(--border);
+        background: var(--card);
+        padding: 0 7px;
+      }
+
+      .address {
+        min-width: 0;
+        flex: 1;
+        height: 28px;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--background);
+        box-shadow: var(--hard-shadow-sm);
+        padding: 0 9px;
+        color: var(--muted-foreground);
+        font-size: 11px;
+      }
+
+      .browser-stage {
+        position: relative;
+        min-height: 0;
+        flex: 1;
+        overflow: auto;
+        background: var(--card);
+      }
+
+      .browser-stage.selecting {
+        cursor: crosshair;
+      }
+
+      .mock-page {
+        min-height: 100%;
+        background: var(--card);
+        color: var(--google-text);
+        font-family:
+          Arial,
+          "PingFang SC",
+          sans-serif;
+      }
+
+      .google-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 18px;
+        border-bottom: 1px solid #dadce0;
+        padding: 20px 24px 0;
+      }
+
+      html[data-theme="dark"] .google-head {
+        border-bottom-color: #3b3b3b;
+      }
+
+      .searchbox {
+        display: flex;
+        width: min(640px, 100%);
+        height: 48px;
+        align-items: center;
+        gap: 12px;
+        border: 1px solid #dfe1e5;
+        border-radius: 999px;
+        background: #fff;
+        box-shadow: 0 1px 6px rgba(32, 33, 36, 0.18);
+        padding: 0 18px;
+        color: #202124;
+        font-size: 20px;
+      }
+
+      html[data-theme="dark"] .searchbox {
+        border-color: #5f6368;
+        background: #202124;
+        color: #e8eaed;
+      }
+
+      .google-g {
+        font-weight: 800;
+        letter-spacing: -0.07em;
+      }
+
+      .google-icons {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+      }
+
+      .login-pill {
+        border: 0;
+        border-radius: 999px;
+        background: #0b57d0;
+        color: white;
+        padding: 10px 21px;
+        font-weight: 700;
+      }
+
+      .search-tabs {
+        display: flex;
+        grid-column: 1 / -1;
+        gap: 28px;
+        margin-top: 19px;
+        color: #5f6368;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .search-tabs span {
+        padding-bottom: 11px;
+      }
+
+      .search-tabs .active {
+        border-bottom: 3px solid #202124;
+        color: #202124;
+      }
+
+      html[data-theme="dark"] .search-tabs .active {
+        border-bottom-color: #e8eaed;
+        color: #e8eaed;
+      }
+
+      .results {
+        width: min(100%, 760px);
+        padding: 26px 24px 70px;
+      }
+
+      .result {
+        position: relative;
+        margin-bottom: 22px;
+        padding-left: 31px;
+      }
+
+      .favicon {
+        position: absolute;
+        left: 0;
+        top: 1px;
+        display: grid;
+        width: 23px;
+        height: 23px;
+        place-items: center;
+        border: 1px solid #dadce0;
+        border-radius: 999px;
+        background: white;
+        color: #3154d4;
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      html[data-theme="dark"] .favicon {
+        border-color: #5f6368;
+        background: #202124;
+      }
+
+      .result-source {
+        color: var(--google-text);
+        font-size: 13px;
+        line-height: 1.35;
+      }
+
+      .result-source small {
+        display: block;
+        color: #5f6368;
+        font-size: 12px;
+      }
+
+      html[data-theme="dark"] .result-source small {
+        color: #aaa39a;
+      }
+
+      .result-title {
+        margin: 7px 0 3px;
+        color: var(--google-blue);
+        font-size: 22px;
+        font-weight: 400;
+        line-height: 1.25;
+      }
+
+      .result-desc {
+        position: relative;
+        width: fit-content;
+        max-width: 700px;
+        margin: 0;
+        color: var(--google-text);
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      .sitelinks {
+        margin-top: 18px;
+        border-top: 1px solid #dadce0;
+      }
+
+      html[data-theme="dark"] .sitelinks {
+        border-top-color: #3b3b3b;
+      }
+
+      .sitelink {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        border-bottom: 1px solid #dadce0;
+        padding: 12px 0;
+      }
+
+      html[data-theme="dark"] .sitelink {
+        border-bottom-color: #3b3b3b;
+      }
+
+      .sitelink b {
+        display: block;
+        color: var(--google-blue);
+        font-size: 18px;
+        font-weight: 400;
+      }
+
+      .sitelink span {
+        display: block;
+        margin-top: 3px;
+        font-size: 13px;
+      }
+
+      .targetable {
+        border-radius: 2px;
+      }
+
+      .selection-overlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 6;
+      }
+
+      .highlight-box {
+        position: absolute;
+        display: none;
+        border: 2px solid var(--ring);
+        border-radius: 3px;
+        background: color-mix(in srgb, var(--ring) 14%, transparent);
+        box-shadow:
+          0 0 0 1px rgba(255, 255, 255, 0.85),
+          0 8px 20px rgba(0, 0, 0, 0.18);
+      }
+
+      .highlight-box.visible {
+        display: block;
+      }
+
+      .hover-label {
+        position: absolute;
+        display: none;
+        max-width: 310px;
+        overflow: hidden;
+        border: 2px solid var(--border);
+        border-radius: 5px;
+        background: var(--foreground);
+        box-shadow: var(--hard-shadow-sm);
+        color: var(--background);
+        padding: 4px 7px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font: 700 10px/1.25 "Space Mono", monospace;
+      }
+
+      .hover-label.visible {
+        display: block;
+      }
+
+      .selecting-banner {
+        position: absolute;
+        top: 12px;
+        left: 50%;
+        z-index: 8;
+        display: none;
+        align-items: center;
+        gap: 8px;
+        transform: translateX(-50%);
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--signal-cyan);
+        box-shadow: var(--hard-shadow);
+        color: #141111;
+        padding: 8px 10px;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .selecting-banner.visible {
+        display: flex;
+      }
+
+      .marker {
+        position: absolute;
+        z-index: 7;
+        display: grid;
+        width: 24px;
+        height: 24px;
+        place-items: center;
+        border: 2px solid var(--border);
+        border-radius: 999px;
+        background: var(--marker-color, var(--signal-cyan));
+        box-shadow: var(--hard-shadow-sm);
+        color: #141111;
+        cursor: pointer;
+        font: 800 11px/1 "Space Mono", monospace;
+        pointer-events: auto;
+      }
+
+      .marker:hover {
+        transform: translate(1px, 1px);
+        box-shadow: none;
+      }
+
+      .comment-float,
+      .annotation-editor,
+      .marker-tooltip,
+      .detail-inspector {
+        position: absolute;
+        display: none;
+        z-index: 10;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--card);
+        color: var(--foreground);
+        box-shadow: var(--hard-shadow);
+        font-family: "Space Grotesk", "PingFang SC", sans-serif;
+      }
+
+      html[data-theme="dark"] .comment-float,
+      html[data-theme="dark"] .annotation-editor,
+      html[data-theme="dark"] .marker-tooltip,
+      html[data-theme="dark"] .detail-inspector {
+        background: var(--card);
+        color: var(--foreground);
+      }
+
+      .comment-float.visible,
+      .annotation-editor.visible,
+      .marker-tooltip.visible,
+      .detail-inspector.visible {
+        display: flex;
+      }
+
+      .comment-float {
+        width: min(360px, calc(100% - 34px));
+        min-height: 44px;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 8px;
+      }
+
+      .float-tool {
+        display: grid;
+        width: 26px;
+        height: 26px;
+        flex: 0 0 auto;
+        place-items: center;
+        border: 2px solid transparent;
+        border-radius: 4px;
+        background: transparent;
+        color: var(--muted-foreground);
+      }
+
+      .float-input {
+        min-width: 0;
+        flex: 1;
+        height: 28px;
+        border: 2px solid var(--border);
+        border-radius: 4px;
+        background: var(--background);
+        box-shadow: var(--hard-shadow-sm);
+        color: inherit;
+        padding: 0 8px;
+        font-size: 12px;
+        font-weight: 600;
+        outline: 0;
+      }
+
+      .float-input::placeholder {
+        color: var(--muted-foreground);
+      }
+
+      .float-confirm {
+        display: grid;
+        width: 28px;
+        height: 28px;
+        flex: 0 0 auto;
+        place-items: center;
+        border: 2px solid var(--border);
+        border-radius: 4px;
+        background: var(--muted);
+        box-shadow: var(--hard-shadow-sm);
+        color: var(--muted-foreground);
+      }
+
+      .float-confirm.ready {
+        background: var(--foreground);
+        color: var(--background);
+      }
+
+      .marker-tooltip {
+        max-width: 180px;
+        min-width: 72px;
+        align-items: center;
+        justify-content: center;
+        padding: 6px 9px;
+        font-size: 12px;
+        font-weight: 800;
+        line-height: 1.2;
+        white-space: nowrap;
+      }
+
+      .annotation-editor {
+        width: min(380px, calc(100% - 36px));
+        min-height: 132px;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .annotation-editor-main {
+        display: flex;
+        min-height: 74px;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 8px;
+      }
+
+      .annotation-editor textarea {
+        min-width: 0;
+        min-height: 56px;
+        flex: 1;
+        resize: none;
+        border: 2px solid var(--border);
+        border-radius: 4px;
+        background: var(--background);
+        box-shadow: var(--hard-shadow-sm);
+        color: inherit;
+        padding: 7px 8px;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.5;
+        outline: 0;
+      }
+
+      .annotation-editor-actions {
+        display: flex;
+        min-height: 44px;
+        align-items: center;
+        gap: 6px;
+        border-top: 2px solid var(--border);
+        background: var(--muted);
+        padding: 6px 8px;
+      }
+
+      .annotation-editor-actions .spacer {
+        flex: 1;
+      }
+
+      .round-action {
+        display: inline-flex;
+        min-height: 28px;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--card);
+        box-shadow: var(--hard-shadow-sm);
+        color: var(--foreground);
+        padding: 0 10px;
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .round-action.primary {
+        background: var(--foreground);
+        color: var(--background);
+      }
+
+      .round-icon {
+        display: grid;
+        width: 28px;
+        height: 28px;
+        place-items: center;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--card);
+        box-shadow: var(--hard-shadow-sm);
+        color: var(--destructive);
+      }
+
+      .detail-inspector {
+        width: min(440px, calc(100% - 40px));
+        max-height: min(430px, calc(100% - 36px));
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .detail-top {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 8px;
+      }
+
+      .detail-top input {
+        min-width: 0;
+        flex: 1;
+        height: 28px;
+        border: 2px solid var(--border);
+        border-radius: 4px;
+        background: var(--background);
+        box-shadow: var(--hard-shadow-sm);
+        color: inherit;
+        padding: 0 8px;
+        font-size: 12px;
+        font-weight: 600;
+        outline: 0;
+      }
+
+      .detail-target {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border-top: 2px solid var(--border);
+        border-bottom: 2px solid var(--border);
+        background: var(--muted);
+        padding: 7px 8px;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      html[data-theme="dark"] .detail-target {
+        background: var(--muted);
+      }
+
+      .detail-body {
+        overflow: auto;
+        padding: 6px 8px 8px;
+      }
+
+      .detail-row {
+        display: grid;
+        grid-template-columns: 92px minmax(0, 1fr);
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        color: var(--muted-foreground);
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .detail-control {
+        display: flex;
+        min-width: 0;
+        height: 26px;
+        align-items: center;
+        gap: 6px;
+        overflow: hidden;
+        border: 2px solid var(--border);
+        border-radius: 4px;
+        background: var(--background);
+        box-shadow: var(--hard-shadow-sm);
+        padding: 0 7px;
+        color: var(--foreground);
+        font-family: "Space Mono", monospace;
+        font-size: 10px;
+        font-weight: 700;
+      }
+
+      html[data-theme="dark"] .detail-control {
+        background: var(--background);
+      }
+
+      .swatch {
+        width: 16px;
+        height: 16px;
+        flex: 0 0 auto;
+        border: 2px solid var(--border);
+        border-radius: 4px;
+        background: #474747;
+      }
+
+      .swatch.transparent {
+        background: #000;
+      }
+
+      .detail-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        border-top: 2px solid var(--border);
+        background: var(--muted);
+        padding: 6px 8px;
+      }
+
+      html[data-theme="dark"] .detail-foot {
+        border-top-color: var(--border);
+      }
+
+      .detail-check {
+        display: grid;
+        width: 28px;
+        height: 28px;
+        place-items: center;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--foreground);
+        box-shadow: var(--hard-shadow-sm);
+        color: var(--background);
+      }
+
+      @media (max-width: 1120px) {
+        .stage {
+          grid-template-columns: minmax(340px, 50%) minmax(340px, 50%);
+        }
+
+        .sheet-body {
+          grid-template-columns: 1fr;
+        }
+
+        .confirmation {
+          min-height: 370px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="prototype-bar">
+      <span class="prototype-chip">PROTOTYPE</span>
+      <strong>Browser Comment Interaction</strong>
+      <span class="prototype-chip" id="stateLabel">IDLE</span>
+      <div class="prototype-actions">
+        <div class="segmented" aria-label="状态切换">
+          <button data-state="idle" class="active">Idle</button>
+          <button data-state="selecting">Selecting</button>
+          <button data-state="selected">Add</button>
+          <button data-state="attached">Marked</button>
+          <button data-state="hover">Hover</button>
+          <button data-state="edit">Edit</button>
+          <button data-state="detail">Detail</button>
+          <button data-state="multi">Multi</button>
+        </div>
+        <button class="button" id="themeToggle" type="button">暗色</button>
+        <button class="button" id="resetButton" type="button">Reset</button>
+      </div>
+    </header>
+
+    <main class="app">
+      <aside class="sidebar">
+        <header class="side-header">
+          <button class="button pink" type="button">
+            <i data-lucide="plus" class="icon"></i>
+            新对话
+          </button>
+        </header>
+        <section class="side-body">
+          <p class="side-label">置顶</p>
+          <button class="session-item active" type="button">
+            <i data-lucide="message-square" class="icon"></i>
+            浏览器评论交互稿
+          </button>
+          <p class="side-label" style="margin-top: 24px">今天</p>
+          <button class="session-item" type="button">
+            <i data-lucide="globe-2" class="icon"></i>
+            Browser extension 调研
+          </button>
+          <button class="session-item" type="button">
+            <i data-lucide="file-code-2" class="icon"></i>
+            Prompt context chip
+          </button>
+        </section>
+        <footer class="side-footer">设置与偏好</footer>
+      </aside>
+
+      <section class="workspace">
+        <header class="workspace-header">
+          <button class="icon-button ghost" type="button" aria-label="Toggle sidebar">
+            <i data-lucide="panel-left" class="icon"></i>
+          </button>
+          <div class="workspace-title">
+            <b>浏览器评论交互稿</b>
+            <span>复刻 Codex app in browser annotation flow，使用 Divisor 视觉语言</span>
+          </div>
+          <button class="icon-button ghost" type="button" aria-label="More">
+            <i data-lucide="more-horizontal" class="icon"></i>
+          </button>
+        </header>
+
+        <div class="stage">
+          <section class="chat-panel">
+            <div class="conversation">
+              <div class="conversation-inner">
+                <article class="message">
+                  <span class="identity user">YOU</span>
+                  <div class="bubble">
+                    在 app browser 里点选网页元素，添加评论，然后让评论作为上下文进入 prompt。
+                  </div>
+                </article>
+                <article class="message">
+                  <span class="identity">AI</span>
+                  <div class="agent-copy">
+                    我会把浏览器里的元素选择、页面标记、确认面板和 Composer 里的
+                    <strong>browserComment chip</strong> 串成一个完整交互。
+                  </div>
+                </article>
+              </div>
+            </div>
+
+            <div class="composer-wrap">
+              <section class="composer" aria-label="Prompt composer">
+                <div class="context-strip" id="contextStrip"></div>
+                <div class="editor">
+                  <span id="editorPlaceholder">Ask Codex to update the selected browser UI...</span>
+                </div>
+                <footer class="composer-footer">
+                  <div class="footer-group">
+                    <button class="button ghost" type="button">
+                      <i data-lucide="paperclip" class="icon"></i>
+                      Attach
+                    </button>
+                    <span class="mini-label" id="composerStatus">0 browser comments</span>
+                  </div>
+                  <div class="footer-group">
+                    <span class="mini-label">GPT-5 Codex</span>
+                    <button class="send" type="button" aria-label="Send">
+                      <i data-lucide="arrow-up" class="icon"></i>
+                    </button>
+                  </div>
+                </footer>
+              </section>
+            </div>
+          </section>
+
+          <section class="artifact-panel">
+            <header class="artifact-header">
+              <i data-lucide="globe-2" class="icon"></i>
+              <b>Browser</b>
+              <button class="icon-button ghost" type="button" aria-label="Close artifact">
+                <i data-lucide="x" class="icon"></i>
+              </button>
+            </header>
+
+            <section class="browser-shell">
+              <div class="tabs">
+                <div class="tab">
+                  <i data-lucide="globe-2" class="icon"></i>
+                  <span>baidu - Google Search</span>
+                  <i data-lucide="x" class="icon"></i>
+                </div>
+              </div>
+
+              <div class="browser-toolbar">
+                <button class="icon-button ghost" type="button" aria-label="Back">
+                  <i data-lucide="arrow-left" class="icon"></i>
+                </button>
+                <button class="icon-button ghost" type="button" aria-label="Forward">
+                  <i data-lucide="arrow-right" class="icon"></i>
+                </button>
+                <button class="icon-button ghost" type="button" aria-label="Reload">
+                  <i data-lucide="refresh-cw" class="icon"></i>
+                </button>
+                <input
+                  class="address"
+                  aria-label="Browser address"
+                  readonly
+                  value="https://www.google.com.hk/search?q=baidu"
+                />
+                <button
+                  class="icon-button"
+                  id="commentButton"
+                  type="button"
+                  aria-label="Select element and comment"
+                  title="Select element and comment"
+                >
+                  <i data-lucide="message-square-plus" class="icon"></i>
+                </button>
+                <button class="icon-button ghost" type="button" aria-label="Profiles">
+                  <i data-lucide="settings-2" class="icon"></i>
+                </button>
+              </div>
+
+              <div class="browser-stage" id="browserStage">
+                <div class="mock-page">
+                  <header class="google-head">
+                    <div class="searchbox">
+                      <span class="google-g">G</span>
+                      <span>baidu</span>
+                      <i data-lucide="x" class="icon"></i>
+                      <i data-lucide="mic" class="icon"></i>
+                      <i data-lucide="camera" class="icon"></i>
+                      <i data-lucide="search" class="icon"></i>
+                    </div>
+                    <div class="google-icons">
+                      <i data-lucide="settings" class="icon"></i>
+                      <i data-lucide="share" class="icon"></i>
+                      <i data-lucide="grip" class="icon"></i>
+                      <button class="login-pill" type="button">登录</button>
+                    </div>
+                    <nav class="search-tabs">
+                      <span class="active">全部</span>
+                      <span>图片</span>
+                      <span>视频</span>
+                      <span>新闻</span>
+                      <span>短视频</span>
+                      <span>网页</span>
+                      <span>图书</span>
+                      <span>更多</span>
+                    </nav>
+                  </header>
+
+                  <main class="results">
+                    <article class="result">
+                      <span class="favicon">du</span>
+                      <div class="result-source">
+                        百度一下
+                        <small>https://www.baidu.com</small>
+                      </div>
+                      <h2 class="result-title targetable" data-target="title">百度一下</h2>
+                      <p class="result-desc targetable" data-target="desc">
+                        全球最大的中文搜索引擎、致力于让网民更便捷地获取信息，找到所求。<b
+                          style="color: #d93025"
+                          >百度</b
+                        >超过千亿的中文网页数据库，可以瞬间找到相关的搜索结果。
+                      </p>
+                      <div class="sitelinks">
+                        <div class="sitelink targetable" data-target="map">
+                          <div>
+                            <b>地图</b>
+                            <span>新手导航、定制足迹、免费安装、取消。去体验...</span>
+                          </div>
+                          <i data-lucide="chevron-right" class="icon"></i>
+                        </div>
+                        <div class="sitelink targetable" data-target="baidu">
+                          <div>
+                            <b>Baidu</b>
+                            <span>百度一下. 使用百度前必读 Baidu 京ICP备...</span>
+                          </div>
+                          <i data-lucide="chevron-right" class="icon"></i>
+                        </div>
+                        <div class="sitelink targetable" data-target="know">
+                          <div>
+                            <b>百度一下，你就知道</b>
+                            <span>全球领先的中文搜索引擎，致力于让网民更便捷地获取信息...</span>
+                          </div>
+                          <i data-lucide="chevron-right" class="icon"></i>
+                        </div>
+                      </div>
+                    </article>
+
+                    <article class="result">
+                      <span class="favicon">W</span>
+                      <div class="result-source">
+                        维基百科
+                        <small>https://zh.wikipedia.org › wiki › 百度</small>
+                      </div>
+                      <h2 class="result-title targetable" data-target="wiki">
+                        百度 - 维基百科，自由的百科全书
+                      </h2>
+                      <p class="result-desc">
+                        百度公司是一家以互联网搜索、人工智能和在线服务为核心的技术公司。
+                      </p>
+                    </article>
+                  </main>
+                </div>
+
+                <div class="selection-overlay" aria-hidden="true">
+                  <div class="highlight-box" id="highlightBox"></div>
+                  <div class="hover-label" id="hoverLabel"></div>
+                  <div id="markers"></div>
+                </div>
+
+                <div class="selecting-banner" id="selectingBanner">
+                  <i data-lucide="mouse-pointer-2" class="icon"></i>
+                  Click an element to capture browser context
+                  <button class="button" id="cancelSelecting" type="button">Cancel</button>
+                </div>
+
+                <section class="comment-float" id="commentFloat" aria-label="Add browser comment">
+                  <button class="float-tool" id="openDetailButton" type="button" aria-label="Open details">
+                    <i data-lucide="sliders-horizontal" class="icon"></i>
+                  </button>
+                  <input
+                    class="float-input"
+                    id="commentInput"
+                    spellcheck="false"
+                    value=""
+                    placeholder="添加评论..."
+                  />
+                  <button class="float-tool" type="button" aria-label="Voice input">
+                    <i data-lucide="mic" class="icon"></i>
+                  </button>
+                  <button class="float-confirm" id="attachButton" type="button" aria-label="Save comment">
+                    <i data-lucide="check" class="icon"></i>
+                  </button>
+                </section>
+
+                <div class="marker-tooltip" id="markerTooltip">23123</div>
+
+                <section class="annotation-editor" id="annotationEditor" aria-label="Edit annotation">
+                  <div class="annotation-editor-main">
+                    <button class="float-tool" id="editorDetailButton" type="button" aria-label="Open details">
+                      <i data-lucide="sliders-horizontal" class="icon"></i>
+                    </button>
+                    <textarea id="editComment" spellcheck="false">23123</textarea>
+                  </div>
+                  <footer class="annotation-editor-actions">
+                    <button class="round-icon" id="deleteAnnotation" type="button" aria-label="Delete annotation">
+                      <i data-lucide="trash-2" class="icon"></i>
+                    </button>
+                    <span class="spacer"></span>
+                    <button class="round-action" id="cancelEdit" type="button">取消</button>
+                    <button class="round-action primary" id="saveEdit" type="button">保存</button>
+                  </footer>
+                </section>
+
+                <section class="detail-inspector" id="detailInspector" aria-label="Comment details">
+                  <div class="detail-top">
+                    <button class="float-tool" id="closeDetailButton" type="button" aria-label="Close details">
+                      <i data-lucide="sliders-horizontal" class="icon"></i>
+                    </button>
+                    <input id="detailComment" spellcheck="false" placeholder="描述这些更改..." />
+                  </div>
+                  <div class="detail-target">
+                    <span>div</span>
+                    <i data-lucide="grip" class="icon"></i>
+                  </div>
+                  <div class="detail-body">
+                    <div class="detail-row">
+                      <span>文本颜色</span>
+                      <span class="detail-control"><span class="swatch"></span>rgb(71, 71, 71)</span>
+                    </div>
+                    <div class="detail-row">
+                      <span>背景</span>
+                      <span class="detail-control"><span class="swatch transparent"></span>rgba(0, 0, 0, 0)</span>
+                    </div>
+                    <div class="detail-row">
+                      <span>Opacity</span>
+                      <span class="detail-control">1</span>
+                    </div>
+                    <div class="detail-row">
+                      <span>字体</span>
+                      <span class="detail-control">Arial, sans-se...</span>
+                    </div>
+                    <div class="detail-row">
+                      <span>字号</span>
+                      <span class="detail-control">14 px</span>
+                    </div>
+                    <div class="detail-row">
+                      <span>字重</span>
+                      <span class="detail-control">400</span>
+                    </div>
+                  </div>
+                  <footer class="detail-foot">
+                    <button class="round-action" id="detailCancel" type="button">取消</button>
+                    <span class="spacer"></span>
+                    <button class="float-tool" type="button" aria-label="Voice input">
+                      <i data-lucide="mic" class="icon"></i>
+                    </button>
+                    <button class="detail-check" id="detailSave" type="button" aria-label="Save detail comment">
+                      <i data-lucide="check" class="icon"></i>
+                    </button>
+                  </footer>
+                </section>
+              </div>
+            </section>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const stateButtons = Array.from(document.querySelectorAll("[data-state]"));
+      const themeToggle = document.getElementById("themeToggle");
+      const resetButton = document.getElementById("resetButton");
+      const stateLabel = document.getElementById("stateLabel");
+      const commentButton = document.getElementById("commentButton");
+      const browserStage = document.getElementById("browserStage");
+      const highlightBox = document.getElementById("highlightBox");
+      const hoverLabel = document.getElementById("hoverLabel");
+      const selectingBanner = document.getElementById("selectingBanner");
+      const cancelSelecting = document.getElementById("cancelSelecting");
+      const commentFloat = document.getElementById("commentFloat");
+      const markerTooltip = document.getElementById("markerTooltip");
+      const annotationEditor = document.getElementById("annotationEditor");
+      const editComment = document.getElementById("editComment");
+      const detailInspector = document.getElementById("detailInspector");
+      const detailComment = document.getElementById("detailComment");
+      const openDetailButton = document.getElementById("openDetailButton");
+      const editorDetailButton = document.getElementById("editorDetailButton");
+      const closeDetailButton = document.getElementById("closeDetailButton");
+      const deleteAnnotation = document.getElementById("deleteAnnotation");
+      const cancelEdit = document.getElementById("cancelEdit");
+      const saveEdit = document.getElementById("saveEdit");
+      const detailCancel = document.getElementById("detailCancel");
+      const detailSave = document.getElementById("detailSave");
+      const attachButton = document.getElementById("attachButton");
+      const contextStrip = document.getElementById("contextStrip");
+      const composerStatus = document.getElementById("composerStatus");
+      const editorPlaceholder = document.getElementById("editorPlaceholder");
+      const markers = document.getElementById("markers");
+      const commentInput = document.getElementById("commentInput");
+      const targetables = Array.from(document.querySelectorAll(".targetable"));
+
+      const intentColors = {
+        change: "var(--signal-cyan)",
+        fix: "var(--signal-yellow)",
+        question: "var(--signal-purple)",
+        approve: "var(--signal-green)",
+      };
+
+      const seedAnnotations = [
+        {
+          id: "a1",
+          target: "desc",
+          intent: "change",
+          comment: "asdasd",
+          label: "Google Search",
+          preview: "asdasd",
+          markerNumber: 1,
+        },
+        {
+          id: "a2",
+          target: "map",
+          intent: "question",
+          comment: "这个 sitelink 是否也应该被 agent 作为 nearby context 带上？",
+          label: "Google Search",
+          preview: "nearby context",
+          markerNumber: 2,
+        },
+        {
+          id: "a3",
+          target: "wiki",
+          intent: "approve",
+          comment: "这个结果保持不变，只作为对比上下文。",
+          label: "Google Search",
+          preview: "保持不变",
+          markerNumber: 3,
+        },
+      ];
+
+      let currentState = "idle";
+      let currentIntent = "change";
+      let annotations = [];
+      let selectedTarget = "desc";
+
+      function setState(nextState) {
+        currentState = nextState;
+        stateLabel.textContent = nextState.toUpperCase();
+        stateButtons.forEach((button) => {
+          button.classList.toggle("active", button.dataset.state === nextState);
+        });
+
+        browserStage.classList.toggle("selecting", nextState === "selecting");
+        selectingBanner.classList.toggle("visible", nextState === "selecting");
+        commentFloat.classList.toggle("visible", nextState === "selected");
+        markerTooltip.classList.toggle("visible", nextState === "hover");
+        annotationEditor.classList.toggle("visible", nextState === "edit");
+        detailInspector.classList.toggle("visible", nextState === "detail");
+        highlightBox.classList.toggle(
+          "visible",
+          ["selecting", "selected", "edit", "detail"].includes(nextState),
+        );
+        hoverLabel.classList.toggle("visible", nextState === "selecting");
+
+        if (nextState === "idle") {
+          annotations = [];
+          selectedTarget = "desc";
+          positionHighlightForTarget("desc");
+        }
+
+        if (nextState === "selecting") {
+          annotations = [];
+          positionHighlightForTarget(selectedTarget);
+        }
+
+        if (nextState === "selected") {
+          annotations = [];
+          positionHighlightForTarget(selectedTarget);
+          updateCommentPreview();
+        }
+
+        if (nextState === "attached") {
+          annotations = [annotationFromCurrent()];
+          positionHighlightForTarget(selectedTarget);
+        }
+
+        if (nextState === "hover") {
+          annotations = [annotationFromCurrent()];
+          positionHighlightForTarget(selectedTarget);
+        }
+
+        if (nextState === "edit") {
+          annotations = [annotationFromCurrent()];
+          editComment.value = annotationFromCurrent().comment;
+          positionHighlightForTarget(selectedTarget);
+        }
+
+        if (nextState === "detail") {
+          selectedTarget = "wiki";
+          annotations = [annotationFromCurrent()];
+          detailComment.value = commentInput.value.trim();
+          positionHighlightForTarget("wiki");
+        }
+
+        if (nextState === "multi") {
+          annotations = seedAnnotations.map((item) => ({ ...item }));
+          selectedTarget = "desc";
+          positionHighlightForTarget("desc");
+        }
+
+        if (nextState !== "selecting") {
+          hoverLabel.classList.remove("visible");
+        }
+
+        renderAnnotations();
+        positionActiveOverlays();
+      }
+
+      function annotationFromCurrent() {
+        const comment = commentInput.value.trim() || "23123";
+        return {
+          id: "a1",
+          target: selectedTarget,
+          intent: currentIntent,
+          comment,
+          label: "Google Search",
+          preview: comment,
+          markerNumber: 2,
+        };
+      }
+
+      function targetElement(targetId) {
+        return document.querySelector(`[data-target="${targetId}"]`) || document.querySelector('[data-target="desc"]');
+      }
+
+      function positionHighlightForTarget(targetId) {
+        const target = targetElement(targetId);
+        const stageRect = browserStage.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        const x = targetRect.left - stageRect.left + browserStage.scrollLeft;
+        const y = targetRect.top - stageRect.top + browserStage.scrollTop;
+
+        highlightBox.style.left = `${x - 2}px`;
+        highlightBox.style.top = `${y - 2}px`;
+        highlightBox.style.width = `${targetRect.width + 4}px`;
+        highlightBox.style.height = `${targetRect.height + 4}px`;
+
+        hoverLabel.textContent = labelForTarget(targetId);
+        hoverLabel.style.left = `${Math.max(8, x)}px`;
+        hoverLabel.style.top = `${Math.max(8, y + targetRect.height + 7)}px`;
+        positionActiveOverlays();
+      }
+
+      function positionActiveOverlays() {
+        const target = targetElement(selectedTarget);
+        if (!target) return;
+        const stageRect = browserStage.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        const x = targetRect.left - stageRect.left + browserStage.scrollLeft;
+        const y = targetRect.top - stageRect.top + browserStage.scrollTop;
+        const centerX = x + targetRect.width / 2;
+        const lowerY = y + targetRect.height + 8;
+
+        placeOverlay(commentFloat, centerX - 184, lowerY - 4);
+        placeOverlay(markerTooltip, centerX + 28, y + targetRect.height - 20);
+        placeOverlay(annotationEditor, Math.max(10, centerX - 260), lowerY - 34);
+        placeOverlay(detailInspector, Math.max(10, centerX - 220), lowerY + 8);
+      }
+
+      function placeOverlay(element, x, y) {
+        if (!element) return;
+        const width = element.offsetWidth || 360;
+        const height = element.offsetHeight || 64;
+        const maxX = browserStage.scrollLeft + browserStage.clientWidth - width - 10;
+        const maxY = browserStage.scrollTop + browserStage.clientHeight - height - 10;
+        element.style.left = `${Math.max(browserStage.scrollLeft + 10, Math.min(x, maxX))}px`;
+        element.style.top = `${Math.max(browserStage.scrollTop + 10, Math.min(y, maxY))}px`;
+      }
+
+      function labelForTarget(targetId) {
+        const target = targetElement(targetId);
+        const text = target.textContent.trim().replace(/\s+/g, " ");
+        const width = Math.round(target.getBoundingClientRect().width);
+        const height = Math.round(target.getBoundingClientRect().height);
+        const tag = targetId === "desc" ? "span" : target.tagName.toLowerCase();
+        return `${tag}  "${text.slice(0, 36)}${text.length > 36 ? "..." : ""}"  ${width}x${height}`;
+      }
+
+      function renderAnnotations() {
+        markers.innerHTML = "";
+        contextStrip.innerHTML = "";
+        contextStrip.classList.toggle("has-comments", annotations.length > 0);
+        composerStatus.textContent = `${annotations.length} browser comment${annotations.length === 1 ? "" : "s"}`;
+        editorPlaceholder.innerHTML =
+          annotations.length > 0
+            ? 'Use the annotated browser context above and update the selected result preview.'
+            : "Ask Codex to update the selected browser UI...";
+
+        annotations.forEach((annotation, index) => {
+          const target = targetElement(annotation.target);
+          const stageRect = browserStage.getBoundingClientRect();
+          const targetRect = target.getBoundingClientRect();
+          const color = intentColors[annotation.intent] || intentColors.change;
+          const marker = document.createElement("span");
+          marker.className = "marker";
+          marker.textContent = String(annotation.markerNumber ?? index + 1);
+          marker.style.setProperty("--marker-color", color);
+          marker.style.left = `${targetRect.left - stageRect.left + browserStage.scrollLeft + targetRect.width / 2 - 12}px`;
+          marker.style.top = `${targetRect.top - stageRect.top + browserStage.scrollTop + targetRect.height - 12}px`;
+          marker.addEventListener("mouseenter", () => {
+            markerTooltip.textContent = annotation.comment;
+            selectedTarget = annotation.target;
+            positionHighlightForTarget(annotation.target);
+            if (currentState === "attached" || currentState === "multi") {
+              currentState = "hover";
+              markerTooltip.classList.add("visible");
+              positionActiveOverlays();
+            }
+          });
+          marker.addEventListener("mouseleave", () => {
+            if (currentState === "hover") {
+              currentState = annotations.length > 1 ? "multi" : "attached";
+              markerTooltip.classList.remove("visible");
+            }
+          });
+          marker.addEventListener("click", () => {
+            selectedTarget = annotation.target;
+            commentInput.value = annotation.comment;
+            editComment.value = annotation.comment;
+            setState("edit");
+          });
+          markers.appendChild(marker);
+
+          const chip = document.createElement("span");
+          chip.className = "browser-chip";
+          chip.style.setProperty("--chip-color", color);
+          chip.title = `${annotation.label}\n${annotation.comment}`;
+          chip.innerHTML = `
+            <span class="number">${annotation.markerNumber ?? index + 1}</span>
+            <i data-lucide="globe-2" class="icon"></i>
+            <span class="label">${escapeHtml(annotation.label)}</span>
+            <span class="preview">· ${escapeHtml(preview(annotation.preview))}</span>
+          `;
+          contextStrip.appendChild(chip);
+        });
+
+        if (window.lucide) window.lucide.createIcons();
+      }
+
+      function updateCommentPreview() {
+        attachButton.classList.toggle("ready", commentInput.value.trim().length > 0);
+      }
+
+      function preview(value) {
+        return value.length > 32 ? `${value.slice(0, 31)}...` : value;
+      }
+
+      function escapeHtml(value) {
+        return value
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;");
+      }
+
+      function selectTarget(targetId) {
+        selectedTarget = targetId;
+        positionHighlightForTarget(targetId);
+        setState("selected");
+      }
+
+      stateButtons.forEach((button) => {
+        button.addEventListener("click", () => setState(button.dataset.state));
+      });
+
+      commentButton.addEventListener("click", () => setState(currentState === "selecting" ? "idle" : "selecting"));
+      cancelSelecting.addEventListener("click", () => setState("idle"));
+      attachButton.addEventListener("click", () => setState("attached"));
+      openDetailButton.addEventListener("click", () => setState("detail"));
+      editorDetailButton.addEventListener("click", () => setState("detail"));
+      closeDetailButton.addEventListener("click", () => setState("selected"));
+      detailCancel.addEventListener("click", () => setState("selected"));
+      detailSave.addEventListener("click", () => {
+        commentInput.value = detailComment.value.trim();
+        setState("attached");
+      });
+      deleteAnnotation.addEventListener("click", () => {
+        annotations = [];
+        commentInput.value = "";
+        setState("idle");
+      });
+      cancelEdit.addEventListener("click", () => setState("attached"));
+      saveEdit.addEventListener("click", () => {
+        commentInput.value = editComment.value.trim();
+        setState("attached");
+      });
+      resetButton.addEventListener("click", () => {
+        commentInput.value = "";
+        editComment.value = "23123";
+        currentIntent = "change";
+        updateCommentPreview();
+        setState("idle");
+      });
+
+      targetables.forEach((target) => {
+        target.addEventListener("mouseenter", () => {
+          if (currentState === "selecting") {
+            selectedTarget = target.dataset.target;
+            positionHighlightForTarget(selectedTarget);
+          }
+        });
+        target.addEventListener("click", (event) => {
+          if (currentState !== "selecting") return;
+          event.preventDefault();
+          event.stopPropagation();
+          selectTarget(target.dataset.target);
+        });
+      });
+
+      commentInput.addEventListener("input", updateCommentPreview);
+      browserStage.addEventListener("scroll", () => {
+        if (["selecting", "selected", "edit", "detail"].includes(currentState)) {
+          positionHighlightForTarget(selectedTarget);
+        }
+        renderAnnotations();
+        positionActiveOverlays();
+      });
+      window.addEventListener("resize", () => {
+        if (["selecting", "selected", "edit", "detail"].includes(currentState)) {
+          positionHighlightForTarget(selectedTarget);
+        }
+        renderAnnotations();
+        positionActiveOverlays();
+      });
+
+      themeToggle.addEventListener("click", () => {
+        const nextTheme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+        document.documentElement.dataset.theme = nextTheme;
+        themeToggle.textContent = nextTheme === "dark" ? "亮色" : "暗色";
+      });
+
+      if (window.lucide) window.lucide.createIcons();
+      positionHighlightForTarget("desc");
+      updateCommentPreview();
+      setState("idle");
+    </script>
+  </body>
+</html>

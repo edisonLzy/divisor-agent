@@ -1,4 +1,5 @@
 import { Button } from "@renderer/components/ui/button";
+import { Textarea } from "@renderer/components/ui/textarea";
 import { Copy, Image, MessageSquarePlus, X } from "lucide-react";
 
 import type {
@@ -87,10 +88,10 @@ function EscapedText({ text, className }: { text: string; className?: string }) 
 }
 
 const INTENT_OPTIONS: { value: BrowserAnnotationIntent; label: string; color: string }[] = [
-  { value: "fix", label: "Fix", color: "bg-amber-500/10 text-amber-400" },
-  { value: "change", label: "Change", color: "bg-blue-500/10 text-blue-400" },
-  { value: "question", label: "Question", color: "bg-purple-500/10 text-purple-400" },
-  { value: "approve", label: "Approve", color: "bg-green-500/10 text-green-400" },
+  { value: "fix", label: "Fix", color: "bg-signal-yellow text-accent-foreground" },
+  { value: "change", label: "Change", color: "bg-signal-cyan text-accent-foreground" },
+  { value: "question", label: "Question", color: "bg-signal-purple text-accent-foreground" },
+  { value: "approve", label: "Approve", color: "bg-signal-green text-accent-foreground" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -98,7 +99,9 @@ const INTENT_OPTIONS: { value: BrowserAnnotationIntent; label: string; color: st
 // ---------------------------------------------------------------------------
 
 export default function GrabConfirmationSheet({
+  comment,
   intent,
+  onCommentChange,
   onIntentChange,
   onCopy,
   onCopyScreenshot,
@@ -107,7 +110,9 @@ export default function GrabConfirmationSheet({
   payload,
   screenshot,
 }: {
+  comment: string;
   intent: BrowserAnnotationIntent;
+  onCommentChange(value: string): void;
   onIntentChange(value: BrowserAnnotationIntent): void;
   onCopy(): void;
   onCopyScreenshot: (() => void) | null;
@@ -119,40 +124,40 @@ export default function GrabConfirmationSheet({
   const { target, page, nearbyText } = payload;
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 top-[58%] z-20 flex flex-col border-t-2 border-border bg-background">
+    <div className="absolute right-0 bottom-0 left-0 top-[62%] z-20 flex flex-col border-t-2 border-border bg-background">
       {/* Header */}
-      <div className="flex shrink-0 items-center justify-between border-b border-border/70 px-4 py-2">
+      <div className="flex shrink-0 items-center justify-between border-b-2 border-border bg-card px-3 py-2">
         <div className="flex items-center gap-2">
-          <div className="rounded-md bg-indigo-500/10 px-2 py-0.5 text-xs font-medium text-indigo-400">
+          <div className="rounded-sm border-2 border-border bg-signal-cyan px-2 py-0.5 font-mono text-[10px] font-bold text-accent-foreground shadow-[var(--hard-shadow-sm)]">
             Grab
           </div>
           <span className="text-xs text-muted-foreground">Review captured element context</span>
         </div>
-        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onCancel}>
-          <X className="size-4" />
+        <Button size="icon-xs" variant="ghost" onClick={onCancel}>
+          <X />
         </Button>
       </div>
 
       {/* Content — scrollable */}
-      <div className="flex-1 overflow-auto p-4">
-        <div className="space-y-3">
+      <div className="flex-1 overflow-auto p-3">
+        <div className="flex flex-col gap-2.5">
           {/* Screenshot preview */}
           {screenshot?.dataUrl?.startsWith("data:image/png;base64,") ? (
-            <div className="overflow-hidden rounded-lg border border-border/60">
+            <div className="overflow-hidden rounded-md border-2 border-border bg-card shadow-[var(--hard-shadow-sm)]">
               <img
                 src={screenshot.dataUrl}
                 alt="Selected element screenshot"
-                className="max-h-40 w-full object-contain bg-black/5"
+                className="max-h-28 w-full object-contain bg-muted/30"
               />
             </div>
           ) : null}
 
           {/* Element summary */}
-          <div className="space-y-1.5">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="flex flex-col gap-1.5">
+            <h3 className="font-mono text-[10px] font-bold tracking-[0.08em] text-muted-foreground uppercase">
               Selected Element
             </h3>
-            <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-sm">
+            <div className="rounded-md border-2 border-border bg-card p-2 text-xs shadow-[var(--hard-shadow-sm)]">
               <div className="flex items-baseline gap-2">
                 <span className="font-mono font-semibold text-foreground">
                   <EscapedText text={`<${target.tagName}>`} />
@@ -171,43 +176,55 @@ export default function GrabConfirmationSheet({
                   &quot;
                 </div>
               ) : null}
-              <div className="mt-1 font-mono text-xs text-muted-foreground/70 break-all">
+              <div className="mt-1 break-all font-mono text-[11px] text-muted-foreground">
                 <EscapedText text={target.selector} />
               </div>
-              <div className="mt-1 text-xs text-muted-foreground/60">
+              <div className="mt-1 text-[11px] text-muted-foreground">
                 {Math.round(target.rectViewport.width)}x{Math.round(target.rectViewport.height)}
               </div>
             </div>
           </div>
 
           {/* Page info */}
-          <div className="space-y-1.5">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="flex flex-col gap-1.5">
+            <h3 className="font-mono text-[10px] font-bold tracking-[0.08em] text-muted-foreground uppercase">
               Page
             </h3>
-            <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-sm">
+            <div className="rounded-md border-2 border-border bg-card p-2 text-xs shadow-[var(--hard-shadow-sm)]">
               <div className="font-medium text-foreground">
                 <EscapedText text={page.title || "Untitled"} />
               </div>
-              <div className="mt-0.5 text-xs text-muted-foreground/70 break-all">
+              <div className="mt-0.5 break-all text-[11px] text-muted-foreground">
                 <EscapedText text={page.sanitizedUrl} />
               </div>
             </div>
           </div>
 
+          <div className="flex flex-col gap-1.5">
+            <h3 className="font-mono text-[10px] font-bold tracking-[0.08em] text-muted-foreground uppercase">
+              Comment
+            </h3>
+            <Textarea
+              className="min-h-14 resize-none text-xs"
+              onChange={(event) => onCommentChange(event.target.value)}
+              placeholder="添加评论..."
+              value={comment}
+            />
+          </div>
+
           {/* Annotation intent */}
-          <div className="space-y-1.5">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="flex flex-col gap-1.5">
+            <h3 className="font-mono text-[10px] font-bold tracking-[0.08em] text-muted-foreground uppercase">
               Intent
             </h3>
             <div className="flex gap-1.5">
               {INTENT_OPTIONS.map((option) => (
                 <button
                   key={option.value}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  className={`rounded-sm border-2 border-border px-2 py-1 text-[11px] font-bold transition-colors ${
                     intent === option.value
                       ? option.color
-                      : "bg-muted/30 text-muted-foreground hover:bg-muted"
+                      : "bg-card text-muted-foreground hover:bg-muted"
                   }`}
                   onClick={() => onIntentChange(option.value)}
                   type="button"
@@ -220,11 +237,11 @@ export default function GrabConfirmationSheet({
 
           {/* HTML snippet */}
           {target.htmlSnippet ? (
-            <div className="space-y-1.5">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="flex flex-col gap-1.5">
+              <h3 className="font-mono text-[10px] font-bold tracking-[0.08em] text-muted-foreground uppercase">
                 HTML
               </h3>
-              <pre className="max-h-24 overflow-auto rounded-lg border border-border/60 bg-muted/20 p-3 font-mono text-xs text-foreground/80">
+              <pre className="max-h-20 overflow-auto rounded-md border-2 border-border bg-[var(--code-surface)] p-2 font-mono text-[11px] text-[var(--code-foreground)]">
                 <EscapedText text={target.htmlSnippet} />
               </pre>
             </div>
@@ -232,12 +249,12 @@ export default function GrabConfirmationSheet({
 
           {/* Nearby text */}
           {nearbyText.length > 0 ? (
-            <div className="space-y-1.5">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="flex flex-col gap-1.5">
+              <h3 className="font-mono text-[10px] font-bold tracking-[0.08em] text-muted-foreground uppercase">
                 Nearby Context
               </h3>
-              <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
-                <ul className="list-inside list-disc space-y-0.5 text-sm text-muted-foreground">
+              <div className="rounded-md border-2 border-border bg-card p-2 shadow-[var(--hard-shadow-sm)]">
+                <ul className="list-inside list-disc text-xs text-muted-foreground">
                   {nearbyText.map((text, i) => (
                     <li key={i}>
                       <EscapedText text={text} />
@@ -251,7 +268,7 @@ export default function GrabConfirmationSheet({
       </div>
 
       {/* Actions */}
-      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border/70 px-4 py-2.5">
+      <div className="flex shrink-0 items-center justify-end gap-2 border-t-2 border-border bg-card px-3 py-2">
         <Button variant="ghost" size="sm" onClick={onCancel}>
           Cancel
         </Button>

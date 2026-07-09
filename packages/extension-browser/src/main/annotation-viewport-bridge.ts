@@ -11,7 +11,7 @@ export interface BrowserAnnotationViewportBridgeOptions {
   token: string;
 }
 
-const MESSAGE_PREFIX = "__divisor_annotation_viewport__:";
+export const BROWSER_ANNOTATION_VIEWPORT_MESSAGE_PREFIX = "__divisor_annotation_viewport__:";
 
 /**
  * Build a self-contained JS script that injects numbered annotation markers
@@ -31,7 +31,7 @@ export function buildBrowserAnnotationViewportBridgeScript({
   const emitViewportMessages = ${JSON.stringify(emitViewport)};
   const markers = ${JSON.stringify(markers)};
   const token = ${JSON.stringify(token)};
-  const prefix = ${JSON.stringify(MESSAGE_PREFIX)};
+  const prefix = ${JSON.stringify(BROWSER_ANNOTATION_VIEWPORT_MESSAGE_PREFIX)};
   const stateKey = '__divisorBrowserAnnotationViewportBridge';
   const hostAttribute = 'data-divisor-browser-annotation-overlay';
   const markerSize = 24;
@@ -68,17 +68,29 @@ export function buildBrowserAnnotationViewportBridgeScript({
     scrollY: toNumber(window.scrollY, toNumber(window.pageYOffset, 0))
   });
 
+  const emit = (message) => {
+    try {
+      console.debug(prefix + token + ':' + JSON.stringify(message));
+    } catch (e) {}
+  };
+
   const emitViewport = () => {
     if (!emitViewportMessages) return;
-    try {
-      console.debug(prefix + token + ':' + JSON.stringify(readViewport()));
-    } catch (e) {}
+    emit({ type: 'viewport', viewport: readViewport() });
+  };
+
+  const emitMarkerEvent = (type, marker, extra) => {
+    emit(Object.assign({ markerId: marker.id, type }, extra || {}));
   };
 
   const getRoot = () => document.body || document.documentElement;
 
   const ensureOverlay = (state) => {
-    if (state.host && state.shadowRoot) return state.shadowRoot;
+    if (state.host && state.shadowRoot && state.tooltip && state.editor) return state.shadowRoot;
+    removeOverlay(state);
+    state.host = null;
+    state.shadowRoot = null;
+    state.markerElements = new Map();
     const root = getRoot();
     if (!root) return null;
     const host = document.createElement('div');
@@ -86,12 +98,123 @@ export function buildBrowserAnnotationViewportBridgeScript({
     host.style.cssText = 'position:fixed;inset:0;z-index:2147483646;pointer-events:none;contain:layout style paint;overflow:hidden;';
     const shadowRoot = host.attachShadow({ mode: 'closed' });
     const style = document.createElement('style');
-    style.textContent = '.marker{box-sizing:border-box;position:absolute;left:0;top:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:9999px;border:1px solid rgba(255,255,255,0.95);background:#2563eb;color:#fff;font:600 11px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 10px 24px rgba(0,0,0,.18);will-change:transform;pointer-events:none;user-select:none;}';
+    style.textContent = [
+      '.marker{box-sizing:border-box;position:absolute;left:0;top:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:9999px;border:2px solid #141111;background:#27ccf3;color:#141111;font:800 11px/1 "Space Mono",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:2px 2px 0 #141111;will-change:transform;pointer-events:auto;user-select:none;cursor:pointer;}',
+      '.marker:hover{transform:translate(1px,1px);box-shadow:none;}',
+      '.tooltip{box-sizing:border-box;position:absolute;left:0;top:0;max-width:220px;display:none;border:2px solid #141111;border-radius:6px;background:#fffdf8;color:#141111;box-shadow:3px 3px 0 #141111;padding:6px 8px;font:700 12px/1.35 "Space Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;white-space:pre-wrap;overflow-wrap:anywhere;pointer-events:none;}',
+      '.editor{box-sizing:border-box;position:absolute;left:0;top:0;width:min(380px,calc(100vw - 24px));display:none;flex-direction:column;border:2px solid #141111;border-radius:6px;background:#fffdf8;color:#141111;box-shadow:3px 3px 0 #141111;pointer-events:auto;font:700 12px/1.4 "Space Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}',
+      '.editor-main{display:flex;gap:8px;padding:8px;}',
+      '.tool{display:grid;min-width:28px;height:28px;flex:0 0 auto;place-items:center;border:2px solid transparent;border-radius:4px;background:transparent;color:#716b64;padding:0 4px;font:800 10px/1 "Space Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}',
+      '.textarea{box-sizing:border-box;min-height:56px;flex:1;resize:vertical;border:2px solid #141111;border-radius:4px;background:#fffaf0;color:#141111;box-shadow:2px 2px 0 #141111;padding:7px 8px;font:700 12px/1.45 "Space Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;outline:none;}',
+      '.actions{display:flex;align-items:center;gap:6px;border-top:2px solid #141111;background:#eee9de;padding:6px 8px;}',
+      '.detailPanel{display:none;border-top:2px solid #141111;background:#fffaf0;padding:6px 8px;}',
+      '.detailPanel.open{display:block;}',
+      '.detailTarget{display:flex;align-items:center;justify-content:space-between;border:2px solid #141111;border-radius:4px;background:#eee9de;padding:5px 7px;font:800 11px/1 "Space Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}',
+      '.detailRows{display:grid;gap:5px;margin-top:6px;}',
+      '.detailRow{display:grid;grid-template-columns:74px minmax(0,1fr);align-items:center;gap:6px;color:#716b64;font:700 10px/1.2 "Space Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}',
+      '.detailValue{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:2px solid #141111;border-radius:4px;background:#fffdf8;box-shadow:2px 2px 0 #141111;padding:4px 6px;color:#141111;font:700 10px/1.2 "Space Mono",monospace;}',
+      '.spacer{flex:1;}',
+      '.button{min-height:28px;border:2px solid #141111;border-radius:6px;background:#fffdf8;color:#141111;box-shadow:2px 2px 0 #141111;padding:0 10px;font:800 11px/1 "Space Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer;}',
+      '.button.primary{background:#141111;color:#fffaf0;}',
+      '.iconButton{width:28px;min-height:28px;padding:0;color:#df5148;}'
+    ].join('');
     shadowRoot.appendChild(style);
+    const tooltip = document.createElement('div');
+    tooltip.className = 'tooltip';
+    shadowRoot.appendChild(tooltip);
+    const editor = document.createElement('div');
+    editor.className = 'editor';
+    editor.innerHTML = '<div class="editor-main"><button class="tool detailToggle" type="button" title="Details">DETAIL</button><textarea class="textarea" spellcheck="false"></textarea></div><div class="detailPanel"></div><div class="actions"><button class="button iconButton delete" type="button" title="Delete">DEL</button><span class="spacer"></span><button class="button cancel" type="button">取消</button><button class="button primary save" type="button">保存</button></div>';
+    shadowRoot.appendChild(editor);
     root.appendChild(host);
     state.host = host;
     state.shadowRoot = shadowRoot;
+    state.tooltip = tooltip;
+    state.editor = editor;
+    state.editorTextarea = editor.querySelector('.textarea');
+    state.editorDetailPanel = editor.querySelector('.detailPanel');
+    editor.querySelector('.cancel').addEventListener('click', () => hideEditor(state));
+    editor.querySelector('.detailToggle').addEventListener('click', () => {
+      if (!state.editorDetailPanel) return;
+      state.editorDetailPanel.classList.toggle('open');
+    });
+    editor.querySelector('.save').addEventListener('click', () => {
+      if (!state.activeEditorMarker) return;
+      const value = state.editorTextarea ? state.editorTextarea.value : '';
+      emitMarkerEvent('save', state.activeEditorMarker, { comment: value });
+      state.activeEditorMarker.comment = value;
+      hideEditor(state);
+    });
+    editor.querySelector('.delete').addEventListener('click', () => {
+      if (!state.activeEditorMarker) return;
+      emitMarkerEvent('delete', state.activeEditorMarker);
+      hideEditor(state);
+    });
     return shadowRoot;
+  };
+
+  const hideTooltip = (state) => {
+    if (state.tooltip) state.tooltip.style.display = 'none';
+  };
+
+  const hideEditor = (state) => {
+    state.activeEditorMarker = null;
+    if (state.editor) state.editor.style.display = 'none';
+  };
+
+  const placeFloating = (element, x, y, fallbackWidth, fallbackHeight) => {
+    if (!element) return;
+    const width = element.offsetWidth || fallbackWidth;
+    const height = element.offsetHeight || fallbackHeight;
+    const maxX = Math.max(8, window.innerWidth - width - 8);
+    const maxY = Math.max(8, window.innerHeight - height - 8);
+    element.style.transform = 'translate3d(' + Math.max(8, Math.min(x, maxX)) + 'px,' + Math.max(8, Math.min(y, maxY)) + 'px,0)';
+  };
+
+  const showTooltip = (state, marker, x, y) => {
+    if (!state.tooltip) return;
+    state.tooltip.textContent = marker.comment || 'Selected element';
+    state.tooltip.style.display = 'block';
+    placeFloating(state.tooltip, x + markerSize + 6, y - 4, 180, 34);
+  };
+
+  const showEditor = (state, marker, x, y) => {
+    if (!state.editor) return;
+    state.activeEditorMarker = marker;
+    if (state.editorTextarea) state.editorTextarea.value = marker.comment || '';
+    renderDetails(state.editorDetailPanel, marker);
+    state.editor.style.display = 'flex';
+    hideTooltip(state);
+    placeFloating(state.editor, x + markerSize + 6, y - 36, 380, 132);
+    if (state.editorTextarea) state.editorTextarea.focus();
+    emitMarkerEvent('open', marker);
+  };
+
+  const valueOrDash = (value) => {
+    if (typeof value !== 'string') return '-';
+    const trimmed = value.trim();
+    return trimmed || '-';
+  };
+
+  const escapeHtml = (value) => valueOrDash(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+  const renderDetails = (container, marker) => {
+    if (!container) return;
+    const styles = marker && marker.computedStyles ? marker.computedStyles : {};
+    container.innerHTML =
+      '<div class="detailTarget"><span>' + escapeHtml(marker && marker.tagName) + '</span><span>style</span></div>' +
+      '<div class="detailRows">' +
+      '<div class="detailRow"><span>文本颜色</span><span class="detailValue">' + escapeHtml(styles.color) + '</span></div>' +
+      '<div class="detailRow"><span>背景</span><span class="detailValue">' + escapeHtml(styles.backgroundColor) + '</span></div>' +
+      '<div class="detailRow"><span>字体</span><span class="detailValue">' + escapeHtml(styles.fontFamily) + '</span></div>' +
+      '<div class="detailRow"><span>字号</span><span class="detailValue">' + escapeHtml(styles.fontSize) + '</span></div>' +
+      '<div class="detailRow"><span>字重</span><span class="detailValue">' + escapeHtml(styles.fontWeight) + '</span></div>' +
+      '</div>';
   };
 
   const updateMarkers = (state, nextMarkers) => {
@@ -112,9 +235,23 @@ export function buildBrowserAnnotationViewportBridgeScript({
       if (!element) {
         element = document.createElement('span');
         element.className = 'marker';
+        element.addEventListener('mouseenter', () => {
+          const liveMarker = state.markers.find((candidate) => candidate.id === element.dataset.markerId);
+          if (!liveMarker) return;
+          showTooltip(state, liveMarker, toNumber(element.dataset.x, 0), toNumber(element.dataset.y, 0));
+        });
+        element.addEventListener('mouseleave', () => hideTooltip(state));
+        element.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const liveMarker = state.markers.find((candidate) => candidate.id === element.dataset.markerId);
+          if (!liveMarker) return;
+          showEditor(state, liveMarker, toNumber(element.dataset.x, 0), toNumber(element.dataset.y, 0));
+        });
         shadowRoot.appendChild(element);
         state.markerElements.set(marker.id, element);
       }
+      element.dataset.markerId = marker.id;
       element.textContent = String(marker.index + 1);
     });
     state.markerElements.forEach((element, id) => {
@@ -146,6 +283,8 @@ export function buildBrowserAnnotationViewportBridgeScript({
         return;
       }
       element.style.display = 'flex';
+      element.dataset.x = String(x + width / 2 - markerSize / 2);
+      element.dataset.y = String(y + height - markerSize / 2);
       element.style.transform =
         'translate3d(' +
         (x + width / 2 - markerSize / 2) + 'px,' +

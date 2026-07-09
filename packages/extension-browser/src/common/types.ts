@@ -157,6 +157,7 @@ export interface BrowserElementPayload {
 // ---------------------------------------------------------------------------
 
 export interface BrowserElementSelection {
+  comment: string;
   kind: "selected" | "context-selected";
   payload: BrowserGrabPayload;
   screenshotDataUrl: string;
@@ -289,9 +290,22 @@ export const GRAB_STYLE_PROPERTIES: readonly (keyof BrowserGrabComputedStyles)[]
 export interface BrowserAnnotationViewportBridgeMarker {
   id: string;
   index: number;
+  comment: string;
+  computedStyles: BrowserGrabComputedStyles;
+  intent: BrowserAnnotationIntent;
+  tagName: string;
   rectPage: BrowserRect;
   rectViewport: BrowserRect;
   isFixed: boolean;
+}
+
+export type BrowserAnnotationViewportBridgeEventType = "delete" | "open" | "save";
+
+export interface BrowserAnnotationViewportBridgeEvent {
+  browserPageId: string;
+  comment?: string;
+  markerId: string;
+  type: BrowserAnnotationViewportBridgeEventType;
 }
 
 // ---------------------------------------------------------------------------
@@ -341,5 +355,6 @@ export interface BrowserInvokeEvents {
 }
 
 export interface BrowserExposeEvents {
+  annotationViewportEvent(event: BrowserAnnotationViewportBridgeEvent): void;
   stateChanged(sessionId: string, state: BrowserState): void;
 }

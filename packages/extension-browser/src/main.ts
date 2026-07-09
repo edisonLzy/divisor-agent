@@ -19,9 +19,15 @@ const optionalTabId = Type.Optional(
 export default defineMainExtension<BrowserInvokeEvents, BrowserExposeEvents>({
   ...BROWSER_EXTENSION,
   setup(ctx) {
-    const manager = new BrowserManager(ctx.getBrowserWindow, (sessionId, state) => {
-      ctx.ipc.emit("stateChanged", sessionId, state);
-    });
+    const manager = new BrowserManager(
+      ctx.getBrowserWindow,
+      (sessionId, state) => {
+        ctx.ipc.emit("stateChanged", sessionId, state);
+      },
+      (event) => {
+        ctx.ipc.emit("annotationViewportEvent", event);
+      },
+    );
 
     ctx.ipc.handle("createTab", ({ profileId, sessionId, url }) =>
       manager.createTab(sessionId, url, profileId),

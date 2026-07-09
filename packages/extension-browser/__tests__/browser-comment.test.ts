@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { buildBrowserAnnotationViewportBridgeScript } from "../src/main/annotation-viewport-bridge";
 import { serializeBrowserComment } from "../src/renderer/browser-comment";
 
 describe("browser comment serialization", () => {
@@ -70,3 +71,54 @@ describe("browser comment serialization", () => {
     expect(serialized).not.toContain("<button onclick");
   });
 });
+
+describe("browser annotation viewport bridge", () => {
+  it("builds interactive marker and editor overlay script", () => {
+    const script = buildBrowserAnnotationViewportBridgeScript({
+      emitViewport: false,
+      enabled: true,
+      markers: [
+        {
+          comment: "Tighten this copy",
+          computedStyles: emptyComputedStyles(),
+          id: "marker-1",
+          index: 0,
+          intent: "change",
+          isFixed: false,
+          tagName: "div",
+          rectPage: { height: 20, width: 100, x: 10, y: 30 },
+          rectViewport: { height: 20, width: 100, x: 10, y: 30 },
+        },
+      ],
+      token: "token",
+    });
+
+    expect(script).toContain("pointer-events:auto");
+    expect(script).toContain("showTooltip");
+    expect(script).toContain("showEditor");
+    expect(script).toContain("emitMarkerEvent('save'");
+    expect(script).toContain("emitMarkerEvent('delete'");
+    expect(script).toContain("Tighten this copy");
+  });
+});
+
+function emptyComputedStyles() {
+  return {
+    backgroundColor: "",
+    border: "",
+    borderRadius: "",
+    color: "",
+    display: "",
+    fontFamily: "",
+    fontSize: "",
+    fontWeight: "",
+    height: "",
+    lineHeight: "",
+    margin: "",
+    padding: "",
+    position: "",
+    textAlign: "",
+    width: "",
+    zIndex: "",
+  };
+}

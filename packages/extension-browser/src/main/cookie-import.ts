@@ -11,7 +11,7 @@ import {
   unlinkSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 import { app, session } from "electron";

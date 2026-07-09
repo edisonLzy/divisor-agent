@@ -31,6 +31,7 @@ vi.mock("electron", () => {
     getURL = vi.fn(() => "https://example.com/");
     isDestroyed = vi.fn(() => false);
     isLoading = vi.fn(() => false);
+    executeJavaScript = vi.fn(async () => undefined);
     loadURL = vi.fn(async () => undefined);
     reload = vi.fn();
     setWindowOpenHandler = vi.fn();
@@ -117,4 +118,147 @@ describe("BrowserManager", () => {
     expect(createdViews[1].webContents.loadURL).toHaveBeenCalledWith("https://example.com/");
     expect(manager.getState("session").tabs[0].id).toBe(tab.id);
   });
+
+  it("returns comments captured by the in-page selection editor", async () => {
+    const manager = new BrowserManager(() => null, vi.fn());
+    const tab = manager.createTab("session", "https://example.com");
+    const screenshot = { toDataURL: vi.fn(() => "data:image/png;base64,selected") };
+    const payload = createGrabPayload();
+    createdViews[0].webContents.executeJavaScript.mockResolvedValue({
+      comment: "Make this clearer",
+      kind: "selected",
+      payload,
+    });
+    createdViews[0].webContents.capturePage.mockResolvedValue(screenshot);
+
+    const result = await manager.startElementSelection("session", tab.id);
+    const selectionScript = createdViews[0].webContents.executeJavaScript.mock.calls[0][0];
+
+    expect(selectionScript).toContain("commentEditor");
+    expect(selectionScript).toContain("添加评论");
+    expect(selectionScript).toContain("detailPanel");
+    expect(result.comment).toBe("Make this clearer");
+    expect(result.screenshotDataUrl).toBe("data:image/png;base64,selected");
+  });
+
+  it("forwards annotation viewport events only for the active bridge token", async () => {
+    const onAnnotationViewportEvent = vi.fn();
+    const manager = new BrowserManager(() => null, vi.fn(), onAnnotationViewportEvent);
+    const tab = manager.createTab("session", "https://example.com");
+    await manager.setAnnotationViewportBridge(
+      tab.id,
+      true,
+      [
+        {
+          comment: "Original",
+          computedStyles: {
+            backgroundColor: "",
+            border: "",
+            borderRadius: "",
+            color: "",
+            display: "",
+            fontFamily: "",
+            fontSize: "",
+            fontWeight: "",
+            height: "",
+            lineHeight: "",
+            margin: "",
+            padding: "",
+            position: "",
+            textAlign: "",
+            width: "",
+            zIndex: "",
+          },
+          id: "marker-1",
+          index: 0,
+          intent: "change",
+          isFixed: false,
+          tagName: "div",
+          rectPage: { height: 20, width: 30, x: 1, y: 2 },
+          rectViewport: { height: 20, width: 30, x: 1, y: 2 },
+        },
+      ],
+      "token",
+    );
+
+    createdViews[0].webContents.emit(
+      "console-message",
+      {},
+      1,
+      '__divisor_annotation_viewport__:wrong:{"type":"save","markerId":"marker-1","comment":"Ignored"}',
+    );
+    createdViews[0].webContents.emit(
+      "console-message",
+      {},
+      1,
+      '__divisor_annotation_viewport__:token:{"type":"save","markerId":"marker-1","comment":"Updated"}',
+    );
+
+    expect(onAnnotationViewportEvent).toHaveBeenCalledTimes(1);
+    expect(onAnnotationViewportEvent).toHaveBeenCalledWith({
+      browserPageId: tab.id,
+      comment: "Updated",
+      markerId: "marker-1",
+      type: "save",
+    });
+  });
 });
+
+function createGrabPayload() {
+  return {
+    ancestorPath: [],
+    nearbyText: [],
+    page: {
+      capturedAt: new Date().toISOString(),
+      devicePixelRatio: 1,
+      sanitizedUrl: "https://example.com/",
+      scrollX: 0,
+      scrollY: 0,
+      title: "Example",
+      viewportHeight: 800,
+      viewportWidth: 1200,
+    },
+    screenshot: null,
+    target: {
+      accessibility: {
+        accessibleName: "Example button",
+        ariaLabel: null,
+        ariaLabelledBy: null,
+        role: "button",
+      },
+      attributes: {},
+      computedStyles: {
+        backgroundColor: "rgba(0, 0, 0, 0)",
+        border: "",
+        borderRadius: "",
+        color: "rgb(20, 17, 17)",
+        display: "block",
+        fontFamily: "Arial",
+        fontSize: "14px",
+        fontWeight: "400",
+        height: "20px",
+        lineHeight: "20px",
+        margin: "",
+        padding: "",
+        position: "static",
+        textAlign: "left",
+        width: "120px",
+        zIndex: "auto",
+      },
+      cssClasses: "",
+      elementPath: "main > button",
+      fullPath: "body > main > button",
+      htmlSnippet: "<button>Example</button>",
+      isFixed: false,
+      nearbyElements: [],
+      reactComponents: null,
+      rectPage: { height: 20, width: 120, x: 10, y: 20 },
+      rectViewport: { height: 20, width: 120, x: 10, y: 20 },
+      selectedText: null,
+      selector: "button",
+      sourceFile: null,
+      tagName: "button",
+      textSnippet: "Example",
+    },
+  };
+}

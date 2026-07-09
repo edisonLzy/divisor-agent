@@ -13,7 +13,9 @@ import {
 } from "electron";
 
 import type {
+  BrowserAnnotationViewportBridgeEvent,
   BrowserAnnotationViewportBridgeMarker,
+  BrowserElementSelection,
   BrowserGetProperty,
   BrowserNavigationAction,
   BrowserProfile,
@@ -22,7 +24,10 @@ import type {
   BrowserTab,
   DetectedChromiumProfile,
 } from "../common/types";
-import { buildBrowserAnnotationViewportBridgeScript } from "./annotation-viewport-bridge";
+import {
+  BROWSER_ANNOTATION_VIEWPORT_MESSAGE_PREFIX,
+  buildBrowserAnnotationViewportBridgeScript,
+} from "./annotation-viewport-bridge";
 import { detectChromiumProfiles, importChromiumCookies } from "./cookie-import";
 import { cancelElementSelection, selectElement } from "./element-selection";
 import { SnapshotService } from "./snapshot";
@@ -52,12 +57,16 @@ export class BrowserManager {
   private snapshotService = new SnapshotService();
   private detectedProfiles = new Map<string, DetectedChromiumProfile>();
   private attachedView: WebContentsView | null = null;
+  private annotationViewportTokens = new Map<string, string>();
   private destroying = false;
   private surface: { rect: BrowserRect; sessionId: string; tabId: string } | null = null;
 
   constructor(
     private getWindow: () => BrowserWindow | null,
     private onStateChanged: (sessionId: string, state: BrowserState) => void,
+    private onAnnotationViewportEvent: (
+      event: BrowserAnnotationViewportBridgeEvent,
+    ) => void = () => {},
   ) {
     this.load();
   }
@@ -91,6 +100,7 @@ export class BrowserManager {
     const tab = this.requireOwnedTab(sessionId, tabId);
     this.detach(tab.view);
     this.tabs.delete(tabId);
+    this.annotationViewportTokens.delete(tabId);
     this.snapshotService.clear(tabId);
     if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close();
     if (this.activeTabBySession.get(sessionId) === tabId) {
@@ -274,7 +284,8 @@ export class BrowserManager {
     const tab = this.requireOwnedTab(sessionId, tabId);
     const result = await selectElement(tab.view.webContents);
     return {
-      kind: result.kind,
+      comment: result.comment,
+      kind: result.kind as BrowserElementSelection["kind"],
       payload: result.payload,
       screenshotDataUrl: result.screenshotDataUrl,
     };
@@ -293,6 +304,8 @@ export class BrowserManager {
   ) {
     const tab = this.tabs.get(browserPageId);
     if (!tab || tab.view.webContents.isDestroyed()) return;
+    if (enabled) this.annotationViewportTokens.set(browserPageId, token);
+    else this.annotationViewportTokens.delete(browserPageId);
     const script = buildBrowserAnnotationViewportBridgeScript({
       emitViewport: false,
       enabled,
@@ -342,11 +355,15 @@ export class BrowserManager {
       this.updateNavigationState(state.id, { title }),
     );
     contents.on("did-navigate", (_event, url) => {
+      this.annotationViewportTokens.delete(state.id);
       this.updateNavigationState(state.id, { url });
     });
     contents.on("did-navigate-in-page", (_event, url) => {
       this.snapshotService.markNavigated(state.id);
       this.updateNavigationState(state.id, { url });
+    });
+    contents.on("console-message", (_event, _level, message) => {
+      this.handleAnnotationViewportMessage(state.id, message);
     });
     contents.on("destroyed", () => {
       const managed = this.tabs.get(state.id);
@@ -412,6 +429,26 @@ export class BrowserManager {
       }
     }
     if (this.attachedView === view) this.attachedView = null;
+  }
+
+  private handleAnnotationViewportMessage(browserPageId: string, message: string) {
+    const token = this.annotationViewportTokens.get(browserPageId);
+    if (!token) return;
+    const prefix = `${BROWSER_ANNOTATION_VIEWPORT_MESSAGE_PREFIX}${token}:`;
+    if (!message.startsWith(prefix)) return;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(message.slice(prefix.length));
+    } catch {
+      return;
+    }
+    if (!isAnnotationViewportEventPayload(parsed)) return;
+    this.onAnnotationViewportEvent({
+      browserPageId,
+      comment: parsed.comment,
+      markerId: parsed.markerId,
+      type: parsed.type,
+    });
   }
 
   private resolveTab(sessionId: string, tabId?: string) {
@@ -555,6 +592,18 @@ function isValidRect(rect: BrowserRect) {
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(Math.max(value, minimum), Math.max(minimum, maximum));
+}
+
+function isAnnotationViewportEventPayload(
+  value: unknown,
+): value is { comment?: string; markerId: string; type: "delete" | "open" | "save" } {
+  if (!value || typeof value !== "object") return false;
+  const payload = value as { comment?: unknown; markerId?: unknown; type?: unknown };
+  return (
+    typeof payload.markerId === "string" &&
+    (payload.type === "delete" || payload.type === "open" || payload.type === "save") &&
+    (payload.comment === undefined || typeof payload.comment === "string")
+  );
 }
 
 async function contentsDownload(url: string, path: string, partition: string) {
