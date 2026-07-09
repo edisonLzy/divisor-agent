@@ -41,6 +41,12 @@ export default defineMainExtension<BrowserInvokeEvents, BrowserExposeEvents>({
       manager.navigate(sessionId, tabId, action, url),
     );
     ctx.ipc.handle("setSurface", (input) => manager.setSurface(input));
+    ctx.ipc.handle("registerGuest", ({ browserPageId, sessionId, profileId, webContentsId }) =>
+      manager.registerGuest({ browserPageId, sessionId, profileId, webContentsId }),
+    );
+    ctx.ipc.handle("unregisterGuest", ({ browserPageId }) =>
+      manager.unregisterGuest({ browserPageId }),
+    );
     ctx.ipc.handle("createProfile", (label) => manager.createProfile(label));
     ctx.ipc.handle("renameProfile", ({ id, label }) => manager.renameProfile(id, label));
     ctx.ipc.handle("deleteProfile", (id) => manager.deleteProfile(id));
@@ -79,7 +85,7 @@ export default defineMainExtension<BrowserInvokeEvents, BrowserExposeEvents>({
         const sessionId = requireSessionId(
           ctx.extensionRuntime.getCurrentAgentContext()?.sessionId,
         );
-        const tab = manager.createTab(sessionId, args.url, args.profileId);
+        const tab = manager.openOrFocus(sessionId, args.url, args.profileId);
         return toolResult(`Opened ${tab.url}`, tab, sessionId);
       },
     });

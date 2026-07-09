@@ -1,7 +1,15 @@
 import type { BrowserAnnotationViewportBridgeMarker } from "../common/types";
 
 // ---------------------------------------------------------------------------
-// Viewport bridge — injects numbered annotation badges into the page
+// Viewport bridge - injects numbered annotation badges into the page
+//
+// Scope: this script ONLY renders numbered marker pins that follow the target
+// element through scroll/resize, shows a lightweight hover tooltip, and emits
+// `open`/`save`/`delete` events back to the host. The comment editor itself is
+// a React overlay in the host renderer (annotation-editor.tsx) - it is NOT
+// injected here. That split is the whole point of the migration: the editor
+// gets types/lint/icons/Popover collision handling, while this script stays a
+// thin, auditable string that runs in the guest page.
 // ---------------------------------------------------------------------------
 
 export interface BrowserAnnotationViewportBridgeOptions {
@@ -80,13 +88,24 @@ export function buildBrowserAnnotationViewportBridgeScript({
   };
 
   const emitMarkerEvent = (type, marker, extra) => {
-    emit(Object.assign({ markerId: marker.id, type }, extra || {}));
+    emit(Object.assign({
+      markerId: marker.id,
+      type,
+      // Geometry the host needs to anchor the React editor at the marker.
+      rectPage: marker.rectPage,
+      rectViewport: marker.rectViewport,
+      isFixed: marker.isFixed,
+      comment: marker.comment,
+      intent: marker.intent,
+      tagName: marker.tagName,
+      computedStyles: marker.computedStyles
+    }, extra || {}));
   };
 
   const getRoot = () => document.body || document.documentElement;
 
   const ensureOverlay = (state) => {
-    if (state.host && state.shadowRoot && state.tooltip && state.editor) return state.shadowRoot;
+    if (state.host && state.shadowRoot && state.tooltip) return state.shadowRoot;
     removeOverlay(state);
     state.host = null;
     state.shadowRoot = null;
@@ -101,65 +120,21 @@ export function buildBrowserAnnotationViewportBridgeScript({
     style.textContent = [
       '.marker{box-sizing:border-box;position:absolute;left:0;top:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:9999px;border:2px solid #141111;background:#27ccf3;color:#141111;font:800 11px/1 "Space Mono",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:2px 2px 0 #141111;will-change:transform;pointer-events:auto;user-select:none;cursor:pointer;}',
       '.marker:hover{transform:translate(1px,1px);box-shadow:none;}',
-      '.tooltip{box-sizing:border-box;position:absolute;left:0;top:0;max-width:220px;display:none;border:2px solid #141111;border-radius:6px;background:#fffdf8;color:#141111;box-shadow:3px 3px 0 #141111;padding:6px 8px;font:700 12px/1.35 "Space Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;white-space:pre-wrap;overflow-wrap:anywhere;pointer-events:none;}',
-      '.editor{box-sizing:border-box;position:absolute;left:0;top:0;width:min(380px,calc(100vw - 24px));display:none;flex-direction:column;border:2px solid #141111;border-radius:6px;background:#fffdf8;color:#141111;box-shadow:3px 3px 0 #141111;pointer-events:auto;font:700 12px/1.4 "Space Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}',
-      '.editor-main{display:flex;gap:8px;padding:8px;}',
-      '.tool{display:grid;min-width:28px;height:28px;flex:0 0 auto;place-items:center;border:2px solid transparent;border-radius:4px;background:transparent;color:#716b64;padding:0 4px;font:800 10px/1 "Space Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}',
-      '.textarea{box-sizing:border-box;min-height:56px;flex:1;resize:vertical;border:2px solid #141111;border-radius:4px;background:#fffaf0;color:#141111;box-shadow:2px 2px 0 #141111;padding:7px 8px;font:700 12px/1.45 "Space Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;outline:none;}',
-      '.actions{display:flex;align-items:center;gap:6px;border-top:2px solid #141111;background:#eee9de;padding:6px 8px;}',
-      '.detailPanel{display:none;border-top:2px solid #141111;background:#fffaf0;padding:6px 8px;}',
-      '.detailPanel.open{display:block;}',
-      '.detailTarget{display:flex;align-items:center;justify-content:space-between;border:2px solid #141111;border-radius:4px;background:#eee9de;padding:5px 7px;font:800 11px/1 "Space Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}',
-      '.detailRows{display:grid;gap:5px;margin-top:6px;}',
-      '.detailRow{display:grid;grid-template-columns:74px minmax(0,1fr);align-items:center;gap:6px;color:#716b64;font:700 10px/1.2 "Space Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}',
-      '.detailValue{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:2px solid #141111;border-radius:4px;background:#fffdf8;box-shadow:2px 2px 0 #141111;padding:4px 6px;color:#141111;font:700 10px/1.2 "Space Mono",monospace;}',
-      '.spacer{flex:1;}',
-      '.button{min-height:28px;border:2px solid #141111;border-radius:6px;background:#fffdf8;color:#141111;box-shadow:2px 2px 0 #141111;padding:0 10px;font:800 11px/1 "Space Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer;}',
-      '.button.primary{background:#141111;color:#fffaf0;}',
-      '.iconButton{width:28px;min-height:28px;padding:0;color:#df5148;}'
+      '.tooltip{box-sizing:border-box;position:absolute;left:0;top:0;max-width:220px;display:none;border:2px solid #141111;border-radius:6px;background:#fffdf8;color:#141111;box-shadow:3px 3px 0 #141111;padding:6px 8px;font:700 12px/1.35 "Space Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;white-space:pre-wrap;overflow-wrap:anywhere;pointer-events:none;}'
     ].join('');
     shadowRoot.appendChild(style);
     const tooltip = document.createElement('div');
     tooltip.className = 'tooltip';
     shadowRoot.appendChild(tooltip);
-    const editor = document.createElement('div');
-    editor.className = 'editor';
-    editor.innerHTML = '<div class="editor-main"><button class="tool detailToggle" type="button" title="Details">DETAIL</button><textarea class="textarea" spellcheck="false"></textarea></div><div class="detailPanel"></div><div class="actions"><button class="button iconButton delete" type="button" title="Delete">DEL</button><span class="spacer"></span><button class="button cancel" type="button">取消</button><button class="button primary save" type="button">保存</button></div>';
-    shadowRoot.appendChild(editor);
     root.appendChild(host);
     state.host = host;
     state.shadowRoot = shadowRoot;
     state.tooltip = tooltip;
-    state.editor = editor;
-    state.editorTextarea = editor.querySelector('.textarea');
-    state.editorDetailPanel = editor.querySelector('.detailPanel');
-    editor.querySelector('.cancel').addEventListener('click', () => hideEditor(state));
-    editor.querySelector('.detailToggle').addEventListener('click', () => {
-      if (!state.editorDetailPanel) return;
-      state.editorDetailPanel.classList.toggle('open');
-    });
-    editor.querySelector('.save').addEventListener('click', () => {
-      if (!state.activeEditorMarker) return;
-      const value = state.editorTextarea ? state.editorTextarea.value : '';
-      emitMarkerEvent('save', state.activeEditorMarker, { comment: value });
-      state.activeEditorMarker.comment = value;
-      hideEditor(state);
-    });
-    editor.querySelector('.delete').addEventListener('click', () => {
-      if (!state.activeEditorMarker) return;
-      emitMarkerEvent('delete', state.activeEditorMarker);
-      hideEditor(state);
-    });
     return shadowRoot;
   };
 
   const hideTooltip = (state) => {
     if (state.tooltip) state.tooltip.style.display = 'none';
-  };
-
-  const hideEditor = (state) => {
-    state.activeEditorMarker = null;
-    if (state.editor) state.editor.style.display = 'none';
   };
 
   const placeFloating = (element, x, y, fallbackWidth, fallbackHeight) => {
@@ -176,45 +151,6 @@ export function buildBrowserAnnotationViewportBridgeScript({
     state.tooltip.textContent = marker.comment || 'Selected element';
     state.tooltip.style.display = 'block';
     placeFloating(state.tooltip, x + markerSize + 6, y - 4, 180, 34);
-  };
-
-  const showEditor = (state, marker, x, y) => {
-    if (!state.editor) return;
-    state.activeEditorMarker = marker;
-    if (state.editorTextarea) state.editorTextarea.value = marker.comment || '';
-    renderDetails(state.editorDetailPanel, marker);
-    state.editor.style.display = 'flex';
-    hideTooltip(state);
-    placeFloating(state.editor, x + markerSize + 6, y - 36, 380, 132);
-    if (state.editorTextarea) state.editorTextarea.focus();
-    emitMarkerEvent('open', marker);
-  };
-
-  const valueOrDash = (value) => {
-    if (typeof value !== 'string') return '-';
-    const trimmed = value.trim();
-    return trimmed || '-';
-  };
-
-  const escapeHtml = (value) => valueOrDash(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-
-  const renderDetails = (container, marker) => {
-    if (!container) return;
-    const styles = marker && marker.computedStyles ? marker.computedStyles : {};
-    container.innerHTML =
-      '<div class="detailTarget"><span>' + escapeHtml(marker && marker.tagName) + '</span><span>style</span></div>' +
-      '<div class="detailRows">' +
-      '<div class="detailRow"><span>文本颜色</span><span class="detailValue">' + escapeHtml(styles.color) + '</span></div>' +
-      '<div class="detailRow"><span>背景</span><span class="detailValue">' + escapeHtml(styles.backgroundColor) + '</span></div>' +
-      '<div class="detailRow"><span>字体</span><span class="detailValue">' + escapeHtml(styles.fontFamily) + '</span></div>' +
-      '<div class="detailRow"><span>字号</span><span class="detailValue">' + escapeHtml(styles.fontSize) + '</span></div>' +
-      '<div class="detailRow"><span>字重</span><span class="detailValue">' + escapeHtml(styles.fontWeight) + '</span></div>' +
-      '</div>';
   };
 
   const updateMarkers = (state, nextMarkers) => {
@@ -246,7 +182,9 @@ export function buildBrowserAnnotationViewportBridgeScript({
           event.stopPropagation();
           const liveMarker = state.markers.find((candidate) => candidate.id === element.dataset.markerId);
           if (!liveMarker) return;
-          showEditor(state, liveMarker, toNumber(element.dataset.x, 0), toNumber(element.dataset.y, 0));
+          // The React editor in the host renderer handles editing; we just
+          // surface which marker was clicked plus its live geometry.
+          emitMarkerEvent('open', liveMarker);
         });
         shadowRoot.appendChild(element);
         state.markerElements.set(marker.id, element);

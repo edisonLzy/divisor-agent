@@ -35,6 +35,7 @@ import {
   type BrowserAnnotationIntent,
   type BrowserAnnotationViewportBridgeEvent,
   type BrowserAnnotationViewportBridgeMarker,
+  type BrowserAnnotationViewportBridgeOpenPayload,
   type BrowserElementSelection,
   type BrowserExposeEvents,
   type BrowserGrabScreenshot,
@@ -45,7 +46,13 @@ import {
   type BrowserTab,
   type DetectedChromiumProfile,
 } from "./common/types";
+import AnnotationEditor from "./renderer/annotation-editor";
 import { browserCommentExtension } from "./renderer/browser-comment";
+import {
+  ensureBrowserPageWebview,
+  getBrowserPageWebview,
+  removeBrowserPageWebview,
+} from "./renderer/browser-page-webview";
 import GrabConfirmationSheet, { formatGrabPayloadAsText } from "./renderer/grab-confirmation";
 
 const useBrowserIPC = createExtensionIPC<BrowserInvokeEvents, BrowserExposeEvents>(
@@ -78,8 +85,22 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
   const [intent, setIntent] = useState<BrowserAnnotationIntent>("change");
   const [annotations, setAnnotations] = useState<BrowserPageAnnotation[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [editingMarker, setEditingMarker] = useState<{
+    anchor: { x: number; y: number };
+    markerId: string;
+    payload: BrowserAnnotationViewportBridgeOpenPayload;
+  } | null>(null);
   const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId) ?? null;
+  const activeTabId = state.activeTabId;
   const activeTabUrl = activeTab?.url;
+  // Partition string for the active tab. Stable by value across state updates
+  // (profiles are re-mapped each emit, but the partition string is identical),
+  // so depending on this only re-mounts the <webview> on a real profile swap.
+  const partitionForActiveTab =
+    state.profiles.find((p) => p.id === activeTab?.profileId)?.partition ??
+    "persist:divisor-browser-default";
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   useEffect(() => {
     let alive = true;
@@ -97,7 +118,13 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
     return () => {
       alive = false;
       off();
-      void ipc.invoke("setSurface", { sessionId, visible: false });
+      // Unmount every guest webview for this artifact and tell main to drop
+      // its handles. Main-side guests are destroyed when the <webview> leaves
+      // the DOM, but unregisterGuest clears stale listeners promptly.
+      for (const tab of stateRef.current.tabs) {
+        removeBrowserPageWebview(tab.id);
+        void ipc.invoke("unregisterGuest", { browserPageId: tab.id });
+      }
     };
   }, [ipc, sessionId]);
 
@@ -105,35 +132,65 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
     if (activeTabUrl) setAddress(activeTabUrl);
   }, [activeTabUrl]);
 
+  // Mount the renderer-owned <webview> for the active tab. The webview lives in
+  // the renderer DOM (so React overlays can paint above it), and main adopts
+  // the guest via registerGuest once dom-ready fires. This replaces the old
+  // WebContentsView + setSurface coordinate-pushing path.
+  //
+  // Deps are intentionally the stable tab *id* + partition, NOT the `activeTab`
+  // object: main emits a fresh state object on every navigation event
+  // (loading/title/url), so depending on `activeTab` would re-run this effect,
+  // removeChild + remount the <webview>, and reload the guest in a loop. We
+  // only (re)mount when the tab identity or profile changes; url changes are
+  // synced by the separate navigation effect below.
   useEffect(() => {
-    const element = viewportRef.current;
-    const tabId = activeTab?.id;
-    const visible = Boolean(element && tabId && !panel);
-    if (!visible || !element || !tabId) {
-      void ipc.invoke("setSurface", { sessionId, visible: false });
-      return;
+    const container = viewportRef.current;
+    const tab = stateRef.current.tabs.find((t) => t.id === activeTabId) ?? null;
+    if (!container || !tab || panel) return;
+    const profile = stateRef.current.profiles.find((p) => p.id === tab.profileId);
+    const partition = profile?.partition ?? "persist:divisor-browser-default";
+    const result = ensureBrowserPageWebview(container, {
+      browserPageId: tab.id,
+      // Guest always receives pointer input. Element selection works by
+      // injecting a picker into the guest (it needs the clicks); the
+      // confirmation sheet sits in the area below the viewport, not on top of
+      // the webview, so there is nothing to lock.
+      inputLocked: false,
+      partition,
+      url: tab.url,
+    });
+    if (!result) return;
+    const { webview, created } = result;
+    if (created) {
+      const onDomReady = () => {
+        const webContentsId = webview.getWebContentsId();
+        if (typeof webContentsId !== "number") return;
+        void ipc.invoke("registerGuest", {
+          browserPageId: tab.id,
+          sessionId,
+          profileId: tab.profileId,
+          webContentsId,
+        });
+      };
+      webview.addEventListener("dom-ready", onDomReady);
     }
-    const update = () => {
-      const rect = element.getBoundingClientRect();
-      void ipc.invoke("setSurface", {
-        rect: { height: rect.height, width: rect.width, x: rect.x, y: rect.y },
-        sessionId,
-        tabId,
-        visible: rect.height > 0 && rect.width > 0,
-      });
-    };
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(element);
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
     return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
-      void ipc.invoke("setSurface", { sessionId, visible: false });
+      // Detach the webview only on a real identity/profile/panel change, not
+      // on every navigation state update. Reparenting recreates the guest.
+      if (webview.parentElement === container) container.removeChild(webview);
     };
-  }, [activeTab?.id, ipc, panel, selection, sessionId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTabId, panel, sessionId, partitionForActiveTab]);
+
+  // Sync the active tab's url into the mounted <webview> without remounting.
+  useEffect(() => {
+    if (!activeTabId || panel) return;
+    const webview = getBrowserPageWebview(activeTabId);
+    if (!webview || !activeTabUrl) return;
+    // Only navigate when the url actually differs to avoid reloading the page
+    // on every state update that happens to carry the same url.
+    if (webview.src !== activeTabUrl) webview.src = activeTabUrl;
+  }, [activeTabId, activeTabUrl, panel]);
 
   useEffect(() => {
     if (!selectingTabId) return;
@@ -257,8 +314,25 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
 
   const handleAnnotationViewportEvent = (event: BrowserAnnotationViewportBridgeEvent) => {
     if (!activeTab || event.browserPageId !== activeTab.id) return;
-    if (event.type === "open") return;
+    if (event.type === "open") {
+      if (!event.open) return;
+      // Anchor the React editor at the marker's position in renderer-screen
+      // space: the <webview> element's origin plus the marker's guest-viewport
+      // rect. (Snapshot-time viewport coords; good enough at click time since
+      // the marker must be visible to be clicked.)
+      const webview = getBrowserPageWebview(activeTab.id);
+      const webviewRect = webview?.getBoundingClientRect();
+      const originX = webviewRect?.left ?? 0;
+      const originY = webviewRect?.top ?? 0;
+      setEditingMarker({
+        anchor: { x: originX + event.open.rectViewport.x, y: originY + event.open.rectViewport.y },
+        markerId: event.markerId,
+        payload: event.open,
+      });
+      return;
+    }
     if (event.type === "delete") {
+      setEditingMarker(null);
       const updatedAnnotations = annotations.filter(
         (annotation) => annotation.id !== event.markerId,
       );
@@ -267,6 +341,7 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
       return;
     }
     if (event.type === "save") {
+      setEditingMarker(null);
       const updatedAnnotations = annotations.map((annotation) =>
         annotation.id === event.markerId
           ? { ...annotation, comment: (event.comment ?? "").trim() || "Selected element" }
@@ -348,7 +423,11 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
       <BrowserTabs
         activeTabId={state.activeTabId}
         onActivate={(tabId) => void ipc.invoke("setActiveTab", { sessionId, tabId })}
-        onClose={(tabId) => void ipc.invoke("closeTab", { sessionId, tabId })}
+        onClose={(tabId) => {
+          removeBrowserPageWebview(tabId);
+          void ipc.invoke("unregisterGuest", { browserPageId: tabId });
+          void ipc.invoke("closeTab", { sessionId, tabId });
+        }}
         onCreate={() => void ipc.invoke("createTab", { sessionId })}
         tabs={state.tabs}
       />
@@ -432,6 +511,33 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
             }}
             payload={selection.payload}
             screenshot={screenshot}
+          />
+        ) : null}
+        {editingMarker && activeTab ? (
+          <AnnotationEditor
+            anchor={editingMarker.anchor}
+            initialComment={editingMarker.payload.comment}
+            initialIntent={editingMarker.payload.intent}
+            payload={editingMarker.payload}
+            onCancel={() => setEditingMarker(null)}
+            onDelete={() => {
+              const markerId = editingMarker.markerId;
+              setEditingMarker(null);
+              const updatedAnnotations = annotations.filter((a) => a.id !== markerId);
+              setAnnotations(updatedAnnotations);
+              updateViewportMarkers(activeTab.id, updatedAnnotations);
+            }}
+            onSave={(nextComment, nextIntent) => {
+              const markerId = editingMarker.markerId;
+              setEditingMarker(null);
+              const updatedAnnotations = annotations.map((a) =>
+                a.id === markerId
+                  ? { ...a, comment: nextComment || "Selected element", intent: nextIntent }
+                  : a,
+              );
+              setAnnotations(updatedAnnotations);
+              updateViewportMarkers(activeTab.id, updatedAnnotations);
+            }}
           />
         ) : null}
       </div>

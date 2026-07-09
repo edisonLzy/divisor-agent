@@ -301,11 +301,27 @@ export interface BrowserAnnotationViewportBridgeMarker {
 
 export type BrowserAnnotationViewportBridgeEventType = "delete" | "open" | "save";
 
+/**
+ * Geometry carried on `open` events so the host renderer can anchor the React
+ * comment editor at the marker's live position. Mirrors the marker fields.
+ */
+export interface BrowserAnnotationViewportBridgeOpenPayload {
+  comment: string;
+  computedStyles: BrowserGrabComputedStyles;
+  intent: BrowserAnnotationIntent;
+  isFixed: boolean;
+  rectPage: BrowserRect;
+  rectViewport: BrowserRect;
+  tagName: string;
+}
+
 export interface BrowserAnnotationViewportBridgeEvent {
   browserPageId: string;
   comment?: string;
   markerId: string;
   type: BrowserAnnotationViewportBridgeEventType;
+  /** Present only on `open` events. */
+  open?: BrowserAnnotationViewportBridgeOpenPayload;
 }
 
 // ---------------------------------------------------------------------------
@@ -332,6 +348,22 @@ export interface BrowserInvokeEvents {
     tabId?: string;
     visible: boolean;
   }): void;
+  /**
+   * Register a renderer-owned `<webview>` guest with the main process.
+   *
+   * Why: after migrating from WebContentsView to `<webview>`, the guest page
+   * is created by the renderer. Main still needs the guest's webContents to
+   * attach navigation policy, CDP, the annotation console bridge, etc. The
+   * renderer sends the guest's webContentsId (from `webview.getWebContentsId()`)
+   * here; main resolves it via `webContents.fromId()` and adopts it.
+   */
+  registerGuest(input: {
+    browserPageId: string;
+    sessionId: string;
+    profileId: string;
+    webContentsId: number;
+  }): void;
+  unregisterGuest(input: { browserPageId: string }): void;
   createProfile(label: string): BrowserProfile;
   renameProfile(input: { id: string; label: string }): BrowserProfile;
   deleteProfile(id: string): void;

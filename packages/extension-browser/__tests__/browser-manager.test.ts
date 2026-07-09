@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createdViews, sessionMock } = vi.hoisted(() => ({
-  createdViews: [] as any[],
+const { createdContents, sessionMock, fromIdMock } = vi.hoisted(() => ({
+  createdContents: [] as any[],
   sessionMock: {
     cookies: { flushStore: vi.fn(), set: vi.fn() },
     fetch: vi.fn(),
@@ -9,10 +9,13 @@ const { createdViews, sessionMock } = vi.hoisted(() => ({
     setPermissionCheckHandler: vi.fn(),
     setPermissionRequestHandler: vi.fn(),
   },
+  fromIdMock: vi.fn(),
 }));
 
 vi.mock("electron", () => {
+  let nextId = 100;
   class FakeContents {
+    id: number;
     private listeners = new Map<string, Array<(...args: any[]) => void>>();
     debugger = {
       attach: vi.fn(),
@@ -26,7 +29,7 @@ vi.mock("electron", () => {
       goForward: vi.fn(),
     };
     capturePage = vi.fn();
-    close = vi.fn(() => this.emit("destroyed"));
+    close = vi.fn();
     getTitle = vi.fn(() => "Example");
     getURL = vi.fn(() => "https://example.com/");
     isDestroyed = vi.fn(() => false);
@@ -35,6 +38,20 @@ vi.mock("electron", () => {
     loadURL = vi.fn(async () => undefined);
     reload = vi.fn();
     setWindowOpenHandler = vi.fn();
+    off = vi.fn((name: string, listener: (...args: any[]) => void) => {
+      const arr = this.listeners.get(name);
+      if (arr)
+        this.listeners.set(
+          name,
+          arr.filter((l) => l !== listener),
+        );
+      return this;
+    });
+
+    constructor() {
+      this.id = nextId++;
+      createdContents.push(this);
+    }
 
     emit(name: string, ...args: unknown[]) {
       for (const listener of this.listeners.get(name) ?? []) listener(...args);
@@ -45,13 +62,6 @@ vi.mock("electron", () => {
       return this;
     }
   }
-  class FakeView {
-    setBounds = vi.fn();
-    webContents = new FakeContents();
-    constructor() {
-      createdViews.push(this);
-    }
-  }
   return {
     app: { getPath: vi.fn(() => "/path/that/does/not/exist") },
     dialog: { showMessageBox: vi.fn(), showSaveDialog: vi.fn() },
@@ -59,46 +69,65 @@ vi.mock("electron", () => {
     safeStorage: { decryptString: vi.fn() },
     session: { fromPartition: vi.fn(() => sessionMock) },
     shell: { openExternal: vi.fn() },
-    WebContentsView: FakeView,
+    webContents: { fromId: fromIdMock },
+    // Exposed so tests can construct a guest the way a <webview> would.
+    __FakeContents: FakeContents,
   };
 });
 
 import { BrowserManager } from "../src/main/browser-manager";
 
+// Lazy accessor for the mock's FakeContents constructor.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const electronMock = await import("electron");
+const FakeContents = (electronMock as any).__FakeContents as { new (): any };
+
 describe("BrowserManager", () => {
   beforeEach(() => {
-    createdViews.length = 0;
+    createdContents.length = 0;
+    fromIdMock.mockReset();
     vi.clearAllMocks();
     sessionMock.listenerCount.mockReturnValue(1);
   });
 
-  it("owns views in main and attaches only the selected surface", () => {
-    const contentView = { addChildView: vi.fn(), removeChildView: vi.fn() };
+  it("registers a renderer-owned guest and tracks it by webContentsId", () => {
     const browserWindow = {
-      contentView,
-      getContentBounds: vi.fn(() => ({ height: 800, width: 1200, x: 0, y: 0 })),
       isDestroyed: vi.fn(() => false),
-      webContents: { getZoomFactor: vi.fn(() => 1.5) },
+      webContents: { id: 1 },
     };
     const manager = new BrowserManager(() => browserWindow as never, vi.fn());
-    const tab = manager.createTab("session", "example.com");
+    const tab = manager.createTab("session", "https://example.com");
 
-    manager.setSurface({
-      rect: { height: 200, width: 300, x: 10, y: 20 },
+    const guest = new FakeContents();
+    fromIdMock.mockReturnValue(guest);
+    manager.registerGuest({
+      browserPageId: tab.id,
       sessionId: "session",
-      tabId: tab.id,
-      visible: true,
+      profileId: "default",
+      webContentsId: guest.id,
     });
 
-    expect(contentView.addChildView).toHaveBeenCalledWith(createdViews[0]);
-    expect(createdViews[0].setBounds).toHaveBeenCalledWith({
-      height: 300,
-      width: 450,
-      x: 15,
-      y: 30,
+    expect(fromIdMock).toHaveBeenCalledWith(guest.id);
+    // Navigation state is read from the guest after registration.
+    expect(guest.getTitle).toHaveBeenCalled();
+  });
+
+  it("rejects registering the host window's own webContents", () => {
+    const browserWindow = {
+      isDestroyed: vi.fn(() => false),
+      webContents: { id: 1 },
+    };
+    const manager = new BrowserManager(() => browserWindow as never, vi.fn());
+    const tab = manager.createTab("session", "https://example.com");
+
+    manager.registerGuest({
+      browserPageId: tab.id,
+      sessionId: "session",
+      profileId: "default",
+      webContentsId: 1,
     });
-    manager.setSurface({ sessionId: "session", visible: false });
-    expect(contentView.removeChildView).toHaveBeenCalledWith(createdViews[0]);
+
+    expect(fromIdMock).not.toHaveBeenCalled();
   });
 
   it("isolates tabs by agent session", () => {
@@ -109,30 +138,29 @@ describe("BrowserManager", () => {
     expect(() => manager.setActiveTab("two", tab.id)).toThrowError(/unavailable/);
   });
 
-  it("recreates a view after an unexpected window or renderer teardown", () => {
-    const manager = new BrowserManager(() => null, vi.fn());
-    const tab = manager.createTab("session", "https://example.com");
-    createdViews[0].webContents.emit("destroyed");
-
-    expect(createdViews).toHaveLength(2);
-    expect(createdViews[1].webContents.loadURL).toHaveBeenCalledWith("https://example.com/");
-    expect(manager.getState("session").tabs[0].id).toBe(tab.id);
-  });
-
   it("returns comments captured by the in-page selection editor", async () => {
     const manager = new BrowserManager(() => null, vi.fn());
     const tab = manager.createTab("session", "https://example.com");
+    const guest = new FakeContents();
+    fromIdMock.mockReturnValue(guest);
+    manager.registerGuest({
+      browserPageId: tab.id,
+      sessionId: "session",
+      profileId: "default",
+      webContentsId: guest.id,
+    });
+
     const screenshot = { toDataURL: vi.fn(() => "data:image/png;base64,selected") };
     const payload = createGrabPayload();
-    createdViews[0].webContents.executeJavaScript.mockResolvedValue({
+    guest.executeJavaScript.mockResolvedValue({
       comment: "Make this clearer",
       kind: "selected",
       payload,
     });
-    createdViews[0].webContents.capturePage.mockResolvedValue(screenshot);
+    guest.capturePage.mockResolvedValue(screenshot);
 
     const result = await manager.startElementSelection("session", tab.id);
-    const selectionScript = createdViews[0].webContents.executeJavaScript.mock.calls[0][0];
+    const selectionScript = guest.executeJavaScript.mock.calls[0][0];
 
     expect(selectionScript).toContain("commentEditor");
     expect(selectionScript).toContain("添加评论");
@@ -145,6 +173,15 @@ describe("BrowserManager", () => {
     const onAnnotationViewportEvent = vi.fn();
     const manager = new BrowserManager(() => null, vi.fn(), onAnnotationViewportEvent);
     const tab = manager.createTab("session", "https://example.com");
+    const guest = new FakeContents();
+    fromIdMock.mockReturnValue(guest);
+    manager.registerGuest({
+      browserPageId: tab.id,
+      sessionId: "session",
+      profileId: "default",
+      webContentsId: guest.id,
+    });
+
     await manager.setAnnotationViewportBridge(
       tab.id,
       true,
@@ -181,13 +218,13 @@ describe("BrowserManager", () => {
       "token",
     );
 
-    createdViews[0].webContents.emit(
+    guest.emit(
       "console-message",
       {},
       1,
       '__divisor_annotation_viewport__:wrong:{"type":"save","markerId":"marker-1","comment":"Ignored"}',
     );
-    createdViews[0].webContents.emit(
+    guest.emit(
       "console-message",
       {},
       1,

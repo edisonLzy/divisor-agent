@@ -2,21 +2,16 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import {
-  app,
-  dialog,
-  nativeImage,
-  session,
-  shell,
-  WebContentsView,
-  type BrowserWindow,
-} from "electron";
+import { app, dialog, nativeImage, session, shell, webContents, type WebContents } from "electron";
 
 import type {
+  BrowserAnnotationIntent,
   BrowserAnnotationViewportBridgeEvent,
   BrowserAnnotationViewportBridgeMarker,
+  BrowserAnnotationViewportBridgeOpenPayload,
   BrowserElementSelection,
   BrowserGetProperty,
+  BrowserGrabComputedStyles,
   BrowserNavigationAction,
   BrowserProfile,
   BrowserRect,
@@ -41,7 +36,11 @@ interface PersistedState {
 
 interface ManagedTab {
   state: BrowserTab;
-  view: WebContentsView;
+  // The guest webContents, owned by the renderer's <webview>. Null until the
+  // renderer calls registerGuest (and after unregisterGuest / navigation that
+  // recreates the guest). All main-side operations (snapshot, screenshot,
+  // selection, annotation bridge) short-circuit while this is null.
+  contents: WebContents | null;
 }
 
 const DEFAULT_PROFILE: BrowserProfile = {
@@ -56,19 +55,32 @@ export class BrowserManager {
   private tabs = new Map<string, ManagedTab>();
   private snapshotService = new SnapshotService();
   private detectedProfiles = new Map<string, DetectedChromiumProfile>();
-  private attachedView: WebContentsView | null = null;
   private annotationViewportTokens = new Map<string, string>();
-  private destroying = false;
-  private surface: { rect: BrowserRect; sessionId: string; tabId: string } | null = null;
 
   constructor(
-    private getWindow: () => BrowserWindow | null,
+    private getWindow: () => Electron.BrowserWindow | null,
     private onStateChanged: (sessionId: string, state: BrowserState) => void,
     private onAnnotationViewportEvent: (
       event: BrowserAnnotationViewportBridgeEvent,
     ) => void = () => {},
   ) {
     this.load();
+  }
+
+  /**
+   * Open a url, reusing an existing tab in the session that already shows it
+   * (or its active tab) rather than spawning a duplicate. Why: agents and the
+   * initial-tab bootstrap can both call createTab, and without dedupe the same
+   * url accumulates multiple identical tabs across restarts.
+   */
+  openOrFocus(sessionId: string, url: string, profileId = "default"): BrowserTab {
+    const normalizedUrl = normalizeBrowserUrl(url);
+    const existing = this.getState(sessionId).tabs.find((tab) => tab.url === normalizedUrl);
+    if (existing) {
+      this.setActiveTab(sessionId, existing.id);
+      return { ...existing };
+    }
+    return this.createTab(sessionId, url, profileId);
   }
 
   createTab(sessionId: string, url?: string, profileId = "default"): BrowserTab {
@@ -85,12 +97,10 @@ export class BrowserManager {
       title: "New Tab",
       url: normalizedUrl,
     };
-    const view = this.createView(state, profile);
-    this.tabs.set(id, { state, view });
+    this.tabs.set(id, { state, contents: null });
     this.activeTabBySession.set(sessionId, id);
-    void view.webContents.loadURL(normalizedUrl).catch((error) => {
-      this.failNavigation(id, error);
-    });
+    // The renderer mounts a <webview> for this tab and calls registerGuest with
+    // its webContentsId; loading happens on the renderer side via webview.src.
     this.persist();
     this.emit(sessionId);
     return { ...state };
@@ -98,11 +108,10 @@ export class BrowserManager {
 
   closeTab(sessionId: string, tabId: string) {
     const tab = this.requireOwnedTab(sessionId, tabId);
-    this.detach(tab.view);
+    this.detachGuest(tab);
     this.tabs.delete(tabId);
     this.annotationViewportTokens.delete(tabId);
     this.snapshotService.clear(tabId);
-    if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close();
     if (this.activeTabBySession.get(sessionId) === tabId) {
       const replacement = [...this.tabs.values()].find(
         (candidate) => candidate.state.sessionId === sessionId,
@@ -117,10 +126,6 @@ export class BrowserManager {
   setActiveTab(sessionId: string, tabId: string) {
     this.requireOwnedTab(sessionId, tabId);
     this.activeTabBySession.set(sessionId, tabId);
-    if (this.surface?.sessionId === sessionId) {
-      this.surface.tabId = tabId;
-      this.showSurface(this.surface);
-    }
     this.persist();
     this.emit(sessionId);
   }
@@ -137,7 +142,13 @@ export class BrowserManager {
 
   async navigate(sessionId: string, tabId: string, action: BrowserNavigationAction, url?: string) {
     const tab = this.requireOwnedTab(sessionId, tabId);
-    const contents = tab.view.webContents;
+    const contents = tab.contents;
+    if (!contents) {
+      // Navigation is driven by the renderer's <webview>; main only tracks the
+      // intended URL so state stays correct until the guest registers.
+      if (action === "goto") tab.state.url = normalizeBrowserUrl(url);
+      return;
+    }
     try {
       if (action === "goto") await contents.loadURL(normalizeBrowserUrl(url));
       else if (action === "back" && contents.navigationHistory.canGoBack())
@@ -153,16 +164,37 @@ export class BrowserManager {
     }
   }
 
-  setSurface(input: { rect?: BrowserRect; sessionId: string; tabId?: string; visible: boolean }) {
-    if (!input.visible || !input.rect || !input.tabId) {
-      this.surface = null;
-      this.detach(this.attachedView);
-      return;
-    }
-    if (!isValidRect(input.rect)) throw new Error("Invalid browser surface bounds");
-    this.requireOwnedTab(input.sessionId, input.tabId);
-    this.surface = { rect: input.rect, sessionId: input.sessionId, tabId: input.tabId };
-    this.showSurface(this.surface);
+  // No-op under the <webview> architecture: the guest is laid out by the
+  // renderer's DOM, so main no longer positions a native view. Retained only
+  // to keep the IPC surface stable during the migration; renderer stops calling.
+  setSurface(_input: { rect?: BrowserRect; sessionId: string; tabId?: string; visible: boolean }) {}
+
+  registerGuest(input: {
+    browserPageId: string;
+    sessionId: string;
+    profileId: string;
+    webContentsId: number;
+  }) {
+    const tab = this.tabs.get(input.browserPageId);
+    if (!tab) return;
+    if (tab.state.sessionId !== input.sessionId) return;
+    // Never adopt the host window's own webContents or an already-detached id.
+    const host = this.getWindow();
+    if (host && !host.isDestroyed() && host.webContents.id === input.webContentsId) return;
+    const contents = webContents.fromId(input.webContentsId);
+    if (!contents || contents.isDestroyed()) return;
+    // If the <webview> recreated its guest (new id), detach the stale one first.
+    if (tab.contents && tab.contents !== contents) this.detachGuest(tab);
+    tab.contents = contents;
+    tab.state.profileId = input.profileId;
+    this.attachGuestListeners(tab);
+    this.updateFromContents(tab.state.id);
+  }
+
+  unregisterGuest(input: { browserPageId: string }) {
+    const tab = this.tabs.get(input.browserPageId);
+    if (!tab) return;
+    this.detachGuest(tab);
   }
 
   createProfile(label: string): BrowserProfile {
@@ -192,7 +224,7 @@ export class BrowserManager {
     if (id === "default") throw new Error("The default browser profile cannot be deleted");
     this.requireProfile(id);
     if ([...this.tabs.values()].some((tab) => tab.state.profileId === id)) {
-      throw new Error("Close or move tabs using this profile before deleting it");
+      throw new Error("Close or move tabs using this profile before deleting");
     }
     this.profiles.delete(id);
     this.persist();
@@ -201,16 +233,13 @@ export class BrowserManager {
 
   setTabProfile(sessionId: string, tabId: string, profileId: string): BrowserTab {
     const managed = this.requireOwnedTab(sessionId, tabId);
-    const profile = this.requireProfile(profileId);
-    const url = managed.state.url;
-    const wasAttached = this.attachedView === managed.view;
-    this.detach(managed.view);
-    if (!managed.view.webContents.isDestroyed()) managed.view.webContents.close();
+    // Validate the profile exists (throws if not) before swapping.
+    this.requireProfile(profileId);
+    // The renderer swaps the <webview> partition and re-registers the new guest.
+    // Drop the old guest handle; updateFromContents runs again after re-register.
+    this.detachGuest(managed);
     managed.state = { ...managed.state, isLoading: true, profileId };
-    managed.view = this.createView(managed.state, profile);
     this.snapshotService.clear(tabId);
-    void managed.view.webContents.loadURL(url).catch((error) => this.failNavigation(tabId, error));
-    if (wasAttached && this.surface) this.showSurface(this.surface);
     this.persist();
     this.emit(sessionId);
     return { ...managed.state };
@@ -240,19 +269,24 @@ export class BrowserManager {
 
   async snapshot(sessionId: string, tabId?: string) {
     const tab = this.resolveTab(sessionId, tabId);
-    const result = await this.snapshotService.snapshot(tab.state.id, tab.view.webContents);
+    const result = await this.snapshotService.snapshot(tab.state.id, this.requireContents(tab));
     return { ...result, browserPageId: tab.state.id, title: tab.state.title, url: tab.state.url };
   }
 
   async get(sessionId: string, ref: string, property: BrowserGetProperty, tabId?: string) {
     const tab = this.resolveTab(sessionId, tabId);
-    const value = await this.snapshotService.get(tab.state.id, tab.view.webContents, ref, property);
+    const value = await this.snapshotService.get(
+      tab.state.id,
+      this.requireContents(tab),
+      ref,
+      property,
+    );
     return { browserPageId: tab.state.id, property, ref, value };
   }
 
   async screenshot(sessionId: string, tabId?: string, fullPage = false) {
     const tab = this.resolveTab(sessionId, tabId);
-    const contents = tab.view.webContents;
+    const contents = this.requireContents(tab);
     let image: Electron.NativeImage;
     if (!fullPage) {
       image = await contents.capturePage();
@@ -282,7 +316,7 @@ export class BrowserManager {
 
   async startElementSelection(sessionId: string, tabId: string) {
     const tab = this.requireOwnedTab(sessionId, tabId);
-    const result = await selectElement(tab.view.webContents);
+    const result = await selectElement(this.requireContents(tab));
     return {
       comment: result.comment,
       kind: result.kind as BrowserElementSelection["kind"],
@@ -293,7 +327,7 @@ export class BrowserManager {
 
   async cancelElementSelection(sessionId: string, tabId: string) {
     const tab = this.requireOwnedTab(sessionId, tabId);
-    await cancelElementSelection(tab.view.webContents);
+    if (tab.contents) await cancelElementSelection(tab.contents);
   }
 
   async setAnnotationViewportBridge(
@@ -303,7 +337,7 @@ export class BrowserManager {
     token: string,
   ) {
     const tab = this.tabs.get(browserPageId);
-    if (!tab || tab.view.webContents.isDestroyed()) return;
+    if (!tab || !tab.contents || tab.contents.isDestroyed()) return;
     if (enabled) this.annotationViewportTokens.set(browserPageId, token);
     else this.annotationViewportTokens.delete(browserPageId);
     const script = buildBrowserAnnotationViewportBridgeScript({
@@ -312,72 +346,92 @@ export class BrowserManager {
       markers,
       token,
     });
-    await tab.view.webContents.executeJavaScript(script, true).catch(() => {});
+    await tab.contents.executeJavaScript(script, true).catch(() => {});
   }
 
   destroy() {
-    this.destroying = true;
-    this.detach(this.attachedView);
-    for (const tab of this.tabs.values()) {
-      if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close();
-    }
+    for (const tab of this.tabs.values()) this.detachGuest(tab);
     this.tabs.clear();
   }
 
-  private createView(state: BrowserTab, profile: BrowserProfile): WebContentsView {
-    this.configureSession(profile);
-    const view = new WebContentsView({
-      webPreferences: {
-        contextIsolation: true,
-        nodeIntegration: false,
-        partition: profile.partition,
-        sandbox: true,
-        webSecurity: true,
-      },
-    });
-    const contents = view.webContents;
-    contents.setWindowOpenHandler(({ url }) => {
+  private attachGuestListeners(tab: ManagedTab) {
+    const contents = tab.contents;
+    if (!contents) return;
+    const state = tab.state;
+    const onDidStartLoading = () => this.updateNavigationState(state.id, { isLoading: true });
+    const onDidStopLoading = () => this.updateFromContents(state.id);
+    const onPageTitle = (_e: unknown, title: string) =>
+      this.updateNavigationState(state.id, { title });
+    const onDidNavigate = (_e: unknown, url: string) => {
+      this.annotationViewportTokens.delete(state.id);
+      this.updateNavigationState(state.id, { url });
+    };
+    const onDidNavigateInPage = (_e: unknown, url: string) => {
+      this.snapshotService.markNavigated(state.id);
+      this.updateNavigationState(state.id, { url });
+    };
+    const onDidStartNavigation = (
+      _e: unknown,
+      _url: string,
+      _inPlace: boolean,
+      isMainFrame: boolean,
+    ) => {
+      if (isMainFrame) this.snapshotService.markNavigated(state.id);
+    };
+    const onConsoleMessage = (_e: unknown, _level: unknown, message: string) => {
+      this.handleAnnotationViewportMessage(state.id, message);
+    };
+    const onWindowOpen = ({ url }: { url: string }) => {
       try {
         this.createTab(state.sessionId, url, state.profileId);
       } catch {
         void shell.openExternal(url).catch(() => {});
       }
-      return { action: "deny" };
-    });
-    contents.on("did-start-navigation", (_event, _url, _inPlace, isMainFrame) => {
-      if (isMainFrame) this.snapshotService.markNavigated(state.id);
-    });
-    contents.on("did-start-loading", () =>
-      this.updateNavigationState(state.id, { isLoading: true }),
-    );
-    contents.on("did-stop-loading", () => this.updateFromContents(state.id));
-    contents.on("page-title-updated", (_event, title) =>
-      this.updateNavigationState(state.id, { title }),
-    );
-    contents.on("did-navigate", (_event, url) => {
-      this.annotationViewportTokens.delete(state.id);
-      this.updateNavigationState(state.id, { url });
-    });
-    contents.on("did-navigate-in-page", (_event, url) => {
-      this.snapshotService.markNavigated(state.id);
-      this.updateNavigationState(state.id, { url });
-    });
-    contents.on("console-message", (_event, _level, message) => {
-      this.handleAnnotationViewportMessage(state.id, message);
-    });
-    contents.on("destroyed", () => {
-      const managed = this.tabs.get(state.id);
-      if (!this.destroying && managed?.view === view) {
-        if (this.attachedView === view) this.attachedView = null;
-        const replacement = this.createView(state, this.requireProfile(state.profileId));
-        managed.view = replacement;
-        state.isLoading = true;
-        void replacement.webContents
-          .loadURL(normalizeBrowserUrl(state.url))
-          .catch((error) => this.failNavigation(state.id, error));
-      }
-    });
-    return view;
+      return { action: "deny" as const };
+    };
+
+    contents.setWindowOpenHandler(onWindowOpen);
+    contents.on("did-start-navigation", onDidStartNavigation);
+    contents.on("did-start-loading", onDidStartLoading);
+    contents.on("did-stop-loading", onDidStopLoading);
+    contents.on("page-title-updated", onPageTitle);
+    contents.on("did-navigate", onDidNavigate);
+    contents.on("did-navigate-in-page", onDidNavigateInPage);
+    contents.on("console-message", onConsoleMessage);
+
+    // Stash disposers on the contents so detachGuest can remove them when the
+    // guest is recreated or the tab closes.
+    (contents as unknown as { __divisorGuestListeners?: unknown }).__divisorGuestListeners = {
+      onDidStartNavigation,
+      onDidStartLoading,
+      onDidStopLoading,
+      onPageTitle,
+      onDidNavigate,
+      onDidNavigateInPage,
+      onConsoleMessage,
+    };
+  }
+
+  private detachGuest(tab: ManagedTab) {
+    const contents = tab.contents;
+    if (!contents) {
+      tab.contents = null;
+      return;
+    }
+    const listeners = (
+      contents as unknown as { __divisorGuestListeners?: Record<string, (...a: unknown[]) => void> }
+    ).__divisorGuestListeners;
+    if (listeners) {
+      contents.off?.("did-start-navigation", listeners.onDidStartNavigation);
+      contents.off?.("did-start-loading", listeners.onDidStartLoading);
+      contents.off?.("did-stop-loading", listeners.onDidStopLoading);
+      contents.off?.("page-title-updated", listeners.onPageTitle);
+      contents.off?.("did-navigate", listeners.onDidNavigate);
+      contents.off?.("did-navigate-in-page", listeners.onDidNavigateInPage);
+      contents.off?.("console-message", listeners.onConsoleMessage);
+      delete (contents as unknown as { __divisorGuestListeners?: unknown }).__divisorGuestListeners;
+    }
+    tab.contents = null;
   }
 
   private configureSession(profile: BrowserProfile) {
@@ -397,40 +451,6 @@ export class BrowserManager {
     }
   }
 
-  private showSurface(surface: { rect: BrowserRect; sessionId: string; tabId: string }) {
-    const window = this.getWindow();
-    if (!window || window.isDestroyed()) return;
-    const tab = this.requireOwnedTab(surface.sessionId, surface.tabId);
-    if (this.attachedView !== tab.view) {
-      this.detach(this.attachedView);
-      window.contentView.addChildView(tab.view);
-      this.attachedView = tab.view;
-    }
-    const zoom = window.webContents.getZoomFactor();
-    const contentBounds = window.getContentBounds();
-    const x = clamp(Math.round(surface.rect.x * zoom), 0, Math.max(0, contentBounds.width - 1));
-    const y = clamp(Math.round(surface.rect.y * zoom), 0, Math.max(0, contentBounds.height - 1));
-    tab.view.setBounds({
-      height: clamp(Math.round(surface.rect.height * zoom), 1, contentBounds.height - y),
-      width: clamp(Math.round(surface.rect.width * zoom), 1, contentBounds.width - x),
-      x,
-      y,
-    });
-  }
-
-  private detach(view: WebContentsView | null) {
-    if (!view) return;
-    const window = this.getWindow();
-    if (window && !window.isDestroyed()) {
-      try {
-        window.contentView.removeChildView(view);
-      } catch {
-        // The view may already have been detached during window teardown.
-      }
-    }
-    if (this.attachedView === view) this.attachedView = null;
-  }
-
   private handleAnnotationViewportMessage(browserPageId: string, message: string) {
     const token = this.annotationViewportTokens.get(browserPageId);
     if (!token) return;
@@ -448,6 +468,7 @@ export class BrowserManager {
       comment: parsed.comment,
       markerId: parsed.markerId,
       type: parsed.type,
+      open: parsed.type === "open" ? extractOpenPayload(parsed) : undefined,
     });
   }
 
@@ -460,13 +481,23 @@ export class BrowserManager {
 
   private requireOwnedTab(sessionId: string, tabId: string): ManagedTab {
     const tab = this.tabs.get(tabId);
-    if (!tab || tab.state.sessionId !== sessionId || tab.view.webContents.isDestroyed()) {
+    if (!tab || tab.state.sessionId !== sessionId) {
       throw new BrowserOperationError(
         "browser_page_closed",
         `Browser page ${tabId} is unavailable`,
       );
     }
     return tab;
+  }
+
+  private requireContents(tab: ManagedTab): WebContents {
+    if (!tab.contents || tab.contents.isDestroyed()) {
+      throw new BrowserOperationError(
+        "browser_page_closed",
+        "The browser page is still loading. Wait for it to finish before reading it.",
+      );
+    }
+    return tab.contents;
   }
 
   private requireProfile(id: string): BrowserProfile {
@@ -477,8 +508,8 @@ export class BrowserManager {
 
   private updateFromContents(tabId: string) {
     const tab = this.tabs.get(tabId);
-    if (!tab || tab.view.webContents.isDestroyed()) return;
-    const contents = tab.view.webContents;
+    if (!tab || !tab.contents || tab.contents.isDestroyed()) return;
+    const contents = tab.contents;
     this.updateNavigationState(tabId, {
       canGoBack: contents.navigationHistory.canGoBack(),
       canGoForward: contents.navigationHistory.canGoForward(),
@@ -494,13 +525,6 @@ export class BrowserManager {
     Object.assign(tab.state, update);
     this.persist();
     this.emit(tab.state.sessionId);
-  }
-
-  private failNavigation(tabId: string, error: unknown) {
-    this.updateNavigationState(tabId, {
-      isLoading: false,
-      title: error instanceof Error ? error.message : "Navigation failed",
-    });
   }
 
   private emit(sessionId: string) {
@@ -535,19 +559,32 @@ export class BrowserManager {
     for (const [sessionId, tabId] of Object.entries(persisted?.activeTabBySession ?? {})) {
       this.activeTabBySession.set(sessionId, tabId);
     }
-    for (const saved of persisted?.tabs ?? []) {
-      const profile = this.profiles.get(saved.profileId) ?? DEFAULT_PROFILE;
+    // Persisted tabs are restored as state-only stubs. The renderer remounts a
+    // <webview> for each and re-registers the guest; contents stay null until then.
+    // Dedupe by (sessionId, url): older sessions could accumulate identical tabs
+    // before openOrFocus landed; drop earlier duplicates so the tab bar stays clean.
+    const seen = new Set<string>();
+    const dedupedTabs = [...(persisted?.tabs ?? [])]
+      .reverse()
+      .filter((saved) => {
+        const key = `${saved.sessionId} ${saved.url}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .reverse();
+    for (const saved of dedupedTabs) {
       const state: BrowserTab = {
         ...saved,
         canGoBack: false,
         canGoForward: false,
         isLoading: true,
       };
-      const view = this.createView(state, profile);
-      this.tabs.set(state.id, { state, view });
-      void view.webContents
-        .loadURL(normalizeBrowserUrl(saved.url))
-        .catch((error) => this.failNavigation(state.id, error));
+      this.tabs.set(state.id, { state, contents: null });
+    }
+    // Drop active-tab pointers that no longer resolve after dedupe.
+    for (const [sessionId, tabId] of this.activeTabBySession) {
+      if (!this.tabs.has(tabId)) this.activeTabBySession.delete(sessionId);
     }
   }
 
@@ -579,30 +616,55 @@ function requireLabel(label: string) {
   return normalized;
 }
 
-function isValidRect(rect: BrowserRect) {
-  return (
-    Number.isFinite(rect.x) &&
-    Number.isFinite(rect.y) &&
-    Number.isFinite(rect.width) &&
-    Number.isFinite(rect.height) &&
-    rect.width > 0 &&
-    rect.height > 0
-  );
-}
-
-function clamp(value: number, minimum: number, maximum: number) {
-  return Math.min(Math.max(value, minimum), Math.max(minimum, maximum));
-}
-
-function isAnnotationViewportEventPayload(
-  value: unknown,
-): value is { comment?: string; markerId: string; type: "delete" | "open" | "save" } {
+function isAnnotationViewportEventPayload(value: unknown): value is {
+  comment?: string;
+  markerId: string;
+  type: "delete" | "open" | "save";
+} {
   if (!value || typeof value !== "object") return false;
   const payload = value as { comment?: unknown; markerId?: unknown; type?: unknown };
   return (
     typeof payload.markerId === "string" &&
     (payload.type === "delete" || payload.type === "open" || payload.type === "save") &&
     (payload.comment === undefined || typeof payload.comment === "string")
+  );
+}
+
+/** Pull the geometry fields an `open` event carries for the React editor anchor. */
+function extractOpenPayload(
+  value: unknown,
+): BrowserAnnotationViewportBridgeOpenPayload | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const p = value as Record<string, unknown>;
+  const rectPage = p.rectPage;
+  const rectViewport = p.rectViewport;
+  if (!isRect(rectPage) || !isRect(rectViewport)) return undefined;
+  const intent =
+    p.intent === "fix" || p.intent === "change" || p.intent === "question" || p.intent === "approve"
+      ? (p.intent as BrowserAnnotationIntent)
+      : "change";
+  return {
+    comment: typeof p.comment === "string" ? p.comment : "",
+    computedStyles:
+      p.computedStyles && typeof p.computedStyles === "object"
+        ? (p.computedStyles as BrowserGrabComputedStyles)
+        : ({} as BrowserGrabComputedStyles),
+    intent,
+    isFixed: Boolean(p.isFixed),
+    rectPage,
+    rectViewport,
+    tagName: typeof p.tagName === "string" ? p.tagName : "",
+  };
+}
+
+function isRect(value: unknown): value is BrowserRect {
+  if (!value || typeof value !== "object") return false;
+  const r = value as Record<string, unknown>;
+  return (
+    typeof r.x === "number" &&
+    typeof r.y === "number" &&
+    typeof r.width === "number" &&
+    typeof r.height === "number"
   );
 }
 
