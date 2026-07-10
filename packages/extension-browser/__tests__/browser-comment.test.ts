@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { buildBrowserAnnotationViewportBridgeScript } from "../src/main/annotation-viewport-bridge";
 import {
   insertBrowserComment,
   removeBrowserComment,
@@ -168,42 +167,6 @@ describe("browser comment prompt sync", () => {
       ["delete", 8, 9],
     ]);
     expect(dispatched).toEqual([transaction, transaction]);
-  });
-});
-
-describe("browser annotation viewport bridge", () => {
-  it("builds interactive marker and editor overlay script", () => {
-    const script = buildBrowserAnnotationViewportBridgeScript({
-      emitViewport: false,
-      enabled: true,
-      markers: [
-        {
-          comment: "Tighten this copy",
-          computedStyles: emptyComputedStyles(),
-          id: "marker-1",
-          index: 0,
-          intent: "change",
-          isFixed: false,
-          tagName: "div",
-          rectPage: { height: 20, width: 100, x: 10, y: 30 },
-          rectViewport: { height: 20, width: 100, x: 10, y: 30 },
-        },
-      ],
-      token: "token",
-    });
-
-    // The bridge renders only marker pins and emits `hover`/`open` events;
-    // tooltip and editor live in the React host, so the script has no injected
-    // tooltip/editor (no showTooltip, no showEditor).
-    expect(script).toContain("pointer-events:auto");
-    expect(script).toContain("emitMarkerEvent('hover'");
-    expect(script).toContain("emitMarkerEvent('open'");
-    expect(script).toContain("element.getBoundingClientRect()");
-    expect(script).toContain("existing.token = token");
-    expect(script).toContain("globalThis[stateKey]?.token || token");
-    expect(script).not.toContain("showTooltip");
-    expect(script).not.toContain("showEditor");
-    expect(script).toContain("Tighten this copy");
   });
 });
 

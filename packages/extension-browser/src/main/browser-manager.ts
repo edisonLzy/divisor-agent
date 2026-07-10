@@ -5,13 +5,8 @@ import { join } from "node:path";
 import { app, dialog, nativeImage, session, shell, webContents, type WebContents } from "electron";
 
 import type {
-  BrowserAnnotationIntent,
-  BrowserAnnotationViewportBridgeEvent,
-  BrowserAnnotationViewportBridgeMarker,
-  BrowserAnnotationViewportBridgeOpenPayload,
   BrowserElementSelection,
   BrowserGetProperty,
-  BrowserGrabComputedStyles,
   BrowserNavigationAction,
   BrowserProfile,
   BrowserRect,
@@ -19,10 +14,6 @@ import type {
   BrowserTab,
   DetectedChromiumProfile,
 } from "../common/types";
-import {
-  BROWSER_ANNOTATION_VIEWPORT_MESSAGE_PREFIX,
-  buildBrowserAnnotationViewportBridgeScript,
-} from "./annotation-viewport-bridge";
 import { detectChromiumProfiles, importChromiumCookies } from "./cookie-import";
 import { cancelElementSelection, selectElement } from "./element-selection";
 import { SnapshotService } from "./snapshot";
@@ -55,14 +46,11 @@ export class BrowserManager {
   private tabs = new Map<string, ManagedTab>();
   private snapshotService = new SnapshotService();
   private detectedProfiles = new Map<string, DetectedChromiumProfile>();
-  private annotationViewportTokens = new Map<string, string>();
 
   constructor(
     private getWindow: () => Electron.BrowserWindow | null,
     private onStateChanged: (sessionId: string, state: BrowserState) => void,
-    private onAnnotationViewportEvent: (
-      event: BrowserAnnotationViewportBridgeEvent,
-    ) => void = () => {},
+    private annotationPreloadPath?: string,
   ) {
     this.load();
   }
@@ -110,7 +98,6 @@ export class BrowserManager {
     const tab = this.requireOwnedTab(sessionId, tabId);
     this.detachGuest(tab);
     this.tabs.delete(tabId);
-    this.annotationViewportTokens.delete(tabId);
     this.snapshotService.clear(tabId);
     if (this.activeTabBySession.get(sessionId) === tabId) {
       const replacement = [...this.tabs.values()].find(
@@ -336,33 +323,6 @@ export class BrowserManager {
     if (tab.contents) await cancelElementSelection(tab.contents);
   }
 
-  async setAnnotationViewportBridge(
-    browserPageId: string,
-    enabled: boolean,
-    markers: BrowserAnnotationViewportBridgeMarker[],
-    token: string,
-  ) {
-    const tab = this.tabs.get(browserPageId);
-    if (!tab || !tab.contents || tab.contents.isDestroyed()) {
-      console.warn(
-        `[anno-debug] setAnnotationViewportBridge SKIP (no contents) pageId=${browserPageId} enabled=${enabled} markers=${markers.length}`,
-      );
-      return;
-    }
-    console.warn(
-      `[anno-debug] setAnnotationViewportBridge inject pageId=${browserPageId} enabled=${enabled} markers=${markers.length}`,
-    );
-    if (enabled) this.annotationViewportTokens.set(browserPageId, token);
-    else this.annotationViewportTokens.delete(browserPageId);
-    const script = buildBrowserAnnotationViewportBridgeScript({
-      emitViewport: false,
-      enabled,
-      markers,
-      token,
-    });
-    await tab.contents.executeJavaScript(script, true).catch(() => {});
-  }
-
   destroy() {
     for (const tab of this.tabs.values()) this.detachGuest(tab);
     this.tabs.clear();
@@ -377,7 +337,6 @@ export class BrowserManager {
     const onPageTitle = (_e: unknown, title: string) =>
       this.updateNavigationState(state.id, { title });
     const onDidNavigate = (_e: unknown, url: string) => {
-      this.annotationViewportTokens.delete(state.id);
       this.updateNavigationState(state.id, { url });
     };
     const onDidNavigateInPage = (_e: unknown, url: string) => {
@@ -391,9 +350,6 @@ export class BrowserManager {
       isMainFrame: boolean,
     ) => {
       if (isMainFrame) this.snapshotService.markNavigated(state.id);
-    };
-    const onConsoleMessage = (_e: unknown, _level: unknown, message: string) => {
-      this.handleAnnotationViewportMessage(state.id, message);
     };
     const onWindowOpen = ({ url }: { url: string }) => {
       try {
@@ -411,7 +367,6 @@ export class BrowserManager {
     contents.on("page-title-updated", onPageTitle);
     contents.on("did-navigate", onDidNavigate);
     contents.on("did-navigate-in-page", onDidNavigateInPage);
-    contents.on("console-message", onConsoleMessage);
 
     // Stash disposers on the contents so detachGuest can remove them when the
     // guest is recreated or the tab closes.
@@ -422,7 +377,6 @@ export class BrowserManager {
       onPageTitle,
       onDidNavigate,
       onDidNavigateInPage,
-      onConsoleMessage,
     };
   }
 
@@ -442,7 +396,6 @@ export class BrowserManager {
       contents.off?.("page-title-updated", listeners.onPageTitle);
       contents.off?.("did-navigate", listeners.onDidNavigate);
       contents.off?.("did-navigate-in-page", listeners.onDidNavigateInPage);
-      contents.off?.("console-message", listeners.onConsoleMessage);
       delete (contents as unknown as { __divisorGuestListeners?: unknown }).__divisorGuestListeners;
     }
     tab.contents = null;
@@ -450,6 +403,13 @@ export class BrowserManager {
 
   private configureSession(profile: BrowserProfile) {
     const browserSession = session.fromPartition(profile.partition);
+    if (this.annotationPreloadPath) {
+      browserSession.registerPreloadScript({
+        filePath: this.annotationPreloadPath,
+        id: "divisor-annotation-bridge",
+        type: "frame",
+      });
+    }
     browserSession.setPermissionRequestHandler((_contents, _permission, callback) =>
       callback(false),
     );
@@ -463,30 +423,6 @@ export class BrowserManager {
         }
       });
     }
-  }
-
-  private handleAnnotationViewportMessage(browserPageId: string, message: string) {
-    const token = this.annotationViewportTokens.get(browserPageId);
-    const prefix = `${BROWSER_ANNOTATION_VIEWPORT_MESSAGE_PREFIX}${token ?? "<notoken>"}:`;
-    if (!token || !message.startsWith(prefix)) return;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(message.slice(prefix.length));
-    } catch {
-      return;
-    }
-    console.warn(
-      `[anno-debug] guest->main event pageId=${browserPageId} type=${(parsed as { type?: string })?.type}`,
-    );
-    if (!isAnnotationViewportEventPayload(parsed)) return;
-    this.onAnnotationViewportEvent({
-      browserPageId,
-      comment: parsed.comment,
-      markerId: parsed.markerId,
-      type: parsed.type,
-      open:
-        parsed.type === "open" || parsed.type === "hover" ? extractOpenPayload(parsed) : undefined,
-    });
   }
 
   private resolveTab(sessionId: string, tabId?: string) {
@@ -631,67 +567,6 @@ function requireLabel(label: string) {
   const normalized = label.trim().slice(0, 80);
   if (!normalized) throw new Error("Profile label is required");
   return normalized;
-}
-
-function isAnnotationViewportEventPayload(value: unknown): value is {
-  comment?: string;
-  markerId: string | null;
-  type: "delete" | "hover" | "open" | "save";
-} {
-  if (!value || typeof value !== "object") return false;
-  const payload = value as { comment?: unknown; markerId?: unknown; type?: unknown };
-  if (
-    !(
-      payload.type === "delete" ||
-      payload.type === "hover" ||
-      payload.type === "open" ||
-      payload.type === "save"
-    )
-  )
-    return false;
-  // hover-leave carries markerId: null; others carry a string.
-  const markerIdOk = payload.markerId === null || typeof payload.markerId === "string";
-  return markerIdOk && (payload.comment === undefined || typeof payload.comment === "string");
-}
-
-/** Pull the geometry fields an `open`/`hover` event carries for the React anchor. */
-function extractOpenPayload(
-  value: unknown,
-): BrowserAnnotationViewportBridgeOpenPayload | undefined {
-  if (!value || typeof value !== "object") return undefined;
-  const p = value as Record<string, unknown>;
-  const rectPage = p.rectPage;
-  const rectViewport = p.rectViewport;
-  if (!isRect(rectPage) || !isRect(rectViewport)) return undefined;
-  const intent =
-    p.intent === "fix" || p.intent === "change" || p.intent === "question" || p.intent === "approve"
-      ? (p.intent as BrowserAnnotationIntent)
-      : "change";
-  return {
-    anchorX: typeof p.anchorX === "number" ? p.anchorX : 0,
-    anchorY: typeof p.anchorY === "number" ? p.anchorY : 0,
-    comment: typeof p.comment === "string" ? p.comment : "",
-    computedStyles:
-      p.computedStyles && typeof p.computedStyles === "object"
-        ? (p.computedStyles as BrowserGrabComputedStyles)
-        : ({} as BrowserGrabComputedStyles),
-    intent,
-    isFixed: Boolean(p.isFixed),
-    rectPage,
-    rectViewport,
-    tagName: typeof p.tagName === "string" ? p.tagName : "",
-  };
-}
-
-function isRect(value: unknown): value is BrowserRect {
-  if (!value || typeof value !== "object") return false;
-  const r = value as Record<string, unknown>;
-  return (
-    typeof r.x === "number" &&
-    typeof r.y === "number" &&
-    typeof r.width === "number" &&
-    typeof r.height === "number"
-  );
 }
 
 async function contentsDownload(url: string, path: string, partition: string) {

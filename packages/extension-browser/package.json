@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     "./main": "./src/main.ts",
+    "./preload": "./src/preload/browser-annotation-bridge.js",
     "./renderer": "./src/renderer.tsx"
   },
   "scripts": {

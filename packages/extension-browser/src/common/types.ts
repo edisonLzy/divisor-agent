@@ -284,52 +284,6 @@ export const GRAB_STYLE_PROPERTIES: readonly (keyof BrowserGrabComputedStyles)[]
 ];
 
 // ---------------------------------------------------------------------------
-// Viewport bridge types
-// ---------------------------------------------------------------------------
-
-export interface BrowserAnnotationViewportBridgeMarker {
-  id: string;
-  index: number;
-  comment: string;
-  computedStyles: BrowserGrabComputedStyles;
-  intent: BrowserAnnotationIntent;
-  tagName: string;
-  rectPage: BrowserRect;
-  rectViewport: BrowserRect;
-  isFixed: boolean;
-}
-
-export type BrowserAnnotationViewportBridgeEventType = "delete" | "hover" | "open" | "save";
-
-/**
- * Geometry carried on `open`/`hover` events so the host renderer can anchor its
- * React overlays (tooltip/editor) at the marker via @floating-ui. `anchorX/Y`
- * are the marker pin's position in guest-viewport coords; the host adds the
- * <webview> element's screen rect to get renderer-screen coords.
- */
-export interface BrowserAnnotationViewportBridgeOpenPayload {
-  anchorX: number;
-  anchorY: number;
-  comment: string;
-  computedStyles: BrowserGrabComputedStyles;
-  intent: BrowserAnnotationIntent;
-  isFixed: boolean;
-  rectPage: BrowserRect;
-  rectViewport: BrowserRect;
-  tagName: string;
-}
-
-export interface BrowserAnnotationViewportBridgeEvent {
-  browserPageId: string;
-  comment?: string;
-  /** null on hover-leave; otherwise the marker id. */
-  markerId: string | null;
-  type: BrowserAnnotationViewportBridgeEventType;
-  /** Present only on `open`/`hover` events (null markerId on hover-leave). */
-  open?: BrowserAnnotationViewportBridgeOpenPayload;
-}
-
-// ---------------------------------------------------------------------------
 // IPC types
 // ---------------------------------------------------------------------------
 
@@ -383,15 +337,8 @@ export interface BrowserInvokeEvents {
     tabId: string;
   }): Promise<BrowserElementSelection>;
   cancelElementSelection(input: { sessionId: string; tabId: string }): Promise<void>;
-  setAnnotationViewportBridge(input: {
-    browserPageId: string;
-    enabled: boolean;
-    markers: BrowserAnnotationViewportBridgeMarker[];
-    token: string;
-  }): void;
 }
 
 export interface BrowserExposeEvents {
-  annotationViewportEvent(event: BrowserAnnotationViewportBridgeEvent): void;
   stateChanged(sessionId: string, state: BrowserState): void;
 }

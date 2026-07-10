@@ -1,3 +1,5 @@
+import { createRequire } from "module";
+
 import { defineMainExtension } from "@divisor-agent/extension-core/main";
 import { Type } from "@earendil-works/pi-ai";
 
@@ -19,14 +21,15 @@ const optionalTabId = Type.Optional(
 export default defineMainExtension<BrowserInvokeEvents, BrowserExposeEvents>({
   ...BROWSER_EXTENSION,
   setup(ctx) {
+    const _require = createRequire(import.meta.url);
+    const PRELOAD_PATH = _require.resolve("@divisor-agent/extension-browser/preload");
+
     const manager = new BrowserManager(
       ctx.getBrowserWindow,
       (sessionId, state) => {
         ctx.ipc.emit("stateChanged", sessionId, state);
       },
-      (event) => {
-        ctx.ipc.emit("annotationViewportEvent", event);
-      },
+      PRELOAD_PATH,
     );
 
     ctx.ipc.handle("createTab", ({ profileId, sessionId, url }) =>
@@ -62,9 +65,6 @@ export default defineMainExtension<BrowserInvokeEvents, BrowserExposeEvents>({
     );
     ctx.ipc.handle("cancelElementSelection", ({ sessionId, tabId }) =>
       manager.cancelElementSelection(sessionId, tabId),
-    );
-    ctx.ipc.handle("setAnnotationViewportBridge", ({ browserPageId, enabled, markers, token }) =>
-      manager.setAnnotationViewportBridge(browserPageId, enabled, markers, token),
     );
 
     ctx.systemPrompt.register({

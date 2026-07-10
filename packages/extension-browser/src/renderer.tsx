@@ -32,8 +32,6 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   BROWSER_ARTIFACT_TYPE,
   BROWSER_EXTENSION,
-  type BrowserAnnotationViewportBridgeEvent,
-  type BrowserAnnotationViewportBridgeMarker,
   type BrowserElementSelection,
   type BrowserExposeEvents,
   type BrowserInvokeEvents,
@@ -44,14 +42,8 @@ import {
   type DetectedChromiumProfile,
 } from "./common/types";
 import AnnotationComposer from "./renderer/annotation-composer";
-import AnnotationEditor from "./renderer/annotation-editor";
-import AnnotationTooltip from "./renderer/annotation-tooltip";
-import {
-  browserCommentExtension,
-  insertBrowserComment,
-  removeBrowserComment,
-  updateBrowserComment,
-} from "./renderer/browser-comment";
+import { AnnotationViewportMarkers } from "./renderer/annotation-viewport-markers";
+import { browserCommentExtension, insertBrowserComment } from "./renderer/browser-comment";
 import {
   ensureBrowserPageWebview,
   getBrowserPageWebview,
@@ -86,14 +78,7 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
   const [selectingTabId, setSelectingTabId] = useState<string | null>(null);
   const [annotations, setAnnotations] = useState<BrowserPageAnnotation[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [editingMarker, setEditingMarker] = useState<{
-    anchor: { x: number; y: number };
-    markerId: string;
-  } | null>(null);
-  const [hoverMarker, setHoverMarker] = useState<{
-    anchor: { x: number; y: number };
-    comment: string;
-  } | null>(null);
+  const [webviewGen, setWebviewGen] = useState(0);
   const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId) ?? null;
   const activeTabId = state.activeTabId;
   const activeTabUrl = activeTab?.url;
@@ -166,6 +151,7 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
     if (!result) return;
     const { webview, created } = result;
     if (created) {
+      setWebviewGen((g) => g + 1);
       const onDomReady = () => {
         const webContentsId = webview.getWebContentsId();
         if (typeof webContentsId !== "number") return;
@@ -202,33 +188,6 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
       void ipc.invoke("cancelElementSelection", { sessionId, tabId: selectingTabId });
     };
   }, [ipc, selectingTabId, sessionId]);
-
-  useEffect(() => {
-    return ipc.on("annotationViewportEvent", (event) => {
-      if (!activeTab || event.browserPageId !== activeTab.id) return;
-      handleAnnotationViewportEvent(event);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab?.id, annotations, ipc]);
-
-  // Sync annotation markers when active tab changes
-  useEffect(() => {
-    if (!activeTab) return;
-    const tabAnnotations = annotations.filter((a) => a.browserPageId === activeTab.id);
-    updateViewportMarkers(activeTab.id, tabAnnotations);
-    return () => {
-      // Remove markers when tab changes
-      if (activeTab) {
-        void ipc.invoke("setAnnotationViewportBridge", {
-          browserPageId: activeTab.id,
-          enabled: false,
-          markers: [],
-          token: "",
-        });
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab?.id]);
 
   const navigate = (action: "back" | "forward" | "goto" | "reload", url?: string) => {
     if (!activeTab) return;
@@ -286,98 +245,17 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
     });
     const updatedAnnotations = [...annotations, newAnnotation];
     setAnnotations(updatedAnnotations);
-    updateViewportMarkers(activeTab.id, updatedAnnotations);
     setSelection(null);
   };
 
-  // Convert a guest-viewport anchor (from the bridge event) to renderer-screen
-  // coords by adding the <webview> element's origin. The React overlays float
-  // against this screen point.
-  const screenAnchor = (guestX: number, guestY: number) => {
+  const selectionAnchor = (selected: BrowserElementSelection) => {
     const webview = getBrowserPageWebview(activeTab?.id ?? "");
     const rect = viewportRef.current?.getBoundingClientRect() ?? webview?.getBoundingClientRect();
-    return { x: (rect?.left ?? 0) + guestX, y: (rect?.top ?? 0) + guestY };
-  };
-
-  const selectionAnchor = (selected: BrowserElementSelection) => {
     const { rectViewport } = selected.payload.target;
-    return screenAnchor(
-      rectViewport.x + rectViewport.width / 2,
-      rectViewport.y + rectViewport.height,
-    );
-  };
-
-  const handleAnnotationViewportEvent = (event: BrowserAnnotationViewportBridgeEvent) => {
-    if (!activeTab || event.browserPageId !== activeTab.id) return;
-    if (event.type === "hover") {
-      // hover-leave carries null markerId; hide the tooltip.
-      if (!event.markerId || !event.open) {
-        setHoverMarker(null);
-        return;
-      }
-      setHoverMarker({
-        anchor: screenAnchor(event.open.anchorX + 12, event.open.anchorY + 12),
-        comment: event.open.comment,
-      });
-      return;
-    }
-    if (event.type === "open") {
-      if (!event.open || !event.markerId) return;
-      setHoverMarker(null);
-      setEditingMarker({
-        anchor: screenAnchor(event.open.anchorX + 12, event.open.anchorY + 12),
-        markerId: event.markerId,
-      });
-      return;
-    }
-    if (event.type === "delete") {
-      if (!event.markerId) return;
-      setEditingMarker(null);
-      const updatedAnnotations = annotations.filter(
-        (annotation) => annotation.id !== event.markerId,
-      );
-      const editor = api.sharedPromptEditor.editor;
-      if (editor) removeBrowserComment(editor, event.markerId);
-      setAnnotations(updatedAnnotations);
-      updateViewportMarkers(activeTab.id, updatedAnnotations);
-      return;
-    }
-    if (event.type === "save") {
-      if (!event.markerId) return;
-      setEditingMarker(null);
-      const updatedAnnotations = annotations.map((annotation) =>
-        annotation.id === event.markerId
-          ? { ...annotation, comment: (event.comment ?? "").trim() || "Selected element" }
-          : annotation,
-      );
-      const editor = api.sharedPromptEditor.editor;
-      if (editor) updateBrowserComment(editor, event.markerId, event.comment?.trim() || "");
-      setAnnotations(updatedAnnotations);
-      updateViewportMarkers(activeTab.id, updatedAnnotations);
-    }
-  };
-
-  const updateViewportMarkers = (tabId: string, pageAnnotations: BrowserPageAnnotation[]) => {
-    const markers: BrowserAnnotationViewportBridgeMarker[] = pageAnnotations
-      .filter((a) => a.browserPageId === tabId)
-      .map((a, index) => ({
-        id: a.id,
-        index,
-        comment: a.comment,
-        computedStyles: a.payload.target.computedStyles,
-        intent: a.intent,
-        tagName: a.payload.target.tagName,
-        rectPage: a.payload.target.rectPage,
-        rectViewport: a.payload.target.rectViewport,
-        isFixed: a.payload.target.isFixed ?? false,
-      }));
-    const token = crypto.randomUUID().replaceAll("-", "").slice(0, 40);
-    void ipc.invoke("setAnnotationViewportBridge", {
-      browserPageId: tabId,
-      enabled: markers.length > 0,
-      markers,
-      token,
-    });
+    return {
+      x: (rect?.left ?? 0) + rectViewport.x + rectViewport.width / 2,
+      y: (rect?.top ?? 0) + rectViewport.y + rectViewport.height,
+    };
   };
 
   return (
@@ -462,37 +340,13 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
             onSave={attachComment}
           />
         ) : null}
-        {hoverMarker && !editingMarker ? (
-          <AnnotationTooltip anchor={hoverMarker.anchor} comment={hoverMarker.comment} />
-        ) : null}
-        {editingMarker && activeTab ? (
-          <AnnotationEditor
-            anchor={editingMarker.anchor}
-            initialComment={
-              annotations.find((annotation) => annotation.id === editingMarker.markerId)?.comment ??
-              ""
-            }
-            onCancel={() => setEditingMarker(null)}
-            onDelete={() => {
-              const markerId = editingMarker.markerId;
-              setEditingMarker(null);
-              const updatedAnnotations = annotations.filter((a) => a.id !== markerId);
-              const editor = api.sharedPromptEditor.editor;
-              if (editor) removeBrowserComment(editor, markerId);
-              setAnnotations(updatedAnnotations);
-              updateViewportMarkers(activeTab.id, updatedAnnotations);
-            }}
-            onSave={(nextComment) => {
-              const markerId = editingMarker.markerId;
-              setEditingMarker(null);
-              const updatedAnnotations = annotations.map((a) =>
-                a.id === markerId ? { ...a, comment: nextComment } : a,
-              );
-              const editor = api.sharedPromptEditor.editor;
-              if (editor) updateBrowserComment(editor, markerId, nextComment);
-              setAnnotations(updatedAnnotations);
-              updateViewportMarkers(activeTab.id, updatedAnnotations);
-            }}
+        {activeTab ? (
+          <AnnotationViewportMarkers
+            annotations={annotations}
+            browserPageId={activeTab.id}
+            editor={api.sharedPromptEditor.editor}
+            onAnnotationsChange={setAnnotations}
+            webviewGen={webviewGen}
           />
         ) : null}
       </div>
