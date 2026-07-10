@@ -1,62 +1,78 @@
-import { autoUpdate, offset, shift, flip, useFloating } from "@floating-ui/react";
-import { useEffect, useState } from "react";
-
-// ---------------------------------------------------------------------------
-// Floating anchor helpers for annotation overlays (tooltip + editor)
-//
-// Marker pins live inside the guest <webview> (they must, to follow the target
-// element through scroll). The tooltip and editor, however, are React overlays
-// in the host renderer - they paint above the <webview> and use @floating-ui
-// to position against a *virtual* anchor derived from the marker's
-// renderer-screen coordinates. This replaces the hand-rolled placeFloating /
-// computeEditorPosition collision math with floating-ui's flip + shift.
-// ---------------------------------------------------------------------------
+import {
+  autoUpdate,
+  computePosition,
+  flip,
+  offset,
+  shift,
+  type Placement,
+} from "@floating-ui/react";
+import { useLayoutEffect, useState } from "react";
 
 export interface ScreenPoint {
   x: number;
   y: number;
 }
 
-/** Build a zero-size virtual element at a screen point for floating-ui. */
-function virtualElementAt(point: ScreenPoint) {
-  return {
-    getBoundingClientRect() {
-      const x = point.x;
-      const y = point.y;
-      return { x, y, width: 0, height: 0, top: y, left: x, right: x, bottom: y };
-    },
-  };
+interface FloatingPosition {
+  x: number;
+  y: number;
 }
 
 /**
- * Position a floating overlay (fixed strategy) anchored at a screen point,
- * with flip + shift collision handling and live autoUpdate.
+ * Positions a host-rendered overlay against a point inside an Electron
+ * <webview>. The overlay itself is portalled to document.body, so all values
+ * here are renderer viewport coordinates rather than artifact-local values.
  */
 export function useAnchoredFloating(
   anchor: ScreenPoint | null,
-  options: { offset?: number; placement?: "top" | "bottom" } = {},
+  options: { offset?: number; placement?: Placement } = {},
 ) {
   const { offset: offsetPx = 8, placement = "bottom" } = options;
-  const [open, setOpen] = useState(false);
+  const [floating, setFloating] = useState<HTMLElement | null>(null);
+  const [position, setPosition] = useState<FloatingPosition | null>(null);
 
-  const { refs, floatingStyles, update } = useFloating({
-    middleware: [offset(offsetPx), flip(), shift({ padding: 8 })],
-    open,
-    onOpenChange: setOpen,
-    placement,
-    strategy: "fixed",
-    whileElementsMounted: autoUpdate,
-  });
-
-  useEffect(() => {
-    if (anchor) {
-      refs.setPositionReference(virtualElementAt(anchor));
-      void update();
-      setOpen(true);
-    } else {
-      setOpen(false);
+  useLayoutEffect(() => {
+    if (!anchor || !floating) {
+      setPosition(null);
+      return;
     }
-  }, [anchor, refs, update]);
 
-  return { refs, floatingStyles, open };
+    const reference = virtualElementAt(anchor);
+    let disposed = false;
+    const updatePosition = () => {
+      void computePosition(reference, floating, {
+        middleware: [offset(offsetPx), flip(), shift({ padding: 8 })],
+        placement,
+        strategy: "fixed",
+      }).then(({ x, y }) => {
+        if (!disposed) setPosition({ x, y });
+      });
+    };
+
+    const cleanup = autoUpdate(reference, floating, updatePosition);
+    return () => {
+      disposed = true;
+      cleanup();
+    };
+  }, [anchor, floating, offsetPx, placement]);
+
+  return {
+    floatingStyles: {
+      left: position?.x ?? 0,
+      position: "fixed" as const,
+      top: position?.y ?? 0,
+      visibility: position ? ("visible" as const) : ("hidden" as const),
+    },
+    refs: { setFloating },
+  };
+}
+
+function virtualElementAt(point: ScreenPoint) {
+  return {
+    contextElement: document.documentElement,
+    getBoundingClientRect() {
+      const { x, y } = point;
+      return { bottom: y, height: 0, left: x, right: x, top: y, width: 0, x, y };
+    },
+  };
 }

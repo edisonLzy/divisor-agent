@@ -1,3 +1,5 @@
+import { createPortal } from "react-dom";
+
 import { useAnchoredFloating } from "./annotation-floating";
 
 // ---------------------------------------------------------------------------
@@ -17,15 +19,16 @@ export interface AnnotationTooltipProps {
 export default function AnnotationTooltip({ anchor, comment }: AnnotationTooltipProps) {
   const { refs, floatingStyles } = useAnchoredFloating(anchor, {
     offset: 6,
-    placement: "top",
+    placement: "right",
   });
-  return (
+  return createPortal(
     <div
       ref={refs.setFloating}
       className="z-50 max-w-[220px] rounded-md border-2 border-border bg-popover px-2 py-1 text-xs font-bold text-popover-foreground shadow-[var(--hard-shadow-sm)]"
       style={floatingStyles}
     >
       {comment || "Selected element"}
-    </div>
+    </div>,
+    document.body,
   );
 }

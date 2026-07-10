@@ -78,7 +78,8 @@ export function buildBrowserAnnotationViewportBridgeScript({
 
   const emit = (message) => {
     try {
-      console.debug(prefix + token + ':' + JSON.stringify(message));
+      const activeToken = globalThis[stateKey]?.token || token;
+      console.debug(prefix + activeToken + ':' + JSON.stringify(message));
     } catch (e) {}
   };
 
@@ -149,7 +150,8 @@ export function buildBrowserAnnotationViewportBridgeScript({
         element.addEventListener('mouseenter', () => {
           const liveMarker = state.markers.find((candidate) => candidate.id === element.dataset.markerId);
           if (!liveMarker) return;
-          emitMarkerEvent('hover', liveMarker, toNumber(element.dataset.x, 0), toNumber(element.dataset.y, 0));
+          const rect = element.getBoundingClientRect();
+          emitMarkerEvent('hover', liveMarker, toNumber(rect.left, 0), toNumber(rect.top, 0));
         });
         element.addEventListener('mouseleave', () => {
           emit({ type: 'hover', markerId: null });
@@ -161,7 +163,8 @@ export function buildBrowserAnnotationViewportBridgeScript({
           if (!liveMarker) return;
           // The React editor in the host handles editing; we just surface
           // which marker was clicked plus its live geometry.
-          emitMarkerEvent('open', liveMarker, toNumber(element.dataset.x, 0), toNumber(element.dataset.y, 0));
+          const rect = element.getBoundingClientRect();
+          emitMarkerEvent('open', liveMarker, toNumber(rect.left, 0), toNumber(rect.top, 0));
         });
         shadowRoot.appendChild(element);
         state.markerElements.set(marker.id, element);
@@ -211,6 +214,7 @@ export function buildBrowserAnnotationViewportBridgeScript({
 
   if (existing && existing.requestUpdate) {
     existing.emitViewport = emitViewport;
+    existing.token = token;
     updateMarkers(existing, markers);
     existing.requestUpdate();
     return true;
@@ -223,6 +227,7 @@ export function buildBrowserAnnotationViewportBridgeScript({
     markerElements: new Map(),
     markers: [],
     shadowRoot: null,
+    token,
     requestUpdate: null
   };
 

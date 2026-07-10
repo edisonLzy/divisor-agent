@@ -621,10 +621,8 @@ const SELECTION_SCRIPT = String.raw`(() => new Promise((resolve) => {
     if (!el) { cleanup(); resolve(null); return; }
     var payload = extractPayload(el);
     freezeHighlight();
-    // Resolve immediately with a default comment; the host's React
-    // GrabConfirmationSheet collects the real comment. The guest no longer
-    // renders an in-page comment editor (that was text-button only and
-    // duplicated the host sheet).
+    // Resolve immediately. The host's React overlay collects the comment at
+    // the selected element, so the guest only needs to provide its context.
     resolve({ kind: 'selected', payload: payload, comment: 'Selected element' });
   }
 

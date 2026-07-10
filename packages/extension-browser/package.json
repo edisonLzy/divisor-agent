@@ -20,6 +20,11 @@
     "react": "catalog:"
   },
   "devDependencies": {
+    "@types/react-dom": "catalog:",
+    "react-dom": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "react-dom": "^19.0.0"
   }
 }
