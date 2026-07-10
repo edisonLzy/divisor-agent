@@ -140,3 +140,38 @@ ORCA 的 React editor 能用 z-index 盖在页面上，是因为它用 **`<webvi
 - marker 跟随滚动用了快照时刻 `rectViewport`，打开 editor 后若页面滚动 editor 不会实时跟随。可打开 `emitViewport` 通道让 editor 锚到 live rect（对齐 ORCA 的 `getLiveBrowserAnnotationRect`）。
 - marker 注入仍跑在主世界，可改 `executeJavaScriptInIsolatedWorld`（对齐 ORCA，防页面 monkey-patch 读到 token / 伪造 save/delete 事件）。
 - `element-selection.ts`（800 行注入脚本）仍是注入式，可同样抽模块化 + co-located 测试。
+
+---
+
+## 续：overlay 全 React 化 + floating-ui（同日）
+
+迁移后用户报告 5 个问题，指向同一个半吊子状态：editor React 化了，但 tooltip 还在注入脚本里、selection picker 的 commentEditor 还是注入式文字按钮、定位全靠手写。统一重构为 **guest 只留 marker pin，tooltip/editor 全 React + `@floating-ui/react` 定位**。
+
+### 5 个问题与修复
+
+| 问题 | 根因 | 修复 |
+|---|---|---|
+| 选元素后小输入框是文字按钮 | `element-selection.ts` 注入式 commentEditor 用 DETAIL/OK/X 文字 | 删掉 guest 内 commentEditor + detailPanel，picker 选完直接 resolve（默认 comment），由 host 的 `GrabConfirmationSheet`（React + lucide 图标）收集评论 |
+| hover tooltip 位置奇怪 | 注入式 `placeFloating` 手写定位 | 新增 React `AnnotationTooltip`，marker hover emit `hover` 事件带坐标，floating-ui `flip+shift` 定位 |
+| 点 marker 不弹 editor | 手写 `computeEditorPosition` + 链路 | editor 改用 floating-ui 锚到 bridge 事件带的 `anchorX/anchorY`；`hover`/`open` 事件统一带坐标 |
+| 能用 float UI 吗 | 之前手写定位 | 新增 `annotation-floating.ts`（`useFloating` + 虚拟锚点 + `autoUpdate`），editor + tooltip 共用 |
+| 为什么还有 bridge 脚本 | marker pin 必须注入（跟随 guest 滚动，ORCA 也如此） | bridge 保留但精简：删 tooltip/editor/showTooltip/placeFloating，只剩 marker pin + emit `hover`/`open` |
+
+### 关键设计
+
+- **`annotation-floating.ts`**：`useAnchoredFloating(anchor, options)` 用 `@floating-ui/react` 的 `useFloating` + `refs.setPositionReference(virtualElement)`，把屏幕坐标包装成零尺寸虚拟元素作锚点，`flip`+`shift` 处理碰撞，`autoUpdate` 实时跟随。editor 和 tooltip 共用，替代手写 `computeEditorPosition`/`placeFloating`。
+- **bridge 事件**：marker `mouseenter` emit `hover`（带 `anchorX/anchorY` + comment），`mouseleave` emit `hover`（`markerId:null`），`click` emit `open`。host `screenAnchor()`（webview rect + guest anchor）算屏幕坐标驱动 React overlay。
+- **selection 瘦身**：删 commentEditor/detailPanel/placeCommentEditor/showCommentEditor/renderDetailPanel/addDetailRow + 监听器，脚本减 ~110 行。
+
+### 踩坑：删死代码误删 `cleanup`
+
+删除 guest 内 commentEditor 死代码时（sed 按行删 L590-695），把同范围内的 `cleanup()` 函数定义一起删了。`cleanup` 被 onKey/onClick/onContext/cancelPicker 调用，定义没了 -> `startElementSelection` 注入脚本运行到 `cleanup()` 抛 `cleanup is not defined`。
+
+**教训**：删除注入式字符串内的大段代码时，sed 按行删不核对边界内是否有仍被引用的函数；测试只断言脚本含/不含某字符串、不执行脚本，所以漏了。删后应 grep 确认删除区间内无外部引用，或对脚本做语法检查。已恢复 `cleanup`（移除 mousemove 监听 + 移除 host + 删 `window.__divisorGrab`）。
+
+### 验证
+
+- extension-browser 测试 14/14 通过（删了 `computeEditorPosition` 的 5 个单测，floating-ui 定位由库保证）。
+- `typecheck:node` / `typecheck:web` 绿（除预存 `VoiceInputButton`）。
+- `@floating-ui/react` 加入 extension-browser `dependencies`（app 已有，source-only 包需声明以解析类型）。
+

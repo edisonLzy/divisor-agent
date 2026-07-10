@@ -182,7 +182,13 @@ export class BrowserManager {
     const host = this.getWindow();
     if (host && !host.isDestroyed() && host.webContents.id === input.webContentsId) return;
     const contents = webContents.fromId(input.webContentsId);
-    if (!contents || contents.isDestroyed()) return;
+    if (!contents || contents.isDestroyed()) {
+      console.warn(`[anno-debug] registerGuest fromId failed/destroyed id=${input.webContentsId}`);
+      return;
+    }
+    console.warn(
+      `[anno-debug] registerGuest ok pageId=${input.browserPageId} wcId=${input.webContentsId}`,
+    );
     // If the <webview> recreated its guest (new id), detach the stale one first.
     if (tab.contents && tab.contents !== contents) this.detachGuest(tab);
     tab.contents = contents;
@@ -337,7 +343,15 @@ export class BrowserManager {
     token: string,
   ) {
     const tab = this.tabs.get(browserPageId);
-    if (!tab || !tab.contents || tab.contents.isDestroyed()) return;
+    if (!tab || !tab.contents || tab.contents.isDestroyed()) {
+      console.warn(
+        `[anno-debug] setAnnotationViewportBridge SKIP (no contents) pageId=${browserPageId} enabled=${enabled} markers=${markers.length}`,
+      );
+      return;
+    }
+    console.warn(
+      `[anno-debug] setAnnotationViewportBridge inject pageId=${browserPageId} enabled=${enabled} markers=${markers.length}`,
+    );
     if (enabled) this.annotationViewportTokens.set(browserPageId, token);
     else this.annotationViewportTokens.delete(browserPageId);
     const script = buildBrowserAnnotationViewportBridgeScript({
@@ -453,22 +467,25 @@ export class BrowserManager {
 
   private handleAnnotationViewportMessage(browserPageId: string, message: string) {
     const token = this.annotationViewportTokens.get(browserPageId);
-    if (!token) return;
-    const prefix = `${BROWSER_ANNOTATION_VIEWPORT_MESSAGE_PREFIX}${token}:`;
-    if (!message.startsWith(prefix)) return;
+    const prefix = `${BROWSER_ANNOTATION_VIEWPORT_MESSAGE_PREFIX}${token ?? "<notoken>"}:`;
+    if (!token || !message.startsWith(prefix)) return;
     let parsed: unknown;
     try {
       parsed = JSON.parse(message.slice(prefix.length));
     } catch {
       return;
     }
+    console.warn(
+      `[anno-debug] guest->main event pageId=${browserPageId} type=${(parsed as { type?: string })?.type}`,
+    );
     if (!isAnnotationViewportEventPayload(parsed)) return;
     this.onAnnotationViewportEvent({
       browserPageId,
       comment: parsed.comment,
       markerId: parsed.markerId,
       type: parsed.type,
-      open: parsed.type === "open" ? extractOpenPayload(parsed) : undefined,
+      open:
+        parsed.type === "open" || parsed.type === "hover" ? extractOpenPayload(parsed) : undefined,
     });
   }
 
@@ -618,19 +635,26 @@ function requireLabel(label: string) {
 
 function isAnnotationViewportEventPayload(value: unknown): value is {
   comment?: string;
-  markerId: string;
-  type: "delete" | "open" | "save";
+  markerId: string | null;
+  type: "delete" | "hover" | "open" | "save";
 } {
   if (!value || typeof value !== "object") return false;
   const payload = value as { comment?: unknown; markerId?: unknown; type?: unknown };
-  return (
-    typeof payload.markerId === "string" &&
-    (payload.type === "delete" || payload.type === "open" || payload.type === "save") &&
-    (payload.comment === undefined || typeof payload.comment === "string")
-  );
+  if (
+    !(
+      payload.type === "delete" ||
+      payload.type === "hover" ||
+      payload.type === "open" ||
+      payload.type === "save"
+    )
+  )
+    return false;
+  // hover-leave carries markerId: null; others carry a string.
+  const markerIdOk = payload.markerId === null || typeof payload.markerId === "string";
+  return markerIdOk && (payload.comment === undefined || typeof payload.comment === "string");
 }
 
-/** Pull the geometry fields an `open` event carries for the React editor anchor. */
+/** Pull the geometry fields an `open`/`hover` event carries for the React anchor. */
 function extractOpenPayload(
   value: unknown,
 ): BrowserAnnotationViewportBridgeOpenPayload | undefined {
@@ -644,6 +668,8 @@ function extractOpenPayload(
       ? (p.intent as BrowserAnnotationIntent)
       : "change";
   return {
+    anchorX: typeof p.anchorX === "number" ? p.anchorX : 0,
+    anchorY: typeof p.anchorY === "number" ? p.anchorY : 0,
     comment: typeof p.comment === "string" ? p.comment : "",
     computedStyles:
       p.computedStyles && typeof p.computedStyles === "object"

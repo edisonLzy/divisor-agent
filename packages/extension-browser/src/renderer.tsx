@@ -47,6 +47,7 @@ import {
   type DetectedChromiumProfile,
 } from "./common/types";
 import AnnotationEditor from "./renderer/annotation-editor";
+import AnnotationTooltip from "./renderer/annotation-tooltip";
 import { browserCommentExtension } from "./renderer/browser-comment";
 import {
   ensureBrowserPageWebview,
@@ -89,6 +90,10 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
     anchor: { x: number; y: number };
     markerId: string;
     payload: BrowserAnnotationViewportBridgeOpenPayload;
+  } | null>(null);
+  const [hoverMarker, setHoverMarker] = useState<{
+    anchor: { x: number; y: number };
+    comment: string;
   } | null>(null);
   const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId) ?? null;
   const activeTabId = state.activeTabId;
@@ -312,26 +317,41 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
     updateViewportMarkers(activeTab.id, updatedAnnotations);
   };
 
+  // Convert a guest-viewport anchor (from the bridge event) to renderer-screen
+  // coords by adding the <webview> element's origin. The React overlays float
+  // against this screen point.
+  const screenAnchor = (guestX: number, guestY: number) => {
+    const webview = getBrowserPageWebview(activeTab?.id ?? "");
+    const rect = webview?.getBoundingClientRect();
+    return { x: (rect?.left ?? 0) + guestX, y: (rect?.top ?? 0) + guestY };
+  };
+
   const handleAnnotationViewportEvent = (event: BrowserAnnotationViewportBridgeEvent) => {
     if (!activeTab || event.browserPageId !== activeTab.id) return;
+    if (event.type === "hover") {
+      // hover-leave carries null markerId; hide the tooltip.
+      if (!event.markerId || !event.open) {
+        setHoverMarker(null);
+        return;
+      }
+      setHoverMarker({
+        anchor: screenAnchor(event.open.anchorX, event.open.anchorY),
+        comment: event.open.comment,
+      });
+      return;
+    }
     if (event.type === "open") {
-      if (!event.open) return;
-      // Anchor the React editor at the marker's position in renderer-screen
-      // space: the <webview> element's origin plus the marker's guest-viewport
-      // rect. (Snapshot-time viewport coords; good enough at click time since
-      // the marker must be visible to be clicked.)
-      const webview = getBrowserPageWebview(activeTab.id);
-      const webviewRect = webview?.getBoundingClientRect();
-      const originX = webviewRect?.left ?? 0;
-      const originY = webviewRect?.top ?? 0;
+      if (!event.open || !event.markerId) return;
+      setHoverMarker(null);
       setEditingMarker({
-        anchor: { x: originX + event.open.rectViewport.x, y: originY + event.open.rectViewport.y },
+        anchor: screenAnchor(event.open.anchorX, event.open.anchorY),
         markerId: event.markerId,
         payload: event.open,
       });
       return;
     }
     if (event.type === "delete") {
+      if (!event.markerId) return;
       setEditingMarker(null);
       const updatedAnnotations = annotations.filter(
         (annotation) => annotation.id !== event.markerId,
@@ -341,6 +361,7 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
       return;
     }
     if (event.type === "save") {
+      if (!event.markerId) return;
       setEditingMarker(null);
       const updatedAnnotations = annotations.map((annotation) =>
         annotation.id === event.markerId
@@ -512,6 +533,9 @@ function BrowserArtifact({ sessionId }: ArtifactRenderProps) {
             payload={selection.payload}
             screenshot={screenshot}
           />
+        ) : null}
+        {hoverMarker && !editingMarker ? (
+          <AnnotationTooltip anchor={hoverMarker.anchor} comment={hoverMarker.comment} />
         ) : null}
         {editingMarker && activeTab ? (
           <AnnotationEditor

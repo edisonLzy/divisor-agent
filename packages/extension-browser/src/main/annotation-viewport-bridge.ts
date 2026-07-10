@@ -4,12 +4,12 @@ import type { BrowserAnnotationViewportBridgeMarker } from "../common/types";
 // Viewport bridge - injects numbered annotation badges into the page
 //
 // Scope: this script ONLY renders numbered marker pins that follow the target
-// element through scroll/resize, shows a lightweight hover tooltip, and emits
-// `open`/`save`/`delete` events back to the host. The comment editor itself is
-// a React overlay in the host renderer (annotation-editor.tsx) - it is NOT
-// injected here. That split is the whole point of the migration: the editor
-// gets types/lint/icons/Popover collision handling, while this script stays a
-// thin, auditable string that runs in the guest page.
+// element through scroll/resize, and emits `hover`/`open` events back to the
+// host. The tooltip and comment editor are React overlays in the host
+// renderer (annotation-tooltip.tsx / annotation-editor.tsx), positioned with
+// @floating-ui against the marker's screen coordinates. That split is the whole
+// point: pins must live in the guest to track the element through scroll, but
+// everything visual (tooltip, editor, icons) stays in React for types/lint/tests.
 // ---------------------------------------------------------------------------
 
 export interface BrowserAnnotationViewportBridgeOptions {
@@ -23,8 +23,8 @@ export const BROWSER_ANNOTATION_VIEWPORT_MESSAGE_PREFIX = "__divisor_annotation_
 
 /**
  * Build a self-contained JS script that injects numbered annotation markers
- * into a guest page via a shadow DOM overlay. The script is injected via
- * executeJavaScript() and runs in the page's own world.
+ * into a guest page via a shadow DOM overlay. Injected via executeJavaScript()
+ * and runs in the page's own world.
  */
 export function buildBrowserAnnotationViewportBridgeScript({
   emitViewport,
@@ -87,11 +87,14 @@ export function buildBrowserAnnotationViewportBridgeScript({
     emit({ type: 'viewport', viewport: readViewport() });
   };
 
-  const emitMarkerEvent = (type, marker, extra) => {
+  // Emit a marker interaction (hover/open) with the geometry the host needs to
+  // anchor its React overlay at the marker's guest-viewport position.
+  const emitMarkerEvent = (type, marker, anchorX, anchorY, extra) => {
     emit(Object.assign({
       markerId: marker.id,
       type,
-      // Geometry the host needs to anchor the React editor at the marker.
+      anchorX,
+      anchorY,
       rectPage: marker.rectPage,
       rectViewport: marker.rectViewport,
       isFixed: marker.isFixed,
@@ -105,7 +108,7 @@ export function buildBrowserAnnotationViewportBridgeScript({
   const getRoot = () => document.body || document.documentElement;
 
   const ensureOverlay = (state) => {
-    if (state.host && state.shadowRoot && state.tooltip) return state.shadowRoot;
+    if (state.host && state.shadowRoot) return state.shadowRoot;
     removeOverlay(state);
     state.host = null;
     state.shadowRoot = null;
@@ -117,40 +120,12 @@ export function buildBrowserAnnotationViewportBridgeScript({
     host.style.cssText = 'position:fixed;inset:0;z-index:2147483646;pointer-events:none;contain:layout style paint;overflow:hidden;';
     const shadowRoot = host.attachShadow({ mode: 'closed' });
     const style = document.createElement('style');
-    style.textContent = [
-      '.marker{box-sizing:border-box;position:absolute;left:0;top:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:9999px;border:2px solid #141111;background:#27ccf3;color:#141111;font:800 11px/1 "Space Mono",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:2px 2px 0 #141111;will-change:transform;pointer-events:auto;user-select:none;cursor:pointer;}',
-      '.marker:hover{transform:translate(1px,1px);box-shadow:none;}',
-      '.tooltip{box-sizing:border-box;position:absolute;left:0;top:0;max-width:220px;display:none;border:2px solid #141111;border-radius:6px;background:#fffdf8;color:#141111;box-shadow:3px 3px 0 #141111;padding:6px 8px;font:700 12px/1.35 "Space Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;white-space:pre-wrap;overflow-wrap:anywhere;pointer-events:none;}'
-    ].join('');
+    style.textContent = '.marker{box-sizing:border-box;position:absolute;left:0;top:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:9999px;border:2px solid #141111;background:#27ccf3;color:#141111;font:800 11px/1 "Space Mono",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:2px 2px 0 #141111;will-change:transform;pointer-events:auto;user-select:none;cursor:pointer;}.marker:hover{transform:translate(1px,1px);box-shadow:none;}';
     shadowRoot.appendChild(style);
-    const tooltip = document.createElement('div');
-    tooltip.className = 'tooltip';
-    shadowRoot.appendChild(tooltip);
     root.appendChild(host);
     state.host = host;
     state.shadowRoot = shadowRoot;
-    state.tooltip = tooltip;
     return shadowRoot;
-  };
-
-  const hideTooltip = (state) => {
-    if (state.tooltip) state.tooltip.style.display = 'none';
-  };
-
-  const placeFloating = (element, x, y, fallbackWidth, fallbackHeight) => {
-    if (!element) return;
-    const width = element.offsetWidth || fallbackWidth;
-    const height = element.offsetHeight || fallbackHeight;
-    const maxX = Math.max(8, window.innerWidth - width - 8);
-    const maxY = Math.max(8, window.innerHeight - height - 8);
-    element.style.transform = 'translate3d(' + Math.max(8, Math.min(x, maxX)) + 'px,' + Math.max(8, Math.min(y, maxY)) + 'px,0)';
-  };
-
-  const showTooltip = (state, marker, x, y) => {
-    if (!state.tooltip) return;
-    state.tooltip.textContent = marker.comment || 'Selected element';
-    state.tooltip.style.display = 'block';
-    placeFloating(state.tooltip, x + markerSize + 6, y - 4, 180, 34);
   };
 
   const updateMarkers = (state, nextMarkers) => {
@@ -174,17 +149,19 @@ export function buildBrowserAnnotationViewportBridgeScript({
         element.addEventListener('mouseenter', () => {
           const liveMarker = state.markers.find((candidate) => candidate.id === element.dataset.markerId);
           if (!liveMarker) return;
-          showTooltip(state, liveMarker, toNumber(element.dataset.x, 0), toNumber(element.dataset.y, 0));
+          emitMarkerEvent('hover', liveMarker, toNumber(element.dataset.x, 0), toNumber(element.dataset.y, 0));
         });
-        element.addEventListener('mouseleave', () => hideTooltip(state));
+        element.addEventListener('mouseleave', () => {
+          emit({ type: 'hover', markerId: null });
+        });
         element.addEventListener('click', (event) => {
           event.preventDefault();
           event.stopPropagation();
           const liveMarker = state.markers.find((candidate) => candidate.id === element.dataset.markerId);
           if (!liveMarker) return;
-          // The React editor in the host renderer handles editing; we just
-          // surface which marker was clicked plus its live geometry.
-          emitMarkerEvent('open', liveMarker);
+          // The React editor in the host handles editing; we just surface
+          // which marker was clicked plus its live geometry.
+          emitMarkerEvent('open', liveMarker, toNumber(element.dataset.x, 0), toNumber(element.dataset.y, 0));
         });
         shadowRoot.appendChild(element);
         state.markerElements.set(marker.id, element);
@@ -221,6 +198,8 @@ export function buildBrowserAnnotationViewportBridgeScript({
         return;
       }
       element.style.display = 'flex';
+      // Pin sits at the element's bottom-center; dataset carries its guest-
+      // viewport coords for the host to convert to screen coords on event.
       element.dataset.x = String(x + width / 2 - markerSize / 2);
       element.dataset.y = String(y + height - markerSize / 2);
       element.style.transform =

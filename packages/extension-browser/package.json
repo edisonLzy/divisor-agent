@@ -12,6 +12,7 @@
   "dependencies": {
     "@divisor-agent/extension-core": "workspace:*",
     "@earendil-works/pi-ai": "catalog:",
+    "@floating-ui/react": "^0.27.19",
     "@tiptap/core": "catalog:",
     "@tiptap/react": "^3.22.5",
     "@types/react": "catalog:",

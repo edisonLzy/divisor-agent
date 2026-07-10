@@ -162,9 +162,10 @@ describe("BrowserManager", () => {
     const result = await manager.startElementSelection("session", tab.id);
     const selectionScript = guest.executeJavaScript.mock.calls[0][0];
 
-    expect(selectionScript).toContain("commentEditor");
-    expect(selectionScript).toContain("添加评论");
-    expect(selectionScript).toContain("detailPanel");
+    // The picker resolves immediately on element click with a default comment;
+    // the in-page comment editor was removed (the host React sheet collects it).
+    expect(selectionScript).not.toContain("commentEditor");
+    expect(selectionScript).not.toContain("detailPanel");
     expect(result.comment).toBe("Make this clearer");
     expect(result.screenshotDataUrl).toBe("data:image/png;base64,selected");
   });

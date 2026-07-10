@@ -535,16 +535,6 @@ const SELECTION_SCRIPT = String.raw`(() => new Promise((resolve) => {
   hoverLabel.style.cssText = 'position:fixed;padding:3px 8px;background:rgba(30,30,30,0.92);color:#e5e5e5;font:11px/1.4 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;border-radius:4px;pointer-events:none;white-space:nowrap;display:none;max-width:300px;overflow:hidden;text-overflow:ellipsis;box-shadow:0 2px 8px rgba(0,0,0,0.3);';
   overlay.appendChild(hoverLabel);
 
-  var commentEditor = document.createElement('div');
-  commentEditor.style.cssText = 'position:fixed;display:none;align-items:center;gap:6px;width:min(360px,calc(100vw - 24px));min-height:44px;border:2px solid #141111;border-radius:6px;background:#fffdf8;color:#141111;box-shadow:3px 3px 0 #141111;padding:6px 8px;pointer-events:auto;font:700 12px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;';
-  commentEditor.innerHTML = '<button type="button" data-action="detail" title="Details" style="display:grid;width:26px;height:26px;place-items:center;border:2px solid transparent;border-radius:4px;background:transparent;color:#716b64;padding:0;font:800 10px/1 sans-serif;">DETAIL</button><input data-role="comment" placeholder="添加评论..." spellcheck="false" style="box-sizing:border-box;min-width:0;height:28px;flex:1;border:2px solid #141111;border-radius:4px;background:#fffaf0;color:#141111;box-shadow:2px 2px 0 #141111;padding:0 8px;font:700 12px/1 -apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,sans-serif;outline:none;" /><button type="button" data-action="save" title="Save comment" style="display:grid;width:28px;height:28px;place-items:center;border:2px solid #141111;border-radius:4px;background:#141111;color:#fffaf0;box-shadow:2px 2px 0 #141111;padding:0;font:800 12px/1 sans-serif;">OK</button><button type="button" data-action="cancel" title="Cancel" style="display:grid;width:28px;height:28px;place-items:center;border:2px solid #141111;border-radius:4px;background:#fffdf8;color:#141111;box-shadow:2px 2px 0 #141111;padding:0;font:800 12px/1 sans-serif;">X</button>';
-  overlay.appendChild(commentEditor);
-  var commentInput = commentEditor.querySelector('[data-role="comment"]');
-  var detailPanel = document.createElement('div');
-  detailPanel.style.cssText = 'position:fixed;display:none;width:min(360px,calc(100vw - 24px));border:2px solid #141111;border-radius:6px;background:#fffdf8;color:#141111;box-shadow:3px 3px 0 #141111;padding:6px 8px;pointer-events:auto;font:700 11px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;';
-  overlay.appendChild(detailPanel);
-  var pendingResult = null;
-
   var currentEl = null;
 
   function updateHighlight(el) {
@@ -597,112 +587,6 @@ const SELECTION_SCRIPT = String.raw`(() => new Promise((resolve) => {
     hoverLabel.style.display = 'none';
   }
 
-  function placeCommentEditor(rect) {
-    var width = commentEditor.offsetWidth || 360;
-    var height = commentEditor.offsetHeight || 44;
-    var x = rect.x + rect.width / 2 - width / 2;
-    var y = rect.bottom + 8;
-    if (y + height > window.innerHeight - 8) y = rect.top - height - 8;
-    commentEditor.style.left = Math.max(8, Math.min(x, window.innerWidth - width - 8)) + 'px';
-    commentEditor.style.top = Math.max(8, Math.min(y, window.innerHeight - height - 8)) + 'px';
-    detailPanel.style.left = commentEditor.style.left;
-    detailPanel.style.top = Math.max(8, Math.min(y + height + 8, window.innerHeight - 220)) + 'px';
-  }
-
-  function showCommentEditor(result) {
-    pendingResult = result;
-    var rect = currentEl ? currentEl.getBoundingClientRect() : result.payload.target.rectViewport;
-    renderDetailPanel(result.payload);
-    detailPanel.style.display = 'none';
-    commentEditor.style.display = 'flex';
-    placeCommentEditor(rect);
-    if (commentInput) commentInput.focus();
-  }
-
-  function addDetailRow(container, label, value) {
-    var row = document.createElement('div');
-    row.style.cssText = 'display:grid;grid-template-columns:72px minmax(0,1fr);align-items:center;gap:6px;min-height:26px;color:#716b64;';
-    var name = document.createElement('span');
-    name.textContent = label;
-    var data = document.createElement('span');
-    data.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:2px solid #141111;border-radius:4px;background:#fffaf0;box-shadow:2px 2px 0 #141111;padding:4px 6px;color:#141111;font:700 10px/1.2 monospace;';
-    data.textContent = value || '-';
-    row.appendChild(name);
-    row.appendChild(data);
-    container.appendChild(row);
-  }
-
-  function renderDetailPanel(payload) {
-    detailPanel.textContent = '';
-    var target = document.createElement('div');
-    target.style.cssText = 'display:flex;justify-content:space-between;border:2px solid #141111;border-radius:4px;background:#eee9de;padding:5px 7px;margin-bottom:6px;color:#141111;font-weight:800;';
-    var tag = document.createElement('span');
-    tag.textContent = payload.target.tagName || 'element';
-    var label = document.createElement('span');
-    label.textContent = 'style';
-    target.appendChild(tag);
-    target.appendChild(label);
-    detailPanel.appendChild(target);
-    addDetailRow(detailPanel, '文本颜色', payload.target.computedStyles.color);
-    addDetailRow(detailPanel, '背景', payload.target.computedStyles.backgroundColor);
-    addDetailRow(detailPanel, '字体', payload.target.computedStyles.fontFamily);
-    addDetailRow(detailPanel, '字号', payload.target.computedStyles.fontSize);
-    addDetailRow(detailPanel, '字重', payload.target.computedStyles.fontWeight);
-  }
-
-  function cleanup() {
-    host.removeEventListener('mousemove', onPointerMove);
-    try { host.remove(); } catch(e) {}
-    delete window.__divisorGrab;
-  }
-
-  commentEditor.addEventListener('click', function(e) {
-    var target = e.target;
-    if (!target || !target.getAttribute) return;
-    var action = target.getAttribute('data-action');
-    if (!action) return;
-    e.preventDefault();
-    e.stopPropagation();
-    if (action === 'cancel') {
-      cleanup();
-      resolve(null);
-      return;
-    }
-    if (action === 'detail') {
-      detailPanel.style.display = detailPanel.style.display === 'none' ? 'block' : 'none';
-      return;
-    }
-    if (action === 'save' && pendingResult) {
-      var comment = commentInput && commentInput.value ? commentInput.value.trim() : '';
-      var result = {
-        kind: pendingResult.kind,
-        payload: pendingResult.payload,
-        comment: comment || 'Selected element'
-      };
-      cleanup();
-      resolve(result);
-    }
-  });
-
-  commentEditor.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      cleanup();
-      resolve(null);
-      return;
-    }
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && pendingResult) {
-      e.preventDefault();
-      var comment = commentInput && commentInput.value ? commentInput.value.trim() : '';
-      var result = {
-        kind: pendingResult.kind,
-        payload: pendingResult.payload,
-        comment: comment || 'Selected element'
-      };
-      cleanup();
-      resolve(result);
-    }
-  });
 
   window.__divisorGrab = {
     host: host,
@@ -711,6 +595,12 @@ const SELECTION_SCRIPT = String.raw`(() => new Promise((resolve) => {
     freezeHighlight: freezeHighlight,
     cleanup: cleanup
   };
+
+  function cleanup() {
+    host.removeEventListener('mousemove', onPointerMove);
+    try { host.remove(); } catch(e) {}
+    delete window.__divisorGrab;
+  }
 
   function onKey(e) {
     if (e.key === 'Escape') {
@@ -731,7 +621,11 @@ const SELECTION_SCRIPT = String.raw`(() => new Promise((resolve) => {
     if (!el) { cleanup(); resolve(null); return; }
     var payload = extractPayload(el);
     freezeHighlight();
-    showCommentEditor({ kind: 'selected', payload: payload });
+    // Resolve immediately with a default comment; the host's React
+    // GrabConfirmationSheet collects the real comment. The guest no longer
+    // renders an in-page comment editor (that was text-button only and
+    // duplicated the host sheet).
+    resolve({ kind: 'selected', payload: payload, comment: 'Selected element' });
   }
 
   function onContext(e) {
@@ -744,7 +638,7 @@ const SELECTION_SCRIPT = String.raw`(() => new Promise((resolve) => {
     if (!el) { cleanup(); resolve(null); return; }
     var payload = extractPayload(el);
     freezeHighlight();
-    showCommentEditor({ kind: 'context-selected', payload: payload });
+    resolve({ kind: 'context-selected', payload: payload, comment: 'Selected element' });
   }
 
   host.addEventListener('click', onClick, true);

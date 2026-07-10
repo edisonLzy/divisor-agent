@@ -93,14 +93,14 @@ describe("browser annotation viewport bridge", () => {
       token: "token",
     });
 
-    // The slimmed bridge renders pins + hover tooltip and emits `open` on
-    // click; the comment editor itself lives in the React host, so the script
-    // no longer contains an injected editor.
+    // The bridge renders only marker pins and emits `hover`/`open` events;
+    // tooltip and editor live in the React host, so the script has no injected
+    // tooltip/editor (no showTooltip, no showEditor).
     expect(script).toContain("pointer-events:auto");
-    expect(script).toContain("showTooltip");
+    expect(script).toContain("emitMarkerEvent('hover'");
     expect(script).toContain("emitMarkerEvent('open'");
+    expect(script).not.toContain("showTooltip");
     expect(script).not.toContain("showEditor");
-    expect(script).not.toContain("emitMarkerEvent('save'");
     expect(script).toContain("Tighten this copy");
   });
 });
