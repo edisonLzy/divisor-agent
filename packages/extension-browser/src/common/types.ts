@@ -45,242 +45,92 @@ export interface DetectedChromiumProfile {
 }
 
 // ---------------------------------------------------------------------------
-// Grab payload — expanded element context
+// Reading annotations
 // ---------------------------------------------------------------------------
 
-/** Page-level metadata captured at selection time. */
-export interface BrowserGrabPageContext {
-  sanitizedUrl: string;
-  title: string;
-  viewportWidth: number;
-  viewportHeight: number;
-  scrollX: number;
-  scrollY: number;
-  devicePixelRatio: number;
-  capturedAt: string;
+/** A text range anchored relative to the page's body. Compatible with NoteBeam's range API. */
+export interface BrowserTextRange {
+  end: string;
+  endOffset: number;
+  start: string;
+  startOffset: number;
 }
 
-/** Accessibility metadata for the selected element. */
-export interface BrowserGrabAccessibility {
-  role: string | null;
-  accessibleName: string | null;
-  ariaLabel: string | null;
-  ariaLabelledBy: string | null;
-}
-
-/** Curated subset of computed styles — 16 properties. */
-export interface BrowserGrabComputedStyles {
-  display: string;
-  position: string;
-  width: string;
-  height: string;
-  margin: string;
-  padding: string;
+export interface BrowserReadingTag {
   color: string;
-  backgroundColor: string;
-  border: string;
-  borderRadius: string;
-  fontFamily: string;
-  fontSize: string;
-  fontWeight: string;
-  lineHeight: string;
-  textAlign: string;
-  zIndex: string;
+  displayLabel?: string | null;
+  group: "english" | "general";
+  id: string;
+  name: string;
 }
 
-/** The selected element's extracted data. */
-export interface BrowserGrabTarget {
-  tagName: string;
-  selector: string;
-  elementPath?: string;
-  fullPath?: string;
-  cssClasses?: string;
-  nearbyElements?: string[];
-  selectedText?: string | null;
-  isFixed?: boolean;
-  reactComponents?: string | null;
-  sourceFile?: string | null;
-  textSnippet: string;
-  htmlSnippet: string;
-  attributes: Record<string, string>;
-  accessibility: BrowserGrabAccessibility;
+export interface BrowserReadingNote {
+  content: string;
+  createdAt: string;
+  id: string;
+  updatedAt: string;
+}
+
+export interface BrowserTextSelection {
+  page: { sanitizedUrl: string; title: string };
+  range: BrowserTextRange;
   rectViewport: BrowserRect;
-  rectPage: BrowserRect;
-  computedStyles: BrowserGrabComputedStyles;
-}
-
-/** Screenshot attachment — always PNG data URL. */
-export interface BrowserGrabScreenshot {
-  mimeType: "image/png";
-  dataUrl: string;
-  width: number;
-  height: number;
-}
-
-/** The full payload extracted from a browser grab selection. */
-export interface BrowserGrabPayload {
-  page: BrowserGrabPageContext;
-  target: BrowserGrabTarget;
-  nearbyText: string[];
-  ancestorPath: string[];
-  screenshot: BrowserGrabScreenshot | null;
-}
-
-/** Persisted annotation payloads keep DOM context but drop transient screenshots. */
-export interface BrowserAnnotationPayload extends Omit<BrowserGrabPayload, "screenshot"> {
-  screenshot: null;
-}
-
-// ---------------------------------------------------------------------------
-// Backward-compatible alias for the old BrowserElementPayload
-// ---------------------------------------------------------------------------
-
-/** @deprecated Use BrowserGrabPayload instead. */
-export interface BrowserElementPayload {
-  accessibility: { name: string; role: string };
-  ancestorPath: string[];
-  computedStyles: Record<string, string>;
-  fullPath: string;
-  html: string;
-  nearbyText: string[];
-  rect: BrowserRect;
-  screenshotPath?: string;
-  selector: string;
-  tagName: string;
+  sentence: string | null;
   text: string;
-  title: string;
+}
+
+/**
+ * A learning-oriented page annotation. This deliberately mirrors NoteBeam's
+ * Highlight shape, while using ISO timestamps throughout the Electron app.
+ */
+export interface BrowserReadingAnnotation {
+  createdAt: string;
+  id: string;
+  note: BrowserReadingNote;
+  range: BrowserTextRange;
+  sentence: string | null;
+  tag: BrowserReadingTag;
+  text: string;
+  updatedAt: string;
   url: string;
 }
 
-// ---------------------------------------------------------------------------
-// Grab selection result
-// ---------------------------------------------------------------------------
-
-export interface BrowserElementSelection {
-  comment: string;
-  kind: "selected" | "context-selected";
-  payload: BrowserGrabPayload;
-  screenshotDataUrl: string;
-}
-
-/** Why a grab operation was cancelled before the user selected an element. */
-export type BrowserGrabCancelReason =
-  | "user"
-  | "tab-inactive"
-  | "navigation"
-  | "evicted"
-  | "timeout";
-
-/** Discriminated union for the result of a single grab operation. */
-export type BrowserGrabResult =
-  | { kind: "selected"; payload: BrowserGrabPayload }
-  | { kind: "context-selected"; payload: BrowserGrabPayload }
-  | { kind: "cancelled"; reason: BrowserGrabCancelReason }
-  | { kind: "error"; reason: string };
-
-// ---------------------------------------------------------------------------
-// Annotation types
-// ---------------------------------------------------------------------------
-
-export type BrowserAnnotationIntent = "fix" | "change" | "question" | "approve";
-
-export type BrowserAnnotationPriority = "blocking" | "important" | "suggestion";
-
-export interface BrowserPageAnnotation {
-  id: string;
-  browserPageId: string;
-  comment: string;
-  intent: BrowserAnnotationIntent;
-  priority: BrowserAnnotationPriority;
-  createdAt: string;
-  payload: BrowserAnnotationPayload;
-}
-
-// ---------------------------------------------------------------------------
-// Payload budgets — enforced in both guest and main
-// ---------------------------------------------------------------------------
-
-export const GRAB_BUDGET = {
-  textSnippetMaxLength: 200,
-  nearbyTextEntryMaxLength: 200,
-  nearbyTextMaxEntries: 10,
-  htmlSnippetMaxLength: 4096,
-  ancestorPathMaxEntries: 10,
-  nearbyElementsMaxEntries: 6,
-  nearbyElementMaxLength: 160,
-  selectorMaxLength: 700,
-  pathMaxLength: 900,
-  cssClassesMaxLength: 500,
-  selectedTextMaxLength: 500,
-  sourceFileMaxLength: 500,
-  reactComponentsMaxLength: 500,
-  annotationCommentMaxLength: 2000,
-  annotationsMaxPerPage: 20,
-  /** Hard byte budget for screenshot PNG data URL before we omit the screenshot. */
-  screenshotMaxBytes: 2 * 1024 * 1024,
-} as const;
-
-// ---------------------------------------------------------------------------
-// Attribute allowlist for safe preview
-// ---------------------------------------------------------------------------
-
-/** Only these attribute names are included in the payload by default. */
-export const GRAB_SAFE_ATTRIBUTE_NAMES = new Set([
-  "id",
-  "class",
-  "name",
-  "type",
-  "role",
-  "href",
-  "src",
-  "alt",
-  "title",
-  "placeholder",
-  "for",
-  "action",
-  "method",
-]);
-
-/**
- * Patterns in attribute values that indicate secrets — these values get
- * redacted. Why tighter patterns than broad words like 'code' or 'state':
- * those match normal CSS class names (e.g. 'source-code', 'stateful') and
- * would visibly degrade extraction quality on most real-world sites.
- */
-export const GRAB_SECRET_PATTERNS = [
-  "access_token",
-  "auth_token",
-  "api_key",
-  "apikey",
-  "client_secret",
-  "oauth_state",
-  "x-amz-",
-  "session_id",
-  "sessionid",
-  "csrf",
-  "secret",
-  "password",
-  "passwd",
-];
-
-/** Computed style properties to extract — matches BrowserGrabComputedStyles keys. */
-export const GRAB_STYLE_PROPERTIES: readonly (keyof BrowserGrabComputedStyles)[] = [
-  "display",
-  "position",
-  "width",
-  "height",
-  "margin",
-  "padding",
-  "color",
-  "backgroundColor",
-  "border",
-  "borderRadius",
-  "fontFamily",
-  "fontSize",
-  "fontWeight",
-  "lineHeight",
-  "textAlign",
-  "zIndex",
+export const DEFAULT_READING_TAGS: readonly BrowserReadingTag[] = [
+  {
+    color: "#4CAF50",
+    displayLabel: "新词",
+    group: "english",
+    id: "vocabulary",
+    name: "Vocabulary",
+  },
+  {
+    color: "#FFEB3B",
+    displayLabel: "好句",
+    group: "english",
+    id: "sentence",
+    name: "Sentence",
+  },
+  {
+    color: "#F44336",
+    displayLabel: "重点",
+    group: "general",
+    id: "important",
+    name: "Important",
+  },
+  {
+    color: "#2196F3",
+    displayLabel: "灵感",
+    group: "general",
+    id: "idea",
+    name: "Idea",
+  },
+  {
+    color: "#FF9800",
+    displayLabel: "问题",
+    group: "general",
+    id: "question",
+    name: "Question",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -291,9 +141,8 @@ export type BrowserGetProperty = "box" | "html" | "name" | "role" | "state" | "t
 export type BrowserNavigationAction = "back" | "forward" | "goto" | "reload";
 
 export interface BrowserInvokeEvents {
-  createTab(input: { profileId?: string; sessionId: string; url?: string }): BrowserTab;
-  closeTab(input: { sessionId: string; tabId: string }): void;
-  setActiveTab(input: { sessionId: string; tabId: string }): void;
+  ensurePage(input: { profileId?: string; sessionId: string; url?: string }): BrowserTab;
+  openPage(input: { profileId?: string; sessionId: string; url: string }): BrowserTab;
   getState(sessionId: string): BrowserState;
   navigate(input: {
     action: BrowserNavigationAction;
@@ -323,6 +172,7 @@ export interface BrowserInvokeEvents {
     webContentsId: number;
   }): void;
   unregisterGuest(input: { browserPageId: string }): void;
+  openInSystemBrowser(input: { sessionId: string; tabId?: string }): Promise<void>;
   createProfile(label: string): BrowserProfile;
   renameProfile(input: { id: string; label: string }): BrowserProfile;
   deleteProfile(id: string): void;
@@ -332,11 +182,14 @@ export interface BrowserInvokeEvents {
     profileId: string;
     sourceId: string;
   }): Promise<{ imported: number; total: number; skipped: number; domains: string[] }>;
-  startElementSelection(input: {
-    sessionId: string;
-    tabId: string;
-  }): Promise<BrowserElementSelection>;
-  cancelElementSelection(input: { sessionId: string; tabId: string }): Promise<void>;
+  createReadingAnnotation(input: BrowserReadingAnnotation): BrowserReadingAnnotation;
+  deleteReadingAnnotation(id: string): void;
+  listReadingAnnotations(input: { url: string }): BrowserReadingAnnotation[];
+  updateReadingAnnotation(input: {
+    id: string;
+    note?: Partial<BrowserReadingNote>;
+    tag?: BrowserReadingTag;
+  }): BrowserReadingAnnotation;
 }
 
 export interface BrowserExposeEvents {

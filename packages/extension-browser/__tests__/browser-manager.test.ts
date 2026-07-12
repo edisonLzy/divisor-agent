@@ -81,6 +81,7 @@ import { BrowserManager } from "../src/main/browser-manager";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const electronMock = await import("electron");
 const FakeContents = (electronMock as any).__FakeContents as { new (): any };
+const openExternalMock = electronMock.shell.openExternal as ReturnType<typeof vi.fn>;
 
 describe("BrowserManager", () => {
   beforeEach(() => {
@@ -96,7 +97,7 @@ describe("BrowserManager", () => {
       webContents: { id: 1 },
     };
     const manager = new BrowserManager(() => browserWindow as never, vi.fn());
-    const tab = manager.createTab("session", "https://example.com");
+    const tab = manager.ensurePage("session", "https://example.com");
 
     const guest = new FakeContents();
     fromIdMock.mockReturnValue(guest);
@@ -118,7 +119,7 @@ describe("BrowserManager", () => {
       webContents: { id: 1 },
     };
     const manager = new BrowserManager(() => browserWindow as never, vi.fn());
-    const tab = manager.createTab("session", "https://example.com");
+    const tab = manager.ensurePage("session", "https://example.com");
 
     manager.registerGuest({
       browserPageId: tab.id,
@@ -130,102 +131,31 @@ describe("BrowserManager", () => {
     expect(fromIdMock).not.toHaveBeenCalled();
   });
 
-  it("isolates tabs by agent session", () => {
+  it("keeps one browser page isolated to its agent session", () => {
     const manager = new BrowserManager(() => null, vi.fn());
-    const tab = manager.createTab("one", "https://example.com");
+    const page = manager.ensurePage("one", "https://example.com");
     expect(manager.getState("one").tabs).toHaveLength(1);
     expect(manager.getState("two").tabs).toHaveLength(0);
-    expect(() => manager.setActiveTab("two", tab.id)).toThrowError(/unavailable/);
+    expect(() => manager.pageInfo("two", page.id)).toThrowError(/unavailable/);
   });
 
-  it("returns comments captured by the in-page selection editor", async () => {
+  it("reuses the session page when opening a new URL", () => {
     const manager = new BrowserManager(() => null, vi.fn());
-    const tab = manager.createTab("session", "https://example.com");
-    const guest = new FakeContents();
-    fromIdMock.mockReturnValue(guest);
-    manager.registerGuest({
-      browserPageId: tab.id,
-      sessionId: "session",
-      profileId: "default",
-      webContentsId: guest.id,
-    });
+    const page = manager.ensurePage("session", "https://example.com");
+    const navigated = manager.openPage("session", "https://example.org");
 
-    const screenshot = { toDataURL: vi.fn(() => "data:image/png;base64,selected") };
-    const payload = createGrabPayload();
-    guest.executeJavaScript.mockResolvedValue({
-      comment: "Make this clearer",
-      kind: "selected",
-      payload,
-    });
-    guest.capturePage.mockResolvedValue(screenshot);
+    expect(navigated.id).toBe(page.id);
+    expect(manager.getState("session").tabs).toEqual([
+      expect.objectContaining({ id: page.id, url: "https://example.org/" }),
+    ]);
+  });
 
-    const result = await manager.startElementSelection("session", tab.id);
-    const selectionScript = guest.executeJavaScript.mock.calls[0][0];
+  it("opens the current page in the system browser only on explicit request", async () => {
+    const manager = new BrowserManager(() => null, vi.fn());
+    manager.ensurePage("session", "https://example.com");
 
-    // The picker resolves immediately on element click; the host React overlay
-    // collects the actual comment at the selected element.
-    expect(selectionScript).not.toContain("commentEditor");
-    expect(selectionScript).not.toContain("detailPanel");
-    expect(result.comment).toBe("Make this clearer");
-    expect(result.screenshotDataUrl).toBe("data:image/png;base64,selected");
+    await manager.openInSystemBrowser("session");
+
+    expect(openExternalMock).toHaveBeenCalledWith("https://example.com/");
   });
 });
-
-function createGrabPayload() {
-  return {
-    ancestorPath: [],
-    nearbyText: [],
-    page: {
-      capturedAt: new Date().toISOString(),
-      devicePixelRatio: 1,
-      sanitizedUrl: "https://example.com/",
-      scrollX: 0,
-      scrollY: 0,
-      title: "Example",
-      viewportHeight: 800,
-      viewportWidth: 1200,
-    },
-    screenshot: null,
-    target: {
-      accessibility: {
-        accessibleName: "Example button",
-        ariaLabel: null,
-        ariaLabelledBy: null,
-        role: "button",
-      },
-      attributes: {},
-      computedStyles: {
-        backgroundColor: "rgba(0, 0, 0, 0)",
-        border: "",
-        borderRadius: "",
-        color: "rgb(20, 17, 17)",
-        display: "block",
-        fontFamily: "Arial",
-        fontSize: "14px",
-        fontWeight: "400",
-        height: "20px",
-        lineHeight: "20px",
-        margin: "",
-        padding: "",
-        position: "static",
-        textAlign: "left",
-        width: "120px",
-        zIndex: "auto",
-      },
-      cssClasses: "",
-      elementPath: "main > button",
-      fullPath: "body > main > button",
-      htmlSnippet: "<button>Example</button>",
-      isFixed: false,
-      nearbyElements: [],
-      reactComponents: null,
-      rectPage: { height: 20, width: 120, x: 10, y: 20 },
-      rectViewport: { height: 20, width: 120, x: 10, y: 20 },
-      selectedText: null,
-      selector: "button",
-      sourceFile: null,
-      tagName: "button",
-      textSnippet: "Example",
-    },
-  };
-}

@@ -10,7 +10,6 @@ describe("browser tool whitelist", () => {
     expect(names).toEqual([
       "browser/open",
       "browser/navigate",
-      "browser/tabs",
       "browser/page-info",
       "browser/snapshot",
       "browser/get",

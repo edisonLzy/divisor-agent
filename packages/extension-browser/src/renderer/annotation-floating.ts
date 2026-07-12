@@ -1,75 +1,80 @@
 import {
   autoUpdate,
-  computePosition,
   flip,
   offset,
   shift,
+  size,
+  useDismiss,
+  useFloating,
+  useInteractions,
   type Placement,
 } from "@floating-ui/react";
-import { useLayoutEffect, useState } from "react";
+import { useLayoutEffect } from "react";
 
 export interface ScreenPoint {
   x: number;
   y: number;
 }
 
-interface FloatingPosition {
-  x: number;
-  y: number;
-}
-
 /**
- * Positions a host-rendered overlay against a point inside an Electron
- * <webview>. The overlay itself is portalled to document.body, so all values
- * here are renderer viewport coordinates rather than artifact-local values.
+ * Anchors a host-rendered overlay to a point reported from an Electron
+ * webview. Floating UI keeps the portal within the Browser Artifact boundary
+ * and supplies dismissal behavior for outside presses and Escape.
  */
 export function useAnchoredFloating(
   anchor: ScreenPoint | null,
-  options: { offset?: number; placement?: Placement } = {},
+  options: {
+    boundary?: HTMLElement | null;
+    offset?: number;
+    onDismiss?(): void;
+    placement?: Placement;
+  } = {},
 ) {
-  const { offset: offsetPx = 8, placement = "bottom" } = options;
-  const [floating, setFloating] = useState<HTMLElement | null>(null);
-  const [position, setPosition] = useState<FloatingPosition | null>(null);
+  const { boundary = null, offset: offsetPx = 8, onDismiss, placement = "bottom" } = options;
+  const { context, floatingStyles, refs, update } = useFloating({
+    middleware: [
+      offset(offsetPx),
+      flip({ boundary: boundary ?? undefined, padding: 8 }),
+      shift({ boundary: boundary ?? undefined, padding: 8 }),
+      size({
+        apply({ availableHeight, availableWidth, elements }) {
+          elements.floating.style.maxHeight = `${Math.max(0, availableHeight)}px`;
+          elements.floating.style.maxWidth = `${Math.max(0, availableWidth)}px`;
+        },
+        boundary: boundary ?? undefined,
+        padding: 8,
+      }),
+    ],
+    onOpenChange(open) {
+      if (!open) onDismiss?.();
+    },
+    open: Boolean(anchor),
+    placement,
+    strategy: "fixed",
+    whileElementsMounted: autoUpdate,
+  });
+  const dismiss = useDismiss(context, { escapeKey: true, outsidePress: true });
+  const { getFloatingProps } = useInteractions([dismiss]);
 
   useLayoutEffect(() => {
-    if (!anchor || !floating) {
-      setPosition(null);
-      return;
-    }
-
-    const reference = virtualElementAt(anchor);
-    let disposed = false;
-    const updatePosition = () => {
-      void computePosition(reference, floating, {
-        middleware: [offset(offsetPx), flip(), shift({ padding: 8 })],
-        placement,
-        strategy: "fixed",
-      }).then(({ x, y }) => {
-        if (!disposed) setPosition({ x, y });
-      });
-    };
-
-    const cleanup = autoUpdate(reference, floating, updatePosition);
-    return () => {
-      disposed = true;
-      cleanup();
-    };
-  }, [anchor, floating, offsetPx, placement]);
+    refs.setReference(anchor ? virtualElementAt(anchor, boundary) : null);
+    void update();
+  }, [anchor, boundary, refs, update]);
 
   return {
     floatingStyles: {
-      left: position?.x ?? 0,
-      position: "fixed" as const,
-      top: position?.y ?? 0,
-      visibility: position ? ("visible" as const) : ("hidden" as const),
+      ...floatingStyles,
+      visibility:
+        anchor && floatingStyles.left !== undefined ? ("visible" as const) : ("hidden" as const),
     },
-    refs: { setFloating },
+    getFloatingProps,
+    refs: { setFloating: refs.setFloating },
   };
 }
 
-function virtualElementAt(point: ScreenPoint) {
+function virtualElementAt(point: ScreenPoint, boundary: HTMLElement | null) {
   return {
-    contextElement: document.documentElement,
+    contextElement: boundary ?? document.documentElement,
     getBoundingClientRect() {
       const { x, y } = point;
       return { bottom: y, height: 0, left: x, right: x, top: y, width: 0, x, y };

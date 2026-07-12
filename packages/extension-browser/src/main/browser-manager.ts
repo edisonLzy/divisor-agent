@@ -5,7 +5,6 @@ import { join } from "node:path";
 import { app, dialog, nativeImage, session, shell, webContents, type WebContents } from "electron";
 
 import type {
-  BrowserElementSelection,
   BrowserGetProperty,
   BrowserNavigationAction,
   BrowserProfile,
@@ -15,7 +14,6 @@ import type {
   DetectedChromiumProfile,
 } from "../common/types";
 import { detectChromiumProfiles, importChromiumCookies } from "./cookie-import";
-import { cancelElementSelection, selectElement } from "./element-selection";
 import { SnapshotService } from "./snapshot";
 import { BrowserOperationError, normalizeBrowserUrl } from "./url";
 
@@ -56,22 +54,41 @@ export class BrowserManager {
   }
 
   /**
-   * Open a url, reusing an existing tab in the session that already shows it
-   * (or its active tab) rather than spawning a duplicate. Why: agents and the
-   * initial-tab bootstrap can both call createTab, and without dedupe the same
-   * url accumulates multiple identical tabs across restarts.
+   * Each Browser Artifact owns one page. The renderer uses this to bootstrap
+   * that page without changing an existing page's URL or selected profile.
    */
-  openOrFocus(sessionId: string, url: string, profileId = "default"): BrowserTab {
-    const normalizedUrl = normalizeBrowserUrl(url);
-    const existing = this.getState(sessionId).tabs.find((tab) => tab.url === normalizedUrl);
-    if (existing) {
-      this.setActiveTab(sessionId, existing.id);
-      return { ...existing };
-    }
-    return this.createTab(sessionId, url, profileId);
+  ensurePage(sessionId: string, url?: string, profileId?: string): BrowserTab {
+    const existing = this.getSessionPage(sessionId);
+    if (existing) return { ...existing.state };
+    return this.createPage(sessionId, url, profileId ?? "default");
   }
 
-  createTab(sessionId: string, url?: string, profileId = "default"): BrowserTab {
+  /**
+   * Navigate the session's only page. Opening another URL replaces the current
+   * page instead of creating another destination inside the Browser Artifact.
+   */
+  openPage(sessionId: string, url: string, profileId?: string): BrowserTab {
+    const existing = this.getSessionPage(sessionId);
+    if (!existing) return this.createPage(sessionId, url, profileId ?? "default");
+
+    const profile = this.requireProfile(profileId ?? existing.state.profileId);
+    if (existing.state.profileId !== profile.id) this.detachGuest(existing);
+    existing.state = {
+      ...existing.state,
+      canGoBack: false,
+      canGoForward: false,
+      isLoading: true,
+      profileId: profile.id,
+      url: normalizeBrowserUrl(url),
+    };
+    this.activeTabBySession.set(sessionId, existing.state.id);
+    this.snapshotService.clear(existing.state.id);
+    this.persist();
+    this.emit(sessionId);
+    return { ...existing.state };
+  }
+
+  private createPage(sessionId: string, url?: string, profileId = "default"): BrowserTab {
     const profile = this.requireProfile(profileId);
     const id = randomUUID();
     const normalizedUrl = normalizeBrowserUrl(url);
@@ -82,48 +99,24 @@ export class BrowserManager {
       isLoading: true,
       profileId: profile.id,
       sessionId,
-      title: "New Tab",
+      title: "New Page",
       url: normalizedUrl,
     };
     this.tabs.set(id, { state, contents: null });
     this.activeTabBySession.set(sessionId, id);
-    // The renderer mounts a <webview> for this tab and calls registerGuest with
+    // The renderer mounts a <webview> for this page and calls registerGuest with
     // its webContentsId; loading happens on the renderer side via webview.src.
     this.persist();
     this.emit(sessionId);
     return { ...state };
   }
 
-  closeTab(sessionId: string, tabId: string) {
-    const tab = this.requireOwnedTab(sessionId, tabId);
-    this.detachGuest(tab);
-    this.tabs.delete(tabId);
-    this.snapshotService.clear(tabId);
-    if (this.activeTabBySession.get(sessionId) === tabId) {
-      const replacement = [...this.tabs.values()].find(
-        (candidate) => candidate.state.sessionId === sessionId,
-      );
-      if (replacement) this.activeTabBySession.set(sessionId, replacement.state.id);
-      else this.activeTabBySession.delete(sessionId);
-    }
-    this.persist();
-    this.emit(sessionId);
-  }
-
-  setActiveTab(sessionId: string, tabId: string) {
-    this.requireOwnedTab(sessionId, tabId);
-    this.activeTabBySession.set(sessionId, tabId);
-    this.persist();
-    this.emit(sessionId);
-  }
-
   getState(sessionId: string): BrowserState {
+    const page = this.getSessionPage(sessionId);
     return {
-      activeTabId: this.activeTabBySession.get(sessionId) ?? null,
+      activeTabId: page?.state.id ?? null,
       profiles: [...this.profiles.values()].map((profile) => ({ ...profile })),
-      tabs: [...this.tabs.values()]
-        .filter((tab) => tab.state.sessionId === sessionId)
-        .map((tab) => ({ ...tab.state })),
+      tabs: page ? [{ ...page.state }] : [],
     };
   }
 
@@ -133,7 +126,14 @@ export class BrowserManager {
     if (!contents) {
       // Navigation is driven by the renderer's <webview>; main only tracks the
       // intended URL so state stays correct until the guest registers.
-      if (action === "goto") tab.state.url = normalizeBrowserUrl(url);
+      if (action === "goto") {
+        this.updateNavigationState(tab.state.id, {
+          canGoBack: false,
+          canGoForward: false,
+          isLoading: true,
+          url: normalizeBrowserUrl(url),
+        });
+      }
       return;
     }
     try {
@@ -217,7 +217,7 @@ export class BrowserManager {
     if (id === "default") throw new Error("The default browser profile cannot be deleted");
     this.requireProfile(id);
     if ([...this.tabs.values()].some((tab) => tab.state.profileId === id)) {
-      throw new Error("Close or move tabs using this profile before deleting");
+      throw new Error("Move the browser page away from this profile before deleting");
     }
     this.profiles.delete(id);
     this.persist();
@@ -307,20 +307,16 @@ export class BrowserManager {
     return { ...this.resolveTab(sessionId, tabId).state };
   }
 
-  async startElementSelection(sessionId: string, tabId: string) {
-    const tab = this.requireOwnedTab(sessionId, tabId);
-    const result = await selectElement(this.requireContents(tab));
-    return {
-      comment: result.comment,
-      kind: result.kind as BrowserElementSelection["kind"],
-      payload: result.payload,
-      screenshotDataUrl: result.screenshotDataUrl,
-    };
-  }
-
-  async cancelElementSelection(sessionId: string, tabId: string) {
-    const tab = this.requireOwnedTab(sessionId, tabId);
-    if (tab.contents) await cancelElementSelection(tab.contents);
+  async openInSystemBrowser(sessionId: string, tabId?: string) {
+    const page = this.resolveTab(sessionId, tabId);
+    try {
+      await shell.openExternal(page.state.url);
+    } catch (error) {
+      throw new BrowserOperationError(
+        "browser_navigation_failed",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
   }
 
   destroy() {
@@ -352,10 +348,13 @@ export class BrowserManager {
       if (isMainFrame) this.snapshotService.markNavigated(state.id);
     };
     const onWindowOpen = ({ url }: { url: string }) => {
+      // A target=_blank page must not recreate the removed tab strip. Navigate
+      // the Artifact's one page instead; opening an external browser is an
+      // explicit action in the address toolbar.
       try {
-        this.createTab(state.sessionId, url, state.profileId);
+        this.openPage(state.sessionId, url, state.profileId);
       } catch {
-        void shell.openExternal(url).catch(() => {});
+        // Invalid popup URLs remain blocked.
       }
       return { action: "deny" as const };
     };
@@ -369,7 +368,7 @@ export class BrowserManager {
     contents.on("did-navigate-in-page", onDidNavigateInPage);
 
     // Stash disposers on the contents so detachGuest can remove them when the
-    // guest is recreated or the tab closes.
+    // guest is recreated or the page is replaced.
     (contents as unknown as { __divisorGuestListeners?: unknown }).__divisorGuestListeners = {
       onDidStartNavigation,
       onDidStartLoading,
@@ -428,8 +427,15 @@ export class BrowserManager {
   private resolveTab(sessionId: string, tabId?: string) {
     const resolvedId = tabId ?? this.activeTabBySession.get(sessionId);
     if (!resolvedId)
-      throw new BrowserOperationError("browser_page_closed", "No browser tab is open");
+      throw new BrowserOperationError("browser_page_closed", "No browser page is open");
     return this.requireOwnedTab(sessionId, resolvedId);
+  }
+
+  private getSessionPage(sessionId: string): ManagedTab | undefined {
+    const activeId = this.activeTabBySession.get(sessionId);
+    const active = activeId ? this.tabs.get(activeId) : undefined;
+    if (active?.state.sessionId === sessionId) return active;
+    return [...this.tabs.values()].find((tab) => tab.state.sessionId === sessionId);
   }
 
   private requireOwnedTab(sessionId: string, tabId: string): ManagedTab {
@@ -512,28 +518,29 @@ export class BrowserManager {
     for (const [sessionId, tabId] of Object.entries(persisted?.activeTabBySession ?? {})) {
       this.activeTabBySession.set(sessionId, tabId);
     }
-    // Persisted tabs are restored as state-only stubs. The renderer remounts a
-    // <webview> for each and re-registers the guest; contents stay null until then.
-    // Dedupe by (sessionId, url): older sessions could accumulate identical tabs
-    // before openOrFocus landed; drop earlier duplicates so the tab bar stays clean.
-    const seen = new Set<string>();
-    const dedupedTabs = [...(persisted?.tabs ?? [])]
-      .reverse()
-      .filter((saved) => {
-        const key = `${saved.sessionId} ${saved.url}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .reverse();
-    for (const saved of dedupedTabs) {
+    // Persisted pages are restored as state-only stubs. The renderer remounts
+    // its one <webview> and re-registers the guest; contents stay null until then.
+    const preferredPageId = persisted?.activeTabBySession ?? {};
+    const savedPages = new Map<string, PersistedState["tabs"][number]>();
+    for (const saved of persisted?.tabs ?? []) {
+      const current = savedPages.get(saved.sessionId);
+      const preferredId = preferredPageId[saved.sessionId];
+      if (!current || saved.id === preferredId || current.id !== preferredId) {
+        savedPages.set(saved.sessionId, saved);
+      }
+    }
+    // Older persisted state can contain several tabs for one session. Keep the
+    // previously active page when possible (otherwise the newest saved one).
+    for (const saved of savedPages.values()) {
       const state: BrowserTab = {
         ...saved,
         canGoBack: false,
         canGoForward: false,
         isLoading: true,
+        profileId: this.profiles.has(saved.profileId) ? saved.profileId : DEFAULT_PROFILE.id,
       };
       this.tabs.set(state.id, { state, contents: null });
+      this.activeTabBySession.set(state.sessionId, state.id);
     }
     // Drop active-tab pointers that no longer resolve after dedupe.
     for (const [sessionId, tabId] of this.activeTabBySession) {
@@ -546,13 +553,15 @@ export class BrowserManager {
       const payload: PersistedState = {
         activeTabBySession: Object.fromEntries(this.activeTabBySession),
         profiles: [...this.profiles.values()],
-        tabs: [...this.tabs.values()].map(({ state }) => ({
-          id: state.id,
-          profileId: state.profileId,
-          sessionId: state.sessionId,
-          title: state.title,
-          url: state.url,
-        })),
+        tabs: [...new Set([...this.tabs.values()].map((tab) => tab.state.sessionId))]
+          .flatMap((sessionId) => this.getSessionPage(sessionId)?.state ?? [])
+          .map((state) => ({
+            id: state.id,
+            profileId: state.profileId,
+            sessionId: state.sessionId,
+            title: state.title,
+            url: state.url,
+          })),
       };
       const temporary = `${this.statePath}.tmp`;
       writeFileSync(temporary, JSON.stringify(payload));

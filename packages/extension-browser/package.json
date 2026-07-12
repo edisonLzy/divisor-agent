@@ -18,7 +18,8 @@
     "@tiptap/react": "^3.22.5",
     "@types/react": "catalog:",
     "lucide-react": "catalog:",
-    "react": "catalog:"
+    "react": "catalog:",
+    "streamdown": "catalog:"
   },
   "devDependencies": {
     "@types/react-dom": "catalog:",

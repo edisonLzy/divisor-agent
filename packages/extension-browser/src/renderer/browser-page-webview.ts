@@ -7,6 +7,7 @@ import { BROWSER_GUEST_WEB_PREFERENCES_ATTRIBUTE } from "../common/browser-guest
 export interface BrowserPageWebview extends HTMLElement {
   src: string;
   getWebContentsId(): number;
+  send(channel: string, ...args: unknown[]): void;
   addEventListener(
     type: "dom-ready",
     listener: (event: { target: BrowserPageWebview }) => void,

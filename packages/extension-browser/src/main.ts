@@ -13,9 +13,10 @@ import {
   type BrowserNavigationAction,
 } from "./common/types";
 import { BrowserManager } from "./main/browser-manager";
+import { ReadingAnnotationStore } from "./main/reading-annotation-store";
 
 const optionalTabId = Type.Optional(
-  Type.String({ description: "Browser page id; defaults to the active tab" }),
+  Type.String({ description: "Browser page id; defaults to the current page" }),
 );
 
 export default defineMainExtension<BrowserInvokeEvents, BrowserExposeEvents>({
@@ -31,13 +32,13 @@ export default defineMainExtension<BrowserInvokeEvents, BrowserExposeEvents>({
       },
       PRELOAD_PATH,
     );
+    const readingAnnotations = new ReadingAnnotationStore();
 
-    ctx.ipc.handle("createTab", ({ profileId, sessionId, url }) =>
-      manager.createTab(sessionId, url, profileId),
+    ctx.ipc.handle("ensurePage", ({ profileId, sessionId, url }) =>
+      manager.ensurePage(sessionId, url, profileId),
     );
-    ctx.ipc.handle("closeTab", ({ sessionId, tabId }) => manager.closeTab(sessionId, tabId));
-    ctx.ipc.handle("setActiveTab", ({ sessionId, tabId }) =>
-      manager.setActiveTab(sessionId, tabId),
+    ctx.ipc.handle("openPage", ({ profileId, sessionId, url }) =>
+      manager.openPage(sessionId, url, profileId),
     );
     ctx.ipc.handle("getState", (sessionId) => manager.getState(sessionId));
     ctx.ipc.handle("navigate", ({ action, sessionId, tabId, url }) =>
@@ -50,6 +51,9 @@ export default defineMainExtension<BrowserInvokeEvents, BrowserExposeEvents>({
     ctx.ipc.handle("unregisterGuest", ({ browserPageId }) =>
       manager.unregisterGuest({ browserPageId }),
     );
+    ctx.ipc.handle("openInSystemBrowser", ({ sessionId, tabId }) =>
+      manager.openInSystemBrowser(sessionId, tabId),
+    );
     ctx.ipc.handle("createProfile", (label) => manager.createProfile(label));
     ctx.ipc.handle("renameProfile", ({ id, label }) => manager.renameProfile(id, label));
     ctx.ipc.handle("deleteProfile", (id) => manager.deleteProfile(id));
@@ -60,23 +64,23 @@ export default defineMainExtension<BrowserInvokeEvents, BrowserExposeEvents>({
     ctx.ipc.handle("importChromiumCookies", ({ profileId, sourceId }) =>
       manager.importChromiumCookies(profileId, sourceId),
     );
-    ctx.ipc.handle("startElementSelection", ({ sessionId, tabId }) =>
-      manager.startElementSelection(sessionId, tabId),
+    ctx.ipc.handle("createReadingAnnotation", (annotation) =>
+      readingAnnotations.create(annotation),
     );
-    ctx.ipc.handle("cancelElementSelection", ({ sessionId, tabId }) =>
-      manager.cancelElementSelection(sessionId, tabId),
-    );
+    ctx.ipc.handle("deleteReadingAnnotation", (id) => readingAnnotations.delete(id));
+    ctx.ipc.handle("listReadingAnnotations", ({ url }) => readingAnnotations.list(url));
+    ctx.ipc.handle("updateReadingAnnotation", (input) => readingAnnotations.update(input));
 
     ctx.systemPrompt.register({
       id: "browser.read-only",
       content:
-        "The browser tools are read-only except for opening pages and navigation. You may inspect tabs, page metadata, accessibility snapshots, element properties, and screenshots. You cannot click, type, submit, upload, execute JavaScript, read cookies, or mutate website data. Take a fresh browser/snapshot after navigation before using element refs.",
+        "The Browser Artifact shows one page at a time. The browser tools are read-only except for opening pages and navigation. You may inspect the current page, page metadata, accessibility snapshots, element properties, and screenshots. You cannot click, type, submit, upload, execute JavaScript, read cookies, or mutate website data. Take a fresh browser/snapshot after navigation before using element refs.",
     });
 
     ctx.tools.register({
       name: "browser/open",
       label: "Open Browser Page",
-      description: "Open a URL in a new in-app browser tab. This is navigation-only.",
+      description: "Navigate the current Browser Artifact page to a URL. This is navigation-only.",
       parameters: Type.Object({
         profileId: Type.Optional(Type.String({ description: "Browser profile id" })),
         url: Type.String({ description: "HTTP(S) URL to open" }),
@@ -85,15 +89,16 @@ export default defineMainExtension<BrowserInvokeEvents, BrowserExposeEvents>({
         const sessionId = requireSessionId(
           ctx.extensionRuntime.getCurrentAgentContext()?.sessionId,
         );
-        const tab = manager.openOrFocus(sessionId, args.url, args.profileId);
-        return toolResult(`Opened ${tab.url}`, tab, sessionId);
+        const page = manager.openPage(sessionId, args.url, args.profileId);
+        return toolResult(`Opened ${page.url}`, page, sessionId);
       },
     });
 
     ctx.tools.register({
       name: "browser/navigate",
       label: "Navigate Browser",
-      description: "Navigate an existing browser tab with goto, back, forward, or reload.",
+      description:
+        "Navigate the current Browser Artifact page with goto, back, forward, or reload.",
       parameters: Type.Object({
         action: Type.Union([
           Type.Literal("goto"),
@@ -119,23 +124,10 @@ export default defineMainExtension<BrowserInvokeEvents, BrowserExposeEvents>({
     });
 
     ctx.tools.register({
-      name: "browser/tabs",
-      label: "List Browser Tabs",
-      description: "List browser tabs in the current agent session.",
-      parameters: Type.Object({}),
-      async execute() {
-        const sessionId = requireSessionId(
-          ctx.extensionRuntime.getCurrentAgentContext()?.sessionId,
-        );
-        const state = manager.getState(sessionId);
-        return toolResult(JSON.stringify(state.tabs, null, 2), state, sessionId);
-      },
-    });
-
-    ctx.tools.register({
       name: "browser/page-info",
       label: "Read Browser Page Info",
-      description: "Read URL, title, loading state, history state, and profile for a browser tab.",
+      description:
+        "Read URL, title, loading state, history state, and profile for the current page.",
       parameters: Type.Object({ tabId: optionalTabId }),
       async execute(_toolCallId, args) {
         const sessionId = requireSessionId(
