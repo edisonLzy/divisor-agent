@@ -1,0 +1,1305 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Browser · 阅读标注交互稿</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+      :root {
+        --bg: #f8f8f5;
+        --card: #fff;
+        --ink: #181818;
+        --muted: #6e6e68;
+        --line: #20201d;
+        --cyan: #93e9f5;
+        --purple: #d6bcff;
+        --yellow: #fee589;
+        --pink: #ffc5e6;
+        --green: #a9f0c7;
+        --shadow: 3px 3px 0 var(--line);
+        --shadow-sm: 2px 2px 0 var(--line);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-width: 1100px;
+        color: var(--ink);
+        background: #e9e9e4;
+        font:
+          13px/1.45 ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+        color: inherit;
+      }
+      button:focus-visible {
+        outline: 2px solid #0d7490;
+        outline-offset: 2px;
+      }
+      .app {
+        display: grid;
+        grid-template-rows: 40px 1fr;
+        height: 100vh;
+        min-height: 720px;
+        overflow: hidden;
+        border: 2px solid var(--line);
+        background: var(--bg);
+      }
+      .browserbar,
+      .side-head,
+      .note-head,
+      .palette-head {
+        display: flex;
+        align-items: center;
+      }
+      .browserbar {
+        gap: 7px;
+        padding: 5px 9px;
+        border-bottom: 2px solid var(--line);
+        background: var(--card);
+      }
+      .icon-btn,
+      .tool-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: 28px;
+        border: 2px solid var(--line);
+        border-radius: 4px;
+        background: var(--card);
+        font-weight: 800;
+      }
+      .icon-btn {
+        width: 29px;
+      }
+      .icon-btn:hover,
+      .tool-btn:hover {
+        background: var(--cyan);
+      }
+      .address {
+        flex: 1;
+        height: 28px;
+        min-width: 200px;
+        border: 2px solid var(--line);
+        border-radius: 4px;
+        padding: 0 10px;
+        background: #f0f0ec;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+      }
+      .tool-btn {
+        padding: 0 9px;
+      }
+      .count {
+        min-width: 21px;
+        padding: 1px 5px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--yellow);
+        font-size: 10px;
+        text-align: center;
+      }
+      .main {
+        min-height: 0;
+      }
+      .reader {
+        position: relative;
+        min-width: 0;
+        height: 100%;
+        overflow: auto;
+        background: #fdfdf9;
+      }
+      article {
+        width: min(700px, calc(100% - 72px));
+        margin: 0 auto;
+        padding: 54px 0 90px;
+        color: #292925;
+        font-family: Georgia, "Noto Serif SC", serif;
+        font-size: 17px;
+        line-height: 1.9;
+      }
+      article h1 {
+        margin: 0 0 9px;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        font-size: 37px;
+        letter-spacing: -1.5px;
+        line-height: 1.15;
+      }
+      article h2 {
+        margin: 42px 0 14px;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        font-size: 22px;
+        line-height: 1.3;
+      }
+      article .meta {
+        margin-bottom: 34px;
+        color: #777770;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        font-size: 12px;
+      }
+      article p {
+        margin: 0 0 21px;
+      }
+      .hl {
+        padding: 0 2px;
+        border-radius: 2px;
+        cursor: pointer;
+        transition: 0.15s background;
+      }
+      .hl:hover {
+        filter: brightness(0.94);
+      }
+      .hl.yellow {
+        background: linear-gradient(transparent 18%, #fee589b5 18%, #fee589b5 88%, transparent 88%);
+      }
+      .hl.cyan {
+        background: linear-gradient(transparent 18%, #93e9f5b8 18%, #93e9f5b8 88%, transparent 88%);
+      }
+      .hl.purple {
+        background: linear-gradient(transparent 18%, #d6bcffb5 18%, #d6bcffb5 88%, transparent 88%);
+      }
+      .hl.pink {
+        background: linear-gradient(transparent 18%, #ffc5e6b5 18%, #ffc5e6b5 88%, transparent 88%);
+      }
+      .selection-menu {
+        position: fixed;
+        z-index: 8;
+        display: none;
+        align-items: center;
+        gap: 4px;
+        max-width: calc(100vw - 16px);
+        flex-wrap: wrap;
+        padding: 4px;
+        border: 2px solid var(--line);
+        border-radius: 6px;
+        background: var(--card);
+        box-shadow: var(--shadow);
+      }
+      .selection-menu.show {
+        display: flex;
+      }
+      .tag-action {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        height: 30px;
+        padding: 0 8px;
+        border: 1px solid transparent;
+        border-radius: 3px;
+        background: transparent;
+        font-size: 11px;
+        font-weight: 800;
+      }
+      .tag-action:hover {
+        border-color: var(--line);
+        background: #f3f3ed;
+      }
+      .swatch {
+        display: inline-block;
+        width: 11px;
+        height: 11px;
+        border: 1px solid var(--line);
+        border-radius: 2px;
+      }
+      .ask {
+        background: var(--cyan);
+        border: 2px solid var(--line);
+      }
+      .side-head {
+        justify-content: space-between;
+        height: 45px;
+        padding: 0 12px;
+        border-bottom: 2px solid var(--line);
+        background: var(--cyan);
+        font-weight: 900;
+      }
+      .side-head .icon-btn {
+        height: 26px;
+        width: 26px;
+        background: transparent;
+      }
+      .side-head .icon-btn:hover {
+        background: var(--card);
+      }
+      .filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 10px 0 12px;
+      }
+      .filter {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        height: 24px;
+        padding: 0 7px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--card);
+        font-size: 11px;
+        font-weight: 800;
+      }
+      .filter.active {
+        background: var(--yellow);
+        box-shadow: 1px 1px 0 var(--line);
+      }
+      .filter:hover {
+        transform: translate(-1px, -1px);
+        box-shadow: 2px 2px 0 var(--line);
+      }
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 1px 6px;
+        color: var(--ink);
+        font-weight: 800;
+      }
+      .quote {
+        display: -webkit-box;
+        overflow: hidden;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        font-family: Georgia, "Noto Serif SC", serif;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+      .note-popover {
+        position: fixed;
+        z-index: 9;
+        display: none;
+        width: min(334px, calc(100vw - 16px));
+        max-height: calc(100vh - 16px);
+        overflow: auto;
+        border: 2px solid var(--line);
+        border-radius: 6px;
+        background: var(--card);
+        box-shadow: var(--shadow);
+        font-family: ui-sans-serif, system-ui, sans-serif;
+      }
+      .note-popover.show {
+        display: block;
+      }
+      .note-head {
+        justify-content: space-between;
+        padding: 8px 9px;
+        border-bottom: 2px solid var(--line);
+        background: #fff9df;
+      }
+      .tag-select {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        border: 0;
+        background: transparent;
+        font-size: 12px;
+        font-weight: 900;
+      }
+      .note-actions {
+        display: flex;
+        gap: 4px;
+      }
+      .note-actions .icon-btn {
+        width: 24px;
+        height: 24px;
+        border-width: 1px;
+      }
+      .note-quote {
+        margin: 10px 11px;
+        overflow-wrap: anywhere;
+        padding-left: 9px;
+        border-left: 3px solid var(--yellow);
+        color: #4d4d47;
+        font-family: Georgia, "Noto Serif SC", serif;
+        font-size: 12px;
+        line-height: 1.55;
+      }
+      .ai-row {
+        display: flex;
+        gap: 5px;
+        padding: 0 11px 10px;
+      }
+      .ai-row button {
+        padding: 5px 7px;
+        border: 1px solid var(--line);
+        border-radius: 3px;
+        background: #f6f6f1;
+        font-size: 10px;
+        font-weight: 800;
+      }
+      .ai-row button:hover {
+        background: var(--cyan);
+      }
+      .note-input {
+        width: calc(100% - 22px);
+        min-height: 72px;
+        margin: 0 11px 11px;
+        padding: 8px;
+        resize: vertical;
+        border: 1px solid var(--line);
+        border-radius: 3px;
+        background: #fbfbf8;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .note-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 7px 10px;
+        border-top: 1px solid #d8d8d1;
+        color: var(--muted);
+        font-size: 10px;
+      }
+      .save-state {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .save-state i {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #44b66b;
+      }
+      .reading-actions {
+        position: absolute;
+        z-index: 10;
+        right: 14px;
+        bottom: 14px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+        width: min(320px, calc(100% - 28px));
+        font-family: ui-sans-serif, system-ui, sans-serif;
+      }
+      .reading-panel {
+        display: none;
+        width: 100%;
+        padding: 11px;
+        border: 2px solid var(--line);
+        border-radius: 7px;
+        background: var(--card);
+        box-shadow: var(--shadow);
+      }
+      .reading-panel.show {
+        display: block;
+      }
+      .reading-title,
+      .action-row,
+      .nav-row,
+      .tag-filters {
+        display: flex;
+        align-items: center;
+      }
+      .reading-title {
+        justify-content: space-between;
+        gap: 8px;
+        font-weight: 900;
+      }
+      .reading-title div {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .action-row {
+        justify-content: space-between;
+        gap: 8px;
+        margin-top: 10px;
+        padding: 8px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: #f5f5ef;
+      }
+      .action-row small {
+        color: var(--muted);
+        font-weight: 700;
+      }
+      .nav-row {
+        gap: 7px;
+        margin-top: 12px;
+      }
+      .nav-row button {
+        flex: 1;
+      }
+      .action-label {
+        margin: 12px 0 6px;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+      .tag-filters {
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+      .tag-filters button {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        height: 25px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 0 7px;
+        background: var(--card);
+        font-size: 10px;
+        font-weight: 800;
+      }
+      .tag-filters button.active {
+        background: var(--yellow);
+        box-shadow: var(--shadow-sm);
+      }
+      .reading-fab {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: 33px;
+        border: 2px solid var(--line);
+        border-radius: 4px;
+        padding: 0 10px;
+        background: var(--cyan);
+        box-shadow: var(--shadow);
+        font-size: 11px;
+        font-weight: 900;
+      }
+      .reading-fab:hover {
+        transform: translate(-1px, -1px);
+        box-shadow: 5px 5px 0 var(--line);
+      }
+      .profile-popover {
+        position: absolute;
+        z-index: 12;
+        top: 12px;
+        right: 12px;
+        display: none;
+        width: min(390px, calc(100% - 24px));
+        max-height: calc(100% - 24px);
+        overflow: auto;
+        border: 2px solid var(--line);
+        border-radius: 7px;
+        background: var(--card);
+        box-shadow: var(--shadow);
+        font-family: ui-sans-serif, system-ui, sans-serif;
+      }
+      .profile-popover.show {
+        display: block;
+      }
+      .profile-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px;
+        border-bottom: 2px solid var(--line);
+        background: #f0e7ff;
+      }
+      .profile-head h3,
+      .profile-head p {
+        margin: 0;
+      }
+      .profile-head h3 {
+        font-size: 14px;
+      }
+      .profile-head p {
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .profile-body {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 12px;
+      }
+      .profile-row {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 6px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: #fbfbf7;
+      }
+      .profile-row.active {
+        background: #effcff;
+        border-width: 2px;
+      }
+      .profile-row button:first-child {
+        flex: 1;
+        min-width: 0;
+        border: 0;
+        background: transparent;
+        text-align: left;
+        font-weight: 900;
+      }
+      .profile-row small {
+        display: block;
+        overflow: hidden;
+        color: var(--muted);
+        font-family: ui-monospace, monospace;
+        font-size: 9px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .profile-add,
+      .profile-import {
+        display: flex;
+        gap: 7px;
+        padding-top: 10px;
+        border-top: 1px solid #d2d2cb;
+      }
+      .profile-add input,
+      .profile-import select {
+        min-width: 0;
+        flex: 1;
+        height: 29px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 0 7px;
+        background: var(--card);
+        font-size: 11px;
+      }
+      .manager {
+        position: fixed;
+        z-index: 15;
+        top: 76px;
+        right: 12px;
+        bottom: 12px;
+        display: none;
+        width: 480px;
+        overflow: auto;
+        border: 2px solid var(--line);
+        border-radius: 7px;
+        background: var(--bg);
+        box-shadow: 5px 5px 0 var(--line);
+      }
+      .manager.show {
+        display: block;
+      }
+      .manager .side-head {
+        position: sticky;
+        top: 0;
+      }
+      .manager-content {
+        padding: 15px;
+      }
+      .manager-content h3 {
+        margin: 0 0 8px;
+        font-size: 16px;
+      }
+      .manager-content .sub {
+        margin: 0 0 15px;
+        color: var(--muted);
+      }
+      .manage-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        padding: 11px 0;
+        border-top: 1px solid #d2d2cb;
+      }
+      .manage-row p {
+        margin: 5px 0 0;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .outline {
+        border: 2px solid var(--line);
+        border-radius: 4px;
+        background: var(--card);
+        padding: 6px 8px;
+        font-size: 11px;
+        font-weight: 800;
+      }
+      .tag-settings {
+        display: none;
+      }
+      .tag-settings.show {
+        display: block;
+      }
+      .tag-settings .back {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        margin-bottom: 14px;
+        border: 0;
+        background: transparent;
+        font-size: 11px;
+        font-weight: 900;
+      }
+      .tag-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 0;
+        border-top: 1px solid #d2d2cb;
+      }
+      .tag-row div {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .tag-row p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .tag-add {
+        display: flex;
+        gap: 7px;
+        margin-top: 15px;
+      }
+      .tag-add input {
+        min-width: 0;
+        flex: 1;
+        height: 30px;
+        border: 2px solid var(--line);
+        border-radius: 4px;
+        padding: 0 8px;
+        background: var(--card);
+        font-size: 11px;
+      }
+      .toast {
+        position: fixed;
+        z-index: 30;
+        right: 18px;
+        bottom: 17px;
+        display: none;
+        max-width: 360px;
+        padding: 10px 12px;
+        border: 2px solid var(--line);
+        border-radius: 5px;
+        background: var(--green);
+        box-shadow: var(--shadow);
+        font-size: 12px;
+        font-weight: 800;
+      }
+      .toast.show {
+        display: block;
+      }
+      .empty {
+        padding: 28px 14px;
+        color: var(--muted);
+        text-align: center;
+      }
+      .hidden {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <div class="browserbar">
+        <button class="icon-btn" title="后退"><i data-lucide="arrow-left" size="15"></i></button
+        ><button class="icon-btn" title="前进"><i data-lucide="arrow-right" size="15"></i></button
+        ><button class="icon-btn" title="刷新"><i data-lucide="rotate-cw" size="14"></i></button
+        ><input
+          class="address"
+          value="https://www.anthropic.com/engineering/harness-engineering"
+          readonly
+        /><button class="icon-btn" id="profilesToggle" title="浏览器身份">
+          <i data-lucide="settings-2" size="15"></i>
+        </button>
+      </div>
+      <div class="main">
+        <section class="reader" id="reader">
+          <article>
+            <h1>Harness engineering: the hidden layer of capable agents</h1>
+            <div class="meta">Anthropic Engineering · Jun 12, 2026</div>
+            <p>
+              When people evaluate an agent, they often focus on the model. But the model is only
+              one part of a system that has to observe, decide, act, and learn from the environment
+              around it.
+            </p>
+            <p>
+              We use the term
+              <span class="hl yellow" data-id="h1"
+                >harness engineering to describe the work of designing the environment in which an
+                agent operates</span
+              >. It includes the tools an agent can call, the feedback it receives, the context it
+              carries forward, and the checks that keep it on task.
+            </p>
+            <h2>The environment is part of the capability</h2>
+            <p>
+              A strong harness makes useful work easier to discover and mistakes easier to recover
+              from. The goal is not to prescribe every action, but to make the next good action
+              legible.
+            </p>
+            <p>
+              <span class="hl cyan" data-id="h2"
+                >A model can be capable in isolation yet ineffective when its environment hides the
+                state it needs to make decisions.</span
+              >
+              This distinction becomes acute when an agent works across many tools, files, and
+              long-running tasks.
+            </p>
+            <p>
+              Good feedback loops turn uncertain attempts into visible progress. They narrow the gap
+              between an action and its consequence, giving both the agent and its operator a shared
+              view of what changed.
+            </p>
+            <h2>Designing for recovery</h2>
+            <p>
+              Reliable systems expect interruption. They retain enough context to resume, give
+              people clear places to intervene, and leave an inspectable trail of decisions.
+            </p>
+            <p>
+              <span class="hl purple" data-id="h3"
+                >The best agent interfaces treat human feedback as a resource for learning, not
+                merely a request for correction.</span
+              >
+            </p>
+            <p>
+              That changes the role of the interface: it becomes a place to build understanding
+              together, rather than a thin layer over a model call.
+            </p>
+          </article>
+          <div class="selection-menu" id="selectionMenu">
+            <button class="tag-action" data-tag="新词" data-color="pink">
+              <i class="swatch" style="background: var(--pink)"></i>新词</button
+            ><button class="tag-action" data-tag="重点" data-color="yellow">
+              <i class="swatch" style="background: var(--yellow)"></i>重点</button
+            ><button class="tag-action" data-tag="问题" data-color="cyan">
+              <i class="swatch" style="background: var(--cyan)"></i>问题</button
+            ><button class="tag-action" data-tag="引用" data-color="purple">
+              <i class="swatch" style="background: var(--purple)"></i>引用</button
+            ><button class="tag-action ask" id="askSelection">
+              <i data-lucide="sparkles" size="13"></i>问 Agent
+            </button>
+          </div>
+          <aside class="note-popover" id="notePopover">
+            <div class="note-head">
+              <button class="tag-select" id="changeTag">
+                <i class="swatch" id="noteSwatch" style="background: var(--yellow)"></i
+                ><span id="noteTag">重点</span><i data-lucide="chevron-down" size="13"></i>
+              </button>
+              <div class="note-actions">
+                <button class="icon-btn" title="上一条 Alt + ↑" id="previous">
+                  <i data-lucide="chevron-up" size="13"></i></button
+                ><button class="icon-btn" title="下一条 Alt + ↓" id="next">
+                  <i data-lucide="chevron-down" size="13"></i></button
+                ><button class="icon-btn" title="仅浏览此标签" id="filterTag">
+                  <i data-lucide="filter" size="13"></i></button
+                ><button class="icon-btn" title="删除标注" id="deleteAnnotation">
+                  <i data-lucide="trash-2" size="13"></i></button
+                ><button class="icon-btn" title="关闭" id="closeNote">
+                  <i data-lucide="x" size="13"></i>
+                </button>
+              </div>
+            </div>
+            <blockquote class="note-quote" id="noteQuote"></blockquote>
+            <div class="ai-row">
+              <button data-ai="解释一下">解释</button><button data-ai="用更简单的话说">简化</button
+              ><button data-ai="举一个例子">举例</button
+              ><button data-ai="为什么重要？">为什么重要</button>
+            </div>
+            <textarea
+              class="note-input"
+              id="noteInput"
+              placeholder="写下你的理解或问题… 支持 Markdown"
+            ></textarea>
+            <div class="note-foot">
+              <span class="save-state"><i></i><span id="saveText">已自动保存</span></span
+              ><span>⌘↵ 保存 · Esc 取消</span>
+            </div>
+          </aside>
+          <aside class="profile-popover" id="profilePopover">
+            <div class="profile-head">
+              <div>
+                <h3>浏览器身份</h3>
+                <p>每个 Profile 使用独立的 Cookie 与本地存储。</p>
+              </div>
+              <button class="icon-btn" id="profileClose"><i data-lucide="x" size="14"></i></button>
+            </div>
+            <div class="profile-body">
+              <div class="profile-row active">
+                <button><span>默认身份</span><small>persist:divisor-browser-default</small></button
+                ><span class="tag">当前</span>
+              </div>
+              <div class="profile-row">
+                <button><span>研究</span><small>persist:divisor-browser-research</small></button
+                ><button class="icon-btn" title="重命名">
+                  <i data-lucide="pencil" size="13"></i></button
+                ><button class="icon-btn" title="删除">
+                  <i data-lucide="trash-2" size="13"></i>
+                </button>
+              </div>
+              <form class="profile-add" id="profileAdd">
+                <input placeholder="新建 Profile" /><button class="outline" type="submit">
+                  <i data-lucide="plus" size="13"></i>新建
+                </button>
+              </form>
+              <div class="profile-import">
+                <select>
+                  <option>检测到的 Chrome Profile</option>
+                  <option>Chrome · Personal</option>
+                  <option>Arc · Default</option></select
+                ><button class="outline" id="importCookies">导入 Cookie</button>
+              </div>
+            </div>
+          </aside>
+          <div class="reading-actions">
+            <section class="reading-panel" id="readingPanel">
+              <div class="reading-title">
+                <div>
+                  <i data-lucide="highlighter" size="15"></i><span>阅读批注</span
+                  ><span class="count" id="annotationCount">3</span>
+                </div>
+                <button class="icon-btn" id="closeActions">
+                  <i data-lucide="x" size="14"></i>
+                </button>
+              </div>
+              <div class="action-row">
+                <div>
+                  <b id="highlighterState">划线已开启</b><small>选中文本即可添加批注</small>
+                </div>
+                <button class="outline" id="toggleHighlighter">切换</button>
+              </div>
+              <div class="action-label">切换高亮内容</div>
+              <div class="nav-row">
+                <button class="outline" id="actionsPrevious">
+                  <i data-lucide="chevron-up" size="13"></i>上一条</button
+                ><button class="outline" id="actionsNext">
+                  <i data-lucide="chevron-down" size="13"></i>下一条
+                </button>
+              </div>
+              <div class="action-label">筛选标签</div>
+              <div class="tag-filters">
+                <button data-filter="all" class="active">全部</button
+                ><button data-filter="重点">
+                  <i class="swatch" style="background: var(--yellow)"></i>重点</button
+                ><button data-filter="问题">
+                  <i class="swatch" style="background: var(--cyan)"></i>问题</button
+                ><button data-filter="引用">
+                  <i class="swatch" style="background: var(--purple)"></i>引用
+                </button>
+              </div>
+            </section>
+            <button class="reading-fab" id="annotationActions" title="阅读批注操作">
+              <i data-lucide="highlighter" size="15"></i>批注
+            </button>
+          </div>
+        </section>
+      </div>
+    </main>
+    <section class="manager" id="manager">
+      <div class="side-head">
+        <span>笔记库</span
+        ><button class="icon-btn" id="closeManager"><i data-lucide="x" size="15"></i></button>
+      </div>
+      <div class="manager-content" id="libraryHome">
+        <h3>这篇文章的标注</h3>
+        <p class="sub">浏览、定位和整理标注。数据会先本地保存，在已登录时自动同步。</p>
+        <div id="managerList"></div>
+        <div class="manage-row">
+          <div>
+            <b>同步与账户</b>
+            <p>已连接 · li@example.com · 最后同步于刚刚</p>
+          </div>
+          <button class="outline" id="syncNow">立即同步</button>
+        </div>
+        <div class="manage-row">
+          <div>
+            <b>标签与颜色</b>
+            <p>用于高亮、筛选与快速定位</p>
+          </div>
+          <button class="outline" id="tagsButton">管理标签</button>
+        </div>
+        <div class="manage-row">
+          <div>
+            <b>导出笔记</b>
+            <p>包含原文、笔记和来源链接</p>
+          </div>
+          <button class="outline" id="exportButton">导出 Markdown</button>
+        </div>
+      </div>
+      <div class="manager-content tag-settings" id="tagSettings">
+        <button class="back" id="backToLibrary">
+          <i data-lucide="arrow-left" size="14"></i>返回笔记库
+        </button>
+        <h3>标签与颜色</h3>
+        <p class="sub">默认标签可改名或换色；也可添加自己的学习标签。</p>
+        <div class="tag-row">
+          <div>
+            <i class="swatch" style="background: var(--pink)"></i
+            ><span
+              ><b>新词</b>
+              <p>英语学习</p></span
+            >
+          </div>
+          <button class="outline">编辑</button>
+        </div>
+        <div class="tag-row">
+          <div>
+            <i class="swatch" style="background: var(--yellow)"></i
+            ><span
+              ><b>重点</b>
+              <p>通用笔记</p></span
+            >
+          </div>
+          <button class="outline">编辑</button>
+        </div>
+        <div class="tag-row">
+          <div>
+            <i class="swatch" style="background: var(--cyan)"></i
+            ><span
+              ><b>问题</b>
+              <p>待理解</p></span
+            >
+          </div>
+          <button class="outline">编辑</button>
+        </div>
+        <div class="tag-row">
+          <div>
+            <i class="swatch" style="background: var(--purple)"></i
+            ><span
+              ><b>引用</b>
+              <p>可复用观点</p></span
+            >
+          </div>
+          <button class="outline">编辑</button>
+        </div>
+        <form class="tag-add" id="tagAdd">
+          <input id="tagName" placeholder="添加自定义标签" /><button class="outline" type="submit">
+            添加
+          </button>
+        </form>
+      </div>
+    </section>
+    <div class="toast" id="toast"></div>
+    <script>
+      lucide.createIcons();
+      const notes = [
+        {
+          id: "h1",
+          tag: "重点",
+          color: "yellow",
+          text: "harness engineering to describe the work of designing the environment in which an agent operates",
+          note: "Agent 能力的一部分来自它所处的环境，而不只是模型本身。",
+        },
+        {
+          id: "h2",
+          tag: "问题",
+          color: "cyan",
+          text: "A model can be capable in isolation yet ineffective when its environment hides the state it needs to make decisions.",
+          note: "这里的「state」具体包括哪些？和 context 有什么区别？",
+        },
+        {
+          id: "h3",
+          tag: "引用",
+          color: "purple",
+          text: "The best agent interfaces treat human feedback as a resource for learning, not merely a request for correction.",
+          note: "可以用于说明阅读型 Agent 的交互原则。",
+        },
+      ];
+      let activeId = "h1",
+        activeFilter = "all",
+        highlighter = true,
+        navIndex = 0;
+      const el = (id) => document.getElementById(id);
+      const labels = { pink: "新词", yellow: "重点", cyan: "问题", purple: "引用" };
+      function visibleNotes() {
+        return notes.filter((n) => activeFilter === "all" || n.tag === activeFilter);
+      }
+      function render() {
+        el("managerList").innerHTML = notes
+          .map(
+            (n) =>
+              `<div class="manage-row"><div><span class="tag"><i class="swatch" style="background:var(--${n.color})"></i>${n.tag}</span><div class="quote" style="margin-top:5px">${n.text}</div><p>${n.note || "未添加笔记"}</p></div><button class="outline" data-open="${n.id}">定位</button></div>`,
+          )
+          .join("");
+        el("annotationCount").textContent = visibleNotes().length;
+        document
+          .querySelectorAll("[data-filter]")
+          .forEach((button) =>
+            button.classList.toggle("active", button.dataset.filter === activeFilter),
+          );
+        document
+          .querySelectorAll(".hl,[data-open]")
+          .forEach((node) => (node.onclick = () => openNote(node.dataset.id || node.dataset.open)));
+      }
+      function positionNote(target) {
+        const reader = el("reader"),
+          bounds = reader.getBoundingClientRect(),
+          rect = target?.getBoundingClientRect(),
+          panel = el("notePopover");
+        const width = Math.min(panel.offsetWidth || 334, bounds.width - 16),
+          height = panel.offsetHeight || 260;
+        const left = Math.min(
+          Math.max(bounds.left + 8, (rect?.right || bounds.left + bounds.width / 2) + 10),
+          bounds.right - width - 8,
+        );
+        let top = (rect?.bottom || bounds.top + 150) + 10;
+        if (top + height > bounds.bottom - 8)
+          top = Math.max(bounds.top + 8, (rect?.top || bounds.top + 150) - height - 10);
+        panel.style.left = left + "px";
+        panel.style.top = top + "px";
+      }
+      function openNote(id) {
+        const n = notes.find((x) => x.id === id);
+        if (!n) return;
+        activeId = id;
+        el("noteTag").textContent = n.tag;
+        el("noteSwatch").style.background = `var(--${n.color})`;
+        el("noteQuote").textContent = "“" + n.text + "”";
+        el("noteInput").value = n.note;
+        const target = document.querySelector(`.hl[data-id="${id}"]`);
+        el("notePopover").classList.add("show");
+        target?.scrollIntoView({ behavior: "smooth", block: "center" });
+        requestAnimationFrame(() => positionNote(target));
+        render();
+      }
+      function toast(msg) {
+        el("toast").textContent = msg;
+        el("toast").classList.add("show");
+        setTimeout(() => el("toast").classList.remove("show"), 2600);
+      }
+      function navigate(step) {
+        const shown = visibleNotes();
+        if (!shown.length) return;
+        navIndex = (navIndex + step + shown.length) % shown.length;
+        openNote(shown[navIndex].id);
+      }
+      function setFilter(f) {
+        activeFilter = f;
+        navIndex = 0;
+        const n = visibleNotes()[0];
+        if (n) openNote(n.id);
+        else el("notePopover").classList.remove("show");
+      }
+      function selectionMenu() {
+        const s = getSelection();
+        if (!highlighter || !s || s.isCollapsed || !s.toString().trim()) return;
+        const r = s.getRangeAt(0).getBoundingClientRect(),
+          box = el("reader").getBoundingClientRect();
+        const menu = el("selectionMenu");
+        menu.style.left = Math.min(Math.max(box.left + 8, r.left), box.right - 220) + "px";
+        menu.style.top = r.bottom + 8 + "px";
+        menu.classList.add("show");
+      }
+      document.addEventListener("mouseup", () => setTimeout(selectionMenu, 0));
+      function persistRange(range, note) {
+        const highlight = document.createElement("span");
+        highlight.className = `hl ${note.color}`;
+        highlight.dataset.id = note.id;
+        try {
+          range.surroundContents(highlight);
+        } catch {
+          const contents = range.extractContents();
+          highlight.append(contents);
+          range.insertNode(highlight);
+        }
+      }
+      function bindTagAction(button) {
+        button.onclick = () => {
+          const selection = getSelection(),
+            text = selection.toString().trim();
+          if (!text || !selection.rangeCount) return;
+          const id = "h" + Date.now(),
+            note = { id, tag: button.dataset.tag, color: button.dataset.color, text, note: "" };
+          persistRange(selection.getRangeAt(0), note);
+          notes.push(note);
+          selection.removeAllRanges();
+          el("selectionMenu").classList.remove("show");
+          toast("已添加「" + button.dataset.tag + "」标注，现在可以写下笔记或问 Agent。");
+          activeId = id;
+          render();
+          openNote(id);
+        };
+      }
+      document.querySelectorAll(".tag-action[data-tag]").forEach(bindTagAction);
+      el("askSelection").onclick = () => {
+        const text = getSelection().toString().trim();
+        if (!text) return;
+        el("selectionMenu").classList.remove("show");
+        toast("已将选中原文和附近段落带入对话：你可以直接提问。");
+        getSelection().removeAllRanges();
+      };
+      el("noteInput").addEventListener("input", (e) => {
+        const n = notes.find((x) => x.id === activeId);
+        n.note = e.target.value;
+        el("saveText").textContent = "正在自动保存…";
+        clearTimeout(window.saveTimer);
+        window.saveTimer = setTimeout(() => {
+          el("saveText").textContent = "已自动保存";
+          render();
+        }, 550);
+      });
+      el("closeNote").onclick = () => el("notePopover").classList.remove("show");
+      el("deleteAnnotation").onclick = () => {
+        const i = notes.findIndex((x) => x.id === activeId);
+        if (i < 0) return;
+        notes.splice(i, 1);
+        el("notePopover").classList.remove("show");
+        activeId = notes[0]?.id || "";
+        toast("标注已删除");
+        render();
+      };
+      el("filterTag").onclick = () => {
+        const n = notes.find((x) => x.id === activeId);
+        setFilter(activeFilter === n.tag ? "all" : n.tag);
+        toast(activeFilter === "all" ? "已显示全部标注" : "已筛选「" + n.tag + "」");
+      };
+      el("changeTag").onclick = () => {
+        const n = notes.find((x) => x.id === activeId),
+          all = ["pink", "yellow", "cyan", "purple"],
+          i = all.indexOf(n.color),
+          color = all[(i + 1) % all.length];
+        n.color = color;
+        n.tag = labels[color];
+        const target = document.querySelector(`.hl[data-id="${n.id}"]`);
+        if (target) target.className = `hl ${color}`;
+        openNote(activeId);
+        toast("标签已更新为「" + n.tag + "」");
+      };
+      document
+        .querySelectorAll("[data-ai]")
+        .forEach(
+          (b) =>
+            (b.onclick = () => toast("已把「" + b.dataset.ai + "」和该段上下文发送给 Agent。")),
+        );
+      el("previous").onclick = () => navigate(-1);
+      el("next").onclick = () => navigate(1);
+      el("reader").addEventListener("scroll", () => {
+        if (!el("notePopover").classList.contains("show")) return;
+        const target = document.querySelector(`.hl[data-id="${activeId}"]`),
+          rect = target?.getBoundingClientRect(),
+          bounds = el("reader").getBoundingClientRect();
+        if (!rect || rect.bottom < bounds.top || rect.top > bounds.bottom) {
+          el("notePopover").classList.remove("show");
+          return;
+        }
+        positionNote(target);
+      });
+      el("annotationActions").onclick = () => el("readingPanel").classList.toggle("show");
+      el("closeActions").onclick = () => el("readingPanel").classList.remove("show");
+      el("toggleHighlighter").onclick = () => {
+        highlighter = !highlighter;
+        el("highlighterState").textContent = highlighter ? "划线已开启" : "划线已关闭";
+        toast(highlighter ? "选中文本即可添加批注" : "划线模式已关闭");
+      };
+      el("actionsPrevious").onclick = () => navigate(-1);
+      el("actionsNext").onclick = () => navigate(1);
+      document
+        .querySelectorAll("[data-filter]")
+        .forEach((button) => (button.onclick = () => setFilter(button.dataset.filter)));
+      el("profilesToggle").onclick = () => el("profilePopover").classList.toggle("show");
+      el("profileClose").onclick = () => el("profilePopover").classList.remove("show");
+      document.querySelectorAll(".profile-row>button:first-child").forEach(
+        (button) =>
+          (button.onclick = () => {
+            document
+              .querySelectorAll(".profile-row")
+              .forEach((row) => row.classList.remove("active"));
+            button.closest(".profile-row").classList.add("active");
+            toast("已切换浏览器身份。");
+          }),
+      );
+      el("profileAdd").onsubmit = (event) => {
+        event.preventDefault();
+        const input = event.currentTarget.querySelector("input"),
+          name = input.value.trim();
+        if (!name) return;
+        input.value = "";
+        toast(`已创建「${name}」Profile。`);
+      };
+      el("importCookies").onclick = () => toast("已将检测到的 Cookie 导入当前 Profile。");
+      document.addEventListener("pointerdown", (event) => {
+        if (!event.target.closest(".reading-actions")) el("readingPanel").classList.remove("show");
+        if (!event.target.closest(".profile-popover") && !event.target.closest("#profilesToggle"))
+          el("profilePopover").classList.remove("show");
+      });
+      el("closeManager").onclick = () => el("manager").classList.remove("show");
+      el("syncNow").onclick = () =>
+        toast(
+          `同步完成：${notes.length} 条标注、${notes.filter((n) => n.note).length} 条笔记已上传。`,
+        );
+      el("tagsButton").onclick = () => {
+        el("libraryHome").classList.add("hidden");
+        el("tagSettings").classList.add("show");
+      };
+      el("backToLibrary").onclick = () => {
+        el("tagSettings").classList.remove("show");
+        el("libraryHome").classList.remove("hidden");
+      };
+      el("tagAdd").onsubmit = (event) => {
+        event.preventDefault();
+        const name = el("tagName").value.trim();
+        if (!name) return;
+        el("tagName").value = "";
+        const colors = ["pink", "yellow", "cyan", "purple"];
+        const color =
+          colors[document.querySelectorAll(".tag-action[data-tag]").length % colors.length];
+        const action = document.createElement("button");
+        action.className = "tag-action";
+        action.dataset.tag = name;
+        action.dataset.color = color;
+        action.innerHTML = `<i class="swatch" style="background:var(--${color})"></i>${name}`;
+        el("selectionMenu").insertBefore(action, el("askSelection"));
+        bindTagAction(action);
+        toast(`已创建「${name}」标签；下次划线时可直接选择。`);
+      };
+      el("exportButton").onclick = () => {
+        const markdown = notes
+          .map(
+            (n) =>
+              `> ${n.text}\n\n- 标签：${n.tag}\n- 笔记：${n.note || "（无）"}\n- 来源：https://www.anthropic.com/engineering/harness-engineering`,
+          )
+          .join("\n\n---\n\n");
+        const url = URL.createObjectURL(new Blob([markdown], { type: "text/markdown" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "harness-engineering-notes.md";
+        link.click();
+        URL.revokeObjectURL(url);
+        toast("已导出 Markdown 笔记。");
+      };
+      document.addEventListener("keydown", (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "h") {
+          e.preventDefault();
+          highlighter = !highlighter;
+          el("highlighterState").textContent = highlighter ? "划线已开启" : "划线已关闭";
+          toast(highlighter ? "划线模式已开启：选中文字即可标注" : "划线模式已关闭");
+        }
+        if (e.key === "Escape") {
+          el("readingPanel").classList.remove("show");
+          el("profilePopover").classList.remove("show");
+          el("notePopover").classList.remove("show");
+          el("selectionMenu").classList.remove("show");
+        }
+        if (e.altKey && e.key === "ArrowUp") {
+          e.preventDefault();
+          navigate(-1);
+        }
+        if (e.altKey && e.key === "ArrowDown") {
+          e.preventDefault();
+          navigate(1);
+        }
+        if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+          el("saveText").textContent = "已保存";
+          toast("笔记已保存");
+        }
+      });
+      render();
+    </script>
+  </body>
+</html>
