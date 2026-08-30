@@ -247,6 +247,8 @@ export function PromptInput({
 
             <VoiceInputButton
               disabled={disabled || isRunning}
+              analyser={voiceInput.analyser}
+              elapsedSeconds={voiceInput.elapsedSeconds}
               isRecording={voiceInput.isRecording}
               isStarting={voiceInput.isStarting}
               onStop={handleVoiceStop}
