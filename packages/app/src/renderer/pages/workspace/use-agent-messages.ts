@@ -302,6 +302,10 @@ function upsertArtifactsFromToolDetails(
       content: isRecord(artifact.content) ? artifact.content : {},
     });
   }
+
+  if (typeof details.openArtifactId === "string") {
+    extensionsApi.openArtifact(sessionId, details.openArtifactId);
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

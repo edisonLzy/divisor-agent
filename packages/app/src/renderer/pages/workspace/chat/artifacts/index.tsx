@@ -24,6 +24,7 @@ import type { SideChatArtifactRecord } from "@renderer/store/side-chat/side-chat
 import {
   Blocks,
   Braces,
+  Globe2,
   FileCode2,
   FileText,
   Image,
@@ -247,6 +248,7 @@ function getArtifactIcon(type: string): LucideIcon {
   if (normalizedType.includes("html") || normalizedType.includes("json")) return Braces;
   if (normalizedType.includes("table") || normalizedType.includes("csv")) return TableProperties;
   if (normalizedType.includes("image")) return Image;
+  if (normalizedType.includes("browser")) return Globe2;
   if (normalizedType.includes("doc") || normalizedType.includes("text")) return FileText;
   if (normalizedType.includes("example")) return PackageOpen;
   if (normalizedType.includes("plugin") || normalizedType.includes("extension")) return Blocks;

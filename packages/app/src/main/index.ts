@@ -8,6 +8,12 @@ import { BrowserWindowManager } from "./browser-window/index.js";
 import { FileSystemManager } from "./file-system/index.js";
 import { registerDeepgramAuth } from "./stt/index.js";
 
+// Force every renderer (including <webview> guests) into the Chromium OS-level
+// sandbox, regardless of the per-view `sandbox` flag. Must run before app ready.
+// Why: the browser extension renders guest pages via <webview>; this guarantees
+// guests stay sandboxed even if a webpreferences attribute is ever omitted.
+app.enableSandbox();
+
 app.whenReady().then(() => {
   if (process.platform === "darwin") {
     app.dock?.setIcon(join(__dirname, "../../resources/icon-divisor.png"));
@@ -78,6 +84,8 @@ function createWindow() {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      // Enable <webview> tags for the browser extension's in-app browser.
+      webviewTag: true,
     },
   });
 

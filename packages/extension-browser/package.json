@@ -1,0 +1,32 @@
+{
+  "name": "@divisor-agent/extension-browser",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./main": "./src/main.ts",
+    "./preload": "./src/preload/browser-annotation-bridge.js",
+    "./renderer": "./src/renderer.tsx"
+  },
+  "scripts": {
+    "test": "vitest --run"
+  },
+  "dependencies": {
+    "@divisor-agent/extension-core": "workspace:*",
+    "@earendil-works/pi-ai": "catalog:",
+    "@floating-ui/react": "^0.27.19",
+    "@tiptap/core": "catalog:",
+    "@tiptap/react": "^3.22.5",
+    "@types/react": "catalog:",
+    "lucide-react": "catalog:",
+    "react": "catalog:",
+    "streamdown": "catalog:"
+  },
+  "devDependencies": {
+    "@types/react-dom": "catalog:",
+    "react-dom": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "react-dom": "^19.0.0"
+  }
+}
