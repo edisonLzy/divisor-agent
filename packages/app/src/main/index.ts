@@ -9,6 +9,10 @@ import { FileSystemManager } from "./file-system/index.js";
 import { registerDeepgramAuth } from "./stt/index.js";
 
 app.whenReady().then(() => {
+  if (process.platform === "darwin") {
+    app.dock?.setIcon(join(__dirname, "../../resources/icon-divisor.png"));
+  }
+
   // Inject the Deepgram Authorization header into renderer WebSocket upgrades
   // (see src/main/stt). Must be registered before the renderer can connect.
   registerDeepgramAuth();
@@ -50,7 +54,7 @@ console.log("Divisor Agent main process started!");
 function createWindow() {
   const isMac = process.platform === "darwin";
   const mainWindow = new BrowserWindow({
-    icon: join(__dirname, "../../resources/icon.png"),
+    icon: join(__dirname, "../../resources/icon-divisor.png"),
     frame: false,
     titleBarStyle: isMac ? "hiddenInset" : "hidden",
     ...(isMac

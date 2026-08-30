@@ -1,6 +1,6 @@
 appId: com.edisonlzy.divisor-agent
 productName: Divisor Agent
-icon: resources/icon.png
+icon: resources/icon-divisor.png
 directories:
   buildResources: build
 files:
@@ -14,14 +14,14 @@ asarUnpack:
   - resources/**
 win:
   executableName: divisor-agent
-  icon: resources/icon.png
+  icon: resources/icon-divisor.png
 nsis:
   artifactName: Divisor-Agent-${version}-${arch}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 mac:
-  icon: resources/icon.png
+  icon: resources/icon-divisor.png
   target:
     - dmg
     - zip
@@ -43,7 +43,7 @@ mac:
 dmg:
   artifactName: Divisor-Agent-${version}-${arch}.${ext}
 linux:
-  icon: resources/icon.png
+  icon: resources/icon-divisor.png
   target:
     - AppImage
     - deb
